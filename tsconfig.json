@@ -6,7 +6,9 @@
       "ES2015",
       "DOM"
     ],
-    "outDir": "distr"
+    "outDir": "distr",
+    "rootDir": "src",
+    "sourceMap": true
   },
   "files": [
     "src/builded.ts"

@@ -1,33 +1,39 @@
-import { Injector, Dependency } from '../../../utils/injector'
-import { RffFile } from '../../../build/rff'
-import { loadBin } from '../../../utils/getter'
-import { ArtFiles, createArts, ArtFile } from '../../../build/art';
-import { Stream } from '../../../utils/stream';
-import { ArtFiles_, GL_, BuildArtProviderConstructor } from '../buildartprovider';
-import { RAW_PAL_ } from '../artselector';
-import { BoardManipulator_, Board_, BuildReferenceTracker, ArtProvider_ } from '../../apis/app';
-import { Shadowsteps_, Palswaps_, PAL_, PLUs_ } from '../buildgl';
-import { cloneBoard, loadBloodMap } from '../../../build/blood/maploader'
-import { createTexture } from '../../../utils/gl/textures';
+import { ArtFile, ArtFiles, createArts } from '../../../build/art';
+import { cloneBoard, loadBloodMap } from '../../../build/blood/maploader';
 import { BloodBoard, BloodSprite } from '../../../build/blood/structs';
-import { Deck } from '../../../utils/collections';
-import { ReferenceTrackerImpl } from '../../apis/referencetracker';
-import { createNewSector } from '../../../build/boardutils';
-import { SpriteStats } from '../../../build/structs';
-import { Implementation_ } from '../view/boardrenderer3d';
 import { BloodImplementationConstructor } from '../../../build/blood/utils';
+import { createNewSector } from '../../../build/boardutils';
+import { RffFile } from '../../../build/rff';
+import { SpriteStats } from '../../../build/structs';
+import { Deck } from '../../../utils/collections';
+import { createTexture } from '../../../utils/gl/textures';
+import { Dependency, Injector } from '../../../utils/injector';
+import { Stream } from '../../../utils/stream';
+import { BoardManipulator_, Board_, BuildReferenceTracker } from '../../apis/app';
+import { ReferenceTrackerImpl } from '../../apis/referencetracker';
+import { RAW_PAL_ } from '../artselector';
+import { ArtFiles_, GL_ } from '../buildartprovider';
+import { Palswaps_, PAL_, PLUs_, Shadowsteps_ } from '../buildgl';
+import { Implementation_ } from '../view/boardrenderer3d';
+import { MapName_ } from './selectmap';
 
-const RFF_ = new Dependency<RffFile>('RFF File');
+export type FileProvider = (name: string) => Promise<ArrayBuffer>;
+export const FS_ = new Dependency<FileProvider>('FileSystem');
+
+export const RFF_ = new Dependency<RffFile>('RFF File');
 const RAW_PLUs_ = new Dependency<Uint8Array[]>('Raw PLUs');
 
 function loadRffFile(name: string): (injector: Injector) => Promise<Uint8Array> {
   return (injector: Injector) => new Promise<Uint8Array>(resolve => injector.getInstance(RFF_).then(rff => resolve(rff.get(name))))
 }
 
-async function loadArtFiles(root: string): Promise<ArtFiles> {
-  const artPromises: Promise<ArtFile>[] = [];
-  for (let a = 0; a < 18; a++)     artPromises.push(loadBin(root + 'TILES0' + ("00" + a).slice(-2) + '.ART').then(file => new ArtFile(new Stream(file, true))))
-  return Promise.all(artPromises).then(artFiles => createArts(artFiles))
+async function loadArtFiles(injector: Injector): Promise<ArtFiles> {
+  return injector.getInstance(FS_).then(async fs => {
+    const artPromises: Promise<ArtFile>[] = [];
+    for (let a = 0; a < 18; a++) artPromises.push(fs('tiles0' + ("00" + a).slice(-2) + '.art').then(file => new ArtFile(new Stream(file, true))))
+    const artFiles = await Promise.all(artPromises);
+    return createArts(artFiles);
+  })
 }
 
 async function loadPLUs(injector: Injector) {
@@ -71,7 +77,7 @@ async function loadPluTexture(injector: Injector) {
     })
 }
 
-function loadMap(name: string) { return async (injector: Injector) => injector.getInstance(RFF_).then(rff => loadBloodMap(new Stream(rff.get(name).buffer, true))) }
+function loadMapImpl(name: string) { return async (injector: Injector) => injector.getInstance(RFF_).then(rff => loadBloodMap(new Stream(rff.get(name).buffer, true))) }
 
 
 
@@ -116,20 +122,21 @@ function createBoard() {
   return board;
 }
 
-export function BloodModule(root: string, map: string) {
-  return (injector: Injector) => {
-    injector.bindPromise(RFF_, loadBin(root + 'BLOOD.RFF').then(rff => new RffFile(rff)));
-    injector.bindPromise(ArtFiles_, loadArtFiles(root));
-    injector.bindInstance(BoardManipulator_, { cloneBoard });
-    injector.bindInstance(Shadowsteps_, 64);
-    injector.bind(RAW_PAL_, loadRffFile('BLOOD.PAL'));
-    injector.bind(RAW_PLUs_, loarRawPlus);
-    injector.bind(Palswaps_, loadPLUs);
-    injector.bind(PAL_, loadPalTexture);
-    injector.bind(PLUs_, loadPluTexture);
-    injector.bind(Implementation_, BloodImplementationConstructor);
+async function loadMap(injector: Injector) {
+  return injector.getInstance(MapName_).then(map => !map ? Promise.resolve(createBoard()) : loadMapImpl(map)(injector).then(m => m));
+}
 
-    if (!map) injector.bindInstance(Board_, createBoard())
-    else injector.bind(Board_, loadMap(map));
-  }
+export function BloodModule(injector: Injector) {
+  injector.bindPromise(RFF_, injector.getInstance(FS_).then(fs => fs('BLOOD.RFF').then(rff => new RffFile(rff))));
+  injector.bindInstance(BoardManipulator_, { cloneBoard });
+  injector.bindInstance(Shadowsteps_, 64);
+  injector.bind(ArtFiles_, loadArtFiles);
+  injector.bind(RAW_PAL_, loadRffFile('BLOOD.PAL'));
+  injector.bind(RAW_PLUs_, loarRawPlus);
+  injector.bind(Palswaps_, loadPLUs);
+  injector.bind(PAL_, loadPalTexture);
+  injector.bind(PLUs_, loadPluTexture);
+  injector.bind(Implementation_, BloodImplementationConstructor);
+  injector.bind(Board_, loadMap);
+
 }

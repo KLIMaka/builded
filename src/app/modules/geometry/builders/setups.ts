@@ -103,6 +103,7 @@ export abstract class BufferRenderable<T extends BufferSetup> implements Builder
   constructor(private getSetup: (state: State) => T) { }
 
   draw(ctx: BuildContext, gl: WebGLRenderingContext, state: State): void {
+    if (this.buff.getSize() == 0) return;
     const setup = this.getSetup(state);
     setup.buffer(this.buff);
     this.setup(ctx, setup);

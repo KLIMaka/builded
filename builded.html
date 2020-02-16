@@ -12,35 +12,6 @@
   <header class="toolbar toolbar-header">
     <h1 class="title">BuildEd</h1>
 
-    <div class="toolbar-actions">
-
-      <div class="btn-group">
-        <button class="btn btn-default">
-          <span class="icon icon-home"></span>
-        </button>
-        <button class="btn btn-default">
-          <span class="icon icon-folder"></span>
-        </button>
-        <button class="btn btn-default active">
-          <span class="icon icon-cloud"></span>
-        </button>
-        <button class="btn btn-default">
-          <span class="icon icon-popup"></span>
-        </button>
-        <button class="btn btn-default">
-          <span class="icon icon-shuffle"></span>
-        </button>
-      </div>
-
-      <button class="btn btn-default">
-        <span class="icon icon-home icon-text"></span>
-        Filters
-      </button>
-
-      <button class="btn btn-default btn-dropdown pull-right js-popover-trigger">
-        <span class="icon icon-megaphone"></span>
-      </button>
-    </div>
   </header>
 
   <div class="window-content">
@@ -83,6 +54,26 @@
   </footer>
 </div>
 
+<div class="window-frame fixed-center hidden" id="zipfile">
+  <div class="window-content" style="width: 700px; height: 700px;">
+    <h1 class="centered">Drop .zip here</h1>
+  </div>
+</div>
+
+<div class="window-frame fixed-center hidden" id="map_select">
+  <header class="toolbar toolbar-header" id="map_select_title">
+    <h1 class="title">Select Map
+      <span class="icon icon-record pull-right padded-horizontally " style="color:#fc605b;"
+        id="map_select_close"></span>
+    </h1>
+  </header>
+
+  <div class="window-content" id="map_select_content" style="width: 350px; height: 600px;"> </div>
+
+  <footer class="toolbar toolbar-footer">
+  </footer>
+</div>
+
 <div class="window-frame hidden" id="select_tile">
   <header class="toolbar toolbar-header" id="select_tile_title">
     <h1 class="title">Tiles
@@ -107,6 +98,7 @@
   <div class="window-content">
     <canvas id="select_tile_canvas" width="640px" height="640px"></canvas>
   </div>
+
 
   <footer class="toolbar toolbar-footer">
   </footer>

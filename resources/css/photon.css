@@ -7,17 +7,17 @@
  * v0.1.1 designed by @connors.
  * =====================================================
  */
-
-@charset "UTF-8";
-audio,
-canvas,
-progress,
-video {
-  vertical-align: baseline;
-}
-
-audio:not([controls]) {
-  display: none;
+ 
+ @charset "UTF-8";
+ audio,
+ canvas,
+ progress,
+ video {
+   vertical-align: baseline;
+  }
+  
+  audio:not([controls]) {
+    display: none;
 }
 
 a:active,
@@ -781,7 +781,6 @@ img {
   position: relative;
   display: inline-block;
   font-family: "photon-entypo";
-  speak: none;
   font-size: 100%;
   font-style: normal;
   font-weight: normal;
@@ -2330,4 +2329,33 @@ td:last-child {
 .tab-item-fixed {
   flex: none;
   padding: 3px 10px;
+}
+
+.window-frame {
+	position: absolute;
+	background-color:white;
+	box-shadow: 0 0 10px black;
+	border-radius:6px ;
+	overflow: hidden;
+}
+
+.hidden {
+	display: none;
+}
+
+.toolbar .title {
+	margin-top: 2px;
+}
+
+.fixed-center {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.centered {
+  align-self: center; 
+  width: 100%; 
+  text-align: center;
 }

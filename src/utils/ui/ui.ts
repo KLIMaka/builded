@@ -66,14 +66,28 @@ function create(tag: string) {
 
 export class Table extends Element {
   private tbody: Element;
+  private thead: Element;
 
   constructor() {
     super(create('table'));
+    this.thead = new Element(create('thead'));
     this.tbody = new Element(create('tbody'));
+    this.append(this.thead);
     this.append(this.tbody);
   }
 
-  public row(cols: Element[]): Table {
+  public head(cols: Element[]): Table {
+    let tr = new Element(create('tr'));
+    for (let i = 0; i < cols.length; i++) {
+      let c = cols[i];
+      let td = new Element(create('th')).append(c);
+      tr.append(td);
+    }
+    this.thead.append(tr);
+    return this;
+  }
+
+  public row(cols: Element[]): Element {
     let tr = new Element(create('tr'));
     for (let i = 0; i < cols.length; i++) {
       let c = cols[i];
@@ -81,7 +95,7 @@ export class Table extends Element {
       tr.append(td);
     }
     this.tbody.append(tr);
-    return this;
+    return tr;
   }
 
   public removeRow(row: number): Table {

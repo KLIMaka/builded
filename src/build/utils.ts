@@ -15,13 +15,25 @@ export function gl2build(out: GLM.Vec3Array, vec: GLM.Vec3Array): GLM.Vec3Array 
   return GLM.vec3.set(out, vec[0], vec[2], vec[1] * ZSCALE);
 }
 
+let fakePlayerStart_: Sprite;
+function fakePlayerStart() {
+  if (fakePlayerStart_ == null) {
+    fakePlayerStart_ = new Sprite();
+    fakePlayerStart_.x = 0
+    fakePlayerStart_.y = 0
+    fakePlayerStart_.z = 0
+    fakePlayerStart_.sectnum = -1;
+  }
+  return fakePlayerStart_;
+}
+
 export function getPlayerStart(board: Board): Sprite {
   for (let i = 0; i < board.numsprites; i++) {
     let sprite = board.sprites[i];
     if (sprite.lotag == 1)
       return sprite;
   }
-  return null;
+  return fakePlayerStart();
 }
 
 export interface MoveStruct {

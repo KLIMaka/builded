@@ -1,0 +1,69 @@
+P               msg sectorcstat parallaxing true true
+SHIFT+RIGHT     msg panrepeat 1 0 0 0 false
+SHIFT+LEFT      msg panrepeat -1 0 0 0 false
+SHIFT+UP        msg panrepeat 0 1 0 0 false
+SHIFT+DOWN      msg panrepeat 0 -1 0 0 false
+RIGHT           msg panrepeat 8 0 0 0 false
+LEFT            msg panrepeat -8 0 0 0 false
+UP              msg panrepeat 0 8 0 0 false
+DOWN            msg panrepeat 0 -8 0 0 false
+CTRL+RIGHT      msg panrepeat 0 0 1 0 false
+CTRL+LEFT       msg panrepeat 0 0 -1 0 false
+CTRL+UP         msg panrepeat 0 0 0 1 false
+CTRL+DOWN       msg panrepeat 0 0 0 -1 false
+CTRL+SHIFT+RIGHT msg panrepeat 0 0 8 0 false
+CTRL+SHIFT+LEFT msg panrepeat 0 0 -8 0 false
+CTRL+SHIFT+UP   msg panrepeat 0 0 0 8 false
+CTRL+SHIFT+DOWN msg panrepeat 0 0 0 -8 false
+\               msg reset_panrepeat
+O               msg pal 1 15 false
+F               msg flip
+wheelUp         msg shade 1 false
+wheelDown       msg shade -1 false
+SHIFT+wheelUp   msg shade 8 false
+SHIFT+wheelDown msg shade -8 false
+K               msg wallcstat swapBottoms true true
+M               msg wallcstat alignBottom true true
+R               msg sprite_mode
+R               msg sectorcstat alignToFirstWall true true
+E               msg sectorcstat doubleSmooshiness true true
+C               msg spritecstat realCenter true true
+
+T               push_wall
+SHIFT+T         push_wall_copy
+BACKSPACE       push_wall_stop
+V               set_picnum
+I               insert_sprite
+1               copy
+2               paste_shade
+3               paste_picnum
+ENTER           view_mode
+mouse0          print_selected
+CTRL+mouse0     split_wall
+SPACE           draw_wall
+SHIFT+SPACE     draw_rect_wall
+BACKSPACE       undo_draw_wall
+[               grid+
+]               grid-
+J               join_sectors
+CTRL+Z          undo
+DELETE          delete
+ALT+F           set_first_wall
+ALT+J           fill_inner_sector
+ALT+DELETE      delete_loop
+ALT+SHIFT+DELETE delete_full
+
++W              forward
++S              backward
++A              strafe_left
++D              strafe_right
++mouse2         lookaim
++W              zoom+
++S              zoom-
++TAB            select_loop_mod
++`              select_full_loop_mod
++mouse0         move
++SHIFT          move.parallel
++ALT            move.vertical
++ALT+SHIFT      move.rotate
++CTRL           move.copy

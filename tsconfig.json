@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "module": "es2015",
+    "target": "ES6",
+    "lib": [
+      "ES2015",
+      "DOM"
+    ],
+    "outDir": "distr"
+  },
+  "files": [
+    "src/builded.ts"
+  ]
+}

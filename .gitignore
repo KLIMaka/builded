@@ -1,0 +1,9 @@
+.tscache
+.idea
+distr
+node_distr
+node_modules
+*.cfg
+package-lock.json
+.vscode
+resources/engines

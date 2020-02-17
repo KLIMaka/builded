@@ -9,9 +9,9 @@ import { Dependency, Injector } from "../../../utils/injector";
 import { BoardManipulator_, Board_, BuildReferenceTracker } from "../../apis/app";
 import { ReferenceTrackerImpl } from "../../apis/referencetracker";
 import { RAW_PAL_ } from "../artselector";
-import { ArtFiles_, GL_ } from "../buildartprovider";
+import { ArtFiles_, GL_, ParallaxTextures_ } from "../buildartprovider";
 import { Palswaps_, PAL_, PLUs_, Shadowsteps_ } from "../gl/buildgl";
-import { FS_ } from "../fs";
+import { FS } from "../fs";
 import { MapNames_, MapName_ } from "../selectmap";
 import { Implementation_, RorLinks } from "../view/boardrenderer3d";
 
@@ -127,7 +127,7 @@ function DukeImplementation() {
 }
 
 async function loadGrp(injector: Injector) {
-  const fs = await injector.getInstance(FS_);
+  const fs = await injector.getInstance(FS);
   const grp = await fs('DUKE3D.GRP');
   return new GrpFile(grp);
 }
@@ -148,6 +148,7 @@ async function palswaps(injector: Injector) {
 }
 
 export function DukeModule(injector: Injector) {
+  injector.bindInstance(ParallaxTextures_, 5);
   injector.bindInstance(BoardManipulator_, { cloneBoard });
   injector.bindInstance(Implementation_, DukeImplementation());
   injector.bind(Palswaps_, palswaps);

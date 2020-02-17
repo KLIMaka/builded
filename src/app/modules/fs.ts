@@ -1,12 +1,12 @@
 import * as loadJSZip from "../../libs_js/jszip";
-import { Dependency } from "../../utils/injector";
+import { Dependency, Injector } from "../../utils/injector";
 import { loadBin } from "../../utils/getter";
-
+import { Storage_ } from "../apis/app";
 
 export type FileProvider = (name: string) => Promise<ArrayBuffer>;
-export const FS_ = new Dependency<FileProvider>('FileSystem');
+export const FS = new Dependency<FileProvider>('FileSystem');
 
-export async function UrlFs(path: string) {
+export function UrlFs(path: string) {
   return (name: string) => loadBin(path + name)
 }
 
@@ -15,7 +15,7 @@ function drag(e) {
   e.preventDefault();
 }
 
-export function ZipFs(): Promise<FileProvider> {
+export function ZipFs(injector: Injector): Promise<FileProvider> {
   return new Promise(resolve => {
     const fileReader = new FileReader();
     const win = document.getElementById("zipfile");
@@ -40,4 +40,17 @@ export function ZipFs(): Promise<FileProvider> {
       })
     }
   })
+}
+
+export async function LocalStorageProxy(injector: Injector) {
+  const fsProvider = injector.getProvider(FS);
+  injector.bindInstance(FS, async name => {
+    const storage = await injector.getInstance(Storage_);
+    const file = await storage.get(name);
+    if (file) return file;
+    const fs = await fsProvider(injector);
+    const fsFile = await fs(name);
+    storage.set(name, fsFile);
+    return fsFile;
+  });
 }

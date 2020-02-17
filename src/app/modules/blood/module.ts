@@ -12,11 +12,11 @@ import { Stream } from '../../../utils/stream';
 import { BoardManipulator_, Board_, BuildReferenceTracker } from '../../apis/app';
 import { ReferenceTrackerImpl } from '../../apis/referencetracker';
 import { RAW_PAL_ } from '../artselector';
-import { ArtFiles_, GL_ } from '../buildartprovider';
+import { ArtFiles_, GL_, ParallaxTextures_ } from '../buildartprovider';
 import { Palswaps_, PAL_, PLUs_, Shadowsteps_ } from '../gl/buildgl';
 import { Implementation_ } from '../view/boardrenderer3d';
 import { MapName_, MapNames_ } from '../selectmap';
-import { FS_ } from '../fs';
+import { FS } from '../fs';
 
 export const RFF_ = new Dependency<RffFile>('RFF File');
 const RAW_PLUs_ = new Dependency<Uint8Array[]>('Raw PLUs');
@@ -26,7 +26,7 @@ function loadRffFile(name: string): (injector: Injector) => Promise<Uint8Array> 
 }
 
 async function loadArtFiles(injector: Injector): Promise<ArtFiles> {
-  const fs = await injector.getInstance(FS_);
+  const fs = await injector.getInstance(FS);
   const artPromises: Promise<ArtFile>[] = [];
   for (let a = 0; a < 18; a++) artPromises.push(fs('TILES0' + ("00" + a).slice(-2) + '.ART').then(file => new ArtFile(new Stream(file, true))))
   const artFiles = await Promise.all(artPromises);
@@ -81,8 +81,6 @@ function loadMapImpl(name: string) {
   }
 }
 
-
-
 function createBoard() {
   const board = new BloodBoard();
   board.walls = [];
@@ -135,12 +133,13 @@ async function getMapNames(injector: Injector) {
 }
 
 async function loadRff(injector: Injector) {
-  const fs = await injector.getInstance(FS_);
+  const fs = await injector.getInstance(FS);
   const rff = await fs('BLOOD.RFF');
   return new RffFile(rff);
 }
 
 export function BloodModule(injector: Injector) {
+  injector.bindInstance(ParallaxTextures_, 16);
   injector.bindInstance(BoardManipulator_, { cloneBoard });
   injector.bindInstance(Shadowsteps_, 64);
   injector.bind(RFF_, loadRff);

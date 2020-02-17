@@ -29,5 +29,6 @@ class StorageDb implements Storage {
 
 export async function DbModule(injector: Injector) {
   const db = new StorageDb();
+  // db.clear();
   injector.bindInstance(Storage_, db);
 }

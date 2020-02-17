@@ -1,4 +1,4 @@
-precision mediump float;
+precision highp float;
 
 uniform sampler2D base;
 uniform sampler2D pal;
@@ -23,8 +23,8 @@ const float trans = float(255.0/256.0);
 const float PI = 3.1415926538;
 
 float lightOffset() {
-  float shadowLevel = length(wpos.xz - eyepos.xz) / 4096.0;
-  return (0.5 + float(shade) / 256.0) * SHADOWSTEPS + shadowLevel;
+  float shadowLevel = length(wpos.xz - eyepos.xz) / 512.0 * (SHADOWSTEPS / 64.0);
+  return (0.2 + float(shade) / 127.0) * SHADOWSTEPS + shadowLevel;
 }
 
 float diffuse() {
@@ -67,7 +67,7 @@ float palLightOffset(float lightLevel) {
 }
 
 float lightOffset(float lightLevel) {
-#ifdef PAL_LIGHTING
+#if defined PAL_LIGHTING || defined PARALLAX
   return 1.0;
 #else
   return 1.0 - lightLevel;

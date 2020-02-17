@@ -43,6 +43,12 @@ export class Injector {
     module(this);
   }
 
+  public getProvider<T>(dependency: Dependency<T>): InstanceProvider<T> {
+    const promise = this.promises.get(dependency);
+    if (promise != undefined) return () => promise;
+    return this.providers.get(dependency);
+  }
+
   private async create<T>(dependency: Dependency<T>): Promise<T> {
     const provider = this.providers.get(dependency);
     if (provider == null) throw new Error(`No provider bound to ${dependency.name}`);

@@ -58,6 +58,9 @@ export function loadPlus(stream: Stream): Uint8Array[] {
   const size = stream.readUByte();
   const table = atomic_array(ubyte, 256);
   const plus = [];
+  const refPlu = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) refPlu[i] = i;
+  plus[0] = refPlu;
   for (let i = 0; i < size; i++) {
     const idx = stream.readUByte();
     const plu = table.read(stream);

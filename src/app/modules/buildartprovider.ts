@@ -9,25 +9,27 @@ import { Texture } from "../../utils/gl/drawstruct";
 export const GL_ = new Dependency<WebGLRenderingContext>('GL');
 export const ArtFiles_ = new Dependency<ArtFiles>('ArtFiles');
 export const UtilityTextures_ = new Dependency<{ [index: number]: Texture }>('UtilityTextures');
+export const ParallaxTextures_ = new Dependency<number>('Number of parallax textures');
 
 export async function BuildArtProviderConstructor(injector: Injector) {
-  return Promise.all([
+  const [art, util, gl, parallax] = await Promise.all([
     injector.getInstance(ArtFiles_),
     injector.getInstance(UtilityTextures_),
-    injector.getInstance(GL_)])
-    .then(([art, util, gl]) => new BuildArtProvider(art, util, gl));
+    injector.getInstance(GL_),
+    injector.getInstance(ParallaxTextures_)]);
+  return new BuildArtProvider(art, util, gl, parallax);
 }
 
 export class BuildArtProvider implements ArtProvider {
   private textures: Texture[] = [];
   private parallaxTextures: Texture[] = [];
   private infos: ArtInfo[] = [];
-  private parallaxPics = 16;
 
   constructor(
     private arts: ArtFiles,
     private addTextures: { [index: number]: Texture },
-    private gl: WebGLRenderingContext) { }
+    private gl: WebGLRenderingContext,
+    private parallaxPics: number) { }
 
   private createTexture(w: number, h: number, arr: Uint8Array): Texture {
     const repeat = WebGLRenderingContext.CLAMP_TO_EDGE;

@@ -102,10 +102,10 @@ export class BagController {
 
   public get(size: number): Place {
     let offset = this.bag.get(size);
-    if (offset == null) {
-      this.optimize();
-      offset = this.bag.get(size);
-    }
+    // if (offset == null) {
+    //   this.optimize();
+    //   offset = this.bag.get(size);
+    // }
     if (offset == null) return null;
     let result = new Place(offset, size);
     this.places[offset] = result;

@@ -1,9 +1,9 @@
-import { Stream } from '../utils/stream';
+import { Stream, atomic_array, ubyte } from '../utils/stream';
 
 export class GrpFile {
   private data: Stream;
   private count: number;
-  private files: any = {};
+  readonly files: { [index: string]: number } = {};
 
   constructor(buf: ArrayBuffer) {
     this.data = new Stream(buf, true);
@@ -18,13 +18,13 @@ export class GrpFile {
     for (let i = 0; i < this.count; i++) {
       const fname = d.readByteString(12);
       const size = d.readUInt();
-      this.files[fname] = offset;
+      this.files[fname.toLowerCase()] = offset;
       offset += size;
     }
   }
 
   public get(fname: string): Stream {
-    const off = this.files[fname];
+    const off = this.files[fname.toLowerCase()];
     if (off == undefined) return null;
     this.data.setOffset(off);
     return this.data.subView();
@@ -43,4 +43,13 @@ export function createPalette(stream: Stream): Uint8Array {
     pal[i * 3 + 2] = stream.readUByte() * 4;
   }
   return pal;
+}
+
+export function loadShadeTables(stream: Stream): Uint8Array[] {
+  stream.skip(0x300);
+  const size = stream.readUShort();
+  const table = atomic_array(ubyte, 256);
+  const result = [];
+  for (let i = 0; i < size; i++) result.push(table.read(stream));
+  return result;
 }

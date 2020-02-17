@@ -23,8 +23,8 @@ const float trans = float(255.0/256.0);
 const float PI = 3.1415926538;
 
 float lightOffset() {
-  float shadowLevel = length(wpos.xz - eyepos.xz) / 512.0;
-  return float(shade) + shadowLevel;
+  float shadowLevel = length(wpos.xz - eyepos.xz) / 4096.0;
+  return (0.5 + float(shade) / 256.0) * SHADOWSTEPS + shadowLevel;
 }
 
 float diffuse() {

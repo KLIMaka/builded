@@ -15,10 +15,8 @@ import { RAW_PAL_ } from '../artselector';
 import { ArtFiles_, GL_ } from '../buildartprovider';
 import { Palswaps_, PAL_, PLUs_, Shadowsteps_ } from '../buildgl';
 import { Implementation_ } from '../view/boardrenderer3d';
-import { MapName_ } from './selectmap';
-
-export type FileProvider = (name: string) => Promise<ArrayBuffer>;
-export const FS_ = new Dependency<FileProvider>('FileSystem');
+import { MapName_, MapNames_ } from './selectmap';
+import { FS_ } from '../fs';
 
 export const RFF_ = new Dependency<RffFile>('RFF File');
 const RAW_PLUs_ = new Dependency<Uint8Array[]>('Raw PLUs');
@@ -137,6 +135,6 @@ export function BloodModule(injector: Injector) {
   injector.bind(PAL_, loadPalTexture);
   injector.bind(PLUs_, loadPluTexture);
   injector.bind(Implementation_, BloodImplementationConstructor);
+  injector.bind(MapNames_, injector => injector.getInstance(RFF_).then(rff => rff.fat.filter(r => r.filename.endsWith('map')).map(r => r.filename)));
   injector.bind(Board_, loadMap);
-
 }

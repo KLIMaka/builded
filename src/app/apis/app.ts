@@ -9,6 +9,15 @@ import { Renderable } from "./renderable";
 import { Context, Message, MessageHandler } from "./handler";
 import { ReferenceTracker } from "./referencetracker";
 
+export interface Storage {
+  get(key: string): Promise<any>;
+  set(key: string, value: any): Promise<any>;
+  delete(key: string): Promise<any>;
+  clear(): Promise<any>;
+  keys(): Promise<string[]>;
+}
+export const Storage_ = new Dependency<Storage>('Storage');
+
 export interface ArtProvider extends ArtInfoProvider {
   get(picnum: number): Texture;
   getParallaxTexture(picnum: number): Texture

@@ -9,6 +9,7 @@ import { Injector } from './utils/injector';
 import * as INPUT from './utils/input';
 import { addLogAppender, CONSOLE } from './utils/logger';
 import { DukeModule } from './app/modules/duke/module';
+import { DbModule } from './app/modules/db';
 
 document.body.oncontextmenu = () => false;
 addLogAppender(CONSOLE);
@@ -21,6 +22,7 @@ injector.bindInstance(GL_, gl);
 injector.bindPromise(FS_, UrlFs('resources/engines/blood/'))
 // injector.bindPromise(FS_, ZipFs())
 injector.bind(MapName_, SelectMap)
+injector.install(DbModule);
 injector.install(ContextModule);
 injector.install(BloodModule)
 // injector.install(DukeModule)

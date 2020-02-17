@@ -248,3 +248,8 @@ export function dragElement(header: HTMLElement, elment: HTMLElement) {
   }
 }
 
+export function closeModal<T>(window: HTMLElement, cb: (v: T) => void, value: T) {
+  window.classList.add('hidden');
+  cb(value);
+}
+

@@ -22,8 +22,8 @@ injector.bindPromise(FS_, UrlFs('resources/engines/blood/'))
 // injector.bindPromise(FS_, ZipFs())
 injector.bind(MapName_, SelectMap)
 injector.install(ContextModule);
-// injector.install(BloodModule)
-injector.install(DukeModule)
+injector.install(BloodModule)
+// injector.install(DukeModule)
 
 injector.getInstance(BuildContext_).then(context => {
   animate(gl, (gl: WebGLRenderingContext, time: number) => {

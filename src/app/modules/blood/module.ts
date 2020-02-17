@@ -26,16 +26,15 @@ function loadRffFile(name: string): (injector: Injector) => Promise<Uint8Array> 
 }
 
 async function loadArtFiles(injector: Injector): Promise<ArtFiles> {
-  return injector.getInstance(FS_).then(async fs => {
-    const artPromises: Promise<ArtFile>[] = [];
-    for (let a = 0; a < 18; a++) artPromises.push(fs('tiles0' + ("00" + a).slice(-2) + '.art').then(file => new ArtFile(new Stream(file, true))))
-    const artFiles = await Promise.all(artPromises);
-    return createArts(artFiles);
-  })
+  const fs = await injector.getInstance(FS_);
+  const artPromises: Promise<ArtFile>[] = [];
+  for (let a = 0; a < 18; a++) artPromises.push(fs('TILES0' + ("00" + a).slice(-2) + '.ART').then(file => new ArtFile(new Stream(file, true))))
+  const artFiles = await Promise.all(artPromises);
+  return createArts(artFiles);
 }
 
 async function loadPLUs(injector: Injector) {
-  return injector.getInstance(RAW_PLUs_).then(plus => plus.length)
+  return (await injector.getInstance(RAW_PLUs_)).length;
 }
 
 async function loadPalTexture(injector: Injector) {
@@ -75,7 +74,12 @@ async function loadPluTexture(injector: Injector) {
     })
 }
 
-function loadMapImpl(name: string) { return async (injector: Injector) => injector.getInstance(RFF_).then(rff => loadBloodMap(new Stream(rff.get(name).buffer, true))) }
+function loadMapImpl(name: string) {
+  return async (injector: Injector) => {
+    const rff = await injector.getInstance(RFF_)
+    return loadBloodMap(new Stream(rff.get(name).buffer, true));
+  }
+}
 
 
 
@@ -121,13 +125,25 @@ function createBoard() {
 }
 
 async function loadMap(injector: Injector) {
-  return injector.getInstance(MapName_).then(map => !map ? Promise.resolve(createBoard()) : loadMapImpl(map)(injector).then(m => m));
+  const map = await injector.getInstance(MapName_)
+  return !map ? createBoard() : loadMapImpl(map)(injector);
+}
+
+async function getMapNames(injector: Injector) {
+  const rff = await injector.getInstance(RFF_);
+  return rff.fat.filter(r => r.filename.endsWith('.map')).map(r => r.filename);
+}
+
+async function loadRff(injector: Injector) {
+  const fs = await injector.getInstance(FS_);
+  const rff = await fs('BLOOD.RFF');
+  return new RffFile(rff);
 }
 
 export function BloodModule(injector: Injector) {
-  injector.bindPromise(RFF_, injector.getInstance(FS_).then(fs => fs('BLOOD.RFF').then(rff => new RffFile(rff))));
   injector.bindInstance(BoardManipulator_, { cloneBoard });
   injector.bindInstance(Shadowsteps_, 64);
+  injector.bind(RFF_, loadRff);
   injector.bind(ArtFiles_, loadArtFiles);
   injector.bind(RAW_PAL_, loadRffFile('BLOOD.PAL'));
   injector.bind(RAW_PLUs_, loarRawPlus);
@@ -135,6 +151,6 @@ export function BloodModule(injector: Injector) {
   injector.bind(PAL_, loadPalTexture);
   injector.bind(PLUs_, loadPluTexture);
   injector.bind(Implementation_, BloodImplementationConstructor);
-  injector.bind(MapNames_, injector => injector.getInstance(RFF_).then(rff => rff.fat.filter(r => r.filename.endsWith('map')).map(r => r.filename)));
+  injector.bind(MapNames_, getMapNames);
   injector.bind(Board_, loadMap);
 }

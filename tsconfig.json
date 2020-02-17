@@ -4,11 +4,13 @@
     "target": "ES6",
     "lib": [
       "ES2015",
-      "DOM"
+      "DOM",
+      "esnext.asynciterable"
     ],
     "outDir": "distr",
     "rootDir": "src",
-    "sourceMap": true
+    "sourceMap": true,
+    "moduleResolution": "node",
   },
   "files": [
     "src/builded.ts"

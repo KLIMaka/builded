@@ -17,5 +17,8 @@
   },
   "devDependencies": {
     "typescript": "~3.7"
+  },
+  "dependencies": {
+    "idb": "^5.0.1"
   }
 }

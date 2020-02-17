@@ -1,6 +1,6 @@
 import { BuildContext_ } from './app/apis/app';
 import { BloodModule, } from './app/modules/blood/module';
-import { MapName_, SelectMap } from './app/modules/blood/selectmap';
+import { MapName_, SelectMap } from './app/modules/selectmap';
 import { GL_ } from './app/modules/buildartprovider';
 import { ContextModule } from './app/modules/context';
 import { UrlFs, ZipFs, FS_ } from './app/modules/fs';

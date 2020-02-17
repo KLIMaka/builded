@@ -15,7 +15,7 @@ import { RAW_PAL_ } from '../artselector';
 import { ArtFiles_, GL_ } from '../buildartprovider';
 import { Palswaps_, PAL_, PLUs_, Shadowsteps_ } from '../buildgl';
 import { Implementation_ } from '../view/boardrenderer3d';
-import { MapName_, MapNames_ } from './selectmap';
+import { MapName_, MapNames_ } from '../selectmap';
 import { FS_ } from '../fs';
 
 export const RFF_ = new Dependency<RffFile>('RFF File');

@@ -1,5 +1,5 @@
-import { Dependency, Injector } from "../../../utils/injector";
-import { span, Table } from "../../../utils/ui/ui";
+import { Dependency, Injector } from "../../utils/injector";
+import { span, Table } from "../../utils/ui/ui";
 
 export const MapName_ = new Dependency<string>('MapName');
 export const MapNames_ = new Dependency<string[]>('MapNames');

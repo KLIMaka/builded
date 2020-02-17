@@ -10,7 +10,7 @@ import { Palswaps_, PAL_, PLUs_, Shadowsteps_ } from "../buildgl";
 import { FS_ } from "../fs";
 import { Implementation_, RorLinks } from "../view/boardrenderer3d";
 import { createTexture } from "../../../utils/gl/textures";
-import { MapName_, MapNames_ } from "../blood/selectmap";
+import { MapName_, MapNames_ } from "../selectmap";
 import { Board, SpriteStats, Sprite } from "../../../build/structs";
 import { Deck } from "../../../utils/collections";
 import { ReferenceTrackerImpl } from "../../apis/referencetracker";

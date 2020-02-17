@@ -53,3 +53,15 @@ export function loadShadeTables(stream: Stream): Uint8Array[] {
   for (let i = 0; i < size; i++) result.push(table.read(stream));
   return result;
 }
+
+export function loadPlus(stream: Stream): Uint8Array[] {
+  const size = stream.readUByte();
+  const table = atomic_array(ubyte, 256);
+  const plus = [];
+  for (let i = 0; i < size; i++) {
+    const idx = stream.readUByte();
+    const plu = table.read(stream);
+    plus[idx] = plu;
+  }
+  return plus;
+}

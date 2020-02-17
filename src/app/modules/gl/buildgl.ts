@@ -1,12 +1,12 @@
-import * as GLM from '../../libs_js/glmatrix';
-import * as DS from '../../utils/gl/drawstruct';
-import { createShader } from '../../utils/gl/shaders';
-import { State } from '../../utils/gl/stategl';
-import { Dependency, Injector } from '../../utils/injector';
-import { BuildContext } from '../apis/app';
-import { GL_, UtilityTextures_ } from '../modules/buildartprovider';
+import * as GLM from '../../../libs_js/glmatrix';
+import * as DS from '../../../utils/gl/drawstruct';
+import { createShader } from '../../../utils/gl/shaders';
+import { State } from '../../../utils/gl/stategl';
+import { Dependency, Injector } from '../../../utils/injector';
+import { BuildContext } from '../../apis/app';
+import { GL_, UtilityTextures_ } from '../buildartprovider';
 import * as BUFF from './buffers';
-import { Renderable } from '../apis/renderable';
+import { Renderable } from '../../apis/renderable';
 
 export const PAL_ = new Dependency<DS.Texture>('PAL');
 export const PLUs_ = new Dependency<DS.Texture>('PLUs');

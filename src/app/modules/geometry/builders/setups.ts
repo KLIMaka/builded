@@ -4,7 +4,7 @@ import { Deck } from "../../../../utils/collections";
 import * as PROFILE from '../../../../utils/profiler';
 import { State } from "../../../../utils/gl/stategl";
 import { BuildContext } from "../../../apis/app";
-import { BuildBuffer } from "../../buffers";
+import { BuildBuffer } from "../../gl/buffers";
 import { Builder } from "../../../apis/builder";
 import { LayeredRenderable, RenderableConsumer } from "../../../apis/renderable";
 import { Texture } from "../../../../utils/gl/drawstruct";

@@ -3,7 +3,7 @@ import { SolidBuilder, Type } from "../../../apis/renderable";
 import { ZSCALE, spriteAngle, ang2vec } from "../../../../build/utils";
 import { FACE_SPRITE, WALL_SPRITE, FLOOR_SPRITE } from "../../../../build/structs";
 import { mat4, Vec3Array, Mat4Array, vec4 } from "../../../../libs_js/glmatrix";
-import { BuildBuffer } from "../../buffers";
+import { BuildBuffer } from "../../gl/buffers";
 
 function normals(n: Vec3Array) {
   return [n[0], n[1], n[2], n[0], n[1], n[2], n[0], n[1], n[2], n[0], n[1], n[2]];

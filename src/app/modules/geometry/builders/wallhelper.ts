@@ -3,7 +3,7 @@ import { BuildContext } from "../../../apis/app";
 import { walllen } from "../../../../build/boardutils";
 import { Board } from "../../../../build/structs";
 import { createSlopeCalculator, sectorOfWall, slope, ZSCALE } from "../../../../build/utils";
-import { BuildBuffer } from "../../buffers";
+import { BuildBuffer } from "../../gl/buffers";
 import { createGridMatrixProviderWall, text } from "./common";
 import { BuildRenderableProvider, GridBuilder, PointSpriteBuilder, Renderables, SolidBuilder, WallRenderable, WireframeBuilder, LayeredRenderables } from "../../../apis/renderable";
 import { Builders } from "../../../apis/builder";

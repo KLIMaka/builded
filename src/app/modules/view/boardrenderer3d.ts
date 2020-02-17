@@ -10,7 +10,7 @@ import { dot2d } from '../../../utils/mathutils';
 import * as PROFILE from '../../../utils/profiler';
 import { mirrorBasis, normal2d, reflectPoint3d } from '../../../utils/vecmath';
 import { BuildContext } from '../../apis/app';
-import { BuildGl } from '../buildgl';
+import { BuildGl } from '../gl/buildgl';
 import { BuildRenderableProvider, LayeredRenderable, Renderable, Renderables, WrapRenderable } from '../../apis/renderable';
 import { View3d } from './view';
 

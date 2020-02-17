@@ -13,7 +13,7 @@ import { BoardManipulator_, Board_, BuildReferenceTracker } from '../../apis/app
 import { ReferenceTrackerImpl } from '../../apis/referencetracker';
 import { RAW_PAL_ } from '../artselector';
 import { ArtFiles_, GL_ } from '../buildartprovider';
-import { Palswaps_, PAL_, PLUs_, Shadowsteps_ } from '../buildgl';
+import { Palswaps_, PAL_, PLUs_, Shadowsteps_ } from '../gl/buildgl';
 import { Implementation_ } from '../view/boardrenderer3d';
 import { MapName_, MapNames_ } from '../selectmap';
 import { FS_ } from '../fs';

@@ -7,7 +7,7 @@ import { AllBoardVisitorResult, VisResult } from '../../../build/boardvisitor';
 import { Board } from '../../../build/structs';
 import { View2d } from './view';
 import { BuildRenderableProvider, GridBuilder, LayeredRenderable, LayeredRenderables, RenderableProvider, SolidBuilder, SortingRenderable } from '../../apis/renderable';
-import { BuildGl } from '../buildgl';
+import { BuildGl } from '../gl/buildgl';
 
 let grid: GridBuilder;
 const scale = GLM.vec3.create();

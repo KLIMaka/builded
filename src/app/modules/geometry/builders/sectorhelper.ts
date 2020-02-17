@@ -1,7 +1,7 @@
 import { BuildContext } from "../../../apis/app";
 import { Board, Sector } from "../../../../build/structs";
 import { createSlopeCalculator, sectorOfWall, ZSCALE } from "../../../../build/utils";
-import { BuildBuffer } from "../../buffers";
+import { BuildBuffer } from "../../gl/buffers";
 import { buildCeilingHinge, buildFloorHinge, gridMatrixProviderSector } from "./common";
 import { BuildRenderableProvider, GridBuilder, PointSpriteBuilder, Renderables, SectorRenderable, SolidBuilder, WireframeBuilder, LayeredRenderables } from "../../../apis/renderable";
 import { Builders } from "../../../apis/builder";

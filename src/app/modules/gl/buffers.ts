@@ -1,5 +1,5 @@
-import { Buffer, BufferBuilder, Pointer } from '../../utils/gl/buffergl';
-import { VertexBuffer, IndexBuffer } from '../../utils/gl/drawstruct';
+import { Buffer, BufferBuilder, Pointer } from '../../../utils/gl/buffergl';
+import { VertexBuffer, IndexBuffer } from '../../../utils/gl/drawstruct';
 
 const buffers: Buffer[] = [];
 let ctx: WebGLRenderingContext;

@@ -5,7 +5,7 @@ import { BuildContext } from "../../../apis/app";
 import { ArtInfo } from "../../../../build/art";
 import { Wall } from "../../../../build/structs";
 import { createSlopeCalculator, sectorOfWall, wallNormal, ZSCALE } from "../../../../build/utils";
-import { BuildBuffer } from "../../buffers";
+import { BuildBuffer } from "../../gl/buffers";
 import { SolidBuilder, WallRenderable } from "../../../apis/renderable";
 import { Builders } from "../../../apis/builder";
 

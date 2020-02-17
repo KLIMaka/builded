@@ -3,7 +3,7 @@ import { createSlopeCalculator, sectorOfWall, slope, ZSCALE } from "../../../../
 import { PointSpriteBuilder, WireframeBuilder } from "../../../apis/renderable";
 import { Builders } from "../../../apis/builder";
 import { Board } from "../../../../build/structs";
-import { BuildBuffer } from "../../buffers";
+import { BuildBuffer } from "../../gl/buffers";
 import { fastIterator } from "../../../../utils/collections";
 
 export class WallPointHelperBuilder extends Builders {

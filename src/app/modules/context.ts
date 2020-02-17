@@ -25,7 +25,7 @@ import { loadString } from '../../utils/getter';
 import { UtilityTextures_, BuildArtProviderConstructor, GL_ } from './buildartprovider';
 import { loadImage } from '../../utils/imgutils';
 import { createTexture } from '../../utils/gl/textures';
-import { BuildGl_, BuildGlConstructor } from './buildgl';
+import { BuildGl_, BuildGlConstructor } from './gl/buildgl';
 import { SwappableViewConstructor } from './view/view';
 import { Texture } from '../../utils/gl/drawstruct';
 import { SelectorConstructor } from '../../app/modules/artselector'

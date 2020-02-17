@@ -4,7 +4,7 @@ import { BuildContext } from "../../../apis/app";
 import { ArtInfo } from "../../../../build/art";
 import { Board, Sector, Wall } from "../../../../build/structs";
 import { createSlopeCalculator, getFirstWallAngle, sectorNormal, ZSCALE } from "../../../../build/utils";
-import { BuildBuffer } from "../../buffers";
+import { BuildBuffer } from "../../gl/buffers";
 import { SectorRenderable, SolidBuilder } from "../../../apis/renderable";
 import { Builders } from "../../../apis/builder";
 import { fastIterator } from "../../../../utils/collections";

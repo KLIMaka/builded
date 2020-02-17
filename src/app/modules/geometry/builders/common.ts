@@ -4,7 +4,7 @@ import { BuildContext } from '../../../apis/app';
 import { walllen } from '../../../../build/boardutils';
 import { Board } from '../../../../build/structs';
 import { slope, ZSCALE } from '../../../../build/utils';
-import { BuildBuffer } from '../../buffers';
+import { BuildBuffer } from '../../gl/buffers';
 import { PointSpriteBuilder, WireframeBuilder } from '../../../apis/renderable';
 import { Tiler } from '../../../../utils/tiler';
 import { vec4, mat4 } from '../../../../libs_js/glmatrix';

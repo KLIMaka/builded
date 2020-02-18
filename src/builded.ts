@@ -21,9 +21,9 @@ INPUT.bind(<HTMLCanvasElement>gl.canvas);
 
 const injector = new Injector();
 injector.bindInstance(GL, gl);
+injector.bind(FS, MountableFs);
 injector.bindMulti(MOUNTS, UrlFs('resources/engines/blood/'));
 injector.bindMulti(MOUNTS, StorageFs);
-injector.bind(FS, MountableFs);
 injector.bind(Storages_, StorageDbConstructor);
 injector.bind(MapName_, SelectMap);
 injector.install(ContextModule);

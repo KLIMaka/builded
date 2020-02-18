@@ -21,7 +21,8 @@ export function loadBin(fname: string, progressCallback: (percent: number) => vo
   if (file != undefined) return Promise.resolve(file);
   return new Promise((resolve) => {
     const xhr = getRequest(fname, 'arraybuffer', xhrCache);
-    xhr.addEventListener('load', () => { cache[fname] = xhr.response; resolve(xhr.response) });
+    xhr.addEventListener('load', () => { if (xhr.status != 200) { resolve(null); return } cache[fname] = xhr.response; resolve(xhr.response) });
+    xhr.addEventListener('error', () => { resolve(null) });
     xhr.addEventListener('progress', (e) => { progressCallback(e.loaded / e.total); });
   });
 }

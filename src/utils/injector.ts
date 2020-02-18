@@ -27,6 +27,10 @@ export class Injector {
     return instance;
   }
 
+  public getProvider<T>(dependency: Dependency<T>): () => Promise<T> {
+    return () => this.promises.get(dependency);
+  }
+
   public bindMulti<T>(dependency: Dependency<T[]>, provider: InstanceProvider<T>) {
     this.bind(<Dependency<T>>dependency, provider);
   }

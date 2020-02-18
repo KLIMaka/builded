@@ -5,9 +5,7 @@ import { Storage, Storages } from "../apis/app";
 class StorageDb implements Storage {
   private db: Promise<IDBPDatabase>
 
-  constructor(private name: string) {
-    this.db = openDB('keyval-store', 1, { upgrade(db) { db.createObjectStore(name) } });
-  }
+  constructor(private name: string) { this.db = openDB('keyval-store', 1, { upgrade(db) { db.createObjectStore(name) } }); }
 
   async get(key: string) { return (await this.db).get(this.name, key) }
   async set(key: string, value: any) { return (await this.db).put(this.name, value, key) }

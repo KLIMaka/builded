@@ -16,14 +16,10 @@ import { ArtFiles_, GL, ParallaxTextures_ } from '../buildartprovider';
 import { Palswaps_, PAL_, PLUs_, Shadowsteps_ } from '../gl/buildgl';
 import { Implementation_ } from '../view/boardrenderer3d';
 import { MapName_, MapNames_ } from '../selectmap';
-import { FS } from '../fs/fs';
+import { FS, FileProvider } from '../fs/fs';
+import { MOUNTS } from '../fs/mount';
 
-export const RFF_ = new Dependency<RffFile>('RFF File');
 const RAW_PLUs_ = new Dependency<Uint8Array[]>('Raw PLUs');
-
-function loadRffFile(name: string): (injector: Injector) => Promise<Uint8Array> {
-  return (injector: Injector) => new Promise<Uint8Array>(resolve => injector.getInstance(RFF_).then(rff => resolve(rff.get(name))))
-}
 
 async function loadArtFiles(injector: Injector): Promise<ArtFiles> {
   const fs = await injector.getInstance(FS);
@@ -42,22 +38,23 @@ async function loadPalTexture(injector: Injector) {
 }
 
 async function loarRawPlus(injector: Injector) {
-  return injector.getInstance(RFF_).then(rff => [
-    rff.get('NORMAL.PLU'),
-    rff.get('SATURATE.PLU'),
-    rff.get('BEAST.PLU'),
-    rff.get('TOMMY.PLU'),
-    rff.get('SPIDER3.PLU'),
-    rff.get('GRAY.PLU'),
-    rff.get('GRAYISH.PLU'),
-    rff.get('SPIDER1.PLU'),
-    rff.get('SPIDER2.PLU'),
-    rff.get('FLAME.PLU'),
-    rff.get('COLD.PLU'),
-    rff.get('P1.PLU'),
-    rff.get('P2.PLU'),
-    rff.get('P3.PLU'),
-    rff.get('P4.PLU'),
+  const fs = await injector.getInstance(FS)
+  return Promise.all([
+    fs('NORMAL.PLU'),
+    fs('SATURATE.PLU'),
+    fs('BEAST.PLU'),
+    fs('TOMMY.PLU'),
+    fs('SPIDER3.PLU'),
+    fs('GRAY.PLU'),
+    fs('GRAYISH.PLU'),
+    fs('SPIDER1.PLU'),
+    fs('SPIDER2.PLU'),
+    fs('FLAME.PLU'),
+    fs('COLD.PLU'),
+    fs('P1.PLU'),
+    fs('P2.PLU'),
+    fs('P3.PLU'),
+    fs('P4.PLU'),
   ])
 }
 
@@ -76,8 +73,8 @@ async function loadPluTexture(injector: Injector) {
 
 function loadMapImpl(name: string) {
   return async (injector: Injector) => {
-    const rff = await injector.getInstance(RFF_)
-    return loadBloodMap(new Stream(rff.get(name).buffer, true));
+    const fs = await injector.getInstance(FS)
+    return loadBloodMap(new Stream(await fs(name), true));
   }
 }
 
@@ -128,23 +125,32 @@ async function loadMap(injector: Injector) {
 }
 
 async function getMapNames(injector: Injector) {
-  const rff = await injector.getInstance(RFF_);
-  return rff.fat.filter(r => r.filename.endsWith('.map')).map(r => r.filename);
+  return ['e1m1.map'];
 }
 
-async function loadRff(injector: Injector) {
-  const fs = await injector.getInstance(FS);
-  const rff = await fs('BLOOD.RFF');
-  return new RffFile(rff);
+async function loadRff(injector: Injector): Promise<FileProvider> {
+  let rff: RffFile = null;
+  return async name => {
+    const fs = await injector.getInstance(FS);
+    if (rff == null) rff = new RffFile(await fs('BLOOD.RFF'));
+    return rff.get(name).buffer;
+  }
+}
+
+function loadFile(name: string) {
+  return async (injector: Injector) => {
+    const fs = await injector.getInstance(FS);
+    return fs(name);
+  }
 }
 
 export function BloodModule(injector: Injector) {
   injector.bindInstance(ParallaxTextures_, 16);
   injector.bindInstance(BoardManipulator_, { cloneBoard });
   injector.bindInstance(Shadowsteps_, 64);
-  injector.bind(RFF_, loadRff);
+  injector.bindMulti(MOUNTS, loadRff);
   injector.bind(ArtFiles_, loadArtFiles);
-  injector.bind(RAW_PAL_, loadRffFile('BLOOD.PAL'));
+  injector.bind(RAW_PAL_, loadFile('BLOOD.PAL'));
   injector.bind(RAW_PLUs_, loarRawPlus);
   injector.bind(Palswaps_, loadPLUs);
   injector.bind(PAL_, loadPalTexture);

@@ -16,7 +16,7 @@ import { ArtFiles_, GL, ParallaxTextures_ } from '../buildartprovider';
 import { Palswaps_, PAL_, PLUs_, Shadowsteps_ } from '../gl/buildgl';
 import { Implementation_ } from '../view/boardrenderer3d';
 import { MapName_, MapNames_ } from '../selectmap';
-import { FS, FileProvider } from '../fs/fs';
+import { FS, FileSystem } from '../fs/fs';
 import { MOUNTS } from '../fs/mount';
 
 const RAW_PLUs_ = new Dependency<Uint8Array[]>('Raw PLUs');
@@ -24,7 +24,7 @@ const RAW_PLUs_ = new Dependency<Uint8Array[]>('Raw PLUs');
 async function loadArtFiles(injector: Injector): Promise<ArtFiles> {
   const fs = await injector.getInstance(FS);
   const artPromises: Promise<ArtFile>[] = [];
-  for (let a = 0; a < 18; a++) artPromises.push(fs('TILES0' + ("00" + a).slice(-2) + '.ART').then(file => new ArtFile(new Stream(file, true))))
+  for (let a = 0; a < 18; a++) artPromises.push(fs.get('TILES0' + ("00" + a).slice(-2) + '.ART').then(file => new ArtFile(new Stream(file, true))))
   const artFiles = await Promise.all(artPromises);
   return createArts(artFiles);
 }
@@ -34,28 +34,30 @@ async function loadPLUs(injector: Injector) {
 }
 
 async function loadPalTexture(injector: Injector) {
-  return Promise.all([injector.getInstance(RAW_PAL_), injector.getInstance(GL)]).then(([pal, gl]) => createTexture(256, 1, gl, { filter: gl.NEAREST }, pal, gl.RGB, 3))
+  const [pal, gl] = await Promise.all([injector.getInstance(RAW_PAL_), injector.getInstance(GL)]);
+  return createTexture(256, 1, gl, { filter: gl.NEAREST }, pal, gl.RGB, 3);
 }
 
 async function loarRawPlus(injector: Injector) {
   const fs = await injector.getInstance(FS)
-  return Promise.all([
-    fs('NORMAL.PLU'),
-    fs('SATURATE.PLU'),
-    fs('BEAST.PLU'),
-    fs('TOMMY.PLU'),
-    fs('SPIDER3.PLU'),
-    fs('GRAY.PLU'),
-    fs('GRAYISH.PLU'),
-    fs('SPIDER1.PLU'),
-    fs('SPIDER2.PLU'),
-    fs('FLAME.PLU'),
-    fs('COLD.PLU'),
-    fs('P1.PLU'),
-    fs('P2.PLU'),
-    fs('P3.PLU'),
-    fs('P4.PLU'),
-  ])
+  const plus = await Promise.all([
+    fs.get('NORMAL.PLU'),
+    fs.get('SATURATE.PLU'),
+    fs.get('BEAST.PLU'),
+    fs.get('TOMMY.PLU'),
+    fs.get('SPIDER3.PLU'),
+    fs.get('GRAY.PLU'),
+    fs.get('GRAYISH.PLU'),
+    fs.get('SPIDER1.PLU'),
+    fs.get('SPIDER2.PLU'),
+    fs.get('FLAME.PLU'),
+    fs.get('COLD.PLU'),
+    fs.get('P1.PLU'),
+    fs.get('P2.PLU'),
+    fs.get('P3.PLU'),
+    fs.get('P4.PLU'),
+  ]);
+  return plus.map(p => new Uint8Array(p));
 }
 
 async function loadPluTexture(injector: Injector) {
@@ -74,7 +76,7 @@ async function loadPluTexture(injector: Injector) {
 function loadMapImpl(name: string) {
   return async (injector: Injector) => {
     const fs = await injector.getInstance(FS)
-    return loadBloodMap(new Stream(await fs(name), true));
+    return loadBloodMap(new Stream(await fs.get(name), true));
   }
 }
 
@@ -125,22 +127,34 @@ async function loadMap(injector: Injector) {
 }
 
 async function getMapNames(injector: Injector) {
-  return ['e1m1.map'];
+  const fs = await injector.getInstance(FS);
+  return (await fs.list()).filter(f => f.endsWith('.map'));
 }
 
-async function loadRff(injector: Injector): Promise<FileProvider> {
-  let rff: RffFile = null;
-  return async name => {
-    const fs = await injector.getInstance(FS);
-    if (rff == null) rff = new RffFile(await fs('BLOOD.RFF'));
-    return rff.get(name).buffer;
+let rff: RffFile;
+async function loadRffFile(injector: Injector) {
+  if (rff == null) {
+    rff = new RffFile(await (await injector.getInstance(FS)).get('BLOOD.RFF'));
+  }
+  return rff;
+}
+
+async function loadRff(injector: Injector): Promise<FileSystem> {
+  return {
+    get: async name => (await loadRffFile(injector)).get(name).buffer,
+    list: async () => (await loadRffFile(injector)).fat.map(r => r.filename),
+    info: async name => {
+      const rff = await loadRffFile(injector);
+      const file = rff.get(name);
+      return file ? { name: name, size: file.byteLength, source: "BLOOD.RFF" } : null;
+    }
   }
 }
 
 function loadFile(name: string) {
   return async (injector: Injector) => {
     const fs = await injector.getInstance(FS);
-    return fs(name);
+    return new Uint8Array(await fs.get(name));
   }
 }
 

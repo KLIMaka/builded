@@ -8,6 +8,11 @@ export class Element {
     return this;
   }
 
+  public id(id: string): Element {
+    this.element.id = id;
+    return this;
+  }
+
   public text(text: string): Element {
     this.element.textContent = text;
     return this;

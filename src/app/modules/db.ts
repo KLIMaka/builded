@@ -1,25 +1,18 @@
+import { IDBPDatabase, openDB } from "../../libs_js/idb/index";
 import { Injector } from "../../utils/injector";
-import { Storage, Storage_ } from "../apis/app";
-import { openDB } from "../../libs_js/idb/index";
+import { Storage, Storages } from "../apis/app";
 
 class StorageDb implements Storage {
-  private db = openDB('keyval-store', 1, { upgrade(db) { db.createObjectStore('keyval') } });
+  private db: Promise<IDBPDatabase>
 
-  async get(key: string): Promise<any> {
-    return (await this.db).get('keyval', key);
+  constructor(private name: string) {
+    this.db = openDB('keyval-store', 1, { upgrade(db) { db.createObjectStore(name) } });
   }
 
-  async  set(key: string, value: any): Promise<any> {
-    return (await this.db).put('keyval', value, key);
-  }
-
-  async delete(key: string): Promise<any> {
-    return (await this.db).delete('keyval', key);
-  }
-
-  async clear(): Promise<any> {
-    return (await this.db).clear('keyval');
-  }
+  async get(key: string) { return (await this.db).get(this.name, key) }
+  async set(key: string, value: any) { return (await this.db).put(this.name, value, key) }
+  async delete(key: string) { return (await this.db).delete(this.name, key) }
+  async clear() { return (await this.db).clear(this.name) }
 
   async keys(): Promise<string[]> {
     // return (await this.db).getAllKeys('keyval');
@@ -27,8 +20,14 @@ class StorageDb implements Storage {
   }
 }
 
-export async function DbModule(injector: Injector) {
-  const db = new StorageDb();
-  // db.clear();
-  injector.bindInstance(Storage_, db);
+export async function StorageDbConstructor(injector: Injector): Promise<Storages> {
+  const storages: { [index: string]: Storage } = {}
+  return async name => {
+    let storage = storages[name];
+    if (storage == undefined) {
+      storage = new StorageDb(name);
+      storages[name] = storage;
+    }
+    return storage;
+  }
 }

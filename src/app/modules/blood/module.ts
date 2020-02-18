@@ -12,11 +12,11 @@ import { Stream } from '../../../utils/stream';
 import { BoardManipulator_, Board_, BuildReferenceTracker } from '../../apis/app';
 import { ReferenceTrackerImpl } from '../../apis/referencetracker';
 import { RAW_PAL_ } from '../artselector';
-import { ArtFiles_, GL_, ParallaxTextures_ } from '../buildartprovider';
+import { ArtFiles_, GL, ParallaxTextures_ } from '../buildartprovider';
 import { Palswaps_, PAL_, PLUs_, Shadowsteps_ } from '../gl/buildgl';
 import { Implementation_ } from '../view/boardrenderer3d';
 import { MapName_, MapNames_ } from '../selectmap';
-import { FS } from '../fs';
+import { FS } from '../fs/fs';
 
 export const RFF_ = new Dependency<RffFile>('RFF File');
 const RAW_PLUs_ = new Dependency<Uint8Array[]>('Raw PLUs');
@@ -38,7 +38,7 @@ async function loadPLUs(injector: Injector) {
 }
 
 async function loadPalTexture(injector: Injector) {
-  return Promise.all([injector.getInstance(RAW_PAL_), injector.getInstance(GL_)]).then(([pal, gl]) => createTexture(256, 1, gl, { filter: gl.NEAREST }, pal, gl.RGB, 3))
+  return Promise.all([injector.getInstance(RAW_PAL_), injector.getInstance(GL)]).then(([pal, gl]) => createTexture(256, 1, gl, { filter: gl.NEAREST }, pal, gl.RGB, 3))
 }
 
 async function loarRawPlus(injector: Injector) {
@@ -64,7 +64,7 @@ async function loarRawPlus(injector: Injector) {
 async function loadPluTexture(injector: Injector) {
   return Promise.all([
     injector.getInstance(RAW_PLUs_),
-    injector.getInstance(GL_),
+    injector.getInstance(GL),
     injector.getInstance(Shadowsteps_)])
     .then(([plus, gl, shadowsteps]) => {
       const tex = new Uint8Array(256 * shadowsteps * plus.length);

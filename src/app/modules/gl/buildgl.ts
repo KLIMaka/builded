@@ -4,7 +4,7 @@ import { createShader } from '../../../utils/gl/shaders';
 import { State } from '../../../utils/gl/stategl';
 import { Dependency, Injector } from '../../../utils/injector';
 import { BuildContext } from '../../apis/app';
-import { GL_, UtilityTextures_ } from '../buildartprovider';
+import { GL, UtilityTextures_ } from '../buildartprovider';
 import * as BUFF from './buffers';
 import { Renderable } from '../../apis/renderable';
 
@@ -16,7 +16,7 @@ export const BuildGl_ = new Dependency<BuildGl>('BuildGL');
 
 export function BuildGlConstructor(injector: Injector): Promise<BuildGl> {
   return new Promise(resolve => Promise.all([
-    injector.getInstance(GL_),
+    injector.getInstance(GL),
     injector.getInstance(PAL_),
     injector.getInstance(PLUs_),
     injector.getInstance(Palswaps_),

@@ -1,5 +1,5 @@
 
-export class Dependency<T> { constructor(readonly name: string) { } }
+export class Dependency<T> { constructor(readonly name: string, readonly multi = false) { } }
 
 export type InstanceProvider<T> = (injector: Injector) => Promise<T>;
 
@@ -11,7 +11,7 @@ export class CircularDependencyError extends Error {
 }
 
 export class Injector {
-  private providers = new Map<Dependency<any>, InstanceProvider<any>>();
+  private providers = new Map<Dependency<any>, InstanceProvider<any>[]>();
   private promises = new Map<Dependency<any>, Promise<any>>();
   private resolving = new Set<Dependency<any>>();
 
@@ -27,8 +27,22 @@ export class Injector {
     return instance;
   }
 
+  public bindMulti<T>(dependency: Dependency<T[]>, provider: InstanceProvider<T>) {
+    this.bind(<Dependency<T>>dependency, provider);
+  }
+
   public bind<T>(dependency: Dependency<T>, provider: InstanceProvider<T>) {
-    this.providers.set(dependency, provider);
+    let p = this.providers.get(dependency);
+    if (dependency.multi) {
+      if (p == undefined) {
+        p = [];
+        this.providers.set(dependency, p);
+      }
+      p.push(provider);
+    } else {
+      if (p != undefined) throw new Error(`Multiple bindings to dependency ${dependency.name}`);
+      this.providers.set(dependency, [provider]);
+    }
   }
 
   public bindPromise<T>(dependency: Dependency<T>, promise: Promise<T>) {
@@ -43,15 +57,11 @@ export class Injector {
     module(this);
   }
 
-  public getProvider<T>(dependency: Dependency<T>): InstanceProvider<T> {
-    const promise = this.promises.get(dependency);
-    if (promise != undefined) return () => promise;
-    return this.providers.get(dependency);
-  }
-
-  private async create<T>(dependency: Dependency<T>): Promise<T> {
+  private create<T>(dependency: Dependency<T>) {
     const provider = this.providers.get(dependency);
     if (provider == null) throw new Error(`No provider bound to ${dependency.name}`);
-    return provider(this);
+    return dependency.multi
+      ? Promise.all(provider.map(p => p(this)))
+      : provider[0](this);
   }
 }

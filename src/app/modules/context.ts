@@ -22,7 +22,7 @@ import { Info } from '../modules/info';
 import { RenderablesCache_, RenderablesCacheImpl } from './geometry/cache';
 import { Statusbar } from '../modules/statusbar';
 import { loadString } from '../../utils/getter';
-import { UtilityTextures_, BuildArtProviderConstructor, GL_ } from './buildartprovider';
+import { UtilityTextures_, BuildArtProviderConstructor, GL } from './buildartprovider';
 import { loadImage } from '../../utils/imgutils';
 import { createTexture } from '../../utils/gl/textures';
 import { BuildGl_, BuildGlConstructor } from './gl/buildgl';
@@ -142,7 +142,7 @@ export function ContextModule(injector: Injector) {
   injector.bind(BuildContext_, ContextConstructor);
   injector.bindInstance(RenderablesCache_, new RenderablesCacheImpl());
   injector.bindPromise(KeymapConfig_, loadString('builded_binds.txt'));
-  injector.bindPromise(UtilityTextures_, injector.getInstance(GL_).then(gl => loadUtilityTextures([
+  injector.bindPromise(UtilityTextures_, injector.getInstance(GL).then(gl => loadUtilityTextures([
     [-1, loadTexture(gl, 'resources/point1.png', { filter: WebGLRenderingContext.NEAREST, repeat: WebGLRenderingContext.CLAMP_TO_EDGE })],
     [-2, loadTexture(gl, 'resources/img/font.png', { filter: WebGLRenderingContext.NEAREST, repeat: WebGLRenderingContext.CLAMP_TO_EDGE })],
     [-3, loadTexture(gl, 'resources/grid.png', { filter: WebGLRenderingContext.LINEAR_MIPMAP_LINEAR, repeat: WebGLRenderingContext.REPEAT, aniso: true })],

@@ -11,7 +11,7 @@ import { int, len2d, tuple2 } from "../../../utils/mathutils";
 import { DelayedValue } from "../../../utils/timed";
 import { BuildContext, View } from "../../apis/app";
 import { closestWallInSector, closestWallPoint, closestWallSegment, closestWallSegmentInSector, DEFAULT_REPEAT_RATE, nextwall } from "../../../build/boardutils";
-import { GL_ } from "../buildartprovider";
+import { GL } from "../buildartprovider";
 import { BoardInvalidate, Frame, Mouse, NamedMessage } from "../../edit/messages";
 import * as RENDERER2D from './boardrenderer2d';
 import * as RENDERER3D from './boardrenderer3d';
@@ -360,7 +360,7 @@ export class View3d extends MessageHandlerReflective implements View {
 
 export async function SwappableViewConstructor(injector: Injector) {
   return Promise.all([
-    injector.getInstance(GL_),
+    injector.getInstance(GL),
     injector.getInstance(RenderablesCache_),
     injector.getInstance(RENDERER3D.Implementation_),
     injector.getInstance(GridController_),

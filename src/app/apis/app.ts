@@ -16,7 +16,8 @@ export interface Storage {
   clear(): Promise<any>;
   keys(): Promise<string[]>;
 }
-export const Storage_ = new Dependency<Storage>('Storage');
+export type Storages = (name: string) => Promise<Storage>;
+export const Storages_ = new Dependency<Storages>('Storages');
 
 export interface ArtProvider extends ArtInfoProvider {
   get(picnum: number): Texture;

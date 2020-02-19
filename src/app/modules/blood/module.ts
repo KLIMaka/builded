@@ -162,7 +162,7 @@ export function BloodModule(injector: Injector) {
   injector.bindInstance(ParallaxTextures_, 16);
   injector.bindInstance(BoardManipulator_, { cloneBoard });
   injector.bindInstance(Shadowsteps_, 64);
-  injector.bind<FileProvider>(MOUNTS, loadRff);
+  injector.bind<FileSystem>(MOUNTS, loadRff);
   injector.bind(ArtFiles_, loadArtFiles);
   injector.bind(RAW_PAL_, loadFile('BLOOD.PAL'));
   injector.bind(RAW_PLUs, loarRawPlus);

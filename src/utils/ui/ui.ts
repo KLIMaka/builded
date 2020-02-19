@@ -258,3 +258,7 @@ export function closeModal<T>(window: HTMLElement, cb: (v: T) => void, value: T)
   cb(value);
 }
 
+export function stopPropagation(e: Event) {
+  e.stopPropagation();
+  e.preventDefault();
+}

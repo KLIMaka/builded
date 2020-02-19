@@ -16,7 +16,7 @@ class Db implements Storage {
       openRequest.onupgradeneeded = () => {
         const db = openRequest.result;
         db.onerror = (e) => error(e);
-        db.createObjectStore(name);
+        db.createObjectStore(name, { keyPath: 'key' });
       }
     })
   }
@@ -29,29 +29,29 @@ class Db implements Storage {
 
   get(key: string) {
     return new Promise(async (ok, error) => {
-      const request = (await this.request('readonly')).get(key);
-      request.onsuccess = () => ok(request.result);
+      const request = (await this.request('readonly')).get(key.toUpperCase());
+      request.onsuccess = () => ok(request.result ? request.result.data : null);
       request.onerror = (e) => error(e);
     })
   }
 
   set(key: string, value: any) {
     return new Promise(async (ok, error) => {
-      const request = (await this.request('readwrite')).add(value, key);
+      const request = (await this.request('readwrite')).add({ key: key.toUpperCase(), name: key, data: value });
       request.onsuccess = () => ok();
       request.onerror = (e) => error(e);
     })
   }
 
-  delete(key: string) {
+  delete(key: string): Promise<void> {
     return new Promise(async (ok, error) => {
-      const request = (await this.request('readwrite')).delete(key);
+      const request = (await this.request('readwrite')).delete(key.toUpperCase());
       request.onsuccess = () => ok();
       request.onerror = (e) => error(e);
     })
   }
 
-  clear() {
+  clear(): Promise<void> {
     return new Promise(async (ok, error) => {
       const request = (await this.request('readwrite')).clear();
       request.onsuccess = () => ok();
@@ -66,7 +66,7 @@ class Db implements Storage {
       request.onsuccess = () => {
         const cursor = request.result;
         if (!cursor) return ok(keys);
-        keys.push(cursor.value);
+        keys.push(<string>cursor.value.name);
         cursor.continue();
       }
       request.onerror = (e) => error(e);

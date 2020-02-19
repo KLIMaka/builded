@@ -18,6 +18,7 @@ export interface WindowBuilder {
   closeable(closeable: boolean): WindowBuilder;
   size(width: number, height: number): WindowBuilder;
   onclose(h: () => void): WindowBuilder;
+  toolbar(icon: string, click: () => void): WindowBuilder;
   build(): Window;
 }
 

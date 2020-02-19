@@ -2237,6 +2237,12 @@ tr:active,
   background-color: #116cd6;
 }
 
+tr.selected,
+.table-striped tr.selected {
+  color: #fff;
+  background-color: #116cd6;
+}
+
 thead tr:active {
   color: #333;
   background-color: #f5f5f4;

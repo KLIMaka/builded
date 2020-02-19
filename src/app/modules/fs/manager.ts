@@ -1,5 +1,5 @@
 import { Dependency, Injector } from "../../../utils/injector";
-import { Table, span } from "../../../utils/ui/ui";
+import { Table, span, stopPropagation } from "../../../utils/ui/ui";
 import { UI, Ui, Window } from "../../apis/ui";
 
 export interface FsManager {
@@ -10,15 +10,9 @@ export interface FsManager {
 }
 export const FS_MANAGER = new Dependency<FsManager>('FileSystem Manager');
 
-function drag(e) {
-  e.stopPropagation();
-  e.preventDefault();
-}
-
-
 class FileBrowser {
   private window: Window;
-  private fileReader = new FileReader();
+  private selected = new Set<string>();
 
   constructor(ui: Ui, private manager: FsManager) {
     this.window = ui.builder.windowBuilder()
@@ -28,29 +22,38 @@ class FileBrowser {
       .closeable(true)
       .centered(true)
       .size(600, 600)
+      .toolbar('icon-arrows-ccw', () => this.refreshContent())
+      .toolbar('icon-trash', () => this.deleteSelected())
       .build();
 
     const win = this.window.winElement;
-    win.addEventListener("dragenter", drag, false);
-    win.addEventListener("dragover", drag, false);
+    win.addEventListener("dragenter", stopPropagation, false);
+    win.addEventListener("dragover", stopPropagation, false);
     win.addEventListener("drop", (e) => {
-      e.stopPropagation();
-      e.preventDefault();
-      this.fileReader.readAsArrayBuffer(e.dataTransfer.files[0])
+      stopPropagation(e);
+      for (const file of e.dataTransfer.files) {
+        const fileReader = new FileReader();
+        const name = file.name;
+        fileReader.readAsArrayBuffer(file);
+        fileReader.onload = async e => {
+          const data = <ArrayBuffer>e.target.result;
+          await manager.write(name, data);
+          this.refreshContent();
+        }
+      }
     }, false);
 
-    this.fileReader.onload = async e => {
-      const data = <ArrayBuffer>e.target.result;
-      await manager.write('file.txt', data);
-      this.refreshContent();
-    }
   }
 
   private async refreshContent() {
     const list = await this.manager.list();
     const table = new Table();
     table.className("table-striped");
-    list.forEach(f => table.row([span().text(f)]));
+    list.forEach(f => {
+      const file = span().text(f);
+      const row = table.row([file]);
+      row.click(() => this.toggleItem(row.elem(), f));
+    });
     this.replaceContent(table.elem());
   }
 
@@ -59,6 +62,18 @@ class FileBrowser {
     if (content) this.window.contentElement.removeChild(content);
     this.window.contentElement.appendChild(newContent);
   }
+
+  private toggleItem(target: HTMLElement, name: string) {
+    target.classList.toggle('selected');
+    if (this.selected.has(name)) this.selected.delete(name)
+    else this.selected.add(name);
+  }
+
+  private async deleteSelected() {
+    for (const file of this.selected) await this.manager.delete(file)
+    this.refreshContent();
+  }
+
 
   public async show() {
     await this.refreshContent();

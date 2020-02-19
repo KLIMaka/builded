@@ -2359,3 +2359,7 @@ td:last-child {
   width: 100%; 
   text-align: center;
 }
+
+.red {
+  color:#fc605b;
+}

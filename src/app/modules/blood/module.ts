@@ -19,7 +19,7 @@ import { MapName_, MapNames_ } from '../selectmap';
 import { FS, FileProvider } from '../fs/fs';
 import { MOUNTS } from '../fs/mount';
 
-const RAW_PLUs_ = new Dependency<Uint8Array[]>('Raw PLUs');
+const RAW_PLUs = new Dependency<Uint8Array[]>('Raw PLUs');
 
 async function loadArtFiles(injector: Injector): Promise<ArtFiles> {
   const fs = await injector.getInstance(FS);
@@ -30,16 +30,17 @@ async function loadArtFiles(injector: Injector): Promise<ArtFiles> {
 }
 
 async function loadPLUs(injector: Injector) {
-  return (await injector.getInstance(RAW_PLUs_)).length;
+  return (await injector.getInstance(RAW_PLUs)).length;
 }
 
 async function loadPalTexture(injector: Injector) {
-  return Promise.all([injector.getInstance(RAW_PAL_), injector.getInstance(GL)]).then(([pal, gl]) => createTexture(256, 1, gl, { filter: gl.NEAREST }, pal, gl.RGB, 3))
+  const [pal, gl] = await Promise.all([injector.getInstance(RAW_PAL_), injector.getInstance(GL)]);
+  return createTexture(256, 1, gl, { filter: gl.NEAREST }, pal, gl.RGB, 3);
 }
 
 async function loarRawPlus(injector: Injector) {
   const fs = await injector.getInstance(FS)
-  return Promise.all([
+  const plus = await Promise.all([
     fs('NORMAL.PLU'),
     fs('SATURATE.PLU'),
     fs('BEAST.PLU'),
@@ -56,11 +57,12 @@ async function loarRawPlus(injector: Injector) {
     fs('P3.PLU'),
     fs('P4.PLU'),
   ])
+  return plus.map(p => new Uint8Array(p));
 }
 
 async function loadPluTexture(injector: Injector) {
   return Promise.all([
-    injector.getInstance(RAW_PLUs_),
+    injector.getInstance(RAW_PLUs),
     injector.getInstance(GL),
     injector.getInstance(Shadowsteps_)])
     .then(([plus, gl, shadowsteps]) => {
@@ -140,7 +142,7 @@ async function loadRff(injector: Injector): Promise<FileProvider> {
 function loadFile(name: string) {
   return async (injector: Injector) => {
     const fs = await injector.getInstance(FS);
-    return fs(name);
+    return new Uint8Array(await fs(name));
   }
 }
 
@@ -148,10 +150,10 @@ export function BloodModule(injector: Injector) {
   injector.bindInstance(ParallaxTextures_, 16);
   injector.bindInstance(BoardManipulator_, { cloneBoard });
   injector.bindInstance(Shadowsteps_, 64);
-  injector.bindMulti(MOUNTS, loadRff);
+  injector.bind<FileProvider>(MOUNTS, loadRff);
   injector.bind(ArtFiles_, loadArtFiles);
   injector.bind(RAW_PAL_, loadFile('BLOOD.PAL'));
-  injector.bind(RAW_PLUs_, loarRawPlus);
+  injector.bind(RAW_PLUs, loarRawPlus);
   injector.bind(Palswaps_, loadPLUs);
   injector.bind(PAL_, loadPalTexture);
   injector.bind(PLUs_, loadPluTexture);

@@ -13,8 +13,7 @@ class StorageDb implements Storage {
   async clear() { return (await this.db).clear(this.name) }
 
   async keys(): Promise<string[]> {
-    // return (await this.db).getAllKeys('keyval');
-    return null;
+    return Promise.resolve((await (await this.db).getAllKeys('keyval')).map(k => k.toString()));
   }
 }
 

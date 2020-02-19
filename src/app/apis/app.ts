@@ -12,8 +12,8 @@ import { ReferenceTracker } from "./referencetracker";
 export interface Storage {
   get(key: string): Promise<any>;
   set(key: string, value: any): Promise<any>;
-  delete(key: string): Promise<any>;
-  clear(): Promise<any>;
+  delete(key: string): Promise<void>;
+  clear(): Promise<void>;
   keys(): Promise<string[]>;
 }
 export type Storages = (name: string) => Promise<Storage>;

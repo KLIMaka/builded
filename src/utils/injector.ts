@@ -31,11 +31,8 @@ export class Injector {
     return () => this.promises.get(dependency);
   }
 
-  public bindMulti<T>(dependency: Dependency<T[]>, provider: InstanceProvider<T>) {
-    this.bind(<Dependency<T>>dependency, provider);
-  }
-
-  public bind<T>(dependency: Dependency<T>, provider: InstanceProvider<T>) {
+  public bind<T>(dependency: Dependency<T>, provider: InstanceProvider<T>): void
+  public bind<T>(dependency: Dependency<T[]>, provider: InstanceProvider<T>): void {
     let p = this.providers.get(dependency);
     if (dependency.multi) {
       if (p == undefined) {

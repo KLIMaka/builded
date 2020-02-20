@@ -44,6 +44,8 @@ function applySectorTextureTransform(sector: Sector, ceiling: boolean, walls: Wa
 const tc_ = vec4.create();
 function fillBuffersForSectorNormal(ceil: boolean, board: Board, s: number, sec: Sector, buff: BuildBuffer, vtxs: number[][], vidxs: number[], normal: Vec3Array, t: Mat4Array) {
   const heinum = ceil ? sec.ceilingheinum : sec.floorheinum;
+  const shade = ceil ? sec.ceilingshade : sec.floorshade;
+  const pal = ceil ? sec.ceilingpal : sec.floorpal;
   const z = ceil ? sec.ceilingz : sec.floorz;
   const slope = createSlopeCalculator(board, s);
 
@@ -54,7 +56,7 @@ function fillBuffersForSectorNormal(ceil: boolean, board: Board, s: number, sec:
     buff.writePos(i, vx, vz, vy);
     buff.writeNormal(i, normal[0], normal[1], normal[2]);
     vec4.transformMat4(tc_, vec4.set(tc_, vx, vz, vy, 1), t);
-    buff.writeTc(i, tc_[0], tc_[1]);
+    buff.writeTcLighting(i, tc_[0], tc_[1], pal, shade);
   }
 
   for (let i = 0; i < vidxs.length; i += 3) {
@@ -106,16 +108,12 @@ export function updateSector(ctx: BuildContext, secId: number, builder: SectorBu
   fillBuffersForSector(true, board, secId, sec, builder, sectorNormal(sectorNormal_, board, secId, true), texMat_);
   builder.ceiling.tex = sec.ceilingstat.parallaxing ? art.getParallaxTexture(sec.ceilingpicnum) : art.get(sec.ceilingpicnum);
   builder.ceiling.parallax = sec.ceilingstat.parallaxing;
-  builder.ceiling.pal = sec.ceilingpal;
-  builder.ceiling.shade = sec.ceilingshade;
 
   const floorinfo = art.getInfo(sec.floorpicnum);
   applySectorTextureTransform(sec, false, board.walls, floorinfo, texMat_);
   fillBuffersForSector(false, board, secId, sec, builder, sectorNormal(sectorNormal_, board, secId, false), texMat_);
   builder.floor.tex = sec.floorstat.parallaxing ? art.getParallaxTexture(sec.floorpicnum) : art.get(sec.floorpicnum);
   builder.floor.parallax = sec.floorstat.parallaxing;
-  builder.floor.pal = sec.floorpal;
-  builder.floor.shade = sec.floorshade;
 
   return builder;
 }

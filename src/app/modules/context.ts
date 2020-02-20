@@ -204,8 +204,8 @@ export class Context extends MessageHandlerReflective implements BuildContext {
     this.boardManipulator = manipulator;
     this.gridController = gridController;
     this.activeBoard = board;
-    this.view = this.bind(view);
     this.buildersFactory = buildersFactory;
+    this.view = this.bind(view);
     this.commit();
 
     this.state.register('gridScale', this.gridScale);

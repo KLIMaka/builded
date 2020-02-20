@@ -24,7 +24,7 @@ export class BufferSetup implements StateSetup {
     this.register('aIndex', state);
     this.register('aPos', state);
     this.register('aNorm', state);
-    this.register('aTc', state);
+    this.register('aTcps', state);
   }
 
   public apply(state: State) {
@@ -56,14 +56,10 @@ export class SolidSetup extends BufferSetup {
     super(state);
     this.register('base', state);
     this.register('color', state);
-    this.register('pluN', state);
-    this.register('shade', state);
   }
 
   public base(tex: Texture) { this.values.set(11, tex); return this }
   public color(color: Vec4Array) { this.values.set(13, color); return this }
-  public pal(pal: number) { this.values.set(15, pal); return this }
-  public shade(shade: number) { this.values.set(17, shade); return this }
 }
 
 export class GridSetup extends BufferSetup {

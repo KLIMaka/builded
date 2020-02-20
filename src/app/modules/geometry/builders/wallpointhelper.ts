@@ -40,10 +40,10 @@ function fillBufferForWallPoint(offset: number, board: Board, wallId: number, bu
   buff.writeNormal(vtxOff + 1, d, d, 0);
   buff.writeNormal(vtxOff + 2, d, -d, 0);
   buff.writeNormal(vtxOff + 3, -d, -d, 0);
-  buff.writeTc(vtxOff + 0, 0, 0);
-  buff.writeTc(vtxOff + 1, 1, 0);
-  buff.writeTc(vtxOff + 2, 1, 1);
-  buff.writeTc(vtxOff + 3, 0, 1);
+  buff.writeTcLighting(vtxOff + 0, 0, 0);
+  buff.writeTcLighting(vtxOff + 1, 1, 0);
+  buff.writeTcLighting(vtxOff + 2, 1, 1);
+  buff.writeTcLighting(vtxOff + 3, 0, 1);
   buff.writeQuad(offset * 6, vtxOff, vtxOff + 1, vtxOff + 2, vtxOff + 3);
 }
 

@@ -106,10 +106,10 @@ export function writeText(buff: BuildBuffer, bufferOff: number, text: string, ch
     buff.writePos(vtxoff + 1, posx, posz, posy);
     buff.writePos(vtxoff + 2, posx, posz, posy);
     buff.writePos(vtxoff + 3, posx, posz, posy);
-    buff.writeTc(vtxoff + 0, column, row + charTexSize);
-    buff.writeTc(vtxoff + 1, column, row);
-    buff.writeTc(vtxoff + 2, column + charTexSize, row);
-    buff.writeTc(vtxoff + 3, column + charTexSize, row + charTexSize);
+    buff.writeTcLighting(vtxoff + 0, column, row + charTexSize);
+    buff.writeTcLighting(vtxoff + 1, column, row);
+    buff.writeTcLighting(vtxoff + 2, column + charTexSize, row);
+    buff.writeTcLighting(vtxoff + 3, column + charTexSize, row + charTexSize);
     buff.writeNormal(vtxoff + 0, xoff, yoff, 0);
     buff.writeNormal(vtxoff + 1, xoff, yoff + charH, 0);
     buff.writeNormal(vtxoff + 2, xoff + charW, yoff + charH, 0);

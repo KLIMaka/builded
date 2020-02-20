@@ -64,10 +64,10 @@ class Contour {
       buff.writePos(off + 1, p[0], this.z, p[1]);
       buff.writePos(off + 2, p[0], this.z, p[1]);
       buff.writePos(off + 3, p[0], this.z, p[1]);
-      buff.writeTc(off + 0, 0, 0);
-      buff.writeTc(off + 1, 1, 0);
-      buff.writeTc(off + 2, 1, 1);
-      buff.writeTc(off + 3, 0, 1);
+      buff.writeTcLighting(off + 0, 0, 0);
+      buff.writeTcLighting(off + 1, 1, 0);
+      buff.writeTcLighting(off + 2, 1, 1);
+      buff.writeTcLighting(off + 3, 0, 1);
       buff.writeNormal(off + 0, -d, d, 0);
       buff.writeNormal(off + 1, d, d, 0);
       buff.writeNormal(off + 2, d, -d, 0);

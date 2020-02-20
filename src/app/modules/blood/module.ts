@@ -27,6 +27,7 @@ async function loadArtFiles(injector: Injector): Promise<ArtFiles> {
     const name = 'TILES0' + ("00" + a).slice(-2) + '.ART';
     const file = await res.get(name);
     if (file) arts.push(new ArtFile(new Stream(file, true)));
+    else break;
   }
   if (arts.length == 0) throw new Error('No ART files was loaded');
   return createArts(arts);

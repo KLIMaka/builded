@@ -10,7 +10,7 @@ export interface BuildBuffer {
   deallocate(): void;
   writePos(off: number, x: number, y: number, z: number): number;
   writeNormal(off: number, x: number, y: number, z: number): number;
-  writeTc(off: number, u: number, v: number): number;
+  writeTcLighting(off: number, u: number, v: number, pal?: number, shade?: number): number;
   writeTriangle(off: number, a: number, b: number, c: number): number;
   writeQuad(off: number, a: number, b: number, c: number, d: number): number;
   writeLine(off: number, a: number, b: number): number;
@@ -33,7 +33,7 @@ export async function DefaultBufferFactory(injector: Injector) {
 
 const POSITION = 0;
 const NORMAL = 1;
-const TEXCOORDS = 2;
+const TEX_SHADING = 2;
 
 class BuildBufferFactoryImpl implements BuildBufferFactory {
   private buffers: Buffer[] = [];
@@ -46,7 +46,7 @@ class BuildBufferFactoryImpl implements BuildBufferFactory {
     const buffer = new Buffer(this.gl, new BufferBuilder()
       .addVertexBuffer(this.gl, this.gl.FLOAT, 3)
       .addVertexBuffer(this.gl, this.gl.FLOAT, 3)
-      .addVertexBuffer(this.gl, this.gl.FLOAT, 2));
+      .addVertexBuffer(this.gl, this.gl.FLOAT, 4));
     this.buffers.push(buffer);
     return buffer;
   }
@@ -104,8 +104,8 @@ export class BuildBufferImpl implements BuildBuffer {
     return off + 1;
   }
 
-  public writeTc(off: number, u: number, v: number): number {
-    this.ptr.buffer.writeVertex(this.ptr, TEXCOORDS, off, [u, v]);
+  public writeTcLighting(off: number, u: number, v: number, pal: number = 0, shade: number = 0): number {
+    this.ptr.buffer.writeVertex(this.ptr, TEX_SHADING, off, [u, v, pal, shade]);
     return off + 1;
   }
 
@@ -133,7 +133,7 @@ export class BuildBufferImpl implements BuildBuffer {
   }
 
   public getTexCoordBuffer(): VertexBuffer {
-    return this.ptr.buffer.getVertexBuffer(TEXCOORDS);
+    return this.ptr.buffer.getVertexBuffer(TEX_SHADING);
   }
 
   public getIdxBuffer(): IndexBuffer {

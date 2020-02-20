@@ -57,10 +57,10 @@ export class BoardRenderer2D {
     buff.writePos(1, 1, 1, 0);
     buff.writePos(2, 1, -1, 0);
     buff.writePos(3, -1, -1, 0);
-    buff.writeTc(0, -1, 1);
-    buff.writeTc(1, 1, 1);
-    buff.writeTc(2, 1, -1);
-    buff.writeTc(3, -1, 1);
+    buff.writeTcLighting(0, -1, 1);
+    buff.writeTcLighting(1, 1, 1);
+    buff.writeTcLighting(2, 1, -1);
+    buff.writeTcLighting(3, -1, 1);
     buff.writeQuad(0, 0, 1, 2, 3);
     this.grid = new GridBuilder();
     this.grid.gridTexMatProvider = (scale: number) => gridMatrix;

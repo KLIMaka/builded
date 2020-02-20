@@ -38,15 +38,10 @@ let implementation: Implementation;
 let context: BuildContext;
 let BGL: BuildGl;
 
-export function init(gl: WebGLRenderingContext, ctx: BuildContext, impl: Implementation, bgl: BuildGl) {
+export function init(ctx: BuildContext, impl: Implementation, bgl: BuildGl) {
   context = ctx;
   implementation = impl;
   BGL = bgl;
-  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-  gl.enable(gl.CULL_FACE);
-  gl.enable(gl.DEPTH_TEST);
-  gl.enable(gl.POLYGON_OFFSET_FILL);
-  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 }
 
 export function draw(view: View3d) {

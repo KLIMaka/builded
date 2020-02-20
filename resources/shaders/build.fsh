@@ -11,10 +11,9 @@ uniform vec4 clipPlane;
 uniform vec4 sys;
 
 uniform vec4 color;
-uniform int pluN;
 uniform int shade;
 
-varying vec2 tc;
+varying vec4 tcps;
 varying vec2 gridtc;
 varying vec3 wpos;
 varying vec3 wnormal;
@@ -24,7 +23,7 @@ const float PI = 3.1415926538;
 
 float lightOffset() {
   float shadowLevel = length(wpos.xz - eyepos.xz) / 512.0 * (SHADOWSTEPS / 64.0);
-  return (0.2 + float(shade) / 127.0) * SHADOWSTEPS + shadowLevel;
+  return (0.2 + float(tcps.w) / 127.0) * SHADOWSTEPS + shadowLevel;
 }
 
 float diffuse() {
@@ -60,9 +59,9 @@ float highlight() {
 
 float palLightOffset(float lightLevel) {
 #ifdef PAL_LIGHTING
-  return (float(pluN) + lightLevel) / PALSWAPS;
+  return (float(tcps.z) + lightLevel) / PALSWAPS;
 #else
-  return (float(pluN) + 0.5 / SHADOWSTEPS) / PALSWAPS ;
+  return (float(tcps.z) + 0.5 / SHADOWSTEPS) / PALSWAPS ;
 #endif
 }
 
@@ -116,8 +115,8 @@ void main() {
   vec4 grid = texture2D(grid, gridtc);
   writeColor(vec3(1.0), grid);
 #elif defined SPRITE_FACE
-  writeColor(color.rgb, texture2D(base, tc));
+  writeColor(color.rgb, texture2D(base, tcps.xy));
 #else
-  writeColor(palLookup(tc), color);
+  writeColor(palLookup(tcps.xy), color);
 #endif
 }

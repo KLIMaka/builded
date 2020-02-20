@@ -1,13 +1,13 @@
-import { int } from "../../../../utils/mathutils";
-import { BuildContext } from "../../../apis/app";
 import { walllen } from "../../../../build/boardutils";
 import { Board } from "../../../../build/structs";
 import { createSlopeCalculator, sectorOfWall, slope, ZSCALE } from "../../../../build/utils";
+import { fastIterator } from "../../../../utils/collections";
+import { int } from "../../../../utils/mathutils";
+import { BuildContext } from "../../../apis/app";
+import { Builders } from "../../../apis/builder";
+import { BuildersFactory, BuildRenderableProvider, LayeredRenderables, PointSpriteBuilder, SolidBuilder, WallRenderable } from "../../../apis/renderable";
 import { BuildBuffer } from "../../gl/buffers";
 import { createGridMatrixProviderWall, text } from "./common";
-import { BuildRenderableProvider, GridBuilder, PointSpriteBuilder, Renderables, SolidBuilder, WallRenderable, WireframeBuilder, LayeredRenderables, BuildersFactory } from "../../../apis/renderable";
-import { Builders } from "../../../apis/builder";
-import { fastIterator } from "../../../../utils/collections";
 
 export class WallHelperBuilder extends Builders implements WallRenderable {
   constructor(
@@ -26,7 +26,7 @@ export class WallHelperBuilder extends Builders implements WallRenderable {
     readonly mid = new LayeredRenderables(fastIterator([midWire, midGrid])),
     readonly bot = new LayeredRenderables(fastIterator([botWire, botGrid, botPoints, botLength])),
   ) {
-    super(fastIterator([topWire, midWire, topGrid, midGrid, botGrid, topPoints, botPoints, topLength, botLength]));
+    super(fastIterator([topWire, midWire, botWire, topGrid, midGrid, botGrid, topPoints, botPoints, topLength, botLength]));
   }
 }
 
@@ -132,10 +132,10 @@ function fillBufferForWallPoint(offset: number, board: Board, wallId: number, bu
   buff.writeNormal(vtxOff + 1, d, d, 0);
   buff.writeNormal(vtxOff + 2, d, -d, 0);
   buff.writeNormal(vtxOff + 3, -d, -d, 0);
-  buff.writeTc(vtxOff + 0, 0, 0);
-  buff.writeTc(vtxOff + 1, 1, 0);
-  buff.writeTc(vtxOff + 2, 1, 1);
-  buff.writeTc(vtxOff + 3, 0, 1);
+  buff.writeTcLighting(vtxOff + 0, 0, 0);
+  buff.writeTcLighting(vtxOff + 1, 1, 0);
+  buff.writeTcLighting(vtxOff + 2, 1, 1);
+  buff.writeTcLighting(vtxOff + 3, 0, 1);
   buff.writeQuad(offset * 6, vtxOff, vtxOff + 1, vtxOff + 2, vtxOff + 3);
 }
 

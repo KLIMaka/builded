@@ -17,22 +17,22 @@ function writePos(buff: BuildBuffer, c: number[]) {
 }
 
 const tc_ = vec4.create();
-function writeTransformTc(buff: BuildBuffer, t: Mat4Array, c: number[]) {
+function writeTransformTc(buff: BuildBuffer, t: Mat4Array, c: number[], pal: number, shade: number) {
   vec4.transformMat4(tc_, vec4.set(tc_, c[0], c[2], c[1], 1), t);
-  buff.writeTc(0, tc_[0], tc_[1]);
+  buff.writeTcLighting(0, tc_[0], tc_[1], pal, shade);
   vec4.transformMat4(tc_, vec4.set(tc_, c[3], c[5], c[4], 1), t);
-  buff.writeTc(1, tc_[0], tc_[1]);
+  buff.writeTcLighting(1, tc_[0], tc_[1], pal, shade);
   vec4.transformMat4(tc_, vec4.set(tc_, c[6], c[8], c[7], 1), t);
-  buff.writeTc(2, tc_[0], tc_[1]);
+  buff.writeTcLighting(2, tc_[0], tc_[1], pal, shade);
   vec4.transformMat4(tc_, vec4.set(tc_, c[9], c[11], c[10], 1), t);
-  buff.writeTc(3, tc_[0], tc_[1]);
+  buff.writeTcLighting(3, tc_[0], tc_[1], pal, shade);
 }
 
-function writeTc(buff: BuildBuffer, t: number[]) {
-  buff.writeTc(0, t[0], t[1]);
-  buff.writeTc(1, t[2], t[3]);
-  buff.writeTc(2, t[4], t[5]);
-  buff.writeTc(3, t[6], t[7]);
+function writeTc(buff: BuildBuffer, t: number[], pal: number, shade: number) {
+  buff.writeTcLighting(0, t[0], t[1], pal, shade);
+  buff.writeTcLighting(1, t[2], t[3], pal, shade);
+  buff.writeTcLighting(2, t[4], t[5], pal, shade);
+  buff.writeTcLighting(3, t[6], t[7], pal, shade);
 }
 
 function writeNormal(buff: BuildBuffer, n: number[]) {
@@ -42,11 +42,11 @@ function writeNormal(buff: BuildBuffer, n: number[]) {
   buff.writeNormal(3, n[9], n[10], n[11]);
 }
 
-function genQuad(c: number[], n: number[], t: Mat4Array, buff: BuildBuffer, onesided: number = 1) {
+function genQuad(c: number[], n: number[], t: Mat4Array, pal: number, shade: number, buff: BuildBuffer, onesided: number = 1) {
   buff.allocate(4, onesided ? 6 : 12);
 
   writePos(buff, c);
-  writeTransformTc(buff, t, c);
+  writeTransformTc(buff, t, c, pal, shade);
   writeNormal(buff, n);
 
   buff.writeQuad(0, 0, 1, 2, 3);
@@ -55,7 +55,9 @@ function genQuad(c: number[], n: number[], t: Mat4Array, buff: BuildBuffer, ones
 }
 
 const texMat_ = mat4.create();
-function fillbuffersForWallSprite(x: number, y: number, z: number, xo: number, yo: number, hw: number, hh: number, ang: number, xf: number, yf: number, onesided: number, renderable: SolidBuilder) {
+function fillbuffersForWallSprite(
+  x: number, y: number, z: number, xo: number, yo: number, hw: number, hh: number, ang: number, xf: number, yf: number,
+  onesided: number, pal: number, shade: number, renderable: SolidBuilder) {
   let dx = Math.sin(ang) * hw;
   let dy = Math.cos(ang) * hw;
 
@@ -73,11 +75,13 @@ function fillbuffersForWallSprite(x: number, y: number, z: number, xo: number, y
     x + dx, y + dy, z + hh + yo,
     x - dx, y - dy, z + hh + yo],
     normals(ang2vec(ang)), texMat,
+    pal, shade,
     renderable.buff, onesided);
 
 }
 
-function fillbuffersForFloorSprite(x: number, y: number, z: number, xo: number, yo: number, hw: number, hh: number, ang: number, xf: number, yf: number, onesided: number, renderable: SolidBuilder) {
+function fillbuffersForFloorSprite(x: number, y: number, z: number, xo: number, yo: number, hw: number, hh: number, ang: number, xf: number, yf: number,
+  onesided: number, pal: number, shade: number, renderable: SolidBuilder) {
   let dwx = Math.sin(ang) * hw;
   let dwy = Math.cos(ang) * hw;
   let dhx = Math.sin(ang + Math.PI / 2) * hh;
@@ -100,22 +104,23 @@ function fillbuffersForFloorSprite(x: number, y: number, z: number, xo: number, 
     x + dwx + dhx, y + dwy + dhy, z,
     x + s * (dwx - dhx), y + s * (dwy - dhy), z],
     normals([0, s, 0]), texMat,
+    pal, shade,
     renderable.buff, onesided);
 
 }
 
-function genSpriteQuad(x: number, y: number, z: number, n: number[], t: number[], buff: BuildBuffer) {
+function genSpriteQuad(x: number, y: number, z: number, n: number[], t: number[], pal: number, shade: number, buff: BuildBuffer) {
   buff.allocate(4, 12);
 
   writePos(buff, [x, y, z, x, y, z, x, y, z, x, y, z]);
-  writeTc(buff, t);
+  writeTc(buff, t, pal, shade);
   writeNormal(buff, n);
 
   buff.writeQuad(0, 0, 1, 2, 3);
   buff.writeQuad(6, 3, 2, 1, 0);
 }
 
-function fillBuffersForFaceSprite(x: number, y: number, z: number, xo: number, yo: number, hw: number, hh: number, xf: number, yf: number, renderable: SolidBuilder) {
+function fillBuffersForFaceSprite(x: number, y: number, z: number, xo: number, yo: number, hw: number, hh: number, xf: number, yf: number, pal: number, shade: number, renderable: SolidBuilder) {
   const texMat = texMat_;
   mat4.identity(texMat);
   mat4.scale(texMat, texMat, [1 / (hw * 2), -1 / (hh * 2), 1, 1]);
@@ -126,7 +131,8 @@ function fillBuffersForFaceSprite(x: number, y: number, z: number, xo: number, y
     +hw + xo, +hh + yo, 0,
     +hw + xo, -hh + yo, 0,
     -hw + xo, -hh + yo, 0
-  ], [0, 0, 1, 0, 1, 1, 0, 1], renderable.buff);
+  ], [0, 0, 1, 0, 1, 1, 0, 1],
+    pal, shade, renderable.buff);
 }
 
 export function updateSprite(ctx: BuildContext, sprId: number, builder: SolidBuilder): SolidBuilder {
@@ -149,17 +155,15 @@ export function updateSprite(ctx: BuildContext, sprId: number, builder: SolidBui
   let shade = spr.shade == -8 ? sectorShade : spr.shade;
   let trans = (spr.cstat.translucent || spr.cstat.tranclucentReversed) ? 0.6 : 1;
   builder.tex = tex;
-  builder.shade = shade;
-  builder.pal = spr.pal;
   builder.trans = trans;
 
   if (spr.cstat.type == FACE_SPRITE) {
-    fillBuffersForFaceSprite(x, y, z, xo, yo, hw, hh, xf, yf, builder);
+    fillBuffersForFaceSprite(x, y, z, xo, yo, hw, hh, xf, yf, spr.pal, shade, builder);
     builder.type = Type.FACE;
   } else if (spr.cstat.type == WALL_SPRITE) {
-    fillbuffersForWallSprite(x, y, z, xo, yo, hw, hh, ang, xf, yf, spr.cstat.onesided, builder);
+    fillbuffersForWallSprite(x, y, z, xo, yo, hw, hh, ang, xf, yf, spr.cstat.onesided, spr.pal, shade, builder);
   } else if (spr.cstat.type == FLOOR_SPRITE) {
-    fillbuffersForFloorSprite(x, y, z, xo, yo, hw, hh, ang, xf, yf, spr.cstat.onesided, builder);
+    fillbuffersForFloorSprite(x, y, z, xo, yo, hw, hh, ang, xf, yf, spr.cstat.onesided, spr.pal, shade, builder);
   }
 
   return builder;

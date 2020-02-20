@@ -8,16 +8,16 @@ uniform vec4 sys;
 
 attribute vec3 aNorm;
 attribute vec3 aPos;
-attribute vec2 aTc;
+attribute vec4 aTcps;
 
-varying vec2 tc;
+varying vec4 tcps;
 varying vec2 gridtc;
 varying vec3 wpos;
 varying vec3 wnormal;
 
 void main() {
   wpos = aPos;
-  tc = aTc;
+  tcps = aTcps;
 #ifdef SPRITE
   vec3 p = aPos + vec3(0.0, aNorm.y, 0.0);
   vec4 epos = V * vec4(p, 1.0);

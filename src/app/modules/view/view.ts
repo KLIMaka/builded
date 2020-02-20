@@ -272,7 +272,7 @@ export class View3d extends MessageHandlerReflective implements View {
     ctx.state.register('strafe_left', false);
     ctx.state.register('strafe_right', false);
     ctx.state.register('camera_speed', 8000);
-    RENDERER3D.init(this.gl, ctx, this.impl, this.buildgl);
+    RENDERER3D.init(ctx, this.impl, this.buildgl);
   }
 
   private updateHitscan(hit: Hitscan): Target {

@@ -64,15 +64,15 @@ function writePos(buff: BuildBuffer, c: number[]) {
 }
 
 const tc = vec4.create();
-function writeTransformTc(buff: BuildBuffer, t: Mat4Array, c: number[]) {
+function writeTransformTc(buff: BuildBuffer, t: Mat4Array, c: number[], pal: number, shade: number) {
   vec4.transformMat4(tc, vec4.set(tc, c[0], c[2], c[1], 1), t);
-  buff.writeTc(0, tc[0], tc[1]);
+  buff.writeTcLighting(0, tc[0], tc[1], pal, shade);
   vec4.transformMat4(tc, vec4.set(tc, c[3], c[5], c[4], 1), t);
-  buff.writeTc(1, tc[0], tc[1]);
+  buff.writeTcLighting(1, tc[0], tc[1], pal, shade);
   vec4.transformMat4(tc, vec4.set(tc, c[6], c[8], c[7], 1), t);
-  buff.writeTc(2, tc[0], tc[1]);
+  buff.writeTcLighting(2, tc[0], tc[1], pal, shade);
   vec4.transformMat4(tc, vec4.set(tc, c[9], c[11], c[10], 1), t);
-  buff.writeTc(3, tc[0], tc[1]);
+  buff.writeTcLighting(3, tc[0], tc[1], pal, shade);
 }
 
 function writeNormal(buff: BuildBuffer, n: number[]) {
@@ -82,11 +82,11 @@ function writeNormal(buff: BuildBuffer, n: number[]) {
   buff.writeNormal(3, n[9], n[10], n[11]);
 }
 
-function genQuad(c: number[], n: number[], t: Mat4Array, buff: BuildBuffer, onesided: number = 1) {
+function genQuad(c: number[], n: number[], t: Mat4Array, pal: number, shade: number, buff: BuildBuffer, onesided: number = 1) {
   buff.allocate(4, onesided ? 6 : 12);
 
   writePos(buff, c);
-  writeTransformTc(buff, t, c);
+  writeTransformTc(buff, t, c, pal, shade);
   writeNormal(buff, n);
 
   buff.writeQuad(0, 0, 1, 2, 3);
@@ -138,10 +138,8 @@ export function updateWall(ctx: BuildContext, wallId: number, builder: WallBuild
     const coords = getWallCoords(x1, y1, x2, y2, slope, slope, ceilingheinum, floorheinum, ceilingz, floorz, false);
     const base = wall.cstat.alignBottom ? floorz : ceilingz;
     applyWallTextureTransform(wall, wall2, info, base, wall, texMat_);
-    genQuad(coords, normal, texMat_, builder.mid.buff);
+    genQuad(coords, normal, texMat_, wall.pal, wall.shade, builder.mid.buff);
     builder.mid.tex = tex;
-    builder.mid.shade = wall.shade;
-    builder.mid.pal = wall.pal;
   } else {
     const nextsector = board.sectors[wall.nextsector];
     const nextslope = createSlopeCalculator(board, wall.nextsector);
@@ -151,10 +149,12 @@ export function updateWall(ctx: BuildContext, wallId: number, builder: WallBuild
     const nextfloorheinum = nextsector.floorheinum;
     const floorcoords = getWallCoords(x1, y1, x2, y2, nextslope, slope, nextfloorheinum, floorheinum, nextfloorz, floorz, true);
     if (floorcoords != null) {
+      let pal = 0;
+      let shade = 0;
       if (sector.floorstat.parallaxing && nextsector.floorstat.parallaxing && sector.floorpicnum == nextsector.floorpicnum) {
         builder.bot.tex = art.getParallaxTexture(sector.floorpicnum);
-        builder.bot.shade = sector.floorshade;
-        builder.bot.pal = sector.floorpal;
+        shade = sector.floorshade;
+        pal = sector.floorpal;
         builder.bot.parallax = 1;
       } else {
         const wall_ = wall.cstat.swapBottoms ? board.walls[wall.nextwall] : wall;
@@ -164,28 +164,30 @@ export function updateWall(ctx: BuildContext, wallId: number, builder: WallBuild
         const base = wall.cstat.alignBottom ? ceilingz : nextfloorz;
         applyWallTextureTransform(wall_, wall2_, info_, base, wall, texMat_);
         builder.bot.tex = tex_;
-        builder.bot.shade = wall_.shade;
-        builder.bot.pal = wall_.pal;
+        shade = wall_.shade;
+        pal = wall_.pal;
       }
-      genQuad(floorcoords, normal, texMat_, builder.bot.buff);
+      genQuad(floorcoords, normal, texMat_, pal, shade, builder.bot.buff);
     }
 
     const nextceilingheinum = nextsector.ceilingheinum;
     const ceilcoords = getWallCoords(x1, y1, x2, y2, slope, nextslope, ceilingheinum, nextceilingheinum, ceilingz, nextceilingz, true);
     if (ceilcoords != null) {
+      let pal = 0;
+      let shade = 0;
       if (sector.ceilingstat.parallaxing && nextsector.ceilingstat.parallaxing && sector.ceilingpicnum == nextsector.ceilingpicnum) {
         builder.top.tex = art.getParallaxTexture(sector.ceilingpicnum);
-        builder.top.shade = sector.ceilingshade;
-        builder.top.pal = sector.ceilingpal;
+        shade = sector.ceilingshade;
+        pal = sector.ceilingpal;
         builder.top.parallax = 1;
       } else {
         const base = wall.cstat.alignBottom ? ceilingz : nextceilingz;
         applyWallTextureTransform(wall, wall2, info, base, wall, texMat_);
         builder.top.tex = tex;
-        builder.top.shade = wall.shade;
-        builder.top.pal = wall.pal;
+        shade = wall.shade;
+        pal = wall.pal;
       }
-      genQuad(ceilcoords, normal, texMat_, builder.top.buff);
+      genQuad(ceilcoords, normal, texMat_, pal, shade, builder.top.buff);
     }
 
     if (wall.cstat.masking) {
@@ -196,10 +198,8 @@ export function updateWall(ctx: BuildContext, wallId: number, builder: WallBuild
         floorheinum, nextfloorheinum, floorz, nextfloorz);
       const base = wall.cstat.alignBottom ? Math.min(floorz, nextfloorz) : Math.max(ceilingz, nextceilingz);
       applyWallTextureTransform(wall, wall2, info1, base, wall, texMat_);
-      genQuad(coords, normal, texMat_, builder.mid.buff);
+      genQuad(coords, normal, texMat_, wall.pal, wall.shade, builder.mid.buff);
       builder.mid.tex = tex1;
-      builder.mid.shade = wall.shade;
-      builder.mid.pal = wall.pal;
       builder.mid.trans = trans;
     }
   }

@@ -159,9 +159,7 @@ let color = vec4.create();
 export class SolidBuilder extends BufferRenderable<SolidSetup> {
   public type: Type = Type.SURFACE;
   public tex: Texture;
-  public shade: number;
   public trans: number = 1;
-  public pal: number;
   public parallax: number = 0;
 
   constructor(readonly buff: BuildBuffer) { super(SOLID) }
@@ -171,8 +169,6 @@ export class SolidBuilder extends BufferRenderable<SolidSetup> {
     setup.shader(this.type == Type.SURFACE ? (this.parallax ? 'parallax' : 'baseShader') : 'spriteShader')
       .base(this.tex)
       .color(vec4.set(color, 1, 1, 1, this.trans))
-      .pal(this.pal)
-      .shade(this.shade);
   }
 
   public reset() {
@@ -181,8 +177,6 @@ export class SolidBuilder extends BufferRenderable<SolidSetup> {
     this.trans = 1;
     this.parallax = 0;
     this.tex = null;
-    this.shade = 0;
-    this.pal = 0;
   }
 }
 

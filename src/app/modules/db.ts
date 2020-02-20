@@ -10,7 +10,7 @@ class Db implements Storage {
 
   private connect(name: string, version = 1): Promise<IDBDatabase> {
     return new Promise((ok, error) => {
-      const openRequest = indexedDB.open('BuildEd', version);
+      const openRequest = indexedDB.open('BuildEd-' + name, version);
       openRequest.onerror = (e) => error(e);
       openRequest.onsuccess = (db) => ok(openRequest.result);
       openRequest.onupgradeneeded = () => {
@@ -23,7 +23,7 @@ class Db implements Storage {
 
   private async request(mode: IDBTransactionMode) {
     const db = await this.db;
-    const transaction = db.transaction([this.name], mode);
+    const transaction = db.transaction(this.name, mode);
     return transaction.objectStore(this.name);
   }
 

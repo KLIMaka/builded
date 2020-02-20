@@ -4,8 +4,8 @@ import { FileSystem } from "./fs";
 import { FS_MANAGER, FsManager } from "./manager";
 import { MOUNTS } from "./mount";
 
-
 const FS_KEY = 'filesystem';
+const FS_INFO_KEY = 'filesystem-info';
 
 export async function StorageFs(injector: Injector): Promise<FileSystem> {
   const storages = await injector.getInstance(Storages_);
@@ -29,13 +29,23 @@ async function getStorageFs(injector: Injector) {
   return dbfs;
 }
 
+let dbfsInfo: Storage;
+async function getStorageInfoFs(injector: Injector) {
+  if (dbfsInfo == null) {
+    const storages = await injector.getInstance(Storages_);
+    dbfsInfo = await storages(FS_INFO_KEY);
+  }
+  return dbfsInfo;
+}
+
 async function StorageFsManager(injector: Injector): Promise<FsManager> {
   const fs = await getStorageFs(injector);
+  const fsinfo = await getStorageInfoFs(injector);
   return {
     read: name => fs.get(name),
-    write: (name: string, data: ArrayBuffer) => fs.set(name, data),
-    delete: name => fs.delete(name),
-    list: () => fs.keys(),
+    write: async (name: string, data: ArrayBuffer) => await Promise.all([fs.set(name, data), fsinfo.set(name, { size: data.byteLength })]),
+    delete: async name => await Promise.all([fs.delete(name), fsinfo.delete(name)]),
+    list: () => fsinfo.keys(),
   }
 }
 

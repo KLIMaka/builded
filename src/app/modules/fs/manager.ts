@@ -4,8 +4,8 @@ import { UI, Ui, Window } from "../../apis/ui";
 
 export interface FsManager {
   read(name: string): Promise<ArrayBuffer>;
-  write(name: string, data: ArrayBuffer): Promise<void>;
-  delete(name: string): Promise<void>;
+  write(name: string, data: ArrayBuffer): Promise<any>;
+  delete(name: string): Promise<any>;
   list(): Promise<string[]>
 }
 export const FS_MANAGER = new Dependency<FsManager>('FileSystem Manager');

@@ -1,6 +1,6 @@
 import { BuildContext } from "../../../apis/app";
 import { createSlopeCalculator, sectorOfWall, slope, ZSCALE } from "../../../../build/utils";
-import { PointSpriteBuilder, WireframeBuilder } from "../../../apis/renderable";
+import { PointSpriteBuilder, WireframeBuilder, BuildersFactory } from "../../../apis/renderable";
 import { Builders } from "../../../apis/builder";
 import { Board } from "../../../../build/structs";
 import { BuildBuffer } from "../../gl/buffers";
@@ -8,8 +8,9 @@ import { fastIterator } from "../../../../utils/collections";
 
 export class WallPointHelperBuilder extends Builders {
   constructor(
-    readonly points = new PointSpriteBuilder(),
-    readonly line = new WireframeBuilder()
+    factory: BuildersFactory,
+    readonly points = factory.pointSprite(),
+    readonly line = factory.wireframe()
   ) { super(fastIterator([points, line])) }
 }
 
@@ -59,7 +60,7 @@ function addWallPoint(offset: number, builder: PointSpriteBuilder, ctx: BuildCon
 }
 
 export function updateWallPoint(ctx: BuildContext, wallId: number, builder: WallPointHelperBuilder): WallPointHelperBuilder {
-  builder = builder == null ? new WallPointHelperBuilder() : builder;
+  builder = builder == null ? new WallPointHelperBuilder(ctx.buildersFactory) : builder;
   builder.points.tex = ctx.art.get(-1);
   builder.points.buff.allocate(8, 12);
   addWallPoint(0, builder.points, ctx, true, wallId, 2.5);

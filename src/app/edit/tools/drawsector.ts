@@ -1,27 +1,30 @@
-import { int, len2d } from "../../../utils/mathutils";
-import { vec3 } from "../../../libs_js/glmatrix";
-import { Deck, fastIterator } from "../../../utils/collections";
-import { BuildContext } from "../../apis/app";
 import { createInnerLoop, createNewSector, splitSector, wallInSector } from "../../../build/boardutils";
-import { writeText } from "../../modules/geometry/builders/common";
-import { LayeredRenderables, PointSpriteBuilder, WireframeBuilder } from "../../apis/renderable";
-import { MessageHandlerReflective } from "../../apis/handler";
+import { Target } from "../../../build/hitscan";
 import { Board } from "../../../build/structs";
 import { findSector, sectorOfWall, ZSCALE } from "../../../build/utils";
+import { vec3 } from "../../../libs_js/glmatrix";
+import { Deck, fastIterator } from "../../../utils/collections";
+import { int, len2d } from "../../../utils/mathutils";
+import { BuildContext } from "../../apis/app";
+import { MessageHandlerReflective } from "../../apis/handler";
+import { LayeredRenderables, BuildersFactory } from "../../apis/renderable";
+import { writeText } from "../../modules/geometry/builders/common";
 import { getClosestSectorZ } from "../editutils";
 import { BoardInvalidate, Frame, NamedMessage, Render } from "../messages";
-import { Target } from "../../../build/hitscan";
 
 class Contour {
   private points: Array<[number, number]> = [];
   private size = 0;
   private z = 0;
-  private contour = new WireframeBuilder();
-  private contourPoints = new PointSpriteBuilder();
-  private length = new PointSpriteBuilder();
-  private renderable = new LayeredRenderables(fastIterator([this.contour, this.contourPoints, this.length]));
 
-  constructor(firstPoint: boolean = true) { if (firstPoint) this.pushPoint(0, 0) }
+  constructor(
+    factory: BuildersFactory,
+    firstPoint: boolean = true,
+    private contour = factory.wireframe(),
+    private contourPoints = factory.pointSprite(),
+    private length = factory.pointSprite(),
+    private renderable = new LayeredRenderables(fastIterator([contour, contourPoints, length]))
+  ) { if (firstPoint) this.pushPoint(0, 0) }
 
   public setZ(z: number) { this.z = z }
   public getZ() { return this.z }
@@ -120,13 +123,16 @@ class Contour {
 }
 
 export class DrawSector extends MessageHandlerReflective {
-
   private points = new Deck<[number, number]>();
   private pointer = vec3.create();
   private hintSector = -1;
   private valid = false;
-  private contour = new Contour();
   private isRect = true;
+
+  constructor(
+    factory: BuildersFactory,
+    private contour = new Contour(factory)
+  ) { super() }
 
   private update(ctx: BuildContext) {
     if (this.predrawUpdate(ctx)) return;

@@ -3,20 +3,21 @@ import { Board, Sector } from "../../../../build/structs";
 import { createSlopeCalculator, sectorOfWall, ZSCALE } from "../../../../build/utils";
 import { BuildBuffer } from "../../gl/buffers";
 import { buildCeilingHinge, buildFloorHinge, gridMatrixProviderSector } from "./common";
-import { BuildRenderableProvider, GridBuilder, PointSpriteBuilder, Renderables, SectorRenderable, SolidBuilder, WireframeBuilder, LayeredRenderables } from "../../../apis/renderable";
+import { BuildRenderableProvider, GridBuilder, PointSpriteBuilder, Renderables, SectorRenderable, SolidBuilder, WireframeBuilder, LayeredRenderables, BuildersFactory } from "../../../apis/renderable";
 import { Builders } from "../../../apis/builder";
 import { fastIterator } from "../../../../utils/collections";
 
 export class SectorHelperBuilder extends Builders implements SectorRenderable {
   constructor(
-    readonly ceilpoints = new PointSpriteBuilder(),
-    readonly ceilwire = new WireframeBuilder(),
-    readonly ceilhinge = new WireframeBuilder(),
-    readonly ceilgrid = new GridBuilder(),
-    readonly floorpoints = new PointSpriteBuilder(),
-    readonly floorwire = new WireframeBuilder(),
-    readonly floorhinge = new WireframeBuilder(),
-    readonly floorgrid = new GridBuilder(),
+    factory: BuildersFactory,
+    readonly ceilpoints = factory.pointSprite(),
+    readonly ceilwire = factory.wireframe(),
+    readonly ceilhinge = factory.wireframe(),
+    readonly ceilgrid = factory.grid(),
+    readonly floorpoints = factory.pointSprite(),
+    readonly floorwire = factory.wireframe(),
+    readonly floorhinge = factory.wireframe(),
+    readonly floorgrid = factory.grid(),
     readonly ceiling = new LayeredRenderables(fastIterator([ceilpoints, ceilwire, ceilhinge, ceilgrid])),
     readonly floor = new LayeredRenderables(fastIterator([floorpoints, floorwire, floorhinge, floorgrid])),
   ) { super(fastIterator([ceilpoints, ceilwire, ceilhinge, ceilgrid, floorpoints, floorwire, floorhinge, floorgrid])) }
@@ -77,7 +78,7 @@ function fillBuffersForSectorWireframe(s: number, sec: Sector, heinum: number, z
 }
 
 export function updateSectorHelper(cache: BuildRenderableProvider, ctx: BuildContext, secId: number, builder: SectorHelperBuilder): SectorHelperBuilder {
-  builder = builder == null ? new SectorHelperBuilder() : builder;
+  builder = builder == null ? new SectorHelperBuilder(ctx.buildersFactory) : builder;
   const pointTex = ctx.art.get(-1);
   builder.ceilpoints.tex = pointTex;
   builder.floorpoints.tex = pointTex;

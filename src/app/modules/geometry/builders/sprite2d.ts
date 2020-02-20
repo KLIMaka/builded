@@ -1,20 +1,20 @@
-import { vec3 } from "../../../../libs_js/glmatrix";
-import { BuildContext } from "../../../apis/app";
 import { ang2vec, spriteAngle, ZSCALE } from "../../../../build/utils";
-import { WireframeBuilder, PointSpriteBuilder } from "../../../apis/renderable";
-import { Builders } from "../../../apis/builder";
+import { vec3 } from "../../../../libs_js/glmatrix";
 import { fastIterator } from "../../../../utils/collections";
+import { BuildContext } from "../../../apis/app";
+import { Builders } from "../../../apis/builder";
+import { BuildersFactory, WireframeBuilder } from "../../../apis/renderable";
 import { text } from "./common";
 
 export class Sprite2dBuilder extends Builders {
   constructor(
-    readonly ang = new WireframeBuilder(),
-    readonly label = new PointSpriteBuilder()
+    factory: BuildersFactory,
+    readonly ang = factory.wireframe(),
+    readonly label = factory.pointSprite()
   ) { super(fastIterator([ang, label])) }
 }
 
 export function updateSpriteAngle(ctx: BuildContext, spriteId: number, builder: WireframeBuilder): WireframeBuilder {
-  builder = builder == null ? new WireframeBuilder() : builder;
   builder.mode = WebGLRenderingContext.TRIANGLES;
   const buff = builder.buff;
   buff.allocate(3, 6);
@@ -35,7 +35,7 @@ export function updateSpriteAngle(ctx: BuildContext, spriteId: number, builder: 
 }
 
 export function updateSprite2d(ctx: BuildContext, sprId: number, builder: Sprite2dBuilder): Sprite2dBuilder {
-  builder = builder == null ? new Sprite2dBuilder() : builder;
+  builder = builder == null ? new Sprite2dBuilder(ctx.buildersFactory) : builder;
   const sprite = ctx.board.sprites[sprId];
   text(builder.label, sprId + "", sprite.x, sprite.y, sprite.z / ZSCALE - 1024, 8, 8, ctx.art.get(-2));
   updateSpriteAngle(ctx, sprId, builder.ang);

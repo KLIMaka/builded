@@ -3,7 +3,7 @@ import { vec3 } from "../../../libs_js/glmatrix";
 import { cyclicPairs } from "../../../utils/collections";
 import { BuildContext } from "../../apis/app";
 import { pushWall } from "../../../build/boardutils";
-import { WireframeBuilder } from "../../apis/renderable";
+import { WireframeBuilder, BuildersFactory } from "../../apis/renderable";
 import { MessageHandlerReflective } from "../../apis/handler";
 import { build2gl, createSlopeCalculator, sectorOfWall, wallNormal, ZSCALE } from "../../../build/utils";
 import { MovingHandle } from "../handle";
@@ -17,7 +17,11 @@ const dir_ = vec3.create();
 export class PushWall extends MessageHandlerReflective {
   private wallId = -1;
   private movingHandle = new MovingHandle();
-  private wireframe = new WireframeBuilder();
+
+  constructor(
+    private builders: BuildersFactory,
+    private wireframe = builders.wireframe()
+  ) { super(); }
 
   private start(ctx: BuildContext) {
     const target = ctx.view.snapTarget();

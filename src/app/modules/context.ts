@@ -12,7 +12,7 @@ import { Binder, loadBinds } from '../input/keymap';
 import { messageParser } from '../input/messageparser';
 import { ReferenceTrackerImpl } from '../apis/referencetracker';
 import { Board } from '../../build/structs';
-import { consumerProvider, LayeredRenderable, SortingRenderable, WrapRenderable } from '../apis/renderable';
+import { consumerProvider, LayeredRenderable, SortingRenderable, WrapRenderable, BuildersFactory, BUILDERS_FACTORY, DefaultBuildersFactory } from '../apis/renderable';
 import { SelectionConstructor, Selection_, PicNumSelector_ } from '../edit/tools/selection';
 import { SplitWall } from '../edit/tools/splitwall';
 import { JoinSectors } from '../edit/tools/joinsectors';
@@ -29,6 +29,7 @@ import { BUILD_GL, BuildGlConstructor } from './gl/buildgl';
 import { SwappableViewConstructor } from './view/view';
 import { Texture } from '../../utils/gl/drawstruct';
 import { SelectorConstructor } from '../../app/modules/artselector'
+import { BUFFER_FACTORY, DefaultBufferFactory } from './gl/buffers';
 
 class History {
   private history: Deck<Board> = new Deck();
@@ -150,6 +151,8 @@ export function ContextModule(injector: Injector) {
   injector.bind(PicNumSelector_, SelectorConstructor);
   injector.bind(View_, SwappableViewConstructor);
   injector.bind(BUILD_GL, BuildGlConstructor);
+  injector.bind(BUFFER_FACTORY, DefaultBufferFactory);
+  injector.bind(BUILDERS_FACTORY, DefaultBuildersFactory);
   injector.bind(BuildContext_, ContextConstructor);
 }
 
@@ -163,14 +166,15 @@ export async function ContextConstructor(injector: Injector) {
     injector.getInstance(RenderablesCache_),
     injector.getInstance(KeymapConfig_),
     injector.getInstance(Selection_),
-  ]).then(([art, board, view, manipulator, ctrl, cache, binds, selection]) => {
-    const ctx = new Context(art, board, view, manipulator, ctrl);
+    injector.getInstance(BUILDERS_FACTORY)
+  ]).then(([art, board, view, manipulator, ctrl, cache, binds, selection, builders]) => {
+    const ctx = new Context(art, board, view, manipulator, ctrl, builders);
     ctx.loadBinds(binds);
     ctx.addHandler(selection);
     ctx.addHandler(new SplitWall());
     ctx.addHandler(new JoinSectors());
-    ctx.addHandler(new DrawSector());
-    ctx.addHandler(new PushWall());
+    ctx.addHandler(new DrawSector(builders));
+    ctx.addHandler(new PushWall(builders));
     ctx.addHandler(new Info());
     ctx.addHandler(new Statusbar());
     ctx.addHandler(view);
@@ -184,6 +188,7 @@ export class Context extends MessageHandlerReflective implements BuildContext {
   readonly state = new StateImpl();
   readonly view: View;
   readonly refs = new BuildReferenceTrackerImpl();
+  readonly buildersFactory: BuildersFactory;
 
   private binder = new Binder();
   private history: History = new History();
@@ -193,13 +198,14 @@ export class Context extends MessageHandlerReflective implements BuildContext {
   private boundObjects = new Set();
   private gridController: GridController;
 
-  constructor(art: ArtProvider, board: Board, view: View, manipulator: BoardManipulator, gridController: GridController) {
+  constructor(art: ArtProvider, board: Board, view: View, manipulator: BoardManipulator, gridController: GridController, buildersFactory: BuildersFactory) {
     super();
     this.art = art;
     this.boardManipulator = manipulator;
     this.gridController = gridController;
     this.activeBoard = board;
     this.view = this.bind(view);
+    this.buildersFactory = buildersFactory;
     this.commit();
 
     this.state.register('gridScale', this.gridScale);

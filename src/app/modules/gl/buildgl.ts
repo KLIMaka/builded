@@ -35,6 +35,12 @@ export class BuildGl {
   private state = new State();
 
   constructor(palswaps: number, shadowsteps: number, gl: WebGLRenderingContext, pal: Texture, plus: Texture, grid: Texture, cb: () => void) {
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.enable(gl.CULL_FACE);
+    gl.enable(gl.DEPTH_TEST);
+    gl.enable(gl.POLYGON_OFFSET_FILL);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
     const defs = ['PALSWAPS (' + palswaps + '.0)', 'SHADOWSTEPS (' + shadowsteps + '.0)']
     Promise.all([
       createShader(gl, SHADER_NAME, [...defs, 'PAL_LIGHTING']).then(shader => this.state.registerShader('baseShader', shader)),

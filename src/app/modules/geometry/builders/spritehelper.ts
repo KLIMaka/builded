@@ -2,14 +2,15 @@ import { vec3 } from "../../../../libs_js/glmatrix";
 import { BuildContext } from "../../../apis/app";
 import { FACE_SPRITE, FLOOR_SPRITE, WALL_SPRITE } from "../../../../build/structs";
 import { ang2vec, spriteAngle, ZSCALE } from "../../../../build/utils";
-import { Type, WireframeBuilder } from "../../../apis/renderable";
+import { Type, WireframeBuilder, BuildersFactory } from "../../../apis/renderable";
 import { Builders } from "../../../apis/builder";
 import { fastIterator } from "../../../../utils/collections";
 
 export class SpriteHelperBuillder extends Builders {
   constructor(
-    readonly wire = new WireframeBuilder(),
-    readonly angle = new WireframeBuilder()
+    factory: BuildersFactory,
+    readonly wire = factory.wireframe(),
+    readonly angle = factory.wireframe()
   ) { super(fastIterator([wire, angle])) }
 }
 
@@ -118,7 +119,7 @@ function updateSpriteAngle(ctx: BuildContext, spriteId: number, renderable: Wire
 }
 
 export function updateSpriteHelper(ctx: BuildContext, sprId: number, builder: SpriteHelperBuillder): SpriteHelperBuillder {
-  builder = builder == null ? new SpriteHelperBuillder() : builder;
+  builder = builder == null ? new SpriteHelperBuillder(ctx.buildersFactory) : builder;
   updateSpriteWireframe(ctx, sprId, builder.wire);
   updateSpriteAngle(ctx, sprId, builder.angle);
   return builder;

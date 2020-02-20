@@ -5,22 +5,23 @@ import { Board } from "../../../../build/structs";
 import { createSlopeCalculator, sectorOfWall, slope, ZSCALE } from "../../../../build/utils";
 import { BuildBuffer } from "../../gl/buffers";
 import { createGridMatrixProviderWall, text } from "./common";
-import { BuildRenderableProvider, GridBuilder, PointSpriteBuilder, Renderables, SolidBuilder, WallRenderable, WireframeBuilder, LayeredRenderables } from "../../../apis/renderable";
+import { BuildRenderableProvider, GridBuilder, PointSpriteBuilder, Renderables, SolidBuilder, WallRenderable, WireframeBuilder, LayeredRenderables, BuildersFactory } from "../../../apis/renderable";
 import { Builders } from "../../../apis/builder";
 import { fastIterator } from "../../../../utils/collections";
 
 export class WallHelperBuilder extends Builders implements WallRenderable {
   constructor(
-    readonly topWire = new WireframeBuilder(),
-    readonly topGrid = new GridBuilder(),
-    readonly topPoints = new PointSpriteBuilder(),
-    readonly topLength = new PointSpriteBuilder(),
-    readonly midWire = new WireframeBuilder(),
-    readonly midGrid = new GridBuilder(),
-    readonly botWire = new WireframeBuilder(),
-    readonly botGrid = new GridBuilder(),
-    readonly botPoints = new PointSpriteBuilder(),
-    readonly botLength = new PointSpriteBuilder(),
+    factory: BuildersFactory,
+    readonly topWire = factory.wireframe(),
+    readonly topGrid = factory.grid(),
+    readonly topPoints = factory.pointSprite(),
+    readonly topLength = factory.pointSprite(),
+    readonly midWire = factory.wireframe(),
+    readonly midGrid = factory.grid(),
+    readonly botWire = factory.wireframe(),
+    readonly botGrid = factory.grid(),
+    readonly botPoints = factory.pointSprite(),
+    readonly botLength = factory.pointSprite(),
     readonly top = new LayeredRenderables(fastIterator([topWire, topGrid, topPoints, topLength])),
     readonly mid = new LayeredRenderables(fastIterator([midWire, midGrid])),
     readonly bot = new LayeredRenderables(fastIterator([botWire, botGrid, botPoints, botLength])),
@@ -174,7 +175,7 @@ function addLength(ctx: BuildContext, builder: PointSpriteBuilder, wallId: numbe
 }
 
 export function updateWallHelper(cache: BuildRenderableProvider, ctx: BuildContext, wallId: number, builder: WallHelperBuilder): WallHelperBuilder {
-  builder = builder == null ? new WallHelperBuilder() : builder;
+  builder = builder == null ? new WallHelperBuilder(ctx.buildersFactory) : builder;
 
   updateWallWireframe(ctx, wallId, builder);
   const wallRenderable = cache.wall(wallId);

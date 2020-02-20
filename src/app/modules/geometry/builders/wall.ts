@@ -6,14 +6,15 @@ import { ArtInfo } from "../../../../build/art";
 import { Wall } from "../../../../build/structs";
 import { createSlopeCalculator, sectorOfWall, wallNormal, ZSCALE } from "../../../../build/utils";
 import { BuildBuffer } from "../../gl/buffers";
-import { SolidBuilder, WallRenderable } from "../../../apis/renderable";
+import { SolidBuilder, WallRenderable, BuildersFactory } from "../../../apis/renderable";
 import { Builders } from "../../../apis/builder";
 
 export class WallBuilder extends Builders implements WallRenderable {
   constructor(
-    readonly top = new SolidBuilder(),
-    readonly mid = new SolidBuilder(),
-    readonly bot = new SolidBuilder()
+    factory: BuildersFactory,
+    readonly top = factory.solid(),
+    readonly mid = factory.solid(),
+    readonly bot = factory.solid()
   ) { super(fastIterator([top, mid, bot])) }
 }
 
@@ -114,7 +115,7 @@ function getMaskedWallCoords(x1: number, y1: number, x2: number, y2: number, slo
 const wallNormal_ = vec3.create();
 const texMat_ = mat4.create();
 export function updateWall(ctx: BuildContext, wallId: number, builder: WallBuilder): WallBuilder {
-  builder = builder == null ? new WallBuilder() : builder;
+  builder = builder == null ? new WallBuilder(ctx.buildersFactory) : builder;
   const board = ctx.board;
   const art = ctx.art;
   const wall = board.walls[wallId];

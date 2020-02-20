@@ -55,15 +55,15 @@ class CacheMap<T extends Builder> {
   }
 }
 
-const NULL_SECTOR_RENDERABLE = new SectorBuilder();
 
 export class CachedTopDownBuildRenderableProvider implements BuildRenderableProvider {
   private walls = new CacheMap(updateWall2d);
   private sprites = new CacheMap(updateSprite2d);
   private ctx: BuildContext;
+  private NULL_SECTOR_RENDERABLE: SectorRenderable;
 
-  bind(ctx: BuildContext): void { this.ctx = ctx }
-  sector(id: number): SectorRenderable { return NULL_SECTOR_RENDERABLE }
+  bind(ctx: BuildContext): void { this.ctx = ctx; this.NULL_SECTOR_RENDERABLE = new SectorBuilder(ctx.buildersFactory) }
+  sector(id: number): SectorRenderable { return this.NULL_SECTOR_RENDERABLE }
   wall(id: number): WallRenderable { return this.walls.get(id, this.ctx) }
   wallPoint(id: number): RenderableProvider<LayeredRenderable> { throw new Error('Cant render points') }
   sprite(id: number): RenderableProvider<LayeredRenderable> { return this.sprites.get(id, this.ctx) }

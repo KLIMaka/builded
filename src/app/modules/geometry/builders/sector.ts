@@ -1,19 +1,20 @@
-import { mat4, Mat4Array, vec3, Vec3Array, vec4 } from "../../../../libs_js/glmatrix";
-import { tesselate } from "../../../../libs_js/glutess";
-import { BuildContext } from "../../../apis/app";
 import { ArtInfo } from "../../../../build/art";
 import { Board, Sector, Wall } from "../../../../build/structs";
 import { createSlopeCalculator, getFirstWallAngle, sectorNormal, ZSCALE } from "../../../../build/utils";
-import { BuildBuffer } from "../../gl/buffers";
-import { SectorRenderable, SolidBuilder } from "../../../apis/renderable";
-import { Builders } from "../../../apis/builder";
+import { mat4, Mat4Array, vec3, Vec3Array, vec4 } from "../../../../libs_js/glmatrix";
+import { tesselate } from "../../../../libs_js/glutess";
 import { fastIterator } from "../../../../utils/collections";
+import { BuildContext } from "../../../apis/app";
+import { Builders } from "../../../apis/builder";
+import { BuildersFactory, SectorRenderable } from "../../../apis/renderable";
+import { BuildBuffer } from "../../gl/buffers";
 
 
 export class SectorBuilder extends Builders implements SectorRenderable {
   constructor(
-    readonly ceiling = new SolidBuilder(),
-    readonly floor = new SolidBuilder()
+    factory: BuildersFactory,
+    readonly ceiling = factory.solid(),
+    readonly floor = factory.solid()
   ) { super(fastIterator([ceiling, floor])) }
 }
 
@@ -95,7 +96,7 @@ function fillBuffersForSector(ceil: boolean, board: Board, s: number, sec: Secto
 const sectorNormal_ = vec3.create();
 const texMat_ = mat4.create();
 export function updateSector(ctx: BuildContext, secId: number, builder: SectorBuilder): SectorBuilder {
-  builder = builder == null ? new SectorBuilder() : builder;
+  builder = builder == null ? new SectorBuilder(ctx.buildersFactory) : builder;
   const board = ctx.board;
   const art = ctx.art;
   const sec = board.sectors[secId];

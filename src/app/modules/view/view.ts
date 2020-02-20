@@ -59,6 +59,7 @@ export class View2d extends MessageHandlerReflective implements View {
   private gridController: GridController;
   private upp = new DelayedValue(100, 1, NumberInterpolator);
   private buildgl: BuildGl;
+  private renderer: RENDERER2D.BoardRenderer2D;
 
   constructor(gl: WebGLRenderingContext, renderables: BuildRenderableProvider, gridController: GridController, buildgl: BuildGl) {
     super();
@@ -102,7 +103,7 @@ export class View2d extends MessageHandlerReflective implements View {
     const campos = this.control.getPosition();
     const dist = len2d(max[0] - campos[0], max[2] - campos[2]);
     this.buildgl.newFrame(this.gl);
-    RENDERER2D.draw(this, campos, dist, this.control);
+    this.renderer.draw(this, campos, dist, this.control);
 
     const state = ctx.state;
     if (state.get('zoom+')) { this.upp.set(this.upp.get() / 1.3); this.recalcGridSize(); }
@@ -132,7 +133,7 @@ export class View2d extends MessageHandlerReflective implements View {
     this.control.setPosition(this.playerstart.x, this.playerstart.y, 1024 * ZSCALE);
     ctx.state.register('zoom+', false);
     ctx.state.register('zoom-', false);
-    RENDERER2D.init(this.gl, ctx, this.buildgl);
+    this.renderer = new RENDERER2D.BoardRenderer2D(this.buildgl, this.ctx.buildersFactory, this.ctx, this.renderables);
   }
 
   private updateHitscan(hit: Hitscan) {

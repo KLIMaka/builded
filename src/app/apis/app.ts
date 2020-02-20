@@ -5,7 +5,7 @@ import { MoveStruct } from "../../build/utils";
 import { Texture } from "../../utils/gl/drawstruct";
 import { Dependency } from "../../utils/injector";
 import { InputState } from "../../utils/input";
-import { Renderable } from "./renderable";
+import { Renderable, BuildersFactory } from "./renderable";
 import { Context, Message, MessageHandler } from "./handler";
 import { ReferenceTracker } from "./referencetracker";
 
@@ -75,6 +75,7 @@ export interface BuildContext extends Context {
   readonly state: State;
   readonly gridScale: number;
   readonly view: View;
+  readonly buildersFactory: BuildersFactory;
 
   snap(x: number): number;
   commit(): void;

@@ -2369,3 +2369,7 @@ td:last-child {
 .red {
   color:#fc605b;
 }
+
+.icon-text .icon.pull-left {
+  margin-right:10px;
+}

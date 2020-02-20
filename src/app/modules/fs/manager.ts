@@ -50,11 +50,17 @@ class FileBrowser {
     const table = new Table();
     table.className("table-striped");
     list.forEach(f => {
-      const file = span().text(f);
+      const file = span().className('icon-text').text(f).append(span().className('icon pull-left ' + this.getIcon(f)));
       const row = table.row([file]);
       row.click(() => this.toggleItem(row.elem(), f));
     });
     this.replaceContent(table.elem());
+  }
+
+  private getIcon(name: string) {
+    if (name.endsWith('.map')) return 'icon-globe'
+    if (name.endsWith('.art')) return 'icon-picture'
+    return 'icon-doc';
   }
 
   private replaceContent(newContent: HTMLElement) {

@@ -42,7 +42,6 @@ class FileBrowser {
         }
       }
     }, false);
-
   }
 
   private async refreshContent() {
@@ -50,7 +49,8 @@ class FileBrowser {
     const table = new Table();
     table.className("table-striped");
     list.forEach(f => {
-      const file = span().className('icon-text').text(f).append(span().className('icon pull-left ' + this.getIcon(f)));
+      const file = span().className('icon-text').text(f)
+        .append(span().className('icon pull-left ' + this.getIcon(f)));
       const row = table.row([file]);
       row.click(() => this.toggleItem(row.elem(), f));
     });
@@ -58,8 +58,8 @@ class FileBrowser {
   }
 
   private getIcon(name: string) {
-    if (name.endsWith('.map')) return 'icon-globe'
-    if (name.endsWith('.art')) return 'icon-picture'
+    if (name.toLowerCase().endsWith('.map')) return 'icon-globe'
+    if (name.toLowerCase().endsWith('.art')) return 'icon-picture'
     return 'icon-doc';
   }
 

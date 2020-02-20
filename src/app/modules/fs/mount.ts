@@ -23,13 +23,5 @@ export async function MountableFs(injector: Injector): Promise<FileSystem> {
       }
       return [...files];
     },
-    info: async name => {
-      const mounts = await injector.getInstance(MOUNTS);
-      for (const mount of mounts) {
-        const file = await mount.info(name);
-        if (file) return file;
-      }
-      return null;
-    }
   }
 }

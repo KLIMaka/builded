@@ -1,16 +1,8 @@
 import { loadBin } from "../../../utils/getter";
 import { Dependency, Injector, InstanceProvider } from "../../../utils/injector";
-import { loadZip } from "../../../utils/zip";
-
-export interface FileInfo {
-  readonly name: string;
-  readonly size: number;
-  readonly source: string;
-}
 
 export interface FileSystem {
   get(name: string): Promise<ArrayBuffer>
-  info(name: string): Promise<FileInfo>
   list(): Promise<string[]>;
 }
 export const FS = new Dependency<FileSystem>('FileSystem');
@@ -28,11 +20,6 @@ export function UrlFs(path: string): InstanceProvider<FileSystem> {
       }
     }
   }
-}
-
-function drag(e) {
-  e.stopPropagation();
-  e.preventDefault();
 }
 
 // export function ZipFs(injector: Injector): Promise<FileProvider> {

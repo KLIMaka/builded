@@ -62,6 +62,12 @@ export interface BuildReferenceTracker {
 }
 export const BuildReferenceTracker_ = new Dependency<BuildReferenceTracker>('BuildReferenceTracker');
 
+export interface BuildResources {
+  get(name: string): Promise<ArrayBuffer>;
+  list(): Promise<string[]>;
+}
+export const RESOURCES = new Dependency<BuildResources>('Build Resources');
+
 export interface BuildContext extends Context {
   readonly art: ArtProvider;
   readonly board: Board;

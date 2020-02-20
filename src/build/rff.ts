@@ -76,7 +76,7 @@ export class RffFile {
 
   public get(fname: string): Uint8Array {
     const idx = this.namesTable[fname.toLowerCase()];
-    if (idx == undefined) throw new Error('Absent file: ' + fname);
+    if (idx == undefined) return null;
     const record = this.fat[idx];
     this.data.setOffset(record.offset);
     const arr = atomic_array(ubyte, record.size).read(this.data);

@@ -9,22 +9,28 @@ import { Deck } from '../../../utils/collections';
 import { createTexture } from '../../../utils/gl/textures';
 import { Dependency, Injector } from '../../../utils/injector';
 import { Stream } from '../../../utils/stream';
-import { BoardManipulator_, Board_, BuildReferenceTracker } from '../../apis/app';
+import { BoardManipulator_, Board_, BuildReferenceTracker, BuildResources, RESOURCES } from '../../apis/app';
 import { ReferenceTrackerImpl } from '../../apis/referencetracker';
 import { RAW_PAL_ } from '../artselector';
 import { ArtFiles_, GL, ParallaxTextures_ } from '../buildartprovider';
+import { FileSystem, FS } from '../fs/fs';
 import { Palswaps_, PAL_, PLUs_, Shadowsteps_ } from '../gl/buildgl';
+import { MapNames_, MapName_ } from '../selectmap';
 import { Implementation_ } from '../view/boardrenderer3d';
-import { MapName_, MapNames_ } from '../selectmap';
-import { FS, FileSystem } from '../fs/fs';
-import { MOUNTS } from '../fs/mount';
 
 const RAW_PLUs = new Dependency<Uint8Array[]>('Raw PLUs');
 
 async function loadArtFiles(injector: Injector): Promise<ArtFiles> {
-  const fs = await injector.getInstance(FS);
+  const res = await injector.getInstance(RESOURCES);
   const artPromises: Promise<ArtFile>[] = [];
-  for (let a = 0; a < 18; a++) artPromises.push(fs.get('TILES0' + ("00" + a).slice(-2) + '.ART').then(file => new ArtFile(new Stream(file, true))))
+  for (let a = 0; a < 18; a++) {
+    const name = 'TILES0' + ("00" + a).slice(-2) + '.ART';
+    artPromises.push(res.get(name)
+      .then(file => {
+        if (!file) throw new Error(`${name} is absent`);
+        return new ArtFile(new Stream(file, true))
+      }))
+  }
   const artFiles = await Promise.all(artPromises);
   return createArts(artFiles);
 }
@@ -39,23 +45,23 @@ async function loadPalTexture(injector: Injector) {
 }
 
 async function loarRawPlus(injector: Injector) {
-  const fs = await injector.getInstance(FS)
+  const res = await injector.getInstance(RESOURCES)
   const plus = await Promise.all([
-    fs.get('NORMAL.PLU'),
-    fs.get('SATURATE.PLU'),
-    fs.get('BEAST.PLU'),
-    fs.get('TOMMY.PLU'),
-    fs.get('SPIDER3.PLU'),
-    fs.get('GRAY.PLU'),
-    fs.get('GRAYISH.PLU'),
-    fs.get('SPIDER1.PLU'),
-    fs.get('SPIDER2.PLU'),
-    fs.get('FLAME.PLU'),
-    fs.get('COLD.PLU'),
-    fs.get('P1.PLU'),
-    fs.get('P2.PLU'),
-    fs.get('P3.PLU'),
-    fs.get('P4.PLU'),
+    res.get('NORMAL.PLU'),
+    res.get('SATURATE.PLU'),
+    res.get('BEAST.PLU'),
+    res.get('TOMMY.PLU'),
+    res.get('SPIDER3.PLU'),
+    res.get('GRAY.PLU'),
+    res.get('GRAYISH.PLU'),
+    res.get('SPIDER1.PLU'),
+    res.get('SPIDER2.PLU'),
+    res.get('FLAME.PLU'),
+    res.get('COLD.PLU'),
+    res.get('P1.PLU'),
+    res.get('P2.PLU'),
+    res.get('P3.PLU'),
+    res.get('P4.PLU'),
   ]);
   return plus.map(p => new Uint8Array(p));
 }
@@ -75,8 +81,8 @@ async function loadPluTexture(injector: Injector) {
 
 function loadMapImpl(name: string) {
   return async (injector: Injector) => {
-    const fs = await injector.getInstance(FS)
-    return loadBloodMap(new Stream(await fs.get(name), true));
+    const res = await injector.getInstance(RESOURCES)
+    return loadBloodMap(new Stream(await res.get(name), true));
   }
 }
 
@@ -127,34 +133,51 @@ async function loadMap(injector: Injector) {
 }
 
 async function getMapNames(injector: Injector) {
-  const fs = await injector.getInstance(FS);
-  return (await fs.list()).filter(f => f.endsWith('.map'));
+  const res = await injector.getInstance(RESOURCES);
+  return (await res.list()).filter(f => f.toLowerCase().endsWith('.map'));
 }
 
-let rff: RffFile;
 async function loadRffFile(injector: Injector) {
-  if (rff == null) {
-    rff = new RffFile(await (await injector.getInstance(FS)).get('BLOOD.RFF'));
-  }
-  return rff;
+  const fs = await injector.getInstance(FS);
+  const rffFile = await fs.get('BLOOD.RFF');
+  if (rffFile) return new RffFile(rffFile);
+  return null;
 }
 
-async function loadRff(injector: Injector): Promise<FileSystem> {
-  return {
-    get: async name => (await loadRffFile(injector)).get(name).buffer,
-    list: async () => (await loadRffFile(injector)).fat.map(r => r.filename),
-    info: async name => {
-      const rff = await loadRffFile(injector);
-      const file = rff.get(name);
-      return file ? { name: name, size: file.byteLength, source: "BLOOD.RFF" } : null;
+async function loadRffFs(injector: Injector): Promise<FileSystem> {
+  const rff = await loadRffFile(injector)
+  return rff
+    ? {
+      get: async name => { const file = rff.get(name); return file ? file.buffer : null },
+      list: async () => rff.fat.map(r => r.filename),
     }
-  }
+    : {
+      get: async name => null,
+      list: async () => []
+    }
 }
 
-function loadFile(name: string) {
-  return async (injector: Injector) => {
-    const fs = await injector.getInstance(FS);
-    return new Uint8Array(await fs.get(name));
+async function loadPal(injector: Injector) {
+  const res = await injector.getInstance(RESOURCES);
+  return new Uint8Array(await res.get('BLOOD.PAL'));
+}
+}
+
+
+async function BloodResources(injector: Injector): Promise<BuildResources> {
+  const fs = await injector.getInstance(FS);
+  const rfffs = await loadRffFs(injector);
+  return {
+    get: async name => {
+      const file = await rfffs.get(name);
+      if (file) return file;
+      return fs.get(name);
+    },
+    list: async () => {
+      const files = new Set<string>(await rfffs.list());
+      (await fs.list()).forEach(f => files.add(f));
+      return [...files];
+    }
   }
 }
 
@@ -162,9 +185,9 @@ export function BloodModule(injector: Injector) {
   injector.bindInstance(ParallaxTextures_, 16);
   injector.bindInstance(BoardManipulator_, { cloneBoard });
   injector.bindInstance(Shadowsteps_, 64);
-  injector.bind<FileSystem>(MOUNTS, loadRff);
+  injector.bind(RESOURCES, BloodResources);
   injector.bind(ArtFiles_, loadArtFiles);
-  injector.bind(RAW_PAL_, loadFile('BLOOD.PAL'));
+  injector.bind(RAW_PAL_, loadPal);
   injector.bind(RAW_PLUs, loarRawPlus);
   injector.bind(Palswaps_, loadPLUs);
   injector.bind(PAL_, loadPalTexture);

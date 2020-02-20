@@ -11,9 +11,7 @@ import { Injector } from './utils/injector';
 import * as INPUT from './utils/input';
 import { addLogAppender, CONSOLE } from './utils/logger';
 
-document.body.oncontextmenu = () => false;
 addLogAppender(CONSOLE);
-
 const gl = createContextFromCanvas("display", { alpha: false, antialias: false, stencil: true });
 INPUT.bind(<HTMLCanvasElement>gl.canvas);
 

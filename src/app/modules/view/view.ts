@@ -16,7 +16,7 @@ import { BoardInvalidate, Frame, Mouse, NamedMessage } from "../../edit/messages
 import * as RENDERER2D from './boardrenderer2d';
 import * as RENDERER3D from './boardrenderer3d';
 import { BuildRenderableProvider, Renderable } from "../../apis/renderable";
-import { BuildGl, BuildGl_ } from "../gl/buildgl";
+import { BuildGl, BUILD_GL } from "../gl/buildgl";
 import { RenderablesCache, RenderablesCache_ } from "../geometry/cache";
 import { GridController, GridController_ } from "../context";
 import { Message, MessageHandler, MessageHandlerReflective } from "../../apis/handler";
@@ -364,7 +364,7 @@ export async function SwappableViewConstructor(injector: Injector) {
     injector.getInstance(RenderablesCache_),
     injector.getInstance(RENDERER3D.Implementation_),
     injector.getInstance(GridController_),
-    injector.getInstance(BuildGl_),
+    injector.getInstance(BUILD_GL),
   ]).then(([gl, cache, impl, ctr, buildgl]) => new SwappableView(gl, cache, impl, ctr, buildgl));
 }
 

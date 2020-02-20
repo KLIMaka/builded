@@ -25,7 +25,7 @@ import { loadString } from '../../utils/getter';
 import { UtilityTextures_, BuildArtProviderConstructor, GL } from './buildartprovider';
 import { loadImage } from '../../utils/imgutils';
 import { createTexture } from '../../utils/gl/textures';
-import { BuildGl_, BuildGlConstructor } from './gl/buildgl';
+import { BUILD_GL, BuildGlConstructor } from './gl/buildgl';
 import { SwappableViewConstructor } from './view/view';
 import { Texture } from '../../utils/gl/drawstruct';
 import { SelectorConstructor } from '../../app/modules/artselector'
@@ -125,9 +125,9 @@ async function loadTexture(gl: WebGLRenderingContext, name: string, options: any
 
 async function loadUtilityTextures(textures: [number, Promise<Texture>][]) {
   return Promise.all(map(textures, t => t[1])).then(
-    _ => {
+    async _ => {
       const result: { [index: number]: Texture } = {};
-      for (const t of textures) t[1].then(tex => result[t[0]] = tex);
+      for (const [id, tex] of textures) result[id] = await tex;
       return result;
     }
   )
@@ -139,7 +139,6 @@ export function ContextModule(injector: Injector) {
   injector.bindInstance(BuildReferenceTracker_, new BuildReferenceTrackerImpl());
   injector.bindInstance(State_, new StateImpl());
   injector.bind(Selection_, SelectionConstructor);
-  injector.bind(BuildContext_, ContextConstructor);
   injector.bindInstance(RenderablesCache_, new RenderablesCacheImpl());
   injector.bindPromise(KeymapConfig_, loadString('builded_binds.txt'));
   injector.bindPromise(UtilityTextures_, injector.getInstance(GL).then(gl => loadUtilityTextures([
@@ -150,7 +149,8 @@ export function ContextModule(injector: Injector) {
   injector.bind(ArtProvider_, BuildArtProviderConstructor);
   injector.bind(PicNumSelector_, SelectorConstructor);
   injector.bind(View_, SwappableViewConstructor);
-  injector.bind(BuildGl_, BuildGlConstructor);
+  injector.bind(BUILD_GL, BuildGlConstructor);
+  injector.bind(BuildContext_, ContextConstructor);
 }
 
 export async function ContextConstructor(injector: Injector) {

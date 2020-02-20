@@ -14,7 +14,7 @@ import { ReferenceTrackerImpl } from '../../apis/referencetracker';
 import { RAW_PAL_ } from '../artselector';
 import { ArtFiles_, GL, ParallaxTextures_ } from '../buildartprovider';
 import { FileSystem, FS } from '../fs/fs';
-import { Palswaps_, PAL_, PLUs_, Shadowsteps_ } from '../gl/buildgl';
+import { PALSWAPS, PAL_TEXTURE, PLU_TEXTURE, SHADOWSTEPS } from '../gl/buildgl';
 import { MapNames_, MapName_ } from '../selectmap';
 import { Implementation_ } from '../view/boardrenderer3d';
 
@@ -22,17 +22,14 @@ const RAW_PLUs = new Dependency<Uint8Array[]>('Raw PLUs');
 
 async function loadArtFiles(injector: Injector): Promise<ArtFiles> {
   const res = await injector.getInstance(RESOURCES);
-  const artPromises: Promise<ArtFile>[] = [];
-  for (let a = 0; a < 18; a++) {
+  const arts: ArtFile[] = [];
+  for (let a = 0; a < 100; a++) {
     const name = 'TILES0' + ("00" + a).slice(-2) + '.ART';
-    artPromises.push(res.get(name)
-      .then(file => {
-        if (!file) throw new Error(`${name} is absent`);
-        return new ArtFile(new Stream(file, true))
-      }))
+    const file = await res.get(name);
+    if (file) arts.push(new ArtFile(new Stream(file, true)));
   }
-  const artFiles = await Promise.all(artPromises);
-  return createArts(artFiles);
+  if (arts.length == 0) throw new Error('No ART files was loaded');
+  return createArts(arts);
 }
 
 async function loadPLUs(injector: Injector) {
@@ -63,14 +60,14 @@ async function loarRawPlus(injector: Injector) {
     res.get('P3.PLU'),
     res.get('P4.PLU'),
   ]);
-  return plus.map(p => new Uint8Array(p));
+  return plus.filter(p => p != null).map(p => new Uint8Array(p));
 }
 
 async function loadPluTexture(injector: Injector) {
   return Promise.all([
     injector.getInstance(RAW_PLUs),
     injector.getInstance(GL),
-    injector.getInstance(Shadowsteps_)])
+    injector.getInstance(SHADOWSTEPS)])
     .then(([plus, gl, shadowsteps]) => {
       const tex = new Uint8Array(256 * shadowsteps * plus.length);
       let i = 0;
@@ -161,7 +158,6 @@ async function loadPal(injector: Injector) {
   const res = await injector.getInstance(RESOURCES);
   return new Uint8Array(await res.get('BLOOD.PAL'));
 }
-}
 
 
 async function BloodResources(injector: Injector): Promise<BuildResources> {
@@ -184,14 +180,14 @@ async function BloodResources(injector: Injector): Promise<BuildResources> {
 export function BloodModule(injector: Injector) {
   injector.bindInstance(ParallaxTextures_, 16);
   injector.bindInstance(BoardManipulator_, { cloneBoard });
-  injector.bindInstance(Shadowsteps_, 64);
+  injector.bindInstance(SHADOWSTEPS, 64);
   injector.bind(RESOURCES, BloodResources);
   injector.bind(ArtFiles_, loadArtFiles);
   injector.bind(RAW_PAL_, loadPal);
   injector.bind(RAW_PLUs, loarRawPlus);
-  injector.bind(Palswaps_, loadPLUs);
-  injector.bind(PAL_, loadPalTexture);
-  injector.bind(PLUs_, loadPluTexture);
+  injector.bind(PALSWAPS, loadPLUs);
+  injector.bind(PAL_TEXTURE, loadPalTexture);
+  injector.bind(PLU_TEXTURE, loadPluTexture);
   injector.bind(Implementation_, BloodImplementationConstructor);
   injector.bind(MapNames_, getMapNames);
   injector.bind(Board_, loadMap);

@@ -87,6 +87,7 @@ class Builder implements UiBuilder {
 }
 
 export function PhotonUiModule(injector: Injector) {
+  document.body.oncontextmenu = () => false;
   injector.bindInstance(UI, {
     builder: new Builder()
   });

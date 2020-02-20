@@ -2,9 +2,10 @@ import { Mat4Array, vec4 } from '../../libs_js/glmatrix';
 import { FastIterable, Deck } from '../../utils/collections';
 import { State } from '../../utils/gl/stategl';
 import { BuildContext } from './app';
-import { BuildBuffer } from '../modules/gl/buffers';
+import { BuildBuffer, BUFFER_FACTORY } from '../modules/gl/buffers';
 import { BufferRenderable, GRID, GridSetup, PointSpriteSetup, POINT_SPRITE, SOLID, SolidSetup, WIREFRAME, WireframeSetup } from '../modules/geometry/builders/setups';
 import { Texture } from '../../utils/gl/drawstruct';
+import { Dependency, Injector } from '../../utils/injector';
 
 
 export interface Renderable {
@@ -130,6 +131,25 @@ export interface BuildRenderableProvider {
 }
 
 
+export interface BuildersFactory {
+  solid(): SolidBuilder;
+  grid(): GridBuilder;
+  pointSprite(): PointSpriteBuilder;
+  wireframe(): WireframeBuilder;
+}
+
+export const BUILDERS_FACTORY = new Dependency<BuildersFactory>('Builder Factory');
+
+export async function DefaultBuildersFactory(injector: Injector) {
+  const bufferFactory = await injector.getInstance(BUFFER_FACTORY);
+  return {
+    solid: () => new SolidBuilder(bufferFactory.get()),
+    grid: () => new GridBuilder(),
+    pointSprite: () => new PointSpriteBuilder(bufferFactory.get()),
+    wireframe: () => new WireframeBuilder(bufferFactory.get())
+  }
+}
+
 export enum Type {
   SURFACE,
   FACE
@@ -137,7 +157,6 @@ export enum Type {
 
 let color = vec4.create();
 export class SolidBuilder extends BufferRenderable<SolidSetup> {
-  readonly buff = new BuildBuffer();
   public type: Type = Type.SURFACE;
   public tex: Texture;
   public shade: number;
@@ -145,7 +164,7 @@ export class SolidBuilder extends BufferRenderable<SolidSetup> {
   public pal: number;
   public parallax: number = 0;
 
-  constructor() { super(SOLID) }
+  constructor(readonly buff: BuildBuffer) { super(SOLID) }
   get layer() { return this.type == Type.SURFACE ? (this.parallax ? PARALLAX : BASE) : SPRITE }
 
   public setup(ctx: BuildContext, setup: SolidSetup) {
@@ -184,12 +203,11 @@ export class GridBuilder extends BufferRenderable<GridSetup> {
 }
 
 export class PointSpriteBuilder extends BufferRenderable<PointSpriteSetup> {
-  readonly buff: BuildBuffer = new BuildBuffer();
   readonly layer = SCREEN;
   public tex: Texture;
   public color = vec4.fromValues(1, 1, 1, 1);
 
-  constructor() { super(POINT_SPRITE) }
+  constructor(readonly buff: BuildBuffer) { super(POINT_SPRITE) }
 
   public setup(ctx: BuildContext, setup: PointSpriteSetup) {
     setup.shader('spriteFaceShader')
@@ -205,12 +223,11 @@ export class PointSpriteBuilder extends BufferRenderable<PointSpriteSetup> {
 }
 
 export class WireframeBuilder extends BufferRenderable<WireframeSetup> {
-  readonly buff: BuildBuffer = new BuildBuffer();
   public type: Type = Type.SURFACE;
   public color = vec4.fromValues(1, 1, 1, 1);
   public mode = WebGLRenderingContext.LINES;
 
-  constructor() { super(WIREFRAME) }
+  constructor(readonly buff: BuildBuffer) { super(WIREFRAME) }
   get layer() { return this.type == Type.SURFACE ? BASE : SPRITE }
 
   public setup(ctx: BuildContext, setup: WireframeSetup) {

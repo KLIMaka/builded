@@ -1,33 +1,32 @@
 import * as GLM from '../../../libs_js/glmatrix';
-import * as DS from '../../../utils/gl/drawstruct';
+import { Texture } from '../../../utils/gl/drawstruct';
 import { createShader } from '../../../utils/gl/shaders';
 import { State } from '../../../utils/gl/stategl';
 import { Dependency, Injector } from '../../../utils/injector';
 import { BuildContext } from '../../apis/app';
-import { GL, UtilityTextures_ } from '../buildartprovider';
-import * as BUFF from './buffers';
 import { Renderable } from '../../apis/renderable';
+import { GL, UtilityTextures_ } from '../buildartprovider';
 
-export const PAL_ = new Dependency<DS.Texture>('PAL');
-export const PLUs_ = new Dependency<DS.Texture>('PLUs');
-export const Shadowsteps_ = new Dependency<number>('Shadowsteps');
-export const Palswaps_ = new Dependency<number>('Palswaps');
-export const BuildGl_ = new Dependency<BuildGl>('BuildGL');
+export const PAL_TEXTURE = new Dependency<Texture>('PAL Texture');
+export const PLU_TEXTURE = new Dependency<Texture>('PLU Texture');
+export const SHADOWSTEPS = new Dependency<number>('Shadowsteps');
+export const PALSWAPS = new Dependency<number>('Palswaps');
+export const BUILD_GL = new Dependency<BuildGl>('BuildGL');
 
 export function BuildGlConstructor(injector: Injector): Promise<BuildGl> {
   return new Promise(resolve => Promise.all([
     injector.getInstance(GL),
-    injector.getInstance(PAL_),
-    injector.getInstance(PLUs_),
-    injector.getInstance(Palswaps_),
-    injector.getInstance(Shadowsteps_),
+    injector.getInstance(PAL_TEXTURE),
+    injector.getInstance(PLU_TEXTURE),
+    injector.getInstance(PALSWAPS),
+    injector.getInstance(SHADOWSTEPS),
     injector.getInstance(UtilityTextures_),
   ]).then(([gl, pal, plus, plaswaps, shadowsteps, util]) => {
     const buildgl = new BuildGl(plaswaps, shadowsteps, gl, pal, plus, util[-3], () => resolve(buildgl))
   }));
 }
 
-const SHADER_NAME = 'resources/shaders/build_base1';
+const SHADER_NAME = 'resources/shaders/build';
 const inv = GLM.mat4.create();
 const pos = GLM.vec3.create();
 const clipPlane = GLM.vec4.create();
@@ -35,7 +34,7 @@ const clipPlane = GLM.vec4.create();
 export class BuildGl {
   private state = new State();
 
-  constructor(palswaps: number, shadowsteps: number, gl: WebGLRenderingContext, pal: DS.Texture, plus: DS.Texture, grid: DS.Texture, cb: () => void) {
+  constructor(palswaps: number, shadowsteps: number, gl: WebGLRenderingContext, pal: Texture, plus: Texture, grid: Texture, cb: () => void) {
     const defs = ['PALSWAPS (' + palswaps + '.0)', 'SHADOWSTEPS (' + shadowsteps + '.0)']
     Promise.all([
       createShader(gl, SHADER_NAME, [...defs, 'PAL_LIGHTING']).then(shader => this.state.registerShader('baseShader', shader)),
@@ -46,7 +45,6 @@ export class BuildGl {
       createShader(gl, SHADER_NAME, [...defs, 'GRID']).then(shader => this.state.registerShader('grid', shader)),
       createShader(gl, SHADER_NAME, [...defs, 'SPRITE_FACE']).then(shader => this.state.registerShader('spriteFaceShader', shader))
     ]).then(r => {
-      BUFF.init(gl);
       this.state.setTexture('pal', pal);
       this.state.setTexture('plu', plus);
       this.state.setTexture('grid', grid);

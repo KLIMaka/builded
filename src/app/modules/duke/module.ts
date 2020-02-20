@@ -10,7 +10,7 @@ import { BoardManipulator_, Board_, BuildReferenceTracker } from "../../apis/app
 import { ReferenceTrackerImpl } from "../../apis/referencetracker";
 import { RAW_PAL_ } from "../artselector";
 import { ArtFiles_, GL, ParallaxTextures_ } from "../buildartprovider";
-import { Palswaps_, PAL_, PLUs_, Shadowsteps_ } from "../gl/buildgl";
+import { PALSWAPS, PAL_TEXTURE, PLU_TEXTURE, SHADOWSTEPS } from "../gl/buildgl";
 import { FS } from "../fs/fs";
 import { MapNames_, MapName_ } from "../selectmap";
 import { Implementation_, RorLinks } from "../view/boardrenderer3d";
@@ -151,15 +151,15 @@ export function DukeModule(injector: Injector) {
   injector.bindInstance(ParallaxTextures_, 5);
   injector.bindInstance(BoardManipulator_, { cloneBoard });
   injector.bindInstance(Implementation_, DukeImplementation());
-  injector.bind(Palswaps_, palswaps);
-  injector.bind(Shadowsteps_, shadowsteps);
+  injector.bind(PALSWAPS, palswaps);
+  injector.bind(SHADOWSTEPS, shadowsteps);
   injector.bind(GRP, loadGrp);
   injector.bind(ArtFiles_, loadArtFiles);
   injector.bind(RAW_PAL_, loadPal);
   injector.bind(LOOKUPS, loadLookups);
   injector.bind(SHADOW_TABLE, loadShadowTable);
-  injector.bind(PAL_, loadPalTexture);
-  injector.bind(PLUs_, loadPluTexture);
+  injector.bind(PAL_TEXTURE, loadPalTexture);
+  injector.bind(PLU_TEXTURE, loadPluTexture);
   injector.bind(MapNames_, getMapNames);
   injector.bind(Board_, loadMap);
 }

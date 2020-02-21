@@ -5,9 +5,9 @@ import { walllen } from '../../../../build/boardutils';
 import { Board } from '../../../../build/structs';
 import { slope, ZSCALE } from '../../../../build/utils';
 import { BuildBuffer } from '../../gl/buffers';
-import { PointSpriteBuilder, WireframeBuilder } from '../../../apis/renderable';
 import { Tiler } from '../../../../utils/tiler';
 import { vec4, mat4 } from '../../../../libs_js/glmatrix';
+import { WireframeBuilder, PointSpriteBuilder } from '../common';
 
 let tmp = vec4.create();
 let texMat = mat4.create();

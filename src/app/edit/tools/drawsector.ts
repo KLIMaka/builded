@@ -7,10 +7,11 @@ import { Deck, fastIterator } from "../../../utils/collections";
 import { int, len2d } from "../../../utils/mathutils";
 import { BuildContext } from "../../apis/app";
 import { MessageHandlerReflective } from "../../apis/handler";
-import { LayeredRenderables, BuildersFactory } from "../../apis/renderable";
+import { LayeredRenderables } from "../../apis/renderable";
 import { writeText } from "../../modules/geometry/builders/common";
 import { getClosestSectorZ } from "../editutils";
 import { BoardInvalidate, Frame, NamedMessage, Render } from "../messages";
+import { BuildersFactory } from "../../modules/geometry/common";
 
 class Contour {
   private points: Array<[number, number]> = [];

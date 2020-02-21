@@ -1,10 +1,10 @@
 import { BuildContext } from "../../../apis/app";
 import { createSlopeCalculator, sectorOfWall, slope, ZSCALE } from "../../../../build/utils";
-import { PointSpriteBuilder, WireframeBuilder, BuildersFactory } from "../../../apis/renderable";
 import { Builders } from "../../../apis/builder";
 import { Board } from "../../../../build/structs";
 import { BuildBuffer } from "../../gl/buffers";
 import { fastIterator } from "../../../../utils/collections";
+import { BuildersFactory, WireframeBuilder, PointSpriteBuilder } from "../common";
 
 export class WallPointHelperBuilder extends Builders {
   constructor(

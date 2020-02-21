@@ -1,11 +1,12 @@
-import { BuildContext } from "../../../apis/app";
 import { Board, Sector } from "../../../../build/structs";
 import { createSlopeCalculator, sectorOfWall, ZSCALE } from "../../../../build/utils";
+import { fastIterator } from "../../../../utils/collections";
+import { BuildContext } from "../../../apis/app";
+import { Builders } from "../../../apis/builder";
 import { BuildBuffer } from "../../gl/buffers";
 import { buildCeilingHinge, buildFloorHinge, gridMatrixProviderSector } from "./common";
-import { BuildRenderableProvider, GridBuilder, PointSpriteBuilder, Renderables, SectorRenderable, SolidBuilder, WireframeBuilder, LayeredRenderables, BuildersFactory } from "../../../apis/renderable";
-import { Builders } from "../../../apis/builder";
-import { fastIterator } from "../../../../utils/collections";
+import { SectorRenderable, LayeredRenderables, BuildRenderableProvider } from "../../../apis/renderable";
+import { BuildersFactory, PointSpriteBuilder, WireframeBuilder, SolidBuilder } from "../common";
 
 export class SectorHelperBuilder extends Builders implements SectorRenderable {
   constructor(

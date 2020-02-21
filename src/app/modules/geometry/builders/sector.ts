@@ -6,8 +6,9 @@ import { tesselate } from "../../../../libs_js/glutess";
 import { fastIterator } from "../../../../utils/collections";
 import { BuildContext } from "../../../apis/app";
 import { Builders } from "../../../apis/builder";
-import { BuildersFactory, SectorRenderable } from "../../../apis/renderable";
 import { BuildBuffer } from "../../gl/buffers";
+import { SectorRenderable } from "../../../apis/renderable";
+import { BuildersFactory } from "../common";
 
 
 export class SectorBuilder extends Builders implements SectorRenderable {

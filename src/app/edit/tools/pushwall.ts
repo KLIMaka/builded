@@ -3,11 +3,11 @@ import { vec3 } from "../../../libs_js/glmatrix";
 import { cyclicPairs } from "../../../utils/collections";
 import { BuildContext } from "../../apis/app";
 import { pushWall } from "../../../build/boardutils";
-import { WireframeBuilder, BuildersFactory } from "../../apis/renderable";
 import { MessageHandlerReflective } from "../../apis/handler";
 import { build2gl, createSlopeCalculator, sectorOfWall, wallNormal, ZSCALE } from "../../../build/utils";
 import { MovingHandle } from "../handle";
 import { Frame, NamedMessage, Render, BoardInvalidate } from "../messages";
+import { BuildersFactory } from "../../modules/geometry/common";
 
 const wallNormal_ = vec3.create();
 const wallNormal1_ = vec3.create();

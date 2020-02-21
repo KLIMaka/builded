@@ -5,9 +5,10 @@ import { fastIterator } from "../../../../utils/collections";
 import { int } from "../../../../utils/mathutils";
 import { BuildContext } from "../../../apis/app";
 import { Builders } from "../../../apis/builder";
-import { BuildersFactory, BuildRenderableProvider, LayeredRenderables, PointSpriteBuilder, SolidBuilder, WallRenderable } from "../../../apis/renderable";
 import { BuildBuffer } from "../../gl/buffers";
 import { createGridMatrixProviderWall, text } from "./common";
+import { WallRenderable, LayeredRenderables, BuildRenderableProvider } from "../../../apis/renderable";
+import { BuildersFactory, PointSpriteBuilder, SolidBuilder } from "../common";
 
 export class WallHelperBuilder extends Builders implements WallRenderable {
   constructor(

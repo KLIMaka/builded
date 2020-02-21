@@ -1,8 +1,9 @@
 import { vec4 } from "../../../../libs_js/glmatrix";
 import { BuildContext } from "../../../apis/app";
-import { WallRenderable, WireframeBuilder, BuildersFactory } from "../../../apis/renderable";
 import { Builders } from "../../../apis/builder";
 import { fastIterator } from "../../../../utils/collections";
+import { WallRenderable } from "../../../apis/renderable";
+import { BuildersFactory } from "../common";
 
 export class Wall2dBuilder extends Builders implements WallRenderable {
   constructor(

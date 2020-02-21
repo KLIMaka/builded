@@ -6,8 +6,9 @@ import { ArtInfo } from "../../../../build/art";
 import { Wall } from "../../../../build/structs";
 import { createSlopeCalculator, sectorOfWall, wallNormal, ZSCALE } from "../../../../build/utils";
 import { BuildBuffer } from "../../gl/buffers";
-import { SolidBuilder, WallRenderable, BuildersFactory } from "../../../apis/renderable";
 import { Builders } from "../../../apis/builder";
+import { WallRenderable } from "../../../apis/renderable";
+import { BuildersFactory } from "../common";
 
 export class WallBuilder extends Builders implements WallRenderable {
   constructor(

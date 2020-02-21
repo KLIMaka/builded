@@ -3,8 +3,8 @@ import { vec3 } from "../../../../libs_js/glmatrix";
 import { fastIterator } from "../../../../utils/collections";
 import { BuildContext } from "../../../apis/app";
 import { Builders } from "../../../apis/builder";
-import { BuildersFactory, WireframeBuilder } from "../../../apis/renderable";
 import { text } from "./common";
+import { WireframeBuilder, BuildersFactory } from "../common";
 
 export class Sprite2dBuilder extends Builders {
   constructor(

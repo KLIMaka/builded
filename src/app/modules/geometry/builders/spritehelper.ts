@@ -2,9 +2,9 @@ import { vec3 } from "../../../../libs_js/glmatrix";
 import { BuildContext } from "../../../apis/app";
 import { FACE_SPRITE, FLOOR_SPRITE, WALL_SPRITE } from "../../../../build/structs";
 import { ang2vec, spriteAngle, ZSCALE } from "../../../../build/utils";
-import { Type, WireframeBuilder, BuildersFactory } from "../../../apis/renderable";
 import { Builders } from "../../../apis/builder";
 import { fastIterator } from "../../../../utils/collections";
+import { BuildersFactory, WireframeBuilder, Type } from "../common";
 
 export class SpriteHelperBuillder extends Builders {
   constructor(

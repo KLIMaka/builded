@@ -12,7 +12,7 @@ import { Binder, loadBinds } from '../input/keymap';
 import { messageParser } from '../input/messageparser';
 import { ReferenceTrackerImpl } from '../apis/referencetracker';
 import { Board } from '../../build/structs';
-import { consumerProvider, LayeredRenderable, SortingRenderable, WrapRenderable, BuildersFactory, BUILDERS_FACTORY, DefaultBuildersFactory } from '../apis/renderable';
+import { consumerProvider, LayeredRenderable, SortingRenderable, WrapRenderable } from '../apis/renderable';
 import { SelectionConstructor, Selection_, PicNumSelector_ } from '../edit/tools/selection';
 import { SplitWall } from '../edit/tools/splitwall';
 import { JoinSectors } from '../edit/tools/joinsectors';
@@ -30,6 +30,7 @@ import { SwappableViewConstructor } from './view/view';
 import { Texture } from '../../utils/gl/drawstruct';
 import { SelectorConstructor } from '../../app/modules/artselector'
 import { BUFFER_FACTORY, DefaultBufferFactory } from './gl/buffers';
+import { DefaultBuildersFactory, BUILDERS_FACTORY, BuildersFactory } from './geometry/common';
 
 class History {
   private history: Deck<Board> = new Deck();

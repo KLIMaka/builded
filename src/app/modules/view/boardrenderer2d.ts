@@ -5,9 +5,10 @@ import { Controller2D } from '../../../utils/camera/controller2d';
 import { Deck } from '../../../utils/collections';
 import * as PROFILE from '../../../utils/profiler';
 import { BuildContext } from '../../apis/app';
-import { BuildersFactory, GridBuilder, LayeredRenderable, LayeredRenderables, RenderableProvider, SortingRenderable, BuildRenderableProvider } from '../../apis/renderable';
 import { BuildGl } from '../gl/buildgl';
 import { View2d } from './view';
+import { GridBuilder, BuildersFactory } from '../geometry/common';
+import { RenderableProvider, LayeredRenderable, SortingRenderable, LayeredRenderables, BuildRenderableProvider } from '../../apis/renderable';
 
 const scale = GLM.vec3.create();
 const offset = GLM.vec3.create();

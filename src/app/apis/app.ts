@@ -5,9 +5,10 @@ import { MoveStruct } from "../../build/utils";
 import { Texture } from "../../utils/gl/drawstruct";
 import { Dependency } from "../../utils/injector";
 import { InputState } from "../../utils/input";
-import { Renderable, BuildersFactory } from "./renderable";
+import { Renderable } from "./renderable";
 import { Context, Message, MessageHandler } from "./handler";
 import { ReferenceTracker } from "./referencetracker";
+import { BuildersFactory } from "../modules/geometry/common";
 
 export interface Storage {
   get(key: string): Promise<any>;

@@ -3,7 +3,6 @@ import { Deck } from '../collections';
 import { Buffer } from './buffergl';
 import { Definition, IndexBuffer, Shader, Texture, VertexBuffer } from './drawstruct';
 import * as SHADER from './shaders';
-import * as PROFILE from '../../utils/profiler';
 
 function eqCmp<T>(lh: T, rh: T) { return lh === rh }
 function assign<T>(dst: T, src: T) { return src }
@@ -35,8 +34,43 @@ function createStateValue(type: string, changecb: () => void): StateValue<any> {
   }
 }
 
+export class Profile {
+  public drawsRequested = 0;
+  public drawsMerged = 0;
+  public shaderChanges = 0;
+  public uniformChanges = 0;
+  public textureChanges = 0;
+  public bufferChanges = 0;
+  public shaderSwaps: { [index: string]: number } = {}
+  public uniqTextures = new Set<Texture>();
+
+  public changeShader(from: string, to: string) {
+    const key = `${from}->${to}`;
+    const swap = this.shaderSwaps[key];
+    this.shaderSwaps[key] = !swap ? 1 : swap + 1;
+  }
+
+  public changeTexture(tex: Texture) {
+    this.uniqTextures.add(tex);
+  }
+
+  public reset() {
+    this.drawsRequested = 0;
+    this.drawsMerged = 0;
+    this.shaderChanges = 0;
+    this.uniformChanges = 0;
+    this.textureChanges = 0;
+    this.bufferChanges = 0;
+    this.shaderSwaps = {};
+    this.uniqTextures.clear()
+  }
+}
+
 export class State {
+  readonly profile = new Profile();
+
   private shader: StateValue<string> = new StateValue<string>(() => this.changeShader = true, null);
+  private lastShader: string;
   private selectedShader: Shader;
   private indexBuffer: StateValue<IndexBuffer> = new StateValue<IndexBuffer>(() => this.changeIndexBuffer = true, null);
   private buffer: Buffer;
@@ -209,6 +243,9 @@ export class State {
 
   private rebindShader(gl: WebGLRenderingContext) {
     if (!this.changeShader) return;
+    ++this.profile.shaderChanges;
+    this.profile.changeShader(this.lastShader, this.shader.get());
+    this.lastShader = this.shader.get();
     const shader = this.shaders[this.shader.get()];
     this.selectedShader = shader;
     gl.useProgram(shader.getProgram());
@@ -259,6 +296,7 @@ export class State {
 
   private rebindIndexBuffer(gl: WebGLRenderingContext) {
     if (!this.changeIndexBuffer) return;
+    ++this.profile.bufferChanges;
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer.get().getBuffer());
     this.changeIndexBuffer = false;
   }
@@ -267,10 +305,12 @@ export class State {
     if (this.changedTextures.isEmpty()) return;
     const textures = this.changedTextures;
     const len = textures.length();
+    this.profile.textureChanges += len;
     for (let t = 0; t < len; t++) {
       const [idx, sampler] = textures.get(t);
       const texture = this.textures[idx];
       if (texture != undefined && texture.get() != null) {
+        this.profile.changeTexture(texture.get());
         gl.activeTexture(gl.TEXTURE0 + sampler);
         gl.bindTexture(gl.TEXTURE_2D, texture.get().get());
       }
@@ -282,6 +322,7 @@ export class State {
     if (this.changedUniformIdxs.isEmpty()) return;
     const uniformsIdxs = this.changedUniformIdxs;
     const len = uniformsIdxs.length();
+    this.profile.uniformChanges += len;
     for (let u = 0; u < len; u++) {
       const idx = uniformsIdxs.get(u);
       const state = this.uniforms[idx];
@@ -290,18 +331,17 @@ export class State {
     uniformsIdxs.clear();
   }
 
-  public draw(gl: WebGLRenderingContext, mode: number = gl.TRIANGLES): boolean {
-    PROFILE.get(null).inc('draws');
+  public draw(gl: WebGLRenderingContext, mode: number = gl.TRIANGLES) {
+    ++this.profile.drawsRequested;
     if (this.tryBatch(gl, mode)) {
-      PROFILE.get(null).inc('skip_draws');
-      return true;
+      ++this.profile.drawsMerged;
+      return;
     }
     this.rebindShader(gl);
     this.rebindVertexBuffers(gl);
     this.rebindIndexBuffer(gl);
     this.updateUniforms(gl);
     this.rebindTextures(gl);
-    return false;
   }
 
   public run(gl: WebGLRenderingContext, call: DrawCall) {

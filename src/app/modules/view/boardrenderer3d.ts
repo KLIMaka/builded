@@ -11,7 +11,7 @@ import * as PROFILE from '../../../utils/profiler';
 import { mirrorBasis, normal2d, reflectPoint3d } from '../../../utils/vecmath';
 import { BuildContext } from '../../apis/app';
 import { BuildGl } from '../gl/buildgl';
-import { BuildRenderableProvider, LayeredRenderable, Renderable, Renderables, WrapRenderable } from '../../apis/renderable';
+import { BuildRenderableProvider, LayeredRenderable, Renderable, Renderables, WrapRenderable, RenderableProvider, LayeredRenderables, SortingRenderable } from '../../apis/renderable';
 import { View3d } from './view';
 
 export class RorLink {
@@ -44,8 +44,9 @@ export function init(ctx: BuildContext, impl: Implementation, bgl: BuildGl) {
   BGL = bgl;
 }
 
-export function draw(view: View3d) {
+export function draw(view: View3d, printInfo: boolean) {
   drawGeometry(view);
+  if (printInfo) BGL.printInfo();
 }
 
 function writeStencilOnly(gl: WebGLRenderingContext, value: number) {
@@ -208,10 +209,10 @@ function drawMirrors(result: VisResult, view: View3d) {
 let renderables: BuildRenderableProvider;
 
 function list() {
-  const list = new Deck<Renderable>();
-  const renderable = new Renderables(list);
+  const list = new Deck<RenderableProvider<LayeredRenderable>>();
+  const renderable = new SortingRenderable(new LayeredRenderables(list));
   return {
-    consumer: (r: LayeredRenderable) => { list.push(r) },
+    add: (r: RenderableProvider<LayeredRenderable>) => { list.push(r) },
     clear: () => list.clear(),
     draw: (ctx: BuildContext, gl: WebGLRenderingContext, state: State) => { renderable.draw(ctx, gl, state) }
   }
@@ -232,9 +233,9 @@ function clearDrawLists() {
 function sectorVisitor(board: Board, sectorId: number) {
   let sector = renderables.sector(sectorId);
   if (implementation.rorLinks().floorLinks[sectorId] == undefined)
-    sector.floor.accept(surfaces.consumer);
+    surfaces.add(sector.floor);
   if (implementation.rorLinks().ceilLinks[sectorId] == undefined)
-    sector.ceiling.accept(surfaces.consumer);
+    surfaces.add(sector.ceiling);
   PROFILE.incCount('sectors');
 }
 
@@ -243,11 +244,11 @@ function wallVisitor(board: Board, wallId: number, sectorId: number) {
   let wall = board.walls[wallId];
   let wallr = renderables.wall(wallId);
   if (wall.cstat.translucent || wall.cstat.translucentReversed) {
-    wallr.mid.accept(surfacesTrans.consumer);
-    wallr.bot.accept(surfaces.consumer);
-    wallr.top.accept(surfaces.consumer);
+    surfacesTrans.add(wallr.mid);
+    surfaces.add(wallr.bot);
+    surfaces.add(wallr.top);
   } else {
-    wallr.accept(surfaces.consumer);
+    surfaces.add(wallr);
   }
   PROFILE.incCount('walls');
 }
@@ -256,7 +257,7 @@ function spriteVisitor(board: Board, spriteId: number) {
   let spriter = renderables.sprite(spriteId);
   let sprite = board.sprites[spriteId];
   let trans = sprite.cstat.tranclucentReversed == 1 || sprite.cstat.translucent == 1;
-  spriter.accept((trans ? spritesTrans : sprites).consumer);
+  (trans ? spritesTrans : sprites).add(spriter);
   PROFILE.incCount('sprites');
 }
 

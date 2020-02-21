@@ -1,11 +1,6 @@
-import { Mat4Array, vec4 } from '../../libs_js/glmatrix';
-import { FastIterable, Deck } from '../../utils/collections';
+import { Deck, FastIterable } from '../../utils/collections';
 import { State } from '../../utils/gl/stategl';
 import { BuildContext } from './app';
-import { BuildBuffer, BUFFER_FACTORY } from '../modules/gl/buffers';
-import { BufferRenderable, GRID, GridSetup, PointSpriteSetup, POINT_SPRITE, SOLID, SolidSetup, WIREFRAME, WireframeSetup } from '../modules/geometry/builders/setups';
-import { Texture } from '../../utils/gl/drawstruct';
-import { Dependency, Injector } from '../../utils/injector';
 
 
 export interface Renderable {

@@ -191,6 +191,7 @@ export class View3d extends MessageHandlerReflective implements View {
   private forwardDamper = new DelayedValue(50, 0, NumberInterpolator);
   private sideDamper = new DelayedValue(50, 0, NumberInterpolator);
   private buildgl: BuildGl;
+  private printInfo = false;
 
   constructor(gl: WebGLRenderingContext, renderables: BuildRenderableProvider, impl: RENDERER3D.Implementation, buildgl: BuildGl) {
     super();
@@ -228,7 +229,8 @@ export class View3d extends MessageHandlerReflective implements View {
     this.buildgl.setCursorPosiotion(this.cursor[0], this.cursor[1], this.cursor[2]);
     this.aspect = this.gl.drawingBufferWidth / this.gl.drawingBufferHeight;
     this.buildgl.newFrame(this.gl);
-    RENDERER3D.draw(this);
+    RENDERER3D.draw(this, this.printInfo);
+    this.printInfo = false;
 
     const state = ctx.state;
     const dt = msg.dt;
@@ -249,6 +251,10 @@ export class View3d extends MessageHandlerReflective implements View {
     this.playerstart.z = int(p[1] * ZSCALE);
     if (!inSector(ctx.board, this.playerstart.x, this.playerstart.y, this.playerstart.sectnum))
       this.playerstart.sectnum = findSector(ctx.board, this.playerstart.x, this.playerstart.y, this.playerstart.sectnum);
+  }
+
+  NamedMessage(msg: NamedMessage, ctx: BuildContext) {
+    if (msg.name == 'print_info') this.printInfo = true;
   }
 
   BoardInvalidate(msg: BoardInvalidate, ctx: BuildContext) {

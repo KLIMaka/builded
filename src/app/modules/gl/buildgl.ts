@@ -1,11 +1,13 @@
-import * as GLM from '../../../libs_js/glmatrix';
 import { Texture } from '../../../utils/gl/drawstruct';
 import { createShader } from '../../../utils/gl/shaders';
-import { State } from '../../../utils/gl/stategl';
+import { State, Profile } from '../../../utils/gl/stategl';
 import { Dependency, Injector } from '../../../utils/injector';
 import { BuildContext } from '../../apis/app';
 import { Renderable } from '../../apis/renderable';
 import { GL, UtilityTextures_ } from '../buildartprovider';
+import * as PROFILER from '../../../utils/profiler';
+import { mat4, vec3, vec4, Mat4Array, Vec3Array } from '../../../libs_js/glmatrix';
+import { info } from '../../../utils/logger';
 
 export const PAL_TEXTURE = new Dependency<Texture>('PAL Texture');
 export const PLU_TEXTURE = new Dependency<Texture>('PLU Texture');
@@ -27,9 +29,9 @@ export function BuildGlConstructor(injector: Injector): Promise<BuildGl> {
 }
 
 const SHADER_NAME = 'resources/shaders/build';
-const inv = GLM.mat4.create();
-const pos = GLM.vec3.create();
-const clipPlane = GLM.vec4.create();
+const inv = mat4.create();
+const pos = vec3.create();
+const clipPlane = vec4.create();
 
 export class BuildGl {
   private state = new State();
@@ -58,21 +60,21 @@ export class BuildGl {
     });
   }
 
-  public setProjectionMatrix(proj: GLM.Mat4Array) { this.state.setUniform('P', proj) }
-  public setPosition(pos: GLM.Vec3Array) { this.state.setUniform('eyepos', pos) }
+  public setProjectionMatrix(proj: Mat4Array) { this.state.setUniform('P', proj) }
+  public setPosition(pos: Vec3Array) { this.state.setUniform('eyepos', pos) }
 
-  public setViewMatrix(view: GLM.Mat4Array) {
+  public setViewMatrix(view: Mat4Array) {
     this.state.setUniform('V', view);
-    if (this.state.isUniformEnabled('IV')) this.state.setUniform('IV', GLM.mat4.invert(inv, view));
+    if (this.state.isUniformEnabled('IV')) this.state.setUniform('IV', mat4.invert(inv, view));
   }
 
   public setCursorPosiotion(x: number, y: number, z: number) {
-    GLM.vec3.set(pos, x, y, z);
+    vec3.set(pos, x, y, z);
     this.state.setUniform('curpos', pos);
   }
 
   public setClipPlane(x: number, y: number, z: number, w: number) {
-    GLM.vec4.set(clipPlane, x, y, z, w);
+    vec4.set(clipPlane, x, y, z, w);
     this.state.setUniform('clipPlane', clipPlane);
   }
 
@@ -82,11 +84,27 @@ export class BuildGl {
   }
 
   public newFrame(gl: WebGLRenderingContext) {
+    this.updateProfile(this.state.profile);
     gl.clearColor(0.2, 0.2, 0.2, 1.0);
     gl.clearStencil(0);
     gl.clearDepth(1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
     this.state.setUniform('sys', [performance.now(), 2 / gl.drawingBufferWidth, 2 / gl.drawingBufferHeight, 0]);
+  }
+
+  private updateProfile(profile: Profile) {
+    const p = PROFILER.get(null);
+    p.set('drawsRequested', profile.drawsRequested);
+    p.set('drawsMerged', profile.drawsMerged);
+    p.set('shaderChanges', profile.shaderChanges);
+    p.set('uniformChanges', profile.uniformChanges);
+    p.set('textureChanges', profile.textureChanges);
+    p.set('bufferChanges', profile.bufferChanges);
+    profile.reset();
+  }
+
+  public printInfo() {
+    info(this.state.profile);
   }
 
   public flush(gl: WebGLRenderingContext) {

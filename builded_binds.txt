@@ -52,6 +52,7 @@ ALT+F           set_first_wall
 ALT+J           fill_inner_sector
 ALT+DELETE      delete_loop
 ALT+SHIFT+DELETE delete_full
+0               print_info
 
 +W              forward
 +S              backward

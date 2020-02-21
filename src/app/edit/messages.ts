@@ -1,4 +1,4 @@
-import { LayeredRenderable, RenderableConsumer } from "../apis/renderable";
+import { HintRenderable, RenderableConsumer } from "../apis/renderable";
 import { Message } from "../apis/handler";
 import { Entity } from "../../build/hitscan";
 
@@ -9,7 +9,7 @@ export class StartMove implements Message { }
 export class Move implements Message { constructor(public dx: number, public dy: number, public dz: number) { } }
 export class EndMove implements Message { }
 export class Highlight implements Message { constructor(public set: Set<number> = new Set()) { } }
-export class Render implements Message { constructor(public consumer: RenderableConsumer<LayeredRenderable>) { } }
+export class Render implements Message { constructor(public consumer: RenderableConsumer<HintRenderable>) { } }
 export class SetPicnum implements Message { constructor(public picnum: number) { } }
 export class Shade implements Message { constructor(public value: number, public absolute = false) { } }
 export class PanRepeat implements Message { constructor(public xpan: number, public ypan: number, public xrepeat: number, public yrepeat: number, public absolute = false) { } }

@@ -12,7 +12,7 @@ import { Binder, loadBinds } from '../input/keymap';
 import { messageParser } from '../input/messageparser';
 import { ReferenceTrackerImpl } from '../apis/referencetracker';
 import { Board } from '../../build/structs';
-import { consumerProvider, LayeredRenderable, SortingRenderable, WrapRenderable } from '../apis/renderable';
+import { consumerProvider, HintRenderable, SortingRenderable, WrapRenderable } from '../apis/renderable';
 import { SelectionConstructor, Selection_, PicNumSelector_ } from '../edit/tools/selection';
 import { SplitWall } from '../edit/tools/splitwall';
 import { JoinSectors } from '../edit/tools/joinsectors';
@@ -65,7 +65,7 @@ class StateImpl implements State {
   }
 }
 
-const tools = consumerProvider<LayeredRenderable>();
+const tools = consumerProvider<HintRenderable>();
 
 const FRAME = new Frame(0);
 const POSTFRAME = new PostFrame();

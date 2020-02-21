@@ -38,7 +38,7 @@ export class SolidBuilder extends BufferRenderable<SolidSetup> {
   public parallax: number = 0;
 
   constructor(readonly buff: BuildBuffer) { super(SOLID) }
-  get layer() { return this.type == Type.SURFACE ? (this.parallax ? PARALLAX : BASE) : SPRITE }
+  get hint() { return this.type == Type.SURFACE ? (this.parallax ? PARALLAX : BASE) : SPRITE }
 
   public setup(ctx: BuildContext, setup: SolidSetup) {
     setup.shader(this.type == Type.SURFACE ? (this.parallax ? 'parallax' : 'baseShader') : 'spriteShader')
@@ -56,7 +56,7 @@ export class SolidBuilder extends BufferRenderable<SolidSetup> {
 }
 
 export class GridBuilder extends BufferRenderable<GridSetup> {
-  readonly layer = GRID1;
+  readonly hint = GRID1;
   public solid: SolidBuilder;
   public gridTexMatProvider: (scale: number) => Mat4Array;
 
@@ -77,7 +77,7 @@ export class GridBuilder extends BufferRenderable<GridSetup> {
 }
 
 export class PointSpriteBuilder extends BufferRenderable<PointSpriteSetup> {
-  readonly layer = SCREEN;
+  readonly hint = SCREEN;
   public tex: Texture;
   public color = vec4.fromValues(1, 1, 1, 1);
 
@@ -102,7 +102,7 @@ export class WireframeBuilder extends BufferRenderable<WireframeSetup> {
   public mode = WebGLRenderingContext.LINES;
 
   constructor(readonly buff: BuildBuffer) { super(WIREFRAME) }
-  get layer() { return this.type == Type.SURFACE ? BASE : SPRITE }
+  get hint() { return this.type == Type.SURFACE ? BASE : SPRITE }
 
   public setup(ctx: BuildContext, setup: WireframeSetup) {
     setup.shader(this.type == Type.SURFACE ? 'baseFlatShader' : 'spriteFlatShader')

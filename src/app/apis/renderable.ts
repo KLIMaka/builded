@@ -1,6 +1,7 @@
 import { Deck, FastIterable } from '../../utils/collections';
 import { State } from '../../utils/gl/stategl';
 import { BuildContext } from './app';
+import { SortedHeap } from '../../utils/list';
 
 
 export interface Renderable {
@@ -34,29 +35,23 @@ export const PARALLAX = 2;
 export const GRID1 = 3;
 export const SCREEN = 4;
 
-export interface LayeredRenderable extends Renderable {
-  readonly layer: number;
+export interface HintRenderable extends Renderable {
+  readonly hint: number;
 }
 
 export class SortingRenderable implements Renderable {
-  private drawLists = [
-    new Deck<Renderable>(),
-    new Deck<Renderable>(),
-    new Deck<Renderable>(),
-    new Deck<Renderable>(),
-    new Deck<Renderable>()
-  ];
+  private drawList = new SortedHeap<Renderable>();
 
-  constructor(private provider: RenderableProvider<LayeredRenderable>) { }
+  constructor(private provider: RenderableProvider<HintRenderable>) { }
 
   draw(ctx: BuildContext, gl: WebGLRenderingContext, state: State): void {
-    for (const list of this.drawLists) list.clear();
+    this.drawList.clear()
     this.provider.accept((r) => this.consume(r));
-    for (const list of this.drawLists) for (const r of list) r.draw(ctx, gl, state);
+    for (const r of this.drawList.get()) r.draw(ctx, gl, state);
   }
 
-  private consume(r: LayeredRenderable) {
-    this.drawLists[r.layer].push(r);
+  private consume(r: HintRenderable) {
+    this.drawList.add(r, r.hint);
   }
 }
 
@@ -73,11 +68,11 @@ export class Renderables implements Renderable {
   }
 }
 
-export class LayeredRenderables implements RenderableProvider<LayeredRenderable> {
+export class LayeredRenderables implements RenderableProvider<HintRenderable> {
   private list = new Deck<Renderable>();
 
-  constructor(private providers: FastIterable<RenderableProvider<LayeredRenderable>>) { }
-  accept(consumer: RenderableConsumer<LayeredRenderable>): void {
+  constructor(private providers: FastIterable<RenderableProvider<HintRenderable>>) { }
+  accept(consumer: RenderableConsumer<HintRenderable>): void {
     const size = this.providers.size;
     const array = this.providers.array;
     for (let i = 0; i < size; i++) array[i].accept(consumer);
@@ -107,20 +102,20 @@ export class WrapRenderable implements Renderable {
   }
 }
 
-export interface SectorRenderable extends RenderableProvider<LayeredRenderable>, Renderable {
-  readonly ceiling: RenderableProvider<LayeredRenderable> & Renderable;
-  readonly floor: RenderableProvider<LayeredRenderable> & Renderable;
+export interface SectorRenderable extends RenderableProvider<HintRenderable>, Renderable {
+  readonly ceiling: RenderableProvider<HintRenderable> & Renderable;
+  readonly floor: RenderableProvider<HintRenderable> & Renderable;
 }
 
-export interface WallRenderable extends RenderableProvider<LayeredRenderable>, Renderable {
-  readonly top: RenderableProvider<LayeredRenderable> & Renderable;
-  readonly mid: RenderableProvider<LayeredRenderable> & Renderable;
-  readonly bot: RenderableProvider<LayeredRenderable> & Renderable;
+export interface WallRenderable extends RenderableProvider<HintRenderable>, Renderable {
+  readonly top: RenderableProvider<HintRenderable> & Renderable;
+  readonly mid: RenderableProvider<HintRenderable> & Renderable;
+  readonly bot: RenderableProvider<HintRenderable> & Renderable;
 }
 
 export interface BuildRenderableProvider {
   sector(id: number): SectorRenderable;
   wall(id: number): WallRenderable;
-  wallPoint(id: number): RenderableProvider<LayeredRenderable>;
-  sprite(id: number): RenderableProvider<LayeredRenderable>;
+  wallPoint(id: number): RenderableProvider<HintRenderable>;
+  sprite(id: number): RenderableProvider<HintRenderable>;
 }

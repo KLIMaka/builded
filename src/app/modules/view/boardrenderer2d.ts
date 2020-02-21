@@ -8,7 +8,7 @@ import { BuildContext } from '../../apis/app';
 import { BuildGl } from '../gl/buildgl';
 import { View2d } from './view';
 import { GridBuilder, BuildersFactory } from '../geometry/common';
-import { RenderableProvider, LayeredRenderable, SortingRenderable, LayeredRenderables, BuildRenderableProvider } from '../../apis/renderable';
+import { RenderableProvider, HintRenderable, SortingRenderable, LayeredRenderables, BuildRenderableProvider } from '../../apis/renderable';
 
 const scale = GLM.vec3.create();
 const offset = GLM.vec3.create();
@@ -18,7 +18,7 @@ const visible = new AllBoardVisitorResult();
 
 export class BoardRenderer2D {
   private grid: GridBuilder;
-  private surfaces = new Deck<RenderableProvider<LayeredRenderable>>();
+  private surfaces = new Deck<RenderableProvider<HintRenderable>>();
   private pass = new SortingRenderable(new LayeredRenderables(this.surfaces));
 
   constructor(

@@ -11,7 +11,7 @@ import * as PROFILE from '../../../utils/profiler';
 import { mirrorBasis, normal2d, reflectPoint3d } from '../../../utils/vecmath';
 import { BuildContext } from '../../apis/app';
 import { BuildGl } from '../gl/buildgl';
-import { BuildRenderableProvider, LayeredRenderable, Renderable, Renderables, WrapRenderable, RenderableProvider, LayeredRenderables, SortingRenderable } from '../../apis/renderable';
+import { BuildRenderableProvider, HintRenderable, Renderable, Renderables, WrapRenderable, RenderableProvider, LayeredRenderables, SortingRenderable } from '../../apis/renderable';
 import { View3d } from './view';
 
 export class RorLink {
@@ -209,10 +209,10 @@ function drawMirrors(result: VisResult, view: View3d) {
 let renderables: BuildRenderableProvider;
 
 function list() {
-  const list = new Deck<RenderableProvider<LayeredRenderable>>();
+  const list = new Deck<RenderableProvider<HintRenderable>>();
   const renderable = new SortingRenderable(new LayeredRenderables(list));
   return {
-    add: (r: RenderableProvider<LayeredRenderable>) => { list.push(r) },
+    add: (r: RenderableProvider<HintRenderable>) => { list.push(r) },
     clear: () => list.clear(),
     draw: (ctx: BuildContext, gl: WebGLRenderingContext, state: State) => { renderable.draw(ctx, gl, state) }
   }

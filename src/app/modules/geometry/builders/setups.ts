@@ -5,7 +5,7 @@ import { Texture } from "../../../../utils/gl/drawstruct";
 import { DrawCall, State } from "../../../../utils/gl/stategl";
 import { BuildContext } from "../../../apis/app";
 import { Builder } from "../../../apis/builder";
-import { LayeredRenderable, RenderableConsumer } from "../../../apis/renderable";
+import { HintRenderable, RenderableConsumer } from "../../../apis/renderable";
 import { BuildBuffer } from "../../gl/buffers";
 
 export interface StateSetup {
@@ -92,9 +92,9 @@ export class PointSpriteSetup extends BufferSetup {
   public color(color: Vec4Array) { this.values.set(13, color); return this }
 }
 
-export abstract class BufferRenderable<T extends BufferSetup> implements Builder, LayeredRenderable {
+export abstract class BufferRenderable<T extends BufferSetup> implements Builder, HintRenderable {
   abstract readonly buff: BuildBuffer;
-  abstract readonly layer: number;
+  abstract readonly hint: number;
   public mode: number = WebGLRenderingContext.TRIANGLES;
   protected drawCall: DrawCall;
 
@@ -116,7 +116,7 @@ export abstract class BufferRenderable<T extends BufferSetup> implements Builder
   abstract reset(): void;
 
   public get() { return this }
-  public accept(consumer: RenderableConsumer<LayeredRenderable>) { if (this.buff.getSize() != 0) consumer(this) }
+  public accept(consumer: RenderableConsumer<HintRenderable>) { if (this.buff.getSize() != 0) consumer(this) }
 }
 
 export function lazySingletonTransformer<I, O>(trans: (i: I) => O) {

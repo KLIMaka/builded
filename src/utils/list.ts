@@ -105,7 +105,6 @@ export class List<T> implements Iterable<T>{
 }
 
 export class FastList<T> implements Iterable<T> {
-
   private elements = new Deck<T>();
   private nextIdx = new Deck<number>();
   private lastIdx = new Deck<number>();
@@ -114,20 +113,22 @@ export class FastList<T> implements Iterable<T> {
 
   public insertAfter(value: T, after: number = this.lastIdx.get(0)): number {
     const idx = this.elements.length();
+    const next = this.nextIdx.get(after);
     this.elements.push(value);
-    this.nextIdx.push(0)
+    this.nextIdx.push(next)
     this.lastIdx.push(after);
     this.nextIdx.set(after, idx);
-    this.lastIdx.set(0, idx);
+    this.lastIdx.set(next, idx);
     return idx;
   }
 
   public insertBefore(value: T, before: number = this.nextIdx.get(0)): number {
     const idx = this.elements.length();
+    const last = this.lastIdx.get(before);
     this.elements.push(value);
     this.nextIdx.push(before)
-    this.lastIdx.push(0);
-    this.nextIdx.set(0, idx);
+    this.lastIdx.push(last);
+    this.nextIdx.set(last, idx);
     this.lastIdx.set(before, idx);
     return idx;
   }
@@ -174,4 +175,54 @@ export class FastList<T> implements Iterable<T> {
         }
       }
   }
-} 
+}
+
+function advance(iter: number, list: FastList<any>, steps: number) {
+  for (let i = 0; i < steps; i++) iter = list.next(iter)
+  return iter;
+}
+
+function length(list: FastList<any>, from: number, to: number) {
+  let length = 0;
+  for (let i = from; i != to; i = list.next(i)) length++;
+  return length;
+}
+
+function binaryIndexOf(list: FastList<number>, searchElement: number) {
+  let refMin = list.first();
+  let min = list.first();
+  let max = list.last(0);
+  if (searchElement < list.get(min)) return 0;
+  if (searchElement >= list.get(max)) return max;
+  let current = min;
+  let currentElement: number = null;
+  let size = length(list, min, max);
+  while (size > 0) {
+    size -= size / 2 | 0;
+    current = advance(min, list, size);
+    currentElement = list.get(current);
+    if (currentElement < searchElement) min = list.next(current);
+    else if (currentElement > searchElement) max = list.last(current);
+    else break;
+    size--;
+  }
+  return current == refMin ? refMin : current;
+}
+
+export class SortedHeap<T> {
+  private values = new FastList<T>();
+  private sortValues = new FastList<number>();
+
+  public add(value: T, sortValue: number) {
+    const ptr = binaryIndexOf(this.sortValues, sortValue);
+    this.values.insertAfter(value, ptr);
+    this.sortValues.insertAfter(sortValue, ptr);
+  }
+
+  public clear() {
+    this.values.clear();
+    this.sortValues.clear();
+  }
+
+  public get(): Iterable<T> { return this.values }
+}

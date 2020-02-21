@@ -8,9 +8,9 @@ import { BuildersFactory } from "../common";
 export class Wall2dBuilder extends Builders implements WallRenderable {
   constructor(
     factory: BuildersFactory,
-    readonly top = factory.wireframe(),
-    readonly mid = factory.wireframe(),
-    readonly bot = factory.wireframe()
+    readonly top = factory.wireframe('2d'),
+    readonly mid = factory.wireframe('2d'),
+    readonly bot = factory.wireframe('2d')
   ) { super(fastIterator([top, mid, bot])) }
 }
 

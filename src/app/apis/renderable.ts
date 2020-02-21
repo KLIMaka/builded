@@ -40,18 +40,19 @@ export interface HintRenderable extends Renderable {
 }
 
 export class SortingRenderable implements Renderable {
-  private drawList = new SortedHeap<Renderable>();
+  private drawList: [Renderable, number][] = [];
 
   constructor(private provider: RenderableProvider<HintRenderable>) { }
 
   draw(ctx: BuildContext, gl: WebGLRenderingContext, state: State): void {
-    this.drawList.clear()
+    this.drawList = [];
     this.provider.accept((r) => this.consume(r));
-    for (const r of this.drawList.get()) r.draw(ctx, gl, state);
+    const sorted = this.drawList.sort((l, r) => l[1] - r[1]);
+    for (const r of sorted) r[0].draw(ctx, gl, state);
   }
 
   private consume(r: HintRenderable) {
-    this.drawList.add(r, r.hint);
+    this.drawList.push([r, r.hint]);
   }
 }
 

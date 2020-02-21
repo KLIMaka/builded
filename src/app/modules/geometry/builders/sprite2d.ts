@@ -9,8 +9,8 @@ import { WireframeBuilder, BuildersFactory } from "../common";
 export class Sprite2dBuilder extends Builders {
   constructor(
     factory: BuildersFactory,
-    readonly ang = factory.wireframe(),
-    readonly label = factory.pointSprite()
+    readonly ang = factory.wireframe('2d'),
+    readonly label = factory.pointSprite('2d')
   ) { super(fastIterator([ang, label])) }
 }
 

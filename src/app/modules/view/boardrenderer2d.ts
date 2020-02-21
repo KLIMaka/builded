@@ -50,7 +50,7 @@ export class BoardRenderer2D {
       GLM.mat4.translate(gridMatrix, gridMatrix, offset);
       return this.grid;
     }
-    const gridSolid = this.builders.solid();
+    const gridSolid = this.builders.solid('utils');
     gridSolid.trans = 0.5;
     const buff = gridSolid.buff;
     buff.allocate(4, 6);

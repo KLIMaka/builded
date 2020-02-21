@@ -20,7 +20,7 @@ export class PushWall extends MessageHandlerReflective {
 
   constructor(
     private builders: BuildersFactory,
-    private wireframe = builders.wireframe()
+    private wireframe = builders.wireframe('utils')
   ) { super(); }
 
   private start(ctx: BuildContext) {

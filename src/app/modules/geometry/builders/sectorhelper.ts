@@ -11,14 +11,14 @@ import { BuildersFactory, PointSpriteBuilder, WireframeBuilder, SolidBuilder } f
 export class SectorHelperBuilder extends Builders implements SectorRenderable {
   constructor(
     factory: BuildersFactory,
-    readonly ceilpoints = factory.pointSprite(),
-    readonly ceilwire = factory.wireframe(),
-    readonly ceilhinge = factory.wireframe(),
-    readonly ceilgrid = factory.grid(),
-    readonly floorpoints = factory.pointSprite(),
-    readonly floorwire = factory.wireframe(),
-    readonly floorhinge = factory.wireframe(),
-    readonly floorgrid = factory.grid(),
+    readonly ceilpoints = factory.pointSprite('helper'),
+    readonly ceilwire = factory.wireframe('helper'),
+    readonly ceilhinge = factory.wireframe('helper'),
+    readonly ceilgrid = factory.grid('helper'),
+    readonly floorpoints = factory.pointSprite('helper'),
+    readonly floorwire = factory.wireframe('helper'),
+    readonly floorhinge = factory.wireframe('helper'),
+    readonly floorgrid = factory.grid('helper'),
     readonly ceiling = new LayeredRenderables(fastIterator([ceilpoints, ceilwire, ceilhinge, ceilgrid])),
     readonly floor = new LayeredRenderables(fastIterator([floorpoints, floorwire, floorhinge, floorgrid])),
   ) { super(fastIterator([ceilpoints, ceilwire, ceilhinge, ceilgrid, floorpoints, floorwire, floorhinge, floorgrid])) }

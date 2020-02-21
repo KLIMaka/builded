@@ -3,6 +3,7 @@ import { Deck } from '../collections';
 import { Buffer } from './buffergl';
 import { Definition, IndexBuffer, Shader, Texture, VertexBuffer } from './drawstruct';
 import * as SHADER from './shaders';
+import { rand, rand0 } from '../random';
 
 function eqCmp<T>(lh: T, rh: T) { return lh === rh }
 function assign<T>(dst: T, src: T) { return src }
@@ -66,8 +67,15 @@ export class Profile {
   }
 }
 
+function nextBatch(batch: number) {
+  const nb = batch + 0.05;
+  return nb > 1.0 ? 0 : nb;
+}
+
 export class State {
   readonly profile = new Profile();
+
+  private batchUniform = -1;
 
   private shader: StateValue<string> = new StateValue<string>(() => this.changeShader = true, null);
   private lastShader: string;
@@ -107,10 +115,20 @@ export class State {
     this.registerState('aIndex', this.indexBuffer);
   }
 
+  private nextBatch() {
+    if (this.batchUniform == -1) {
+      this.batchUniform = this.getState('sys');
+    }
+    const value = [...<GLM.Vec4Array>this.states[this.batchUniform].get()];
+    value[3] = nextBatch(value[3])
+    this.states[this.batchUniform].set(value);
+  }
+
   public flush(gl: WebGLRenderingContext) {
     if (this.batchMode == -1) return;
     this.buffer.update(gl);
     gl.drawElements(this.batchMode, this.batchSize, gl.UNSIGNED_SHORT, this.batchOffset * 2);
+    // this.nextBatch();
     this.batchMode = -1;
   }
 

@@ -28,7 +28,10 @@ class CacheMap<T extends Builder> {
 
   get(id: number, ctx: BuildContext): T {
     let v = this.ensureValue(id);
-    if (!v.valid) v.update(this.update(ctx, id, v.value));
+    if (!v.valid) {
+      v.update(this.update(ctx, id, v.value));
+      v.value.needToRebuild();
+    }
     return v.value;
   }
 
@@ -153,6 +156,22 @@ export class RenderablesCacheImpl extends MessageHandlerReflective implements Re
     this.geometry.bind(ctx);
     this.helpers.bind(ctx);
     this.topdown.bind(ctx);
+    this.prebuild(ctx);
+  }
+
+  private prebuild(ctx: BuildContext) {
+    for (let i = 0; i < ctx.board.sectors.length; i++) {
+      this.geometry.sector(i);
+      this.topdown.sector(i);
+    }
+    for (let i = 0; i < ctx.board.walls.length; i++) {
+      this.geometry.wall(i);
+      this.helpers.wall(i);
+    }
+    for (let i = 0; i < ctx.board.sprites.length; i++) {
+      this.geometry.sprite(i);
+      this.topdown.sprite(i);
+    }
   }
 
   BoardInvalidate(msg: BoardInvalidate, ctx: BuildContext) {

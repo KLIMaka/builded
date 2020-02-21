@@ -94,9 +94,10 @@ export class PointSpriteSetup extends BufferSetup {
 
 export abstract class BufferRenderable<T extends BufferSetup> implements Builder, HintRenderable {
   abstract readonly buff: BuildBuffer;
-  abstract readonly hint: number;
   public mode: number = WebGLRenderingContext.TRIANGLES;
   protected drawCall: DrawCall;
+  private _hint: number;
+  get hint() { return this._hint }
 
   constructor(private getSetup: (state: State) => T) { }
 
@@ -108,12 +109,16 @@ export abstract class BufferRenderable<T extends BufferSetup> implements Builder
       setup.buffer(this.buff).mode(this.mode);
       this.setup(ctx, setup);
       this.drawCall = setup.createDrawCall();
+      this._hint = hash(this.drawCall.values[1], this.buff.get().buffer, this.textureHint(), this.buff.get().idx.offset);
     }
     state.run(gl, this.drawCall);
   }
 
+  public needToRebuild() { this.drawCall = null }
+
   abstract setup(ctx: BuildContext, setup: T): void;
   abstract reset(): void;
+  protected abstract textureHint(): Texture;
 
   public get() { return this }
   public accept(consumer: RenderableConsumer<HintRenderable>) { if (this.buff.getSize() != 0) consumer(this) }
@@ -125,6 +130,28 @@ export function lazySingletonTransformer<I, O>(trans: (i: I) => O) {
     if (instance == null) instance = trans(i);
     return instance;
   }
+}
+
+const textureMap = new Map<Texture, number>();
+const bufferMap = new Map<Buffer, number>();
+const shaderMap = new Map<String, number>();
+export function hash(sh: String, buff: Buffer, tex: Texture, offset: number) {
+  let shader = shaderMap.get(sh);
+  if (shader == undefined) {
+    shader = shaderMap.size;
+    shaderMap.set(sh, shader);
+  }
+  let texture = textureMap.get(tex);
+  if (texture == undefined) {
+    texture = textureMap.size;
+    textureMap.set(tex, texture);
+  }
+  let buffer = bufferMap.get(buff);
+  if (buffer == undefined) {
+    buffer = bufferMap.size;
+    bufferMap.set(buff, buffer);
+  }
+  return offset + (texture << 16) + (buffer << 24) + (shader << 28);
 }
 
 export const SOLID = lazySingletonTransformer((state: State) => new SolidSetup(state));

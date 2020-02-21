@@ -13,9 +13,9 @@ import { BuildersFactory } from "../common";
 export class WallBuilder extends Builders implements WallRenderable {
   constructor(
     factory: BuildersFactory,
-    readonly top = factory.solid(),
-    readonly mid = factory.solid(),
-    readonly bot = factory.solid()
+    readonly top = factory.solid('wall'),
+    readonly mid = factory.solid('wall'),
+    readonly bot = factory.solid('wall')
   ) { super(fastIterator([top, mid, bot])) }
 }
 

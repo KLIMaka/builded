@@ -21,7 +21,7 @@ export interface BuildBuffer {
 }
 
 export interface BuildBufferFactory {
-  get(): BuildBuffer;
+  get(hint: string): BuildBuffer;
 }
 
 export const BUFFER_FACTORY = new Dependency<BuildBufferFactory>('Build Buffer Factory');
@@ -36,31 +36,35 @@ const NORMAL = 1;
 const TEX_SHADING = 2;
 
 class BuildBufferFactoryImpl implements BuildBufferFactory {
-  private buffers: Buffer[] = [];
+  private buffers = new Map<string, Buffer[]>();
 
-  constructor(private gl: WebGLRenderingContext) {
-    this.addNewBuffer();
-  }
+  constructor(private gl: WebGLRenderingContext) { }
 
-  private addNewBuffer() {
+  private addNewBuffer(hint: string) {
     const buffer = new Buffer(this.gl, new BufferBuilder()
       .addVertexBuffer(this.gl, this.gl.FLOAT, 3)
       .addVertexBuffer(this.gl, this.gl.FLOAT, 3)
       .addVertexBuffer(this.gl, this.gl.FLOAT, 4));
-    this.buffers.push(buffer);
+    let buffers = this.buffers.get(hint);
+    buffers.push(buffer);
     return buffer;
   }
 
-  public get(): BuildBuffer {
-    return new BuildBufferImpl(this);
+  public get(hint: string): BuildBuffer {
+    let buffers = this.buffers.get(hint);
+    if (buffers == undefined) {
+      buffers = [];
+      this.buffers.set(hint, buffers);
+    }
+    return new BuildBufferImpl(this, hint);
   }
 
-  public allocate(vtxSize: number, idxSize: number): Pointer {
-    for (const buff of this.buffers) {
+  public allocate(hint: string, vtxSize: number, idxSize: number): Pointer {
+    for (const buff of this.buffers.get(hint)) {
       const ptr = buff.allocate(vtxSize, idxSize);
       if (ptr != null) return ptr;
     }
-    return this.addNewBuffer().allocate(vtxSize, idxSize);
+    return this.addNewBuffer(hint).allocate(vtxSize, idxSize);
   }
 }
 
@@ -68,7 +72,7 @@ export class BuildBufferImpl implements BuildBuffer {
   private ptr: Pointer;
   private size = 0;
 
-  constructor(private factory: BuildBufferFactoryImpl) { }
+  constructor(private factory: BuildBufferFactoryImpl, private hint: string) { }
 
   public get(): Pointer { return this.ptr }
   public getSize() { return this.size }
@@ -82,7 +86,7 @@ export class BuildBufferImpl implements BuildBuffer {
       }
       this.remove();
     }
-    this.ptr = this.factory.allocate(vtxCount, triIndexCount);
+    this.ptr = this.factory.allocate(this.hint, vtxCount, triIndexCount);
     this.size = this.ptr.idx.size;
   }
 

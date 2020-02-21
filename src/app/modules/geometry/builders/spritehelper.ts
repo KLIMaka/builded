@@ -9,8 +9,8 @@ import { BuildersFactory, WireframeBuilder, Type } from "../common";
 export class SpriteHelperBuillder extends Builders {
   constructor(
     factory: BuildersFactory,
-    readonly wire = factory.wireframe(),
-    readonly angle = factory.wireframe()
+    readonly wire = factory.wireframe('helper'),
+    readonly angle = factory.wireframe('helper')
   ) { super(fastIterator([wire, angle])) }
 }
 

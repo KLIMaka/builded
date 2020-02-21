@@ -34,8 +34,8 @@ export class Statusbar extends MessageHandlerReflective {
     const draws = PROFILE.get(null).counts['drawsRequested'] | 0;
     const skips = PROFILE.get(null).counts['drawsMerged'] | 0;
     this.draws.textContent = '' + draws + ' / ' + (draws - skips);
-    this.bufferPixelProvider.buffer = PROFILE.get(null).counts['buffer'];
-    drawToCanvas(this.bufferPixelProvider, this.buffer);
+    // this.bufferPixelProvider.buffer = PROFILE.get(null).counts['buffer'];
+    // drawToCanvas(this.bufferPixelProvider, this.buffer);
 
     // info['Rendering:'] = PROFILE.get('draw').time.toFixed(2) + 'ms';
     // info['Processing:'] = PROFILE.get('processing').time.toFixed(2) + 'ms';

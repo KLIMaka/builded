@@ -139,7 +139,7 @@ export class DynamicIndexBuffer extends IndexBufferImpl implements Updatable {
 
   public getData(): ArrayBufferView { return this.data }
 }
-export function createVertexBuffer(gl: WebGLRenderingContext, type: number, data: any, spacing: number, usage: number = WebGLRenderingContext.STREAM_DRAW, norm: boolean = false): VertexBufferDynamic {
+export function createVertexBuffer(gl: WebGLRenderingContext, type: number, data: any, spacing: number, usage: number = WebGLRenderingContext.DYNAMIC_DRAW, norm: boolean = false): VertexBufferDynamic {
   var arrtype = GlType2ArrayType(type);
   if (typeof data == 'number') data = new arrtype(data * spacing)
   else if (arrtype != data.constructor) throw new Error('GL Type and ArrayBuffer is incompatible')

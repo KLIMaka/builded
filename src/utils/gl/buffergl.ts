@@ -38,7 +38,7 @@ export class Buffer {
   private idxRegions: Region[] = [];
   private needUpdate = true;
 
-  constructor(gl: WebGLRenderingContext, builder: BufferBuilder, readonly blockSize = 10 * 1024) {
+  constructor(gl: WebGLRenderingContext, builder: BufferBuilder, readonly blockSize = 1024) {
     let vtxSize = builder.size;
     let idxSize = vtxSize * 2;
     this.vtxBuffers = builder.vtxBuffers;
@@ -136,8 +136,8 @@ export class Buffer {
     for (let i = 0; i < regions.length; i++) {
       let [ii, region] = this.mergeRegions(regions, i);
       i = ii;
-      PROFILE.get(null).inc('traffic', region[1]);
-      PROFILE.get(null).inc('updates');
+      // PROFILE.get(null).inc('traffic', region[1]);
+      // PROFILE.get(null).inc('updates');
       buffer.updateRegion(gl, region[0], region[1]);
     }
     return true;
@@ -156,6 +156,6 @@ export class Buffer {
       this.idxRegions = [];
     }
     this.needUpdate = false;
-    PROFILE.get(null).set('buffer', this.vtxBag.freeSpace(64));
+    // PROFILE.get(null).set('buffer', this.vtxBag.freeSpace(64));
   }
 }

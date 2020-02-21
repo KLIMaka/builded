@@ -9,8 +9,8 @@ import { BuildersFactory, WireframeBuilder, PointSpriteBuilder } from "../common
 export class WallPointHelperBuilder extends Builders {
   constructor(
     factory: BuildersFactory,
-    readonly points = factory.pointSprite(),
-    readonly line = factory.wireframe()
+    readonly points = factory.pointSprite('helper'),
+    readonly line = factory.wireframe('helper')
   ) { super(fastIterator([points, line])) }
 }
 

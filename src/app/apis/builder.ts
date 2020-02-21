@@ -6,6 +6,7 @@ import { FastIterable } from "../../utils/collections";
 export interface Builder extends RenderableProvider<HintRenderable> {
   reset(): void;
   get(): Renderable;
+  needToRebuild(): void;
 }
 
 export class Builders implements Builder, RenderableProvider<HintRenderable> {
@@ -28,5 +29,11 @@ export class Builders implements Builder, RenderableProvider<HintRenderable> {
     const size = this.builders.size;
     const array = this.builders.array;
     for (let i = 0; i < size; i++) array[i].accept(consumer)
+  }
+
+  needToRebuild() {
+    const size = this.builders.size;
+    const array = this.builders.array;
+    for (let i = 0; i < size; i++) array[i].needToRebuild();
   }
 }

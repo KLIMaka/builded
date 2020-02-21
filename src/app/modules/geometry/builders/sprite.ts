@@ -136,7 +136,7 @@ function fillBuffersForFaceSprite(x: number, y: number, z: number, xo: number, y
 }
 
 export function updateSprite(ctx: BuildContext, sprId: number, builder: SolidBuilder): SolidBuilder {
-  builder = builder == null ? ctx.buildersFactory.solid() : builder;
+  builder = builder == null ? ctx.buildersFactory.solid('sprite') : builder;
   let spr = ctx.board.sprites[sprId];
   if (spr.picnum == 0 || spr.cstat.invisible)
     return builder;

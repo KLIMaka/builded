@@ -21,9 +21,9 @@ class Contour {
   constructor(
     factory: BuildersFactory,
     firstPoint: boolean = true,
-    private contour = factory.wireframe(),
-    private contourPoints = factory.pointSprite(),
-    private length = factory.pointSprite(),
+    private contour = factory.wireframe('utils'),
+    private contourPoints = factory.pointSprite('utils'),
+    private length = factory.pointSprite('utils'),
     private renderable = new LayeredRenderables(fastIterator([contour, contourPoints, length]))
   ) { if (firstPoint) this.pushPoint(0, 0) }
 
@@ -54,6 +54,7 @@ class Contour {
   }
 
   private updateContourPoints(ctx: BuildContext) {
+    this.contourPoints.needToRebuild();
     this.contourPoints.tex = ctx.art.get(-1);
     let buff = this.contourPoints.buff;
     buff.allocate(this.size * 4, this.size * 6);
@@ -78,6 +79,7 @@ class Contour {
   }
 
   private updateContour() {
+    this.contour.needToRebuild();
     let buff = this.contour.buff;
     buff.deallocate();
     let size = this.size - 1;
@@ -105,6 +107,7 @@ class Contour {
   }
 
   private updateLength(ctx: BuildContext) {
+    this.length.needToRebuild();
     const buff = this.length.buff;
     buff.deallocate();
     if (this.size < 2) return;

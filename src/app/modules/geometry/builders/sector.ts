@@ -14,8 +14,8 @@ import { BuildersFactory } from "../common";
 export class SectorBuilder extends Builders implements SectorRenderable {
   constructor(
     factory: BuildersFactory,
-    readonly ceiling = factory.solid(),
-    readonly floor = factory.solid()
+    readonly ceiling = factory.solid('sector'),
+    readonly floor = factory.solid('sector')
   ) { super(fastIterator([ceiling, floor])) }
 }
 

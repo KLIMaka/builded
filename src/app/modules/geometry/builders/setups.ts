@@ -1,16 +1,15 @@
 import { Mat4Array, Vec4Array } from "../../../../libs_js/glmatrix";
-import { Buffer } from "../../../../utils/gl/buffergl";
 import { Deck } from "../../../../utils/collections";
-import * as PROFILE from '../../../../utils/profiler';
-import { State } from "../../../../utils/gl/stategl";
+import { Buffer } from "../../../../utils/gl/buffergl";
+import { Texture } from "../../../../utils/gl/drawstruct";
+import { DrawCall, State } from "../../../../utils/gl/stategl";
 import { BuildContext } from "../../../apis/app";
-import { BuildBuffer } from "../../gl/buffers";
 import { Builder } from "../../../apis/builder";
 import { LayeredRenderable, RenderableConsumer } from "../../../apis/renderable";
-import { Texture } from "../../../../utils/gl/drawstruct";
+import { BuildBuffer } from "../../gl/buffers";
 
 export interface StateSetup {
-  apply(state: State): void;
+  createDrawCall(): DrawCall;
 }
 
 export class BufferSetup implements StateSetup {
@@ -18,6 +17,7 @@ export class BufferSetup implements StateSetup {
   protected buff: Buffer;
   protected offset: number;
   protected size: number;
+  protected _mode: number;
 
   constructor(state: State) {
     this.register('shader', state);
@@ -27,9 +27,8 @@ export class BufferSetup implements StateSetup {
     this.register('aTcps', state);
   }
 
-  public apply(state: State) {
-    state.setup(this.values);
-    state.setDrawElements(this.buff, this.offset, this.size);
+  public createDrawCall() {
+    return new DrawCall([...this.values], this.buff, this.offset, this.size, this._mode);
   }
 
   protected register(name: string, state: State) {
@@ -38,6 +37,7 @@ export class BufferSetup implements StateSetup {
   }
 
   public shader(shader: string) { this.values.set(1, shader); return this }
+  public mode(mode: number) { this._mode = mode; return this }
 
   public buffer(buffer: BuildBuffer) {
     this.values.set(3, buffer.getIdxBuffer());
@@ -48,6 +48,7 @@ export class BufferSetup implements StateSetup {
     this.buff = pointer.buffer;
     this.offset = pointer.idx.offset;
     this.size = buffer.getSize();
+    return this;
   }
 }
 
@@ -95,18 +96,20 @@ export abstract class BufferRenderable<T extends BufferSetup> implements Builder
   abstract readonly buff: BuildBuffer;
   abstract readonly layer: number;
   public mode: number = WebGLRenderingContext.TRIANGLES;
+  protected drawCall: DrawCall;
 
   constructor(private getSetup: (state: State) => T) { }
 
+
   draw(ctx: BuildContext, gl: WebGLRenderingContext, state: State): void {
     if (this.buff.getSize() == 0) return;
-    const setup = this.getSetup(state);
-    setup.buffer(this.buff);
-    this.setup(ctx, setup);
-    setup.apply(state);
-    if (state.draw(gl, this.mode))
-      PROFILE.get(null).inc('skip_draws');
-    PROFILE.get(null).inc('draws');
+    if (this.drawCall == null) {
+      const setup = this.getSetup(state);
+      setup.buffer(this.buff).mode(this.mode);
+      this.setup(ctx, setup);
+      this.drawCall = setup.createDrawCall();
+    }
+    state.run(gl, this.drawCall);
   }
 
   abstract setup(ctx: BuildContext, setup: T): void;

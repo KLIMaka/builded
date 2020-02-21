@@ -1,8 +1,9 @@
 import * as GLM from '../../libs_js/glmatrix';
+import { Deck } from '../collections';
 import { Buffer } from './buffergl';
-import { Deck, Collection } from '../collections';
 import { Definition, IndexBuffer, Shader, Texture, VertexBuffer } from './drawstruct';
 import * as SHADER from './shaders';
+import * as PROFILE from '../../utils/profiler';
 
 function eqCmp<T>(lh: T, rh: T) { return lh === rh }
 function assign<T>(dst: T, src: T) { return src }
@@ -290,7 +291,11 @@ export class State {
   }
 
   public draw(gl: WebGLRenderingContext, mode: number = gl.TRIANGLES): boolean {
-    if (this.tryBatch(gl, mode)) return true;
+    PROFILE.get(null).inc('draws');
+    if (this.tryBatch(gl, mode)) {
+      PROFILE.get(null).inc('skip_draws');
+      return true;
+    }
     this.rebindShader(gl);
     this.rebindVertexBuffers(gl);
     this.rebindIndexBuffer(gl);
@@ -299,11 +304,25 @@ export class State {
     return false;
   }
 
-  public setup(values: Collection<any>) {
-    for (let i = 0; i < values.length(); i += 2) {
-      const idx = values.get(i);
-      const value = values.get(i + 1);
+  public run(gl: WebGLRenderingContext, call: DrawCall) {
+    const values = call.values;
+    const size = call.values.length;
+    for (let i = 0; i < size; i += 2) {
+      const idx = values[i];
+      const value = values[i + 1];
       this.states[idx].set(value);
     }
+    this.setDrawElements(call.buffer, call.offset, call.size);
+    this.draw(gl, call.mode)
   }
+}
+
+export class DrawCall {
+  constructor(
+    readonly values: any[],
+    readonly buffer: Buffer,
+    readonly offset: number,
+    readonly size: number,
+    readonly mode: number
+  ) { }
 }

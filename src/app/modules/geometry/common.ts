@@ -5,6 +5,7 @@ import { PARALLAX, BASE, SPRITE, GRID1, SCREEN } from "../../apis/renderable"
 import { BuildBuffer, BUFFER_FACTORY } from "../gl/buffers";
 import { BuildContext } from "../../apis/app";
 import { Injector, Dependency } from "../../../utils/injector";
+import { State } from "../../../utils/gl/stategl";
 
 export interface BuildersFactory {
   solid(): SolidBuilder;
@@ -67,6 +68,11 @@ export class GridBuilder extends BufferRenderable<GridSetup> {
   public setup(ctx: BuildContext, setup: GridSetup) {
     setup.shader('grid')
       .grid(this.gridTexMatProvider(ctx.gridScale));
+  }
+
+  public draw(ctx: BuildContext, gl: WebGLRenderingContext, state: State): void {
+    super.draw(ctx, gl, state);
+    this.drawCall = null;
   }
 }
 

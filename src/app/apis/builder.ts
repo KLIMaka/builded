@@ -8,10 +8,10 @@ export interface Builder extends RenderableProvider<HintRenderable> {
 }
 
 export class Builders implements Builder, RenderableProvider<HintRenderable> {
-  constructor(private builders: Iterable<Builder>) { }
+  constructor(builders: Iterable<Builder>, private copy = [...builders]) { }
   get() { return this }
-  reset() { for (const b of this.builders) b.reset() }
-  draw(gl: WebGLRenderingContext, state: State) { for (const b of this.builders) b.get().draw(gl, state) }
-  accept(consumer: RenderableConsumer<HintRenderable>): void { for (const b of this.builders) b.accept(consumer) }
-  needToRebuild() { for (const b of this.builders) b.needToRebuild() }
+  reset() { let size = this.copy.length - 1; while (size >= 0) this.copy[size--].reset() }
+  draw(gl: WebGLRenderingContext, state: State) { let size = this.copy.length - 1; while (size >= 0) this.copy[size--].get().draw(gl, state) }
+  accept(consumer: RenderableConsumer<HintRenderable>): void { let size = this.copy.length - 1; while (size >= 0) this.copy[size--].accept(consumer) }
+  needToRebuild() { let size = this.copy.length - 1; while (size >= 0) this.copy[size--].needToRebuild() }
 }

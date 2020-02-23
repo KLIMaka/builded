@@ -1,15 +1,15 @@
-import { cyclic, tuple } from "../../utils/mathutils";
-import * as GLM from "../../libs_js/glmatrix";
-import { Deck, IndexedDeck } from "../../utils/collections";
-import { BuildContext } from "../apis/app";
 import { connectedWalls, deleteWall, lastwall, mergePoints, moveWall, splitWall } from "../../build/boardutils";
-import { MessageHandlerReflective, Message } from "../apis/handler";
+import { Entity, EntityType } from "../../build/hitscan";
 import { Board } from "../../build/structs";
 import { sectorOfWall } from "../../build/utils";
+import { vec2 } from "../../libs_js/glmatrix";
+import { Deck, IndexedDeck } from "../../utils/collections";
+import { cyclic, tuple } from "../../utils/mathutils";
+import { Message, MessageHandlerReflective } from "../apis/handler";
+import { EditContext } from "./context";
 import { invalidateSectorAndWalls } from "./editutils";
-import { EndMove, Flip, Highlight, Move, NamedMessage, Palette, PanRepeat, SetPicnum, Shade, StartMove, BoardInvalidate } from "./messages";
+import { BoardInvalidate, EndMove, Flip, Highlight, Move, NamedMessage, Palette, PanRepeat, SetPicnum, Shade, StartMove } from "./messages";
 import { MOVE_COPY } from "./tools/selection";
-import { Entity, EntityType } from "../../build/hitscan";
 
 function collectConnectedWalls(board: Board, wallId: number) {
   let result = new Deck<number>();
@@ -20,60 +20,59 @@ function collectConnectedWalls(board: Board, wallId: number) {
 export class WallEnt extends MessageHandlerReflective {
   private static invalidatedSectors = new IndexedDeck<number>();
 
-  public static create(board: Board, id: number) {
-    return new WallEnt(board, id);
-  }
-
   constructor(
-    board: Board,
     public wallId: number,
-    public origin = GLM.vec2.create(),
+    private ctx: EditContext,
+    public origin = vec2.create(),
     public active = false,
-    public connectedWalls = collectConnectedWalls(board, wallId),
+    public connectedWalls = collectConnectedWalls(ctx.board(), wallId),
     private valid = true) { super() }
 
-  public StartMove(msg: StartMove, ctx: BuildContext) {
-    let wall = ctx.board.walls[this.wallId];
-    if (ctx.state.get(MOVE_COPY)) {
-      this.wallId = splitWall(ctx.board, this.wallId, wall.x, wall.y, ctx.art, ctx.refs);
-      this.connectedWalls = collectConnectedWalls(ctx.board, this.wallId);
+  public StartMove(msg: StartMove) {
+    const board = this.ctx.board();
+    const wall = board.walls[this.wallId];
+    if (this.ctx.state.get(MOVE_COPY)) {
+      this.wallId = splitWall(board, this.wallId, wall.x, wall.y, this.ctx.art, this.ctx.refs);
+      this.connectedWalls = collectConnectedWalls(board, this.wallId);
     }
-    GLM.vec2.set(this.origin, wall.x, wall.y);
+    vec2.set(this.origin, wall.x, wall.y);
     this.active = true;
   }
 
-  private invalidate(ctx: BuildContext) {
+  private invalidate() {
     WallEnt.invalidatedSectors.clear();
-    let cwalls = this.connectedWalls;
+    const cwalls = this.connectedWalls;
+    const board = this.ctx.board();
     for (let w of cwalls) {
-      let s = sectorOfWall(ctx.board, w);
+      let s = sectorOfWall(board, w);
       if (WallEnt.invalidatedSectors.indexOf(s) == -1) {
-        invalidateSectorAndWalls(s, ctx);
+        invalidateSectorAndWalls(s, board, this.ctx.bus);
         WallEnt.invalidatedSectors.push(s);
       }
     }
   }
 
-  public Move(msg: Move, ctx: BuildContext) {
-    let x = ctx.snap(this.origin[0] + msg.dx);
-    let y = ctx.snap(this.origin[1] + msg.dy);
-    if (moveWall(ctx.board, this.wallId, x, y)) {
-      this.invalidate(ctx);
+  public Move(msg: Move) {
+    let x = this.ctx.gridController.snap(this.origin[0] + msg.dx);
+    let y = this.ctx.gridController.snap(this.origin[1] + msg.dy);
+    if (moveWall(this.ctx.board(), this.wallId, x, y)) {
+      this.invalidate();
     }
   }
 
-  public EndMove(msg: EndMove, ctx: BuildContext) {
+  public EndMove(msg: EndMove) {
     this.active = false;
-    mergePoints(ctx.board, this.wallId, ctx.refs);
+    mergePoints(this.ctx.board(), this.wallId, this.ctx.refs);
   }
 
-  public Highlight(msg: Highlight, ctx: BuildContext) {
+  public Highlight(msg: Highlight) {
     if (this.active) {
+      const board = this.ctx.board();
       let cwalls = this.connectedWalls;
       for (let i = 0; i < cwalls.length(); i++) {
         let w = cwalls.get(i);
-        let s = sectorOfWall(ctx.board, w);
-        let p = lastwall(ctx.board, w);
+        let s = sectorOfWall(board, w);
+        let p = lastwall(board, w);
         msg.set.add(tuple(2, w));
         msg.set.add(tuple(3, w));
         msg.set.add(tuple(2, p));
@@ -85,22 +84,22 @@ export class WallEnt extends MessageHandlerReflective {
     }
   }
 
-  public SetPicnum(msg: SetPicnum, ctx: BuildContext) {
-    let wall = ctx.board.walls[this.wallId];
+  public SetPicnum(msg: SetPicnum) {
+    let wall = this.ctx.board().walls[this.wallId];
     wall.picnum = msg.picnum;
-    ctx.message(new BoardInvalidate(new Entity(this.wallId, EntityType.WALL_POINT)));
+    this.ctx.bus.handle(new BoardInvalidate(new Entity(this.wallId, EntityType.WALL_POINT)));
   }
 
-  public Shade(msg: Shade, ctx: BuildContext) {
-    let wall = ctx.board.walls[this.wallId];
+  public Shade(msg: Shade) {
+    let wall = this.ctx.board().walls[this.wallId];
     let shade = wall.shade;
     if (msg.absolute && shade == msg.value) return;
     if (msg.absolute) wall.shade = msg.value; else wall.shade += msg.value;
-    ctx.message(new BoardInvalidate(new Entity(this.wallId, EntityType.WALL_POINT)));
+    this.ctx.bus.handle(new BoardInvalidate(new Entity(this.wallId, EntityType.WALL_POINT)));
   }
 
-  public PanRepeat(msg: PanRepeat, ctx: BuildContext) {
-    let wall = ctx.board.walls[this.wallId];
+  public PanRepeat(msg: PanRepeat) {
+    let wall = this.ctx.board().walls[this.wallId];
     if (msg.absolute) {
       if (wall.xpanning == msg.xpan && wall.ypanning == msg.ypan && wall.xrepeat == msg.xrepeat && wall.yrepeat == msg.yrepeat) return;
       wall.xpanning = msg.xpan;
@@ -113,42 +112,42 @@ export class WallEnt extends MessageHandlerReflective {
       wall.xrepeat += msg.xrepeat;
       wall.yrepeat += msg.yrepeat;
     }
-    ctx.message(new BoardInvalidate(new Entity(this.wallId, EntityType.WALL_POINT)));
+    this.ctx.bus.handle(new BoardInvalidate(new Entity(this.wallId, EntityType.WALL_POINT)));
   }
 
-  public Palette(msg: Palette, ctx: BuildContext) {
-    let wall = ctx.board.walls[this.wallId];
+  public Palette(msg: Palette) {
+    let wall = this.ctx.board().walls[this.wallId];
     if (msg.absolute) {
       if (msg.value == wall.pal) return;
       wall.pal = msg.value;
     } else {
       wall.pal = cyclic(wall.pal + msg.value, msg.max);
     }
-    ctx.message(new BoardInvalidate(new Entity(this.wallId, EntityType.WALL_POINT)));
+    this.ctx.bus.handle(new BoardInvalidate(new Entity(this.wallId, EntityType.WALL_POINT)));
   }
 
-  public Flip(msg: Flip, ctx: BuildContext) {
-    let wall = ctx.board.walls[this.wallId];
+  public Flip(msg: Flip) {
+    let wall = this.ctx.board().walls[this.wallId];
     let flip = wall.cstat.xflip + wall.cstat.yflip * 2;
     let nflip = cyclic(flip + 1, 4);
     wall.cstat.xflip = nflip & 1;
     wall.cstat.yflip = (nflip & 2) >> 1;
-    ctx.message(new BoardInvalidate(new Entity(this.wallId, EntityType.WALL_POINT)));
+    this.ctx.bus.handle(new BoardInvalidate(new Entity(this.wallId, EntityType.WALL_POINT)));
   }
 
-  public NamedMessage(msg: NamedMessage, ctx: BuildContext) {
+  public NamedMessage(msg: NamedMessage) {
     if (msg.name == 'delete') {
-      deleteWall(ctx.board, this.wallId, ctx.refs);
-      ctx.commit();
-      ctx.message(new BoardInvalidate(null));
+      deleteWall(this.ctx.board(), this.wallId, this.ctx.refs);
+      // this.ctx.commit();
+      this.ctx.bus.handle(new BoardInvalidate(null));
     }
   }
 
-  public BoardInvalidate(msg: BoardInvalidate, ctx: BuildContext) {
+  public BoardInvalidate(msg: BoardInvalidate) {
     if (msg.ent == null) this.valid = false;
   }
 
-  public handle(msg: Message, ctx: BuildContext) {
-    if (this.valid) super.handle(msg, ctx);
+  public handle(msg: Message) {
+    if (this.valid) super.handle(msg);
   }
 }

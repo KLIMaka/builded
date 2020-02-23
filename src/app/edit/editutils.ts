@@ -1,17 +1,17 @@
-import { tuple2 } from "../../utils/mathutils";
-import { BuildContext } from "../apis/app";
-import { EntityType, Entity } from "../../build/hitscan";
+import { Entity, EntityType } from "../../build/hitscan";
 import { Board } from "../../build/structs";
 import { slope } from "../../build/utils";
+import { tuple2 } from "../../utils/mathutils";
+import { MessageBus } from "../apis/handler";
 import { BoardInvalidate } from "./messages";
 
-export function invalidateSectorAndWalls(sectorId: number, ctx: BuildContext) {
-  ctx.message(new BoardInvalidate(new Entity(sectorId, EntityType.CEILING)));
-  let sec = ctx.board.sectors[sectorId];
+export function invalidateSectorAndWalls(sectorId: number, board: Board, bus: MessageBus) {
+  bus.handle(new BoardInvalidate(new Entity(sectorId, EntityType.CEILING)));
+  let sec = board.sectors[sectorId];
   let end = sec.wallnum + sec.wallptr;
   for (let w = sec.wallptr; w < end; w++) {
-    ctx.message(new BoardInvalidate(new Entity(w, EntityType.WALL_POINT)));
-    ctx.message(new BoardInvalidate(new Entity(ctx.board.walls[w].nextwall, EntityType.WALL_POINT)));
+    bus.handle(new BoardInvalidate(new Entity(w, EntityType.WALL_POINT)));
+    bus.handle(new BoardInvalidate(new Entity(board.walls[w].nextwall, EntityType.WALL_POINT)));
   }
 }
 

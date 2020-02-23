@@ -1,5 +1,5 @@
 import { Injector } from "../../../utils/injector";
-import { Storages_, Storage } from "../../apis/app";
+import { STORAGES, Storage } from "../../apis/app";
 import { FileSystem, UrlFs, FS } from "./fs";
 import { FS_MANAGER, FsManager } from "./manager";
 import { MOUNTS, MountableFs } from "./mount";
@@ -9,7 +9,7 @@ function createDb(name: string) {
   let db: Storage = null;
   return async (injector: Injector) => {
     if (db == null) {
-      const storages = await injector.getInstance(Storages_);
+      const storages = await injector.getInstance(STORAGES);
       db = await storages(name);
     }
     return db;
@@ -40,7 +40,7 @@ async function StorageFsManager(injector: Injector): Promise<FsManager> {
 
 export function DbFsModule(rom: string = null) {
   return (injector: Injector) => {
-    injector.bind(Storages_, StorageDbConstructor);
+    injector.bind(STORAGES, StorageDbConstructor);
     injector.bind(FS, MountableFs);
     injector.bind<FileSystem>(MOUNTS, StorageFs);
     if (rom != null) injector.bind<FileSystem>(MOUNTS, UrlFs(rom));

@@ -1,13 +1,13 @@
-import { len2d } from "../../../../utils/mathutils";
-import { mat4, Mat4Array, vec3, Vec3Array, vec4 } from "../../../../libs_js/glmatrix";
-import { fastIterator } from "../../../../utils/collections";
-import { BuildContext } from "../../../apis/app";
 import { ArtInfo } from "../../../../build/art";
 import { Wall } from "../../../../build/structs";
 import { createSlopeCalculator, sectorOfWall, wallNormal, ZSCALE } from "../../../../build/utils";
-import { BuildBuffer } from "../../gl/buffers";
+import { mat4, Mat4Array, vec3, Vec3Array, vec4 } from "../../../../libs_js/glmatrix";
+import { fastIterator } from "../../../../utils/collections";
+import { len2d } from "../../../../utils/mathutils";
 import { Builders } from "../../../apis/builder";
 import { WallRenderable } from "../../../apis/renderable";
+import { BuildBuffer } from "../../gl/buffers";
+import { RenderablesCacheContext } from "../cache";
 import { BuildersFactory } from "../common";
 
 export class WallBuilder extends Builders implements WallRenderable {
@@ -115,9 +115,9 @@ function getMaskedWallCoords(x1: number, y1: number, x2: number, y2: number, slo
 
 const wallNormal_ = vec3.create();
 const texMat_ = mat4.create();
-export function updateWall(ctx: BuildContext, wallId: number, builder: WallBuilder): WallBuilder {
-  builder = builder == null ? new WallBuilder(ctx.buildersFactory) : builder;
-  const board = ctx.board;
+export function updateWall(ctx: RenderablesCacheContext, wallId: number, builder: WallBuilder): WallBuilder {
+  builder = builder == null ? new WallBuilder(ctx.factory) : builder;
+  const board = ctx.board();
   const art = ctx.art;
   const wall = board.walls[wallId];
   const sectorId = sectorOfWall(board, wallId);

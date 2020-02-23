@@ -1,7 +1,6 @@
 import { Collection, Deck } from "../../utils/collections";
 import { Lexer, LexerRule } from "../../utils/lexer";
 import { error } from "../../utils/logger";
-import { BuildContext, constCtxValue, ContextedValue } from "../apis/app";
 import { EndMove, Flip, Move, NamedMessage, Palette, PanRepeat, ResetPanRepeat, SetPicnum, SetSectorCstat, SetWallCstat, Shade, SpriteMode, StartMove, SetSpriteCstat } from "../edit/messages";
 import { Message } from "../apis/handler";
 
@@ -44,16 +43,10 @@ class MessageParser {
 }
 let parser = new MessageParser();
 
-function createMacro(macro: string): ContextedValue<any> {
-  return <ContextedValue<any>>Function('ctx', macro);
-}
-
 function parseArgs(...types: string[]) {
-  let args = new Deck<ContextedValue<any>>();
+  let args = new Deck<any>();
   for (let type of types) {
-    let macro = parser.tryGet<string>('MACRO');
-    if (macro != null) args.push(createMacro(macro))
-    else args.push(constCtxValue(parser.get(type)));
+    args.push(parser.get(type));
   }
   return args;
 }
@@ -62,9 +55,9 @@ const NOOP_MESSAGE: Message = {};
 let factArgs = new Deck<any>();
 function createMessage(constr: Function, ...types: string[]) {
   let args = parseArgs(...types);
-  return (ctx: BuildContext) => {
+  return () => {
     factArgs.clear();
-    for (let v of args) factArgs.push(v(ctx));
+    for (let v of args) factArgs.push(v);
     try {
       return Reflect.construct(constr, [...factArgs]);
     } catch (e) {
@@ -74,8 +67,8 @@ function createMessage(constr: Function, ...types: string[]) {
   }
 }
 
-let parsdMessages = new Deck<ContextedValue<Message>>();
-function tryParseMessage(): Collection<ContextedValue<Message>> {
+let parsdMessages = new Deck<Message>();
+function tryParseMessage(): Collection<Message> {
   parsdMessages.clear();
   switch (parser.get('ID')) {
     case 'picnum': return parsdMessages.push(createMessage(SetPicnum, 'INT'));
@@ -85,18 +78,18 @@ function tryParseMessage(): Collection<ContextedValue<Message>> {
     case 'wallcstat': return parsdMessages.push(createMessage(SetWallCstat, 'ID', 'BOOLEAN', 'BOOLEAN'));
     case 'sectorcstat': return parsdMessages.push(createMessage(SetSectorCstat, 'ID', 'BOOLEAN', 'BOOLEAN'));
     case 'spritecstat': return parsdMessages.push(createMessage(SetSpriteCstat, 'ID', 'BOOLEAN', 'BOOLEAN'));
-    case 'flip': return parsdMessages.push(constCtxValue(new Flip()));
-    case 'sprite_mode': return parsdMessages.push(constCtxValue(new SpriteMode()));
-    case 'reset_panrepeat': return parsdMessages.push(constCtxValue(new ResetPanRepeat()));
+    case 'flip': return parsdMessages.push(new Flip());
+    case 'sprite_mode': return parsdMessages.push(new SpriteMode());
+    case 'reset_panrepeat': return parsdMessages.push(new ResetPanRepeat());
     case 'move': return parsdMessages
-      .push(constCtxValue(new StartMove()))
+      .push(new StartMove())
       .push(createMessage(Move, 'INT', 'INT', 'INT'))
-      .push(constCtxValue(new EndMove()));
+      .push(new EndMove());
     default: return parsdMessages;
   }
 }
 
-function tryParse(src: string, messages: Deck<ContextedValue<Message>>): Collection<ContextedValue<Message>> {
+function tryParse(src: string, messages: Deck<Message>): Collection<Message> {
   try {
     parser.setSource(src);
     parser.get('ID', 'msg');
@@ -112,9 +105,9 @@ function tryParse(src: string, messages: Deck<ContextedValue<Message>>): Collect
   }
 }
 
-let messages = new Deck<ContextedValue<Message>>();
-export function messageParser(str: string): Collection<ContextedValue<Message>> {
+let messages = new Deck<Message>();
+export function messageParser(str: string): Collection<Message> {
   let result = tryParse(str, messages.clear());
-  if (result.length() == 0) return messages.push(constCtxValue(new NamedMessage(str)));
+  if (result.length() == 0) return messages.push(new NamedMessage(str));
   return result;
 }

@@ -1,18 +1,17 @@
+import { connectedWalls, fixxrepeat, lastwall, mergePoints, moveWall, nextwall } from "../../build/boardutils";
 import { Entity, EntityType, Target } from "../../build/hitscan";
 import { Board } from "../../build/structs";
 import { sectorOfWall } from "../../build/utils";
-import * as GLM from "../../libs_js/glmatrix";
+import { vec2 } from "../../libs_js/glmatrix";
 import { Collection, Deck, IndexedDeck } from "../../utils/collections";
 import { List } from "../../utils/list";
 import { cyclic, len2d, tuple } from "../../utils/mathutils";
-import { BuildContext } from "../apis/app";
-import { connectedWalls, fixxrepeat, lastwall, mergePoints, moveWall, nextwall } from "../../build/boardutils";
 import { Message, MessageHandlerReflective } from "../apis/handler";
+import { EditContext } from "./context";
 import { invalidateSectorAndWalls } from "./editutils";
 import { BoardInvalidate, EndMove, Flip, Highlight, Move, Palette, PanRepeat, ResetPanRepeat, SetPicnum, SetWallCstat, Shade, StartMove } from "./messages";
 
-function getClosestWallByIds(board: Board, target: Target, ids: Collection<number>): number {
-  if (ids.length() == 1) return ids.get(0);
+function getClosestWallByIds(board: Board, target: Target, ids: Iterable<number>): number {
   let id = -1;
   let mindist = Number.MAX_VALUE;
   let [x, y] = target.coords;
@@ -24,10 +23,10 @@ function getClosestWallByIds(board: Board, target: Target, ids: Collection<numbe
       mindist = dist;
     }
   }
-  return id;
+  return id == -1 ? ids[Symbol.iterator]().next().value : id;
 }
 
-function collectHighlightedWalls(board: Board, walls: Collection<number>): Collection<number> {
+function collectHighlightedWalls(board: Board, walls: Iterable<number>): Collection<number> {
   let result = new Deck<number>();
   let chains = new Deck<List<number>>();
   for (let w of walls) {
@@ -62,13 +61,13 @@ function collectHighlightedWalls(board: Board, walls: Collection<number>): Colle
   return result;
 }
 
-function collectConnectedWalls(board: Board, walls: Collection<number>) {
+function collectConnectedWalls(board: Board, walls: Iterable<number>) {
   let result = new Deck<number>();
   for (let w of walls) connectedWalls(board, w, result);
   return result;
 }
 
-function collectMotionSectors(board: Board, walls: Collection<number>): Set<number> {
+function collectMotionSectors(board: Board, walls: Iterable<number>): Set<number> {
   let sectors = new Set<number>();
   return sectors;
 }
@@ -76,67 +75,67 @@ function collectMotionSectors(board: Board, walls: Collection<number>): Set<numb
 export class WallSegmentsEnt extends MessageHandlerReflective {
   private static invalidatedSectors = new IndexedDeck<number>();
 
-  public static create(board: Board, ids: Collection<number>, bottom: boolean = false) {
-    return new WallSegmentsEnt(board, ids, bottom);
-  }
-
   constructor(
-    board: Board,
-    public wallIds: Collection<number>,
+    public wallIds: Iterable<number>,
     public bottom: boolean,
-    public origin = GLM.vec2.create(),
+    public ctx: EditContext,
+    public origin = vec2.create(),
     public refwall = -1,
     public active = false,
-    public highlighted = collectHighlightedWalls(board, wallIds),
-    public connectedWalls = collectConnectedWalls(board, wallIds),
-    public motionSectors = collectMotionSectors(board, wallIds),
+    public highlighted = collectHighlightedWalls(ctx.board(), wallIds),
+    public connectedWalls = collectConnectedWalls(ctx.board(), wallIds),
+    public motionSectors = collectMotionSectors(ctx.board(), wallIds),
     private valid = true) { super() }
 
-  private invalidate(ctx: BuildContext) {
-    let invalidatedSectors = WallSegmentsEnt.invalidatedSectors.clear();
+  private invalidate() {
+    const invalidatedSectors = WallSegmentsEnt.invalidatedSectors.clear();
+    const board = this.ctx.board();
     for (let w of this.connectedWalls) {
-      let s = sectorOfWall(ctx.board, w);
+      let s = sectorOfWall(board, w);
       if (invalidatedSectors.indexOf(s) == -1) {
-        invalidateSectorAndWalls(s, ctx);
+        invalidateSectorAndWalls(s, board, this.ctx.bus);
         invalidatedSectors.push(s);
       }
     }
   }
 
-  public StartMove(msg: StartMove, ctx: BuildContext) {
-    this.refwall = getClosestWallByIds(ctx.board, ctx.view.target(), this.wallIds);
-    let wall = ctx.board.walls[this.refwall];
-    GLM.vec2.set(this.origin, wall.x, wall.y);
+  public StartMove(msg: StartMove) {
+    const board = this.ctx.board();
+    this.refwall = getClosestWallByIds(board, this.ctx.view.target(), this.wallIds);
+    let wall = board.walls[this.refwall];
+    vec2.set(this.origin, wall.x, wall.y);
     this.active = true;
   }
 
-  public Move(msg: Move, ctx: BuildContext) {
-    let x = ctx.snap(this.origin[0] + msg.dx);
-    let y = ctx.snap(this.origin[1] + msg.dy);
-    let refwall = ctx.board.walls[this.refwall];
+  public Move(msg: Move) {
+    const board = this.ctx.board();
+    let x = this.ctx.gridController.snap(this.origin[0] + msg.dx);
+    let y = this.ctx.gridController.snap(this.origin[1] + msg.dy);
+    let refwall = board.walls[this.refwall];
     let dx = x - refwall.x;
     let dy = y - refwall.y;
-    if (moveWall(ctx.board, this.refwall, x, y)) {
+    if (moveWall(board, this.refwall, x, y)) {
       for (let w of this.wallIds) {
         if (w == this.refwall) continue;
-        let wall = ctx.board.walls[w];
-        moveWall(ctx.board, w, wall.x + dx, wall.y + dy);
+        let wall = board.walls[w];
+        moveWall(board, w, wall.x + dx, wall.y + dy);
       }
-      this.invalidate(ctx);
+      this.invalidate();
     }
   }
 
-  public EndMove(msg: EndMove, ctx: BuildContext) {
+  public EndMove(msg: EndMove) {
     this.active = false;
-    for (let w of this.wallIds) mergePoints(ctx.board, w, ctx.refs);
+    for (let w of this.wallIds) mergePoints(this.ctx.board(), w, this.ctx.refs);
   }
 
-  public Highlight(msg: Highlight, ctx: BuildContext) {
+  public Highlight(msg: Highlight) {
+    const board = this.ctx.board();
     if (this.active) {
       let cwalls = this.connectedWalls;
       for (let w of cwalls) {
-        let s = sectorOfWall(ctx.board, w);
-        let p = lastwall(ctx.board, w);
+        let s = sectorOfWall(board, w);
+        let p = lastwall(board, w);
         msg.set.add(tuple(2, w));
         msg.set.add(tuple(3, w));
         msg.set.add(tuple(2, p));
@@ -149,53 +148,55 @@ export class WallSegmentsEnt extends MessageHandlerReflective {
     }
   }
 
-  private getWall(w: number, ctx: BuildContext) {
-    let wall = ctx.board.walls[w];
+  private getWall(w: number) {
+    const board = this.ctx.board();
+    const wall = board.walls[w];
     return wall.cstat.swapBottoms && this.bottom && wall.nextwall != -1
-      ? ctx.board.walls[wall.nextwall]
+      ? board.walls[wall.nextwall]
       : wall;
   }
 
-  private invalidateWall(w: number, ctx: BuildContext) {
-    ctx.message(new BoardInvalidate(new Entity(w, EntityType.WALL_POINT)));
-    let wall = ctx.board.walls[w];
+  private invalidateWall(w: number) {
+    const board = this.ctx.board();
+    this.ctx.bus.handle(new BoardInvalidate(new Entity(w, EntityType.WALL_POINT)));
+    let wall = board.walls[w];
     if (wall.cstat.swapBottoms && wall.nextwall != -1 ||
-      wall.nextwall != -1 && ctx.board.walls[wall.nextwall].cstat.swapBottoms)
-      ctx.message(new BoardInvalidate(new Entity(wall.nextwall, EntityType.WALL_POINT)));
+      wall.nextwall != -1 && board.walls[wall.nextwall].cstat.swapBottoms)
+      this.ctx.bus.handle(new BoardInvalidate(new Entity(wall.nextwall, EntityType.WALL_POINT)));
   }
 
-  public SetPicnum(msg: SetPicnum, ctx: BuildContext) {
+  public SetPicnum(msg: SetPicnum) {
     for (let w of this.highlighted) {
-      let wall = this.getWall(w, ctx);
+      let wall = this.getWall(w);
       wall.picnum = msg.picnum;
-      this.invalidateWall(w, ctx);
+      this.invalidateWall(w);
     }
   }
 
-  public Shade(msg: Shade, ctx: BuildContext) {
+  public Shade(msg: Shade) {
     for (let w of this.highlighted) {
-      let wall = this.getWall(w, ctx);
+      let wall = this.getWall(w);
       let shade = wall.shade;
       if (msg.absolute && shade == msg.value) return;
       if (msg.absolute) wall.shade = msg.value; else wall.shade += msg.value;
-      this.invalidateWall(w, ctx);
+      this.invalidateWall(w);
     }
   }
 
-  public ResetPanRepeat(msg: ResetPanRepeat, ctx: BuildContext) {
+  public ResetPanRepeat(msg: ResetPanRepeat) {
     for (let w of this.highlighted) {
-      let wall = this.getWall(w, ctx);
+      let wall = this.getWall(w);
       wall.xpanning = 0;
       wall.ypanning = 0;
       wall.yrepeat = 8;
-      fixxrepeat(ctx.board, w);
-      this.invalidateWall(w, ctx);
+      fixxrepeat(this.ctx.board(), w);
+      this.invalidateWall(w);
     }
   }
 
-  public PanRepeat(msg: PanRepeat, ctx: BuildContext) {
+  public PanRepeat(msg: PanRepeat) {
     for (let w of this.highlighted) {
-      let wall = this.getWall(w, ctx);
+      let wall = this.getWall(w);
       if (msg.absolute) {
         if (wall.xpanning == msg.xpan && wall.ypanning == msg.ypan && wall.xrepeat == msg.xrepeat && wall.yrepeat == msg.yrepeat) return;
         wall.xpanning = msg.xpan;
@@ -208,48 +209,49 @@ export class WallSegmentsEnt extends MessageHandlerReflective {
         wall.xrepeat += msg.xrepeat;
         wall.yrepeat += msg.yrepeat;
       }
-      this.invalidateWall(w, ctx);
+      this.invalidateWall(w);
     }
   }
 
-  public Palette(msg: Palette, ctx: BuildContext) {
+  public Palette(msg: Palette) {
     for (let w of this.highlighted) {
-      let wall = this.getWall(w, ctx);
+      let wall = this.getWall(w);
       if (msg.absolute) {
         if (msg.value == wall.pal) return;
         wall.pal = msg.value;
       } else {
         wall.pal = cyclic(wall.pal + msg.value, msg.max);
       }
-      this.invalidateWall(w, ctx);
+      this.invalidateWall(w);
     }
   }
 
-  public Flip(msg: Flip, ctx: BuildContext) {
+  public Flip(msg: Flip) {
     for (let w of this.highlighted) {
-      let wall = this.getWall(w, ctx);
+      let wall = this.getWall(w);
       let flip = wall.cstat.xflip + wall.cstat.yflip * 2;
       let nflip = cyclic(flip + 1, 4);
       wall.cstat.xflip = nflip & 1;
       wall.cstat.yflip = (nflip & 2) >> 1;
-      this.invalidateWall(w, ctx);
+      this.invalidateWall(w);
     }
   }
 
-  public SetWallCstat(msg: SetWallCstat, ctx: BuildContext) {
+  public SetWallCstat(msg: SetWallCstat) {
+    const board = this.ctx.board();
     for (let w of this.highlighted) {
-      let wall = msg.name == 'swapBottoms' ? ctx.board.walls[w] : this.getWall(w, ctx);
+      let wall = msg.name == 'swapBottoms' ? board.walls[w] : this.getWall(w);
       let stat = wall.cstat[msg.name];
       wall.cstat[msg.name] = stat ? 0 : 1;
-      this.invalidateWall(w, ctx);
+      this.invalidateWall(w);
     }
   }
 
-  public BoardInvalidate(msg: BoardInvalidate, ctx: BuildContext) {
+  public BoardInvalidate(msg: BoardInvalidate) {
     if (msg.ent == null) this.valid = false;
   }
 
-  public handle(msg: Message, ctx: BuildContext) {
-    if (this.valid) super.handle(msg, ctx);
+  public handle(msg: Message) {
+    if (this.valid) super.handle(msg);
   }
 }

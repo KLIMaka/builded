@@ -1,7 +1,6 @@
-import { Renderable, RenderableProvider, RenderableConsumer, HintRenderable } from "./renderable";
-import { BuildContext } from "./app";
-import { State } from "../../utils/gl/stategl";
 import { FastIterable } from "../../utils/collections";
+import { State } from "../../utils/gl/stategl";
+import { HintRenderable, Renderable, RenderableConsumer, RenderableProvider } from "./renderable";
 
 export interface Builder extends RenderableProvider<HintRenderable> {
   reset(): void;
@@ -19,10 +18,10 @@ export class Builders implements Builder, RenderableProvider<HintRenderable> {
     for (let i = 0; i < size; i++) array[i].reset()
   }
 
-  draw(ctx: BuildContext, gl: WebGLRenderingContext, state: State) {
+  draw(gl: WebGLRenderingContext, state: State) {
     const size = this.builders.size;
     const array = this.builders.array;
-    for (let i = 0; i < size; i++) array[i].get().draw(ctx, gl, state)
+    for (let i = 0; i < size; i++) array[i].get().draw(gl, state)
   }
 
   accept(consumer: RenderableConsumer<HintRenderable>): void {

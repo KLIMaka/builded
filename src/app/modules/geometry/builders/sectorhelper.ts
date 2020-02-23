@@ -1,12 +1,12 @@
 import { Board, Sector } from "../../../../build/structs";
 import { createSlopeCalculator, sectorOfWall, ZSCALE } from "../../../../build/utils";
 import { fastIterator } from "../../../../utils/collections";
-import { BuildContext } from "../../../apis/app";
 import { Builders } from "../../../apis/builder";
+import { BuildRenderableProvider, LayeredRenderables, SectorRenderable } from "../../../apis/renderable";
 import { BuildBuffer } from "../../gl/buffers";
+import { RenderablesCacheContext } from "../cache";
+import { BuildersFactory, PointSpriteBuilder, SolidBuilder, WireframeBuilder } from "../common";
 import { buildCeilingHinge, buildFloorHinge, gridMatrixProviderSector } from "./common";
-import { SectorRenderable, LayeredRenderables, BuildRenderableProvider } from "../../../apis/renderable";
-import { BuildersFactory, PointSpriteBuilder, WireframeBuilder, SolidBuilder } from "../common";
 
 export class SectorHelperBuilder extends Builders implements SectorRenderable {
   constructor(
@@ -42,8 +42,8 @@ function fillBufferForWallPoint(offset: number, board: Board, wallId: number, bu
   buff.writeQuad(offset * 6, vtxOff, vtxOff + 1, vtxOff + 2, vtxOff + 3);
 }
 
-function addWallPoint(offset: number, builder: PointSpriteBuilder, ctx: BuildContext, ceiling: boolean, wallId: number, d: number): void {
-  const board = ctx.board;
+function addWallPoint(offset: number, builder: PointSpriteBuilder, ctx: RenderablesCacheContext, ceiling: boolean, wallId: number, d: number): void {
+  const board = ctx.board();
   const s = sectorOfWall(board, wallId);
   const sec = board.sectors[s];
   const slope = createSlopeCalculator(board, s);
@@ -78,13 +78,14 @@ function fillBuffersForSectorWireframe(s: number, sec: Sector, heinum: number, z
   }
 }
 
-export function updateSectorHelper(cache: BuildRenderableProvider, ctx: BuildContext, secId: number, builder: SectorHelperBuilder): SectorHelperBuilder {
-  builder = builder == null ? new SectorHelperBuilder(ctx.buildersFactory) : builder;
+export function updateSectorHelper(cache: BuildRenderableProvider, ctx: RenderablesCacheContext, secId: number, builder: SectorHelperBuilder): SectorHelperBuilder {
+  builder = builder == null ? new SectorHelperBuilder(ctx.factory) : builder;
   const pointTex = ctx.art.get(-1);
+  const board = ctx.board();
   builder.ceilpoints.tex = pointTex;
   builder.floorpoints.tex = pointTex;
 
-  const sec = ctx.board.sectors[secId];
+  const sec = board.sectors[secId];
   const wallnum = sec.wallnum;
   builder.ceilpoints.buff.allocate(wallnum * 4, wallnum * 6);
   builder.floorpoints.buff.allocate(wallnum * 4, wallnum * 6);
@@ -94,8 +95,8 @@ export function updateSectorHelper(cache: BuildRenderableProvider, ctx: BuildCon
     addWallPoint(i, builder.floorpoints, ctx, false, w, 2.5);
   }
 
-  fillBuffersForSectorWireframe(secId, sec, sec.ceilingheinum, sec.ceilingz, ctx.board, builder.ceilwire);
-  fillBuffersForSectorWireframe(secId, sec, sec.floorheinum, sec.floorz, ctx.board, builder.floorwire);
+  fillBuffersForSectorWireframe(secId, sec, sec.ceilingheinum, sec.ceilingz, board, builder.ceilwire);
+  fillBuffersForSectorWireframe(secId, sec, sec.floorheinum, sec.floorz, board, builder.floorwire);
 
   buildCeilingHinge(ctx, secId, builder.ceilhinge);
   buildFloorHinge(ctx, secId, builder.floorhinge);

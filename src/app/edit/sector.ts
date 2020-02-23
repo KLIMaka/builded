@@ -1,67 +1,67 @@
-import { cyclic, tuple } from "../../utils/mathutils";
-import * as GLM from "../../libs_js/glmatrix";
-import { BuildContext } from "../apis/app";
 import { deleteSector } from "../../build/boardutils";
-import { MessageHandlerReflective, Message } from "../apis/handler";
 import { Entity, EntityType } from "../../build/hitscan";
 import { heinumCalc, sectorZ, setSectorHeinum, setSectorPicnum, setSectorZ, ZSCALE } from "../../build/utils";
+import * as GLM from "../../libs_js/glmatrix";
+import { cyclic, tuple } from "../../utils/mathutils";
+import { Message, MessageHandlerReflective } from "../apis/handler";
+import { EditContext } from "./context";
 import { invalidateSectorAndWalls } from "./editutils";
-import { Highlight, Move, NamedMessage, Palette, PanRepeat, ResetPanRepeat, SetPicnum, SetSectorCstat, Shade, StartMove, BoardInvalidate } from "./messages";
+import { BoardInvalidate, Highlight, Move, NamedMessage, Palette, PanRepeat, ResetPanRepeat, SetPicnum, SetSectorCstat, Shade, StartMove } from "./messages";
 import { MOVE_ROTATE, MOVE_VERTICAL } from "./tools/selection";
 
 const resetPanrepeat = new PanRepeat(0, 0, 0, 0, true);
 
+export type SectorEntFactory = (ent: Entity) => SectorEnt;
+
+
+
 export class SectorEnt extends MessageHandlerReflective {
-
-  public static create(sectorEnt: Entity) {
-    return new SectorEnt(sectorEnt);
-  }
-
   constructor(
     public sectorEnt: Entity,
+    private ctx: EditContext,
     public originz = 0,
     public origin = GLM.vec2.create(),
     private valid = true
   ) { super() }
 
-  public StartMove(msg: StartMove, ctx: BuildContext) {
-    let [x, y] = ctx.view.target().coords;
+  public StartMove(msg: StartMove) {
+    let [x, y] = this.ctx.view.target().coords;
     // let sec = ctx.board.sectors[this.sectorId];
     // let slope = createSlopeCalculator(sec, ctx.board.walls);
     // this.originz = slope(x, y, this.type == HitType.CEILING ? sec.ceilingheinum : sec.floorheinum) + sectorZ(ctx.board, this.sectorId, this.type)) / ZSCALE;
-    this.originz = sectorZ(ctx.board, this.sectorEnt) / ZSCALE;
+    this.originz = sectorZ(this.ctx.board(), this.sectorEnt) / ZSCALE;
     GLM.vec2.set(this.origin, x, y);
   }
 
-  public Move(msg: Move, ctx: BuildContext) {
-    if (ctx.state.get(MOVE_ROTATE)) {
+  public Move(msg: Move) {
+    if (this.ctx.state.get(MOVE_ROTATE)) {
       let x = this.origin[0];
       let y = this.origin[1];
-      let z = ctx.snap(this.originz + msg.dz * ZSCALE);
-      let h = heinumCalc(ctx.board, this.sectorEnt.id, x, y, z);
-      if (setSectorHeinum(ctx.board, this.sectorEnt, h))
-        invalidateSectorAndWalls(this.sectorEnt.id, ctx);
-    } else if (ctx.state.get(MOVE_VERTICAL)) {
-      const ent = ctx.view.target().entity;
+      let z = this.ctx.gridController.snap(this.originz + msg.dz * ZSCALE);
+      let h = heinumCalc(this.ctx.board(), this.sectorEnt.id, x, y, z);
+      if (setSectorHeinum(this.ctx.board(), this.sectorEnt, h))
+        invalidateSectorAndWalls(this.sectorEnt.id, this.ctx.board(), this.ctx.bus);
+    } else if (this.ctx.state.get(MOVE_VERTICAL)) {
+      const ent = this.ctx.view.target().entity;
       let z = ent != null && ent.isSector() && ent.id != this.sectorEnt.id
-        ? sectorZ(ctx.board, ent) / ZSCALE
-        : ctx.snap(this.originz + msg.dz);
-      if (setSectorZ(ctx.board, this.sectorEnt, z * ZSCALE))
-        invalidateSectorAndWalls(this.sectorEnt.id, ctx);
+        ? sectorZ(this.ctx.board(), ent) / ZSCALE
+        : this.ctx.gridController.snap(this.originz + msg.dz);
+      if (setSectorZ(this.ctx.board(), this.sectorEnt, z * ZSCALE))
+        invalidateSectorAndWalls(this.sectorEnt.id, this.ctx.board(), this.ctx.bus);
     }
   }
 
-  public Highlight(msg: Highlight, ctx: BuildContext) {
+  public Highlight(msg: Highlight) {
     msg.set.add(tuple(this.sectorEnt.type == EntityType.CEILING ? 0 : 1, this.sectorEnt.id));
   }
 
-  public SetPicnum(msg: SetPicnum, ctx: BuildContext) {
-    if (setSectorPicnum(ctx.board, this.sectorEnt, msg.picnum))
-      ctx.message(new BoardInvalidate(this.sectorEnt));
+  public SetPicnum(msg: SetPicnum) {
+    if (setSectorPicnum(this.ctx.board(), this.sectorEnt, msg.picnum))
+      this.ctx.bus.handle(new BoardInvalidate(this.sectorEnt));
   }
 
-  public Shade(msg: Shade, ctx: BuildContext) {
-    let sector = ctx.board.sectors[this.sectorEnt.id];
+  public Shade(msg: Shade) {
+    let sector = this.ctx.board().sectors[this.sectorEnt.id];
     let shade = this.sectorEnt.type == EntityType.CEILING ? sector.ceilingshade : sector.floorshade;
     if (msg.absolute && msg.value == shade) return;
     if (msg.absolute) {
@@ -69,15 +69,15 @@ export class SectorEnt extends MessageHandlerReflective {
     } else {
       if (this.sectorEnt.type == EntityType.CEILING) sector.ceilingshade += msg.value; else sector.floorshade += msg.value;
     }
-    ctx.message(new BoardInvalidate(this.sectorEnt));
+    this.ctx.bus.handle(new BoardInvalidate(this.sectorEnt));
   }
 
-  public ResetPanRepeat(msg: ResetPanRepeat, ctx: BuildContext) {
-    this.PanRepeat(resetPanrepeat, ctx);
+  public ResetPanRepeat(msg: ResetPanRepeat) {
+    this.PanRepeat(resetPanrepeat);
   }
 
-  public PanRepeat(msg: PanRepeat, ctx: BuildContext) {
-    let sector = ctx.board.sectors[this.sectorEnt.id];
+  public PanRepeat(msg: PanRepeat) {
+    let sector = this.ctx.board().sectors[this.sectorEnt.id];
     if (msg.absolute) {
       if (this.sectorEnt.type == EntityType.CEILING) {
         if (sector.ceilingxpanning == msg.xpan && sector.ceilingypanning == msg.ypan) return;
@@ -97,11 +97,11 @@ export class SectorEnt extends MessageHandlerReflective {
         sector.floorypanning += msg.ypan;
       }
     }
-    ctx.message(new BoardInvalidate(this.sectorEnt));
+    this.ctx.bus.handle(new BoardInvalidate(this.sectorEnt));
   }
 
-  public Palette(msg: Palette, ctx: BuildContext) {
-    let sector = ctx.board.sectors[this.sectorEnt.id];
+  public Palette(msg: Palette) {
+    let sector = this.ctx.board().sectors[this.sectorEnt.id];
     if (msg.absolute) {
       if (this.sectorEnt.type == EntityType.CEILING) {
         if (msg.value == sector.ceilingpal) return;
@@ -117,11 +117,11 @@ export class SectorEnt extends MessageHandlerReflective {
         sector.floorpal = cyclic(sector.floorpal + msg.value, msg.max);
       }
     }
-    ctx.message(new BoardInvalidate(this.sectorEnt));
+    this.ctx.bus.handle(new BoardInvalidate(this.sectorEnt));
   }
 
-  public SetSectorCstat(msg: SetSectorCstat, ctx: BuildContext) {
-    let sector = ctx.board.sectors[this.sectorEnt.id];
+  public SetSectorCstat(msg: SetSectorCstat) {
+    let sector = this.ctx.board().sectors[this.sectorEnt.id];
     let stat = this.sectorEnt.type == EntityType.CEILING ? sector.ceilingstat[msg.name] : sector.floorstat[msg.name];
     if (msg.toggle) {
       let nstat = stat ? 0 : 1;
@@ -130,24 +130,24 @@ export class SectorEnt extends MessageHandlerReflective {
       if (stat == msg.value) return;
       if (this.sectorEnt.type == EntityType.CEILING) sector.ceilingstat[msg.name] = msg.value; else sector.floorstat[msg.name] = msg.value;
     }
-    ctx.message(new BoardInvalidate(this.sectorEnt));
+    this.ctx.bus.handle(new BoardInvalidate(this.sectorEnt));
   }
 
-  public NamedMessage(msg: NamedMessage, ctx: BuildContext) {
+  public NamedMessage(msg: NamedMessage) {
     switch (msg.name) {
       case 'delete':
-        deleteSector(ctx.board, this.sectorEnt.id, ctx.refs);
-        ctx.commit();
-        ctx.message(new BoardInvalidate(null));
+        deleteSector(this.ctx.board(), this.sectorEnt.id, this.ctx.refs);
+        // ctx.commit();
+        this.ctx.bus.handle(new BoardInvalidate(null));
         return;
     }
   }
 
-  public BoardInvalidate(msg: BoardInvalidate, ctx: BuildContext) {
+  public BoardInvalidate(msg: BoardInvalidate) {
     if (msg.ent == null) this.valid = false;
   }
 
-  public handle(msg: Message, ctx: BuildContext) {
-    if (this.valid) super.handle(msg, ctx);
+  public handle(msg: Message) {
+    if (this.valid) super.handle(msg);
   }
 }

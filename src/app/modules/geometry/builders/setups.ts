@@ -3,7 +3,6 @@ import { Deck } from "../../../../utils/collections";
 import { Buffer } from "../../../../utils/gl/buffergl";
 import { Texture } from "../../../../utils/gl/drawstruct";
 import { DrawCall, State } from "../../../../utils/gl/stategl";
-import { BuildContext } from "../../../apis/app";
 import { Builder } from "../../../apis/builder";
 import { HintRenderable, RenderableConsumer } from "../../../apis/renderable";
 import { BuildBuffer } from "../../gl/buffers";
@@ -102,12 +101,12 @@ export abstract class BufferRenderable<T extends BufferSetup> implements Builder
   constructor(private getSetup: (state: State) => T) { }
 
 
-  draw(ctx: BuildContext, gl: WebGLRenderingContext, state: State): void {
+  draw(gl: WebGLRenderingContext, state: State): void {
     if (this.buff.getSize() == 0) return;
     if (this.drawCall == null) {
       const setup = this.getSetup(state);
       setup.buffer(this.buff).mode(this.mode);
-      this.setup(ctx, setup);
+      this.setup(setup);
       this.drawCall = setup.createDrawCall();
       this._hint = hash(this.drawCall.values[1], this.buff.get().buffer, this.textureHint(), this.buff.get().idx.offset);
     }
@@ -116,7 +115,7 @@ export abstract class BufferRenderable<T extends BufferSetup> implements Builder
 
   public needToRebuild() { this.drawCall = null }
 
-  abstract setup(ctx: BuildContext, setup: T): void;
+  abstract setup(setup: T): void;
   abstract reset(): void;
   protected abstract textureHint(): Texture;
 
@@ -131,6 +130,11 @@ export function lazySingletonTransformer<I, O>(trans: (i: I) => O) {
     return instance;
   }
 }
+
+export const SOLID_SETUP = lazySingletonTransformer((state: State) => new SolidSetup(state));
+export const GRID_SETUP = lazySingletonTransformer((state: State) => new GridSetup(state));
+export const POINT_SPRITE_SETUP = lazySingletonTransformer((state: State) => new PointSpriteSetup(state));
+export const WIREFRAME_SETUP = lazySingletonTransformer((state: State) => new WireframeSetup(state));
 
 const textureMap = new Map<Texture, number>();
 const bufferMap = new Map<Buffer, number>();
@@ -153,8 +157,3 @@ export function hash(sh: String, buff: Buffer, tex: Texture, offset: number) {
   }
   return offset + (texture << 16) + (buffer << 24) + (shader << 28);
 }
-
-export const SOLID = lazySingletonTransformer((state: State) => new SolidSetup(state));
-export const GRID = lazySingletonTransformer((state: State) => new GridSetup(state));
-export const POINT_SPRITE = lazySingletonTransformer((state: State) => new PointSpriteSetup(state));
-export const WIREFRAME = lazySingletonTransformer((state: State) => new WireframeSetup(state));

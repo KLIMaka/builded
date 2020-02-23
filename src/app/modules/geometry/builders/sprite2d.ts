@@ -1,10 +1,10 @@
 import { ang2vec, spriteAngle, ZSCALE } from "../../../../build/utils";
 import { vec3 } from "../../../../libs_js/glmatrix";
 import { fastIterator } from "../../../../utils/collections";
-import { BuildContext } from "../../../apis/app";
 import { Builders } from "../../../apis/builder";
+import { RenderablesCacheContext } from "../cache";
+import { BuildersFactory, WireframeBuilder } from "../common";
 import { text } from "./common";
-import { WireframeBuilder, BuildersFactory } from "../common";
 
 export class Sprite2dBuilder extends Builders {
   constructor(
@@ -14,11 +14,12 @@ export class Sprite2dBuilder extends Builders {
   ) { super(fastIterator([ang, label])) }
 }
 
-export function updateSpriteAngle(ctx: BuildContext, spriteId: number, builder: WireframeBuilder): WireframeBuilder {
+export function updateSpriteAngle(ctx: RenderablesCacheContext, spriteId: number, builder: WireframeBuilder): WireframeBuilder {
   builder.mode = WebGLRenderingContext.TRIANGLES;
+  const board = ctx.board();
   const buff = builder.buff;
   buff.allocate(3, 6);
-  const spr = ctx.board.sprites[spriteId];
+  const spr = board.sprites[spriteId];
   const x = spr.x, y = spr.y, z = spr.z / ZSCALE;
   const ang = spriteAngle(spr.ang);
   const size = 128;
@@ -34,9 +35,10 @@ export function updateSpriteAngle(ctx: BuildContext, spriteId: number, builder: 
   return builder;
 }
 
-export function updateSprite2d(ctx: BuildContext, sprId: number, builder: Sprite2dBuilder): Sprite2dBuilder {
-  builder = builder == null ? new Sprite2dBuilder(ctx.buildersFactory) : builder;
-  const sprite = ctx.board.sprites[sprId];
+export function updateSprite2d(ctx: RenderablesCacheContext, sprId: number, builder: Sprite2dBuilder): Sprite2dBuilder {
+  builder = builder == null ? new Sprite2dBuilder(ctx.factory) : builder;
+  const board = ctx.board();
+  const sprite = board.sprites[sprId];
   text(builder.label, sprId + "", sprite.x, sprite.y, sprite.z / ZSCALE - 1024, 8, 8, ctx.art.get(-2));
   updateSpriteAngle(ctx, sprId, builder.ang);
   return builder;

@@ -1,8 +1,15 @@
-import { Element, span, Table } from "../../utils/ui/ui";
-import { BuildContext } from "../apis/app";
-import { Frame } from "../edit/messages";
-import { MessageHandlerReflective } from "../apis/handler";
 import { Entity, EntityType } from "../../build/hitscan";
+import { create, Injector } from "../../utils/injector";
+import { Element, span, Table } from "../../utils/ui/ui";
+import { BOARD, BoardProvider, View, VIEW } from "../apis/app";
+import { BUS, MessageHandlerReflective } from "../apis/handler";
+import { Frame } from "../edit/messages";
+
+
+export async function InfoModule(injector: Injector) {
+  const bus = await injector.getInstance(BUS);
+  bus.connect(await create(injector, Info, VIEW, BOARD))
+}
 
 export class Info extends MessageHandlerReflective {
   private wallTable: Element;
@@ -12,20 +19,23 @@ export class Info extends MessageHandlerReflective {
   private spriteTable: Element;
   private spriteFields: { [index: string]: Element } = {};
 
-  constructor() {
+  constructor(
+    private view: View,
+    private board: BoardProvider
+  ) {
     super();
     this.prepareWallTable();
     this.prepareSectorTable();
     this.prepareSpriteTable();
   }
 
-  public Frame(msg: Frame, ctx: BuildContext) {
+  public Frame(msg: Frame) {
     this.clear();
-    const ent = ctx.view.snapTarget().entity;
+    const ent = this.view.snapTarget().entity;
     if (ent == null) return;
-    if (ent.isWall()) this.renderWall(ctx, ent.id);
-    else if (ent.isSector()) this.renderSector(ctx, ent);
-    else if (ent.isSprite()) this.renderSprite(ctx, ent.id);
+    if (ent.isWall()) this.renderWall(ent.id);
+    else if (ent.isSector()) this.renderSector(ent);
+    else if (ent.isSprite()) this.renderSprite(ent.id);
   }
 
   private clear() {
@@ -34,8 +44,8 @@ export class Info extends MessageHandlerReflective {
     this.spriteTable.css('display', 'none');
   }
 
-  private renderSprite(ctx: BuildContext, id: number) {
-    const sprite = ctx.board.sprites[id];
+  private renderSprite(id: number) {
+    const sprite = this.board().sprites[id];
     this.spriteTable.css('display', '');
     this.spriteFields['id'].text(`${id}`);
     this.spriteFields['offset'].text(`${sprite.xoffset}, ${sprite.yoffset}`);
@@ -46,10 +56,10 @@ export class Info extends MessageHandlerReflective {
     this.spriteFields['z'].text(`${sprite.z}`);
   }
 
-  private renderSector(ctx: BuildContext, sectorEnt: Entity) {
+  private renderSector(sectorEnt: Entity) {
     const id = sectorEnt.id;
     const type = sectorEnt.type;
-    const sector = ctx.board.sectors[id];
+    const sector = this.board().sectors[id];
     this.sectorTable.css('display', '');
     this.sectorFields['id'].text(`${id}`);
     if (type == EntityType.CEILING) {
@@ -67,9 +77,9 @@ export class Info extends MessageHandlerReflective {
     }
   }
 
-  private renderWall(ctx: BuildContext, id: number) {
+  private renderWall(id: number) {
     this.wallTable.css('display', '');
-    const wall = ctx.board.walls[id];
+    const wall = this.board().walls[id];
     this.wallFields['id'].text(`${id}`);
     this.wallFields['panning'].text(`${wall.xpanning}, ${wall.ypanning}`);
     this.wallFields['repeat'].text(`${wall.xrepeat}, ${wall.yrepeat}`);

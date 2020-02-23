@@ -1,9 +1,10 @@
-import { Dependency } from '../../../utils/injector';
-import { BuildContext } from '../../apis/app';
-import { BoardInvalidate } from '../../edit/messages';
-import { MessageHandler, MessageHandlerReflective } from '../../apis/handler';
+import { Board } from '../../../build/structs';
+import { create, Dependency, Injector } from '../../../utils/injector';
+import { ART, ArtProvider, BOARD, BoardProvider } from '../../apis/app';
 import { Builder } from '../../apis/builder';
+import { BUS, MessageHandler, MessageHandlerReflective } from '../../apis/handler';
 import { BuildRenderableProvider, HintRenderable, RenderableProvider, SectorRenderable, WallRenderable } from '../../apis/renderable';
+import { BoardInvalidate } from '../../edit/messages';
 import { SectorBuilder, updateSector } from './builders/sector';
 import { SectorHelperBuilder, updateSectorHelper } from './builders/sectorhelper';
 import { updateSprite } from './builders/sprite';
@@ -13,6 +14,7 @@ import { updateWall } from './builders/wall';
 import { updateWall2d } from './builders/wall2d';
 import { updateWallHelper, WallHelperBuilder } from './builders/wallhelper';
 import { updateWallPoint } from './builders/wallpointhelper';
+import { BuildersFactory, BUILDERS_FACTORY } from './common';
 
 class Entry<T> {
   constructor(public value: T, public valid: boolean = false) { }
@@ -21,12 +23,12 @@ class Entry<T> {
 
 class CacheMap<T extends Builder> {
   constructor(
-    readonly update: (ctx: BuildContext, id: number, value: T) => T
+    readonly update: (ctx: RenderablesCacheContext, id: number, value: T) => T
   ) { }
 
   private cache: { [index: number]: Entry<T> } = {};
 
-  get(id: number, ctx: BuildContext): T {
+  get(id: number, ctx: RenderablesCacheContext): T {
     let v = this.ensureValue(id);
     if (!v.valid) {
       v.update(this.update(ctx, id, v.value));
@@ -62,10 +64,12 @@ class CacheMap<T extends Builder> {
 export class CachedTopDownBuildRenderableProvider implements BuildRenderableProvider {
   private walls = new CacheMap(updateWall2d);
   private sprites = new CacheMap(updateSprite2d);
-  private ctx: BuildContext;
-  private NULL_SECTOR_RENDERABLE: SectorRenderable;
 
-  bind(ctx: BuildContext): void { this.ctx = ctx; this.NULL_SECTOR_RENDERABLE = new SectorBuilder(ctx.buildersFactory) }
+  constructor(
+    private ctx: RenderablesCacheContext,
+    private NULL_SECTOR_RENDERABLE = new SectorBuilder(ctx.factory)
+  ) { }
+
   sector(id: number): SectorRenderable { return this.NULL_SECTOR_RENDERABLE }
   wall(id: number): WallRenderable { return this.walls.get(id, this.ctx) }
   wallPoint(id: number): RenderableProvider<HintRenderable> { throw new Error('Cant render points') }
@@ -84,9 +88,11 @@ export class CachedBuildRenderableProvider implements BuildRenderableProvider {
   private sectors = new CacheMap(updateSector);
   private walls = new CacheMap(updateWall);
   private sprites = new CacheMap(updateSprite);
-  private ctx: BuildContext;
 
-  bind(ctx: BuildContext): void { this.ctx = ctx }
+  constructor(
+    private ctx: RenderablesCacheContext
+  ) { }
+
   sector(id: number): SectorRenderable { return this.sectors.get(id, this.ctx) }
   wall(id: number): WallRenderable { return this.walls.get(id, this.ctx) }
   wallPoint(id: number): RenderableProvider<HintRenderable> { throw new Error('Cant render points') }
@@ -104,15 +110,16 @@ export class CachedBuildRenderableProvider implements BuildRenderableProvider {
 
 
 export class CachedHelperBuildRenderableProvider implements BuildRenderableProvider {
-  private sectors = new CacheMap((ctx: BuildContext, id: number, value: SectorHelperBuilder) => updateSectorHelper(this.cache, ctx, id, value));
-  private walls = new CacheMap((ctx: BuildContext, id: number, value: WallHelperBuilder) => updateWallHelper(this.cache, ctx, id, value));
+  private sectors = new CacheMap((ctx: RenderablesCacheContext, id: number, value: SectorHelperBuilder) => updateSectorHelper(this.cache, ctx, id, value));
+  private walls = new CacheMap((ctx: RenderablesCacheContext, id: number, value: WallHelperBuilder) => updateWallHelper(this.cache, ctx, id, value));
   private sprites = new CacheMap(updateSpriteHelper);
   private wallPoints = new CacheMap(updateWallPoint);
-  private ctx: BuildContext;
 
-  constructor(readonly cache: CachedBuildRenderableProvider) { }
+  constructor(
+    private ctx: RenderablesCacheContext,
+    readonly cache: CachedBuildRenderableProvider
+  ) { }
 
-  bind(ctx: BuildContext): void { this.ctx = ctx }
   sector(id: number): SectorRenderable { return this.sectors.get(id, this.ctx) }
   wall(id: number): WallRenderable { return this.walls.get(id, this.ctx) }
   wallPoint(id: number): RenderableProvider<HintRenderable> { return this.wallPoints.get(id, this.ctx) }
@@ -138,43 +145,67 @@ export interface RenderablesCache extends MessageHandler {
   readonly helpers: CachedHelperBuildRenderableProvider;
   readonly topdown: CachedTopDownBuildRenderableProvider;
 }
-export const RenderablesCache_ = new Dependency<RenderablesCache>('RenderablesCache');
+export const RENDRABLES_CACHE = new Dependency<RenderablesCache>('RenderablesCache');
+
+export class RenderablesCacheContext {
+  readonly board: BoardProvider;
+  readonly art: ArtProvider;
+  readonly factory: BuildersFactory;
+}
+const RENDERABLES_CACHE_CONTEXT = new Dependency<RenderablesCacheContext>('RenderablesCacheContext');
+async function RenderablesCacheContextConstructor(injector: Injector): Promise<RenderablesCacheContext> {
+  const [board, art, factory] = await Promise.all([
+    injector.getInstance(BOARD),
+    injector.getInstance(ART),
+    injector.getInstance(BUILDERS_FACTORY),
+  ]);
+  return { board, art, factory }
+}
+
+async function RenderablesCacheConstructor(injector: Injector) {
+  return create(injector, RenderablesCacheImpl, RENDERABLES_CACHE_CONTEXT);
+}
+
+export async function RenderablesCacheModule(injector: Injector) {
+  injector.bind(RENDERABLES_CACHE_CONTEXT, RenderablesCacheContextConstructor);
+  injector.bind(RENDRABLES_CACHE, RenderablesCacheConstructor);
+  const bus = await injector.getInstance(BUS);
+  const cache = await injector.getInstance(RENDRABLES_CACHE);
+  bus.connect(cache);
+}
 
 export class RenderablesCacheImpl extends MessageHandlerReflective implements RenderablesCache {
   readonly geometry: CachedBuildRenderableProvider;
   readonly helpers: CachedHelperBuildRenderableProvider;
   readonly topdown: CachedTopDownBuildRenderableProvider;
 
-  constructor() {
+  constructor(
+    private ctx: RenderablesCacheContext
+  ) {
     super();
-    this.geometry = new CachedBuildRenderableProvider();
-    this.helpers = new CachedHelperBuildRenderableProvider(this.geometry);
-    this.topdown = new CachedTopDownBuildRenderableProvider();
+    this.geometry = new CachedBuildRenderableProvider(ctx);
+    this.helpers = new CachedHelperBuildRenderableProvider(ctx, this.geometry);
+    this.topdown = new CachedTopDownBuildRenderableProvider(ctx);
+    this.prebuild();
   }
 
-  bind(ctx: BuildContext): void {
-    this.geometry.bind(ctx);
-    this.helpers.bind(ctx);
-    this.topdown.bind(ctx);
-    this.prebuild(ctx);
-  }
-
-  private prebuild(ctx: BuildContext) {
-    for (let i = 0; i < ctx.board.sectors.length; i++) {
+  private prebuild() {
+    const board = this.ctx.board();
+    for (let i = 0; i < board.sectors.length; i++) {
       this.geometry.sector(i);
       this.topdown.sector(i);
     }
-    for (let i = 0; i < ctx.board.walls.length; i++) {
+    for (let i = 0; i < board.walls.length; i++) {
       this.geometry.wall(i);
       this.helpers.wall(i);
     }
-    for (let i = 0; i < ctx.board.sprites.length; i++) {
+    for (let i = 0; i < board.sprites.length; i++) {
       this.geometry.sprite(i);
       this.topdown.sprite(i);
     }
   }
 
-  BoardInvalidate(msg: BoardInvalidate, ctx: BuildContext) {
+  BoardInvalidate(msg: BoardInvalidate) {
     if (msg.ent == null) this.invalidateAll();
     else if (msg.ent.isSector()) this.invalidateSector(msg.ent.id);
     else if (msg.ent.isSprite()) this.invalidateSprite(msg.ent.id);

@@ -4,10 +4,10 @@ import { createSlopeCalculator, getFirstWallAngle, sectorNormal, ZSCALE } from "
 import { mat4, Mat4Array, vec3, Vec3Array, vec4 } from "../../../../libs_js/glmatrix";
 import { tesselate } from "../../../../libs_js/glutess";
 import { fastIterator } from "../../../../utils/collections";
-import { BuildContext } from "../../../apis/app";
 import { Builders } from "../../../apis/builder";
-import { BuildBuffer } from "../../gl/buffers";
 import { SectorRenderable } from "../../../apis/renderable";
+import { BuildBuffer } from "../../gl/buffers";
+import { RenderablesCacheContext } from "../cache";
 import { BuildersFactory } from "../common";
 
 
@@ -98,9 +98,9 @@ function fillBuffersForSector(ceil: boolean, board: Board, s: number, sec: Secto
 
 const sectorNormal_ = vec3.create();
 const texMat_ = mat4.create();
-export function updateSector(ctx: BuildContext, secId: number, builder: SectorBuilder): SectorBuilder {
-  builder = builder == null ? new SectorBuilder(ctx.buildersFactory) : builder;
-  const board = ctx.board;
+export function updateSector(ctx: RenderablesCacheContext, secId: number, builder: SectorBuilder): SectorBuilder {
+  builder = builder == null ? new SectorBuilder(ctx.factory) : builder;
+  const board = ctx.board();
   const art = ctx.art;
   const sec = board.sectors[secId];
 

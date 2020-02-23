@@ -4,14 +4,15 @@ import { Board } from "../../../build/structs";
 import { findSector, sectorOfWall, ZSCALE } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 import { Deck, fastIterator } from "../../../utils/collections";
+import { Injector, create } from "../../../utils/injector";
 import { int, len2d } from "../../../utils/mathutils";
-import { BuildContext } from "../../apis/app";
-import { MessageHandlerReflective } from "../../apis/handler";
+import { MessageHandlerReflective, MessageBus, BUS } from "../../apis/handler";
 import { LayeredRenderables } from "../../apis/renderable";
 import { writeText } from "../../modules/geometry/builders/common";
+import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
 import { getClosestSectorZ } from "../editutils";
 import { BoardInvalidate, Frame, NamedMessage, Render } from "../messages";
-import { BuildersFactory } from "../../modules/geometry/common";
+import { ArtProvider, View, BuildReferenceTracker, ART, VIEW, BOARD, REFERENCE_TRACKER, BoardProvider } from "../../apis/app";
 
 class Contour {
   private points: Array<[number, number]> = [];
@@ -20,6 +21,7 @@ class Contour {
 
   constructor(
     factory: BuildersFactory,
+    private art: ArtProvider,
     firstPoint: boolean = true,
     private contour = factory.wireframe('utils'),
     private contourPoints = factory.pointSprite('utils'),
@@ -41,21 +43,21 @@ class Contour {
     p[1] = y;
   }
 
-  public getRenderable(ctx: BuildContext) {
-    this.updateRenderable(ctx);
+  public getRenderable() {
+    this.updateRenderable();
     return this.renderable;
   }
 
-  private updateRenderable(ctx: BuildContext) {
+  private updateRenderable() {
     if (this.size == 0) return;
-    this.updateContourPoints(ctx);
+    this.updateContourPoints();
     this.updateContour();
-    this.updateLength(ctx);
+    this.updateLength();
   }
 
-  private updateContourPoints(ctx: BuildContext) {
+  private updateContourPoints() {
     this.contourPoints.needToRebuild();
-    this.contourPoints.tex = ctx.art.get(-1);
+    this.contourPoints.tex = this.art.get(-1);
     let buff = this.contourPoints.buff;
     buff.allocate(this.size * 4, this.size * 6);
     let d = 2.5;
@@ -106,12 +108,12 @@ class Contour {
     return [total, labels];
   }
 
-  private updateLength(ctx: BuildContext) {
+  private updateLength() {
     this.length.needToRebuild();
     const buff = this.length.buff;
     buff.deallocate();
     if (this.size < 2) return;
-    this.length.tex = ctx.art.get(-2);
+    this.length.tex = this.art.get(-2);
     let size = this.size - 1;
     const [total, labels] = this.prepareLengthLabels();
     buff.allocate(total * 4, total * 6);
@@ -126,6 +128,11 @@ class Contour {
   }
 }
 
+export async function DrawSectorModule(injector: Injector) {
+  const bus = await injector.getInstance(BUS);
+  bus.connect(await create(injector, DrawSector, BUILDERS_FACTORY, ART, VIEW, BOARD, REFERENCE_TRACKER, BUS));
+}
+
 export class DrawSector extends MessageHandlerReflective {
   private points = new Deck<[number, number]>();
   private pointer = vec3.create();
@@ -135,14 +142,19 @@ export class DrawSector extends MessageHandlerReflective {
 
   constructor(
     factory: BuildersFactory,
-    private contour = new Contour(factory)
+    art: ArtProvider,
+    private view: View,
+    private board: BoardProvider,
+    private refs: BuildReferenceTracker,
+    private bus: MessageBus,
+    private contour = new Contour(factory, art)
   ) { super() }
 
-  private update(ctx: BuildContext) {
-    if (this.predrawUpdate(ctx)) return;
+  private update() {
+    if (this.predrawUpdate()) return;
 
     let z = this.contour.getZ();
-    const [x, y] = ctx.view.snapTarget().coords;
+    const [x, y] = this.view.snapTarget().coords;
     vec3.set(this.pointer, x, y, z);
 
     if (this.isRect) {
@@ -164,36 +176,39 @@ export class DrawSector extends MessageHandlerReflective {
     }
   }
 
-  private predrawUpdate(ctx: BuildContext) {
+  private predrawUpdate() {
     if (this.points.length() > 0) return false;
-    const target = ctx.view.snapTarget();
+    const target = this.view.snapTarget();
     if (target.entity == null) {
       this.valid = false;
     } else {
       this.valid = true;
       let [x, y,] = target.coords;
-      let z = this.getPointerZ(ctx.board, target);
+      const board = this.board();
+      let z = this.getPointerZ(board, target);
       vec3.set(this.pointer, x, y, z);
       this.contour.setZ(z / ZSCALE);
       this.contour.updateLastPoint(x, y);
       if (target.entity.isSector()) this.hintSector = target.entity.id;
-      if (target.entity.isSprite()) this.hintSector = ctx.board.sprites[target.entity.id].sectnum;
-      if (target.entity.isWall()) this.hintSector = sectorOfWall(ctx.board, target.entity.id);
+      if (target.entity.isSprite()) this.hintSector = board.sprites[target.entity.id].sectnum;
+      if (target.entity.isWall()) this.hintSector = sectorOfWall(board, target.entity.id);
     }
     return true;
   }
 
-  private isSplitSector(ctx: BuildContext, x: number, y: number) {
-    let sectorId = this.findContainingSector(ctx);
+  private isSplitSector(x: number, y: number) {
+    let sectorId = this.findContainingSector();
     if (sectorId == -1) return -1;
     let fp = this.points.get(0);
-    return wallInSector(ctx.board, sectorId, fp[0], fp[1]) != -1 && wallInSector(ctx.board, sectorId, x, y) != -1 ? sectorId : -1;
+    const board = this.board();
+    return wallInSector(board, sectorId, fp[0], fp[1]) != -1
+      && wallInSector(board, sectorId, x, y) != -1 ? sectorId : -1;
   }
 
-  private insertPoint(ctx: BuildContext, rect: boolean) {
+  private insertPoint(rect: boolean) {
     if (this.points.length() == 0) this.isRect = rect;
     if (!this.valid) return;
-    if (this.checkFinish(ctx)) return;
+    if (this.checkFinish()) return;
 
     if (this.isRect) {
       for (let i = 0; i < 4; i++) {
@@ -206,20 +221,20 @@ export class DrawSector extends MessageHandlerReflective {
     }
   }
 
-  private checkFinish(ctx: BuildContext) {
+  private checkFinish() {
     if (this.points.length() == 0) return false;
 
-    let splitSector = this.isSplitSector(ctx, this.pointer[0], this.pointer[1]);
+    let splitSector = this.isSplitSector(this.pointer[0], this.pointer[1]);
     if (splitSector != -1) {
       this.points.push([this.pointer[0], this.pointer[1]]);
-      this.splitSector(ctx, splitSector);
+      this.splitSector(splitSector);
       return true;
     }
     let latsPoint = this.points.get(this.points.length() - 1);
     if (latsPoint[0] == this.pointer[0] && latsPoint[1] == this.pointer[1]) return;
     let firstPoint = this.points.get(0);
     if (firstPoint[0] == this.pointer[0] && firstPoint[1] == this.pointer[1] || this.isRect) {
-      this.createSector(ctx);
+      this.createSector();
       return true;
     }
     return false;
@@ -245,50 +260,51 @@ export class DrawSector extends MessageHandlerReflective {
     return getClosestSectorZ(board, sectorId, target.coords[0], target.coords[1], target.coords[2])[1];
   }
 
-  private findContainingSector(ctx: BuildContext) {
+  private findContainingSector() {
     let sectorId = this.hintSector;
     for (let p of this.points) {
-      let s = findSector(ctx.board, p[0], p[1], sectorId);
+      let s = findSector(this.board(), p[0], p[1], sectorId);
       if (s != sectorId) return -1;
     }
     return sectorId;
   }
 
-  private createSector(ctx: BuildContext) {
-    let sectorId = this.findContainingSector(ctx);
+  private createSector() {
+    let sectorId = this.findContainingSector();
+    const board = this.board();
     if (sectorId != -1)
-      createInnerLoop(ctx.board, sectorId, this.points, ctx.refs);
-    createNewSector(ctx.board, this.points, ctx.refs);
-    ctx.commit();
-    ctx.message(new BoardInvalidate(null));
+      createInnerLoop(board, sectorId, this.points, this.refs);
+    createNewSector(board, this.points, this.refs);
+    // ctx.commit();
+    this.bus.handle(new BoardInvalidate(null));
     this.points.clear();
     this.contour.clear();
     this.contour.pushPoint(0, 0);
   }
 
-  private splitSector(ctx: BuildContext, sectorId: number) {
-    if (splitSector(ctx.board, sectorId, this.points, ctx.refs) != -1) {
-      ctx.commit();
-      ctx.message(new BoardInvalidate(null));
+  private splitSector(sectorId: number) {
+    if (splitSector(this.board(), sectorId, this.points, this.refs) != -1) {
+      // ctx.commit();
+      this.bus.handle(new BoardInvalidate(null));
     }
     this.points.clear();
     this.contour.clear();
     this.contour.pushPoint(0, 0);
   }
 
-  public NamedMessage(msg: NamedMessage, ctx: BuildContext) {
+  public NamedMessage(msg: NamedMessage) {
     switch (msg.name) {
-      case 'draw_rect_wall': this.insertPoint(ctx, true); return;
-      case 'draw_wall': this.insertPoint(ctx, false); return;
+      case 'draw_rect_wall': this.insertPoint(true); return;
+      case 'draw_wall': this.insertPoint(false); return;
       case 'undo_draw_wall': this.popPoint(); return;
     }
   }
 
-  public Frame(msg: Frame, ctx: BuildContext) {
-    this.update(ctx);
+  public Frame(msg: Frame) {
+    this.update();
   }
 
-  public Render(msg: Render, ctx: BuildContext) {
-    this.contour.getRenderable(ctx).accept(msg.consumer);
+  public Render(msg: Render, ) {
+    this.contour.getRenderable().accept(msg.consumer);
   }
 }

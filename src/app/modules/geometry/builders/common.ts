@@ -1,13 +1,13 @@
-import { int, len2d } from '../../../../utils/mathutils';
-import { Texture } from '../../../../utils/gl/drawstruct';
-import { BuildContext } from '../../../apis/app';
 import { walllen } from '../../../../build/boardutils';
 import { Board } from '../../../../build/structs';
 import { slope, ZSCALE } from '../../../../build/utils';
-import { BuildBuffer } from '../../gl/buffers';
+import { mat4, vec4 } from '../../../../libs_js/glmatrix';
+import { Texture } from '../../../../utils/gl/drawstruct';
+import { int, len2d } from '../../../../utils/mathutils';
 import { Tiler } from '../../../../utils/tiler';
-import { vec4, mat4 } from '../../../../libs_js/glmatrix';
-import { WireframeBuilder, PointSpriteBuilder } from '../common';
+import { BuildBuffer } from '../../gl/buffers';
+import { RenderablesCacheContext } from '../cache';
+import { PointSpriteBuilder, WireframeBuilder } from '../common';
 
 let tmp = vec4.create();
 let texMat = mat4.create();
@@ -36,11 +36,11 @@ export function createGridMatrixProviderWall(board: Board, id: number) {
   }
 }
 
-export function buildCeilingHinge(ctx: BuildContext, sectorId: number, builder: WireframeBuilder): WireframeBuilder { return prepareHinge(ctx, sectorId, true, builder) }
-export function buildFloorHinge(ctx: BuildContext, sectorId: number, builder: WireframeBuilder): WireframeBuilder { return prepareHinge(ctx, sectorId, false, builder) }
+export function buildCeilingHinge(ctx: RenderablesCacheContext, sectorId: number, builder: WireframeBuilder): WireframeBuilder { return prepareHinge(ctx, sectorId, true, builder) }
+export function buildFloorHinge(ctx: RenderablesCacheContext, sectorId: number, builder: WireframeBuilder): WireframeBuilder { return prepareHinge(ctx, sectorId, false, builder) }
 
-function prepareHinge(ctx: BuildContext, sectorId: number, ceiling: boolean, builder: WireframeBuilder): WireframeBuilder {
-  let board = ctx.board;
+function prepareHinge(ctx: RenderablesCacheContext, sectorId: number, ceiling: boolean, builder: WireframeBuilder): WireframeBuilder {
+  let board = ctx.board();
   builder.mode = WebGLRenderingContext.TRIANGLES;
   vec4.set(builder.color, 0.7, 0.7, 0.7, 0.7);
   let size = 128;

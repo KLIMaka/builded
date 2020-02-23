@@ -1,36 +1,37 @@
-import { cyclic } from '../../utils/mathutils';
-import { Dependency, Injector } from '../../utils/injector';
+import { SelectorConstructor } from '../../app/modules/artselector';
+import { Board } from '../../build/structs';
 import { Deck, map } from '../../utils/collections';
-import { InputState } from '../../utils/input';
-import { error, warning } from '../../utils/logger';
-import * as PROFILE from '../../utils/profiler';
+import { loadString } from '../../utils/getter';
+import { Texture } from '../../utils/gl/drawstruct';
 import { State as StateGl } from '../../utils/gl/stategl';
-import { ArtProvider, Bindable, BoardManipulator, BuildContext, BuildReferenceTracker, State, View, BuildReferenceTracker_, State_, ArtProvider_, View_, BoardManipulator_, Board_, BuildContext_ } from '../apis/app';
-import { BoardInvalidate, Frame, Mouse, NamedMessage, PostFrame, Render } from '../edit/messages';
-import { Message, MessageHandler, MessageHandlerList, MessageHandlerReflective } from '../apis/handler';
+import { createTexture } from '../../utils/gl/textures';
+import { loadImage } from '../../utils/imgutils';
+import { create, Dependency, Injector } from '../../utils/injector';
+import { InputState } from '../../utils/input';
+import { warning } from '../../utils/logger';
+import { cyclic } from '../../utils/mathutils';
+import * as PROFILE from '../../utils/profiler';
+import { ART, BOARD, BoardManipulator_, BoardProvider, BuildReferenceTracker, REFERENCE_TRACKER, State, STATE, View, VIEW, DEFAULT_BOARD } from '../apis/app';
+import { BUS, DefaultMessageBus, Message, MessageBus, MessageHandlerReflective } from '../apis/handler';
+import { ReferenceTrackerImpl } from '../apis/referencetracker';
+import { consumerProvider, HintRenderable, SortingRenderable, WrapRenderable } from '../apis/renderable';
+import { EntityFactoryConstructor, ENTITY_FACTORY } from '../edit/context';
+import { BoardInvalidate, Frame, LoadBoard, Mouse, NamedMessage, PostFrame, Render } from '../edit/messages';
+import { DrawSectorModule } from '../edit/tools/drawsector';
+import { JoinSectorsModule } from '../edit/tools/joinsectors';
+import { PushWallModule } from '../edit/tools/pushwall';
+import { PicNumSelector_, SelectionModule } from '../edit/tools/selection';
+import { SplitWallModule } from '../edit/tools/splitwall';
 import { Binder, loadBinds } from '../input/keymap';
 import { messageParser } from '../input/messageparser';
-import { ReferenceTrackerImpl } from '../apis/referencetracker';
-import { Board } from '../../build/structs';
-import { consumerProvider, HintRenderable, SortingRenderable, WrapRenderable } from '../apis/renderable';
-import { SelectionConstructor, Selection_, PicNumSelector_ } from '../edit/tools/selection';
-import { SplitWall } from '../edit/tools/splitwall';
-import { JoinSectors } from '../edit/tools/joinsectors';
-import { DrawSector } from '../edit/tools/drawsector';
-import { PushWall } from '../edit/tools/pushwall';
-import { Info } from '../modules/info';
-import { RenderablesCache_, RenderablesCacheImpl } from './geometry/cache';
-import { Statusbar } from '../modules/statusbar';
-import { loadString } from '../../utils/getter';
-import { UtilityTextures_, BuildArtProviderConstructor, GL } from './buildartprovider';
-import { loadImage } from '../../utils/imgutils';
-import { createTexture } from '../../utils/gl/textures';
-import { BUILD_GL, BuildGlConstructor } from './gl/buildgl';
-import { SwappableViewConstructor } from './view/view';
-import { Texture } from '../../utils/gl/drawstruct';
-import { SelectorConstructor } from '../../app/modules/artselector'
+import { InfoModule } from '../modules/info';
+import { StatusBarModule } from '../modules/statusbar';
+import { BuildArtProviderConstructor, GL, UtilityTextures_ } from './buildartprovider';
+import { RenderablesCacheModule } from './geometry/cache';
+import { BUILDERS_FACTORY, DefaultBuildersFactory } from './geometry/common';
 import { BUFFER_FACTORY, DefaultBufferFactory } from './gl/buffers';
-import { DefaultBuildersFactory, BUILDERS_FACTORY, BuildersFactory } from './geometry/common';
+import { BuildGlConstructor, BUILD_GL } from './gl/buildgl';
+import { SwappableViewConstructor } from './view/view';
 
 class History {
   private history: Deck<Board> = new Deck();
@@ -74,11 +75,11 @@ const RENDER = new Render(tools.consumer);
 const INVALIDATE_ALL = new BoardInvalidate(null);
 
 const onTopRenderable = new WrapRenderable(new SortingRenderable(tools.provider),
-  (ctx: BuildContext, gl: WebGLRenderingContext, state: StateGl) => {
+  (gl: WebGLRenderingContext, state: StateGl) => {
     gl.disable(WebGLRenderingContext.DEPTH_TEST);
     gl.enable(WebGLRenderingContext.BLEND);
   },
-  (ctx: BuildContext, gl: WebGLRenderingContext, state: StateGl) => {
+  (gl: WebGLRenderingContext, state: StateGl) => {
     gl.disable(WebGLRenderingContext.BLEND);
     gl.enable(WebGLRenderingContext.DEPTH_TEST);
   });
@@ -94,10 +95,11 @@ export interface GridController {
   getGridSize(): number;
   incGridSize(): void;
   decGridSize(): void;
+  snap(x: number): number;
 }
-export const GridController_ = new Dependency<GridController>('GridController');
+export const GRID = new Dependency<GridController>('GridController');
 
-export class GridControllerImpl {
+export class GridControllerImpl extends MessageHandlerReflective {
   private gridSizes = [16, 32, 64, 128, 256, 512, 1024];
   private gridSizeIdx = 3;
 
@@ -117,6 +119,21 @@ export class GridControllerImpl {
   public getGridSize(): number { return this.gridSizes[this.gridSizeIdx] }
   public incGridSize() { this.gridSizeIdx = cyclic(this.gridSizeIdx + 1, this.gridSizes.length) }
   public decGridSize() { this.gridSizeIdx = cyclic(this.gridSizeIdx - 1, this.gridSizes.length) }
+  public snap(x: number) { return snapGrid(x, this.getGridSize()) }
+
+  NamedMessage(msg: NamedMessage) {
+    switch (msg.name) {
+      case 'grid+': this.incGridSize(); return;
+      case 'grid-': this.decGridSize(); return;
+    }
+  }
+}
+
+async function GridControllerConstructor(injector: Injector) {
+  const bus = await injector.getInstance(BUS);
+  const grid = new GridControllerImpl();
+  bus.connect(grid);
+  return grid;
 }
 
 export const KeymapConfig_ = new Dependency<string>('KeymapConfig');
@@ -137,102 +154,86 @@ async function loadUtilityTextures(textures: [number, Promise<Texture>][]) {
 
 
 export function ContextModule(injector: Injector) {
-  injector.bindInstance(GridController_, new GridControllerImpl());
-  injector.bindInstance(BuildReferenceTracker_, new BuildReferenceTrackerImpl());
-  injector.bindInstance(State_, new StateImpl());
-  injector.bind(Selection_, SelectionConstructor);
-  injector.bindInstance(RenderablesCache_, new RenderablesCacheImpl());
+  injector.bindInstance(REFERENCE_TRACKER, new BuildReferenceTrackerImpl());
+  injector.bindInstance(STATE, new StateImpl());
   injector.bindPromise(KeymapConfig_, loadString('builded_binds.txt'));
   injector.bindPromise(UtilityTextures_, injector.getInstance(GL).then(gl => loadUtilityTextures([
     [-1, loadTexture(gl, 'resources/point1.png', { filter: WebGLRenderingContext.NEAREST, repeat: WebGLRenderingContext.CLAMP_TO_EDGE })],
     [-2, loadTexture(gl, 'resources/img/font.png', { filter: WebGLRenderingContext.NEAREST, repeat: WebGLRenderingContext.CLAMP_TO_EDGE })],
     [-3, loadTexture(gl, 'resources/grid.png', { filter: WebGLRenderingContext.LINEAR_MIPMAP_LINEAR, repeat: WebGLRenderingContext.REPEAT, aniso: true })],
   ])));
-  injector.bind(ArtProvider_, BuildArtProviderConstructor);
+  injector.bind(GRID, GridControllerConstructor);
+  injector.bind(ART, BuildArtProviderConstructor);
   injector.bind(PicNumSelector_, SelectorConstructor);
-  injector.bind(View_, SwappableViewConstructor);
+  injector.bind(VIEW, SwappableViewConstructor);
   injector.bind(BUILD_GL, BuildGlConstructor);
   injector.bind(BUFFER_FACTORY, DefaultBufferFactory);
   injector.bind(BUILDERS_FACTORY, DefaultBuildersFactory);
-  injector.bind(BuildContext_, ContextConstructor);
+  injector.bind(BUS, DefaultMessageBus);
+  injector.bind(BOARD, BoardProviderConstructor);
+  injector.bind(ENTITY_FACTORY, EntityFactoryConstructor);
+
+  injector.install(SplitWallModule);
+  injector.install(JoinSectorsModule);
+  injector.install(DrawSectorModule);
+  injector.install(PushWallModule);
+  injector.install(RenderablesCacheModule);
+  injector.install(SelectionModule);
+  injector.install(InfoModule);
+  injector.install(StatusBarModule);
 }
 
-export async function ContextConstructor(injector: Injector) {
-  return Promise.all([
-    injector.getInstance(ArtProvider_),
-    injector.getInstance(Board_),
-    injector.getInstance(View_),
-    injector.getInstance(BoardManipulator_),
-    injector.getInstance(GridController_),
-    injector.getInstance(RenderablesCache_),
-    injector.getInstance(KeymapConfig_),
-    injector.getInstance(Selection_),
-    injector.getInstance(BUILDERS_FACTORY)
-  ]).then(([art, board, view, manipulator, ctrl, cache, binds, selection, builders]) => {
-    const ctx = new Context(art, board, view, manipulator, ctrl, builders);
-    ctx.loadBinds(binds);
-    ctx.addHandler(selection);
-    ctx.addHandler(new SplitWall());
-    ctx.addHandler(new JoinSectors());
-    ctx.addHandler(new DrawSector(builders));
-    ctx.addHandler(new PushWall(builders));
-    ctx.addHandler(new Info());
-    ctx.addHandler(new Statusbar());
-    ctx.addHandler(view);
-    ctx.addHandler(cache);
-    return ctx;
-  })
+export function MainLoopConstructor(injector: Injector) {
+  return create(injector, MainLoop, VIEW, BUS, STATE, KeymapConfig_);
 }
 
-export class Context extends MessageHandlerReflective implements BuildContext {
-  readonly art: ArtProvider;
-  readonly state = new StateImpl();
-  readonly view: View;
-  readonly refs = new BuildReferenceTrackerImpl();
-  readonly buildersFactory: BuildersFactory;
-
-  private binder = new Binder();
-  private history: History = new History();
-  private activeBoard: Board;
-  private boardManipulator: BoardManipulator;
-  private handlers = new MessageHandlerList();
-  private boundObjects = new Set();
-  private gridController: GridController;
-
-  constructor(art: ArtProvider, board: Board, view: View, manipulator: BoardManipulator, gridController: GridController, buildersFactory: BuildersFactory) {
-    super();
-    this.art = art;
-    this.boardManipulator = manipulator;
-    this.gridController = gridController;
-    this.activeBoard = board;
-    this.buildersFactory = buildersFactory;
-    this.view = this.bind(view);
-    this.commit();
-
-    this.state.register('gridScale', this.gridScale);
-  }
-
-  get board() {
-    return this.activeBoard;
-  }
-
-  get gridScale() {
-    return this.gridController.getGridSize();
-  }
-
-  private bind<T extends Bindable>(bindable: T): T {
-    if (!this.boundObjects.has(bindable)) {
-      bindable.bind(this);
-      this.boundObjects.add(bindable);
+export async function BoardProviderConstructor(injector: Injector): Promise<BoardProvider> {
+  const bus = await injector.getInstance(BUS);
+  const cloner = await injector.getInstance(BoardManipulator_);
+  const defaultBoard = await injector.getInstance(DEFAULT_BOARD);
+  const history = new History();
+  let activeBoard: Board = cloner.cloneBoard(defaultBoard);
+  history.push(cloner.cloneBoard(defaultBoard));
+  bus.connect(new class extends MessageHandlerReflective {
+    NamedMessage(msg: NamedMessage) {
+      switch (msg.name) {
+        case 'undo':
+          history.pop();
+          activeBoard = cloner.cloneBoard(history.top());
+          bus.handle(INVALIDATE_ALL);
+          return;
+      }
     }
-    return bindable;
+
+    LoadBoard(msg: LoadBoard) {
+      activeBoard = cloner.cloneBoard(msg.board);
+      history.push(cloner.cloneBoard(msg.board));
+      bus.handle(INVALIDATE_ALL);
+    }
+  })
+  return () => activeBoard;
+}
+
+export class MainLoop extends MessageHandlerReflective {
+  private view: View;
+  private binder = new Binder();
+  private bus: MessageBus;
+  private state: State;
+
+  constructor(view: View, bus: MessageBus, state: State, binds: string) {
+    super();
+    this.view = view;
+    this.bus = bus;
+    this.state = state;
+    loadBinds(binds, this.binder, messageParser);
+    this.bus.connect(this);
   }
 
   private mouseMove(input: InputState) {
     if (MOUSE.x == input.mouseX && MOUSE.y == input.mouseY) return;
     MOUSE.x = input.mouseX;
     MOUSE.y = input.mouseY;
-    this.handle(MOUSE, this);
+    this.bus.handle(MOUSE);
   }
 
   private poolMessages(input: InputState) {
@@ -240,58 +241,14 @@ export class Context extends MessageHandlerReflective implements BuildContext {
     return this.binder.poolEvents(input);
   }
 
-  private incGridSize() {
-    this.gridController.incGridSize();
-    this.state.set('gridScale', this.gridScale);
-  }
-
-  private decGridSize() {
-    this.gridController.decGridSize();
-    this.state.set('gridScale', this.gridScale);
-  }
-
-  snap(x: number) {
-    return snapGrid(x, this.gridScale);
-  }
-
-  loadBinds(binds: string) {
-    loadBinds(binds, this.binder, messageParser);
-  }
-
-  commit() {
-    this.history.push(this.boardManipulator.cloneBoard(this.activeBoard));
-  }
-
   private drawTools() {
     tools.clear();
-    this.handle(RENDER, this);
+    this.message(RENDER);
     this.view.draw(onTopRenderable);
   }
 
-  private undo() {
-    this.history.pop();
-    this.activeBoard = this.boardManipulator.cloneBoard(this.history.top());
-    this.message(INVALIDATE_ALL);
-  }
-
-  addHandler(handler: MessageHandler): void
-  addHandler(handler: MessageHandler & Bindable): void {
-    if (handler.bind != undefined) this.bind(handler);
-    this.handlers.list().push(handler);
-  }
-
-  message(msg: Message) {
-    this.handle(msg, this);
-  }
-
-  handle(msg: Message, ctx: BuildContext) {
-    try {
-      // info(msg);
-      super.handle(msg, ctx);
-      this.handlers.handle(msg, ctx);
-    } catch (e) {
-      error(e, e.stack);
-    }
+  private message(msg: Message) {
+    this.bus.handle(msg);
   }
 
   frame(input: InputState, dt: number) {
@@ -299,20 +256,9 @@ export class Context extends MessageHandlerReflective implements BuildContext {
     this.mouseMove(input);
     FRAME.dt = dt;
     this.message(FRAME);
-    for (let contextedMessage of this.poolMessages(input)) {
-      let message = contextedMessage(this);
-      this.message(message);
-    }
+    for (const message of this.poolMessages(input)) this.message(message);
     this.drawTools();
     PROFILE.endProfile();
     this.message(POSTFRAME);
-  }
-
-  NamedMessage(msg: NamedMessage, ctx: BuildContext) {
-    switch (msg.name) {
-      case 'grid+': this.incGridSize(); return;
-      case 'grid-': this.decGridSize(); return;
-      case 'undo': this.undo(); return;
-    }
   }
 }

@@ -3,7 +3,6 @@ import { Deck } from '../collections';
 import { Buffer } from './buffergl';
 import { Definition, IndexBuffer, Shader, Texture, VertexBuffer } from './drawstruct';
 import * as SHADER from './shaders';
-import { rand, rand0 } from '../random';
 
 function eqCmp<T>(lh: T, rh: T) { return lh === rh }
 function assign<T>(dst: T, src: T) { return src }
@@ -76,14 +75,12 @@ export class State {
   readonly profile = new Profile();
 
   private batchUniform = -1;
+  private lastBuffer: Buffer;
 
   private shader: StateValue<string> = new StateValue<string>(() => this.changeShader = true, null);
   private lastShader: string;
   private selectedShader: Shader;
   private indexBuffer: StateValue<IndexBuffer> = new StateValue<IndexBuffer>(() => this.changeIndexBuffer = true, null);
-  private buffer: Buffer;
-  private offset: number;
-  private size: number;
   private shaders: { [index: string]: Shader } = {};
 
   private states: StateValue<any>[] = [];
@@ -124,19 +121,21 @@ export class State {
     this.states[this.batchUniform].set(value);
   }
 
-  public flush(gl: WebGLRenderingContext) {
+  public flush(gl: WebGLRenderingContext, buffer: Buffer = this.lastBuffer) {
     if (this.batchMode == -1) return;
-    this.buffer.update(gl);
+    if (buffer) buffer.update(gl);
     gl.drawElements(this.batchMode, this.batchSize, gl.UNSIGNED_SHORT, this.batchOffset * 2);
     // this.nextBatch();
     this.batchMode = -1;
+    this.lastBuffer = null;
   }
 
-  private tryBatch(gl: WebGLRenderingContext, mode: number): boolean {
+  private tryBatch(gl: WebGLRenderingContext, buffer: Buffer, offset: number, size: number, mode: number): boolean {
     if (this.batchMode == -1) {
       this.batchMode = mode;
-      this.batchOffset = this.offset;
-      this.batchSize = this.size;
+      this.batchOffset = offset;
+      this.batchSize = size;
+      this.lastBuffer = buffer;
       return false;
     } else if (this.batchMode == mode
       && !this.changeShader
@@ -144,8 +143,6 @@ export class State {
       && this.changedUniformIdxs.isEmpty()
       && this.changedTextures.isEmpty()
       && this.changedVertexBuffersIds.isEmpty()) {
-      const offset = this.offset;
-      const size = this.size;
       if (this.batchOffset == offset + size) {
         this.batchOffset = offset;
         this.batchSize += size;
@@ -156,7 +153,7 @@ export class State {
       }
     }
     this.flush(gl);
-    return this.tryBatch(gl, mode);
+    return this.tryBatch(gl, buffer, offset, size, mode);
   }
 
   public registerShader(name: string, shader: Shader) {
@@ -253,12 +250,6 @@ export class State {
     return this.vertexBuffers[a];
   }
 
-  public setDrawElements(buffer: Buffer, offset: number, size: number) {
-    this.buffer = buffer;
-    this.offset = offset;
-    this.size = size;
-  }
-
   private rebindShader(gl: WebGLRenderingContext) {
     if (!this.changeShader) return;
     ++this.profile.shaderChanges;
@@ -349,9 +340,9 @@ export class State {
     uniformsIdxs.clear();
   }
 
-  public draw(gl: WebGLRenderingContext, mode: number = gl.TRIANGLES) {
+  public draw(gl: WebGLRenderingContext, buffer: Buffer, offset: number, size: number, mode: number = gl.TRIANGLES) {
     ++this.profile.drawsRequested;
-    if (this.tryBatch(gl, mode)) {
+    if (this.tryBatch(gl, buffer, offset, size, mode)) {
       ++this.profile.drawsMerged;
       return;
     }
@@ -370,8 +361,7 @@ export class State {
       const value = values[i + 1];
       this.states[idx].set(value);
     }
-    this.setDrawElements(call.buffer, call.offset, call.size);
-    this.draw(gl, call.mode)
+    this.draw(gl, call.buffer, call.offset, call.size, call.mode)
   }
 }
 

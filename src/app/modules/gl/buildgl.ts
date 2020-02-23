@@ -1,13 +1,12 @@
+import { mat4, Mat4Array, vec3, Vec3Array, vec4 } from '../../../libs_js/glmatrix';
 import { Texture } from '../../../utils/gl/drawstruct';
 import { createShader } from '../../../utils/gl/shaders';
-import { State, Profile } from '../../../utils/gl/stategl';
+import { Profile, State } from '../../../utils/gl/stategl';
 import { Dependency, Injector } from '../../../utils/injector';
-import { BuildContext } from '../../apis/app';
+import { info } from '../../../utils/logger';
+import * as PROFILER from '../../../utils/profiler';
 import { Renderable } from '../../apis/renderable';
 import { GL, UtilityTextures_ } from '../buildartprovider';
-import * as PROFILER from '../../../utils/profiler';
-import { mat4, vec3, vec4, Mat4Array, Vec3Array } from '../../../libs_js/glmatrix';
-import { info } from '../../../utils/logger';
 
 export const PAL_TEXTURE = new Dependency<Texture>('PAL Texture');
 export const PLU_TEXTURE = new Dependency<Texture>('PLU Texture');
@@ -78,9 +77,9 @@ export class BuildGl {
     this.state.setUniform('clipPlane', clipPlane);
   }
 
-  public draw(ctx: BuildContext, gl: WebGLRenderingContext, renderable: Renderable) {
+  public draw(gl: WebGLRenderingContext, renderable: Renderable) {
     if (renderable == null) return;
-    renderable.draw(ctx, gl, this.state);
+    renderable.draw(gl, this.state);
   }
 
   public newFrame(gl: WebGLRenderingContext) {

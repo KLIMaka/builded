@@ -1,8 +1,8 @@
 import { Collection, Deck, EMPTY_COLLECTION } from "../../utils/collections";
 import { InputState } from "../../utils/input";
 import { warning } from "../../utils/logger";
-import { ContextedValue, State } from "../apis/app";
 import { Message } from "../apis/handler";
+import { State } from "../apis/app";
 
 type InputHandler = (state: InputState) => boolean;
 
@@ -47,14 +47,14 @@ function createHandler(key: string, mods: string[]): InputHandler {
 export class Binder {
   private binds: string[] = [];
   private handlers: InputHandler[] = [];
-  private messages: Deck<ContextedValue<Message>>[] = [];
+  private messages: Deck<Message>[] = [];
   private sorttable: number[] = [];
 
   private stateBinds: string[] = [];
   private stateHandlers: InputHandler[] = [];
   private stateValues: [string, any, any][][] = [];
 
-  public poolEvents(state: InputState): Collection<ContextedValue<Message>> {
+  public poolEvents(state: InputState): Collection<Message> {
     for (let i = this.handlers.length - 1; i >= 0; i--) {
       if (this.handlers[i](state))
         return this.messages[i];
@@ -85,7 +85,7 @@ export class Binder {
     }
   }
 
-  public addBind(messages: Collection<ContextedValue<Message>>, key: string, ...mods: string[]) {
+  public addBind(messages: Collection<Message>, key: string, ...mods: string[]) {
     let bindName = canonizeBind(key, mods);
     let bindIdx = this.findBind(bindName, mods.length);
     if (bindIdx == -1) {
@@ -96,12 +96,12 @@ export class Binder {
     }
   }
 
-  private insertBind(bindName: string, handler: InputHandler, messages: Collection<ContextedValue<Message>>, mods: number): void {
+  private insertBind(bindName: string, handler: InputHandler, messages: Collection<Message>, mods: number): void {
     this.ensureSortTable(mods);
     let pos = this.sorttable[mods];
     this.binds.splice(pos, 0, bindName);
     this.handlers.splice(pos, 0, handler);
-    this.messages.splice(pos, 0, new Deck<ContextedValue<Message>>().pushAll(messages));
+    this.messages.splice(pos, 0, new Deck<Message>().pushAll(messages));
     for (let i = this.sorttable.length - 1; i >= mods; i--) {
       this.sorttable[i]++;
     }
@@ -124,7 +124,7 @@ export class Binder {
   }
 }
 
-export type EventParser = (str: string) => Collection<ContextedValue<Message>>;
+export type EventParser = (str: string) => Collection<Message>;
 
 export function loadBinds(binds: string, binder: Binder, messageParser: EventParser) {
   let lines = binds.split(/\r?\n/);

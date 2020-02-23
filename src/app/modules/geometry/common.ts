@@ -2,9 +2,9 @@ import { Mat4Array, vec4 } from "../../../libs_js/glmatrix";
 import { Texture } from "../../../utils/gl/drawstruct";
 import { State } from "../../../utils/gl/stategl";
 import { Dependency, Injector } from "../../../utils/injector";
-import { BuildContext } from "../../apis/app";
+import { GRID, GridController } from "../context";
 import { BUFFER_FACTORY, BuildBuffer } from "../gl/buffers";
-import { BufferRenderable, GRID, GridSetup, PointSpriteSetup, POINT_SPRITE, SOLID, SolidSetup, WIREFRAME, WireframeSetup } from "./builders/setups";
+import { BufferRenderable, GridSetup, GRID_SETUP, PointSpriteSetup, POINT_SPRITE_SETUP, SolidSetup, SOLID_SETUP, WireframeSetup, WIREFRAME_SETUP } from "./builders/setups";
 
 export interface BuildersFactory {
   solid(hint: string): SolidBuilder;
@@ -16,9 +16,10 @@ export const BUILDERS_FACTORY = new Dependency<BuildersFactory>('Builder Factory
 
 export async function DefaultBuildersFactory(injector: Injector) {
   const bufferFactory = await injector.getInstance(BUFFER_FACTORY);
+  const gridController = await injector.getInstance(GRID);
   return {
     solid: (hint: string) => new SolidBuilder(bufferFactory.get('solid-' + hint)),
-    grid: (hint: string) => new GridBuilder(),
+    grid: (hint: string) => new GridBuilder(gridController),
     pointSprite: (hint: string) => new PointSpriteBuilder(bufferFactory.get('pointsprite-' + hint)),
     wireframe: (hint: string) => new WireframeBuilder(bufferFactory.get('wireframe-' + hint))
   }
@@ -36,10 +37,10 @@ export class SolidBuilder extends BufferRenderable<SolidSetup> {
   public trans: number = 1;
   public parallax: number = 0;
 
-  constructor(readonly buff: BuildBuffer) { super(SOLID) }
+  constructor(readonly buff: BuildBuffer) { super(SOLID_SETUP) }
   protected textureHint() { return this.tex }
 
-  public setup(ctx: BuildContext, setup: SolidSetup) {
+  public setup(setup: SolidSetup) {
     setup.shader(this.type == Type.SURFACE ? (this.parallax ? 'parallax' : 'baseShader') : 'spriteShader')
       .base(this.tex)
       .color(vec4.set(color, 1, 1, 1, this.trans))
@@ -58,20 +59,20 @@ export class GridBuilder extends BufferRenderable<GridSetup> {
   public solid: SolidBuilder;
   public gridTexMatProvider: (scale: number) => Mat4Array;
 
-  constructor() { super(GRID) }
+  constructor(private gridController: GridController) { super(GRID_SETUP) }
 
   public get buff() { return this.solid.buff }
   public reset() { }
   protected textureHint() { return null }
 
-  public setup(ctx: BuildContext, setup: GridSetup) {
+  public setup(setup: GridSetup) {
     setup.shader('grid')
-      .grid(this.gridTexMatProvider(ctx.gridScale));
+      .grid(this.gridTexMatProvider(this.gridController.getGridSize()));
   }
 
-  public draw(ctx: BuildContext, gl: WebGLRenderingContext, state: State): void {
+  public draw(gl: WebGLRenderingContext, state: State): void {
     this.needToRebuild();
-    super.draw(ctx, gl, state);
+    super.draw(gl, state);
   }
 }
 
@@ -79,9 +80,9 @@ export class PointSpriteBuilder extends BufferRenderable<PointSpriteSetup> {
   public tex: Texture;
   public color = vec4.fromValues(1, 1, 1, 1);
 
-  constructor(readonly buff: BuildBuffer) { super(POINT_SPRITE) }
+  constructor(readonly buff: BuildBuffer) { super(POINT_SPRITE_SETUP) }
 
-  public setup(ctx: BuildContext, setup: PointSpriteSetup) {
+  public setup(setup: PointSpriteSetup) {
     setup.shader('spriteFaceShader')
       .base(this.tex)
       .color(this.color);
@@ -101,9 +102,9 @@ export class WireframeBuilder extends BufferRenderable<WireframeSetup> {
   public color = vec4.fromValues(1, 1, 1, 1);
   public mode = WebGLRenderingContext.LINES;
 
-  constructor(readonly buff: BuildBuffer) { super(WIREFRAME) }
+  constructor(readonly buff: BuildBuffer) { super(WIREFRAME_SETUP) }
 
-  public setup(ctx: BuildContext, setup: WireframeSetup) {
+  public setup(setup: WireframeSetup) {
     setup.shader(this.type == Type.SURFACE ? 'baseFlatShader' : 'spriteFlatShader')
       .color(this.color);
   }

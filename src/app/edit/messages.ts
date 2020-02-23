@@ -1,10 +1,12 @@
 import { HintRenderable, RenderableConsumer } from "../apis/renderable";
 import { Message } from "../apis/handler";
 import { Entity } from "../../build/hitscan";
+import { Board } from "../../build/structs";
 
 export interface Mover { readonly dx: number; readonly dy: number; readonly dz: number; }
 
 export class NamedMessage implements Message { constructor(public name: string) { } }
+export class LoadBoard implements Message { constructor(public board: Board) { } }
 export class StartMove implements Message { }
 export class Move implements Message { constructor(public dx: number, public dy: number, public dz: number) { } }
 export class EndMove implements Message { }

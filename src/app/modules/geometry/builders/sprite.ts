@@ -1,8 +1,8 @@
-import { BuildContext } from "../../../apis/app";
-import { ZSCALE, spriteAngle, ang2vec } from "../../../../build/utils";
-import { FACE_SPRITE, WALL_SPRITE, FLOOR_SPRITE } from "../../../../build/structs";
-import { mat4, Vec3Array, Mat4Array, vec4 } from "../../../../libs_js/glmatrix";
+import { FACE_SPRITE, FLOOR_SPRITE, WALL_SPRITE } from "../../../../build/structs";
+import { ang2vec, spriteAngle, ZSCALE } from "../../../../build/utils";
+import { mat4, Mat4Array, Vec3Array, vec4 } from "../../../../libs_js/glmatrix";
 import { BuildBuffer } from "../../gl/buffers";
+import { RenderablesCacheContext } from "../cache";
 import { SolidBuilder, Type } from "../common";
 
 function normals(n: Vec3Array) {
@@ -58,12 +58,12 @@ const texMat_ = mat4.create();
 function fillbuffersForWallSprite(
   x: number, y: number, z: number, xo: number, yo: number, hw: number, hh: number, ang: number, xf: number, yf: number,
   onesided: number, pal: number, shade: number, renderable: SolidBuilder) {
-  let dx = Math.sin(ang) * hw;
-  let dy = Math.cos(ang) * hw;
+  const dx = Math.sin(ang) * hw;
+  const dy = Math.cos(ang) * hw;
 
-  let xs = xf ? -1.0 : 1.0;
-  let ys = yf ? -1.0 : 1.0;
-  let texMat = texMat_;
+  const xs = xf ? -1.0 : 1.0;
+  const ys = yf ? -1.0 : 1.0;
+  const texMat = texMat_;
   mat4.identity(texMat);
   mat4.scale(texMat, texMat, [xs / (hw * 2), -ys / (hh * 2), 1, 1]);
   mat4.rotateY(texMat, texMat, -ang - Math.PI / 2);
@@ -82,15 +82,15 @@ function fillbuffersForWallSprite(
 
 function fillbuffersForFloorSprite(x: number, y: number, z: number, xo: number, yo: number, hw: number, hh: number, ang: number, xf: number, yf: number,
   onesided: number, pal: number, shade: number, renderable: SolidBuilder) {
-  let dwx = Math.sin(ang) * hw;
-  let dwy = Math.cos(ang) * hw;
-  let dhx = Math.sin(ang + Math.PI / 2) * hh;
-  let dhy = Math.cos(ang + Math.PI / 2) * hh;
-  let s = !(xf || yf) ? 1 : -1;
+  const dwx = Math.sin(ang) * hw;
+  const dwy = Math.cos(ang) * hw;
+  const dhx = Math.sin(ang + Math.PI / 2) * hh;
+  const dhy = Math.cos(ang + Math.PI / 2) * hh;
+  const s = !(xf || yf) ? 1 : -1;
 
-  let xs = xf ? -1.0 : 1.0;
-  let ys = yf ? -1.0 : 1.0;
-  let texMat = texMat_;
+  const xs = xf ? -1.0 : 1.0;
+  const ys = yf ? -1.0 : 1.0;
+  const texMat = texMat_;
   mat4.identity(texMat);
   mat4.scale(texMat, texMat, [xs / (hw * 2), ys / (hh * 2), 1, 1]);
   mat4.translate(texMat, texMat, [hw, hh, 0, 0]);
@@ -135,25 +135,26 @@ function fillBuffersForFaceSprite(x: number, y: number, z: number, xo: number, y
     pal, shade, renderable.buff);
 }
 
-export function updateSprite(ctx: BuildContext, sprId: number, builder: SolidBuilder): SolidBuilder {
-  builder = builder == null ? ctx.buildersFactory.solid('sprite') : builder;
-  let spr = ctx.board.sprites[sprId];
+export function updateSprite(ctx: RenderablesCacheContext, sprId: number, builder: SolidBuilder): SolidBuilder {
+  builder = builder == null ? ctx.factory.solid('sprite') : builder;
+  const board = ctx.board();
+  const spr = board.sprites[sprId];
   if (spr.picnum == 0 || spr.cstat.invisible)
     return builder;
 
-  let x = spr.x; let y = spr.y; let z = spr.z / ZSCALE;
-  let info = ctx.art.getInfo(spr.picnum);
-  let tex = ctx.art.get(spr.picnum);
-  let w = (info.w * spr.xrepeat) / 4; let hw = w >> 1;
-  let h = (info.h * spr.yrepeat) / 4; let hh = h >> 1;
-  let ang = spriteAngle(spr.ang);
-  let xo = (info.attrs.xoff * spr.xrepeat) / 4;
-  let yo = (info.attrs.yoff * spr.yrepeat) / 4 + (spr.cstat.realCenter ? 0 : hh);
-  let xf = spr.cstat.xflip; let yf = spr.cstat.yflip;
-  let sec = ctx.board.sectors[spr.sectnum];
-  let sectorShade = sec ? sec.floorshade : spr.shade;
-  let shade = spr.shade == -8 ? sectorShade : spr.shade;
-  let trans = (spr.cstat.translucent || spr.cstat.tranclucentReversed) ? 0.6 : 1;
+  const x = spr.x; const y = spr.y; const z = spr.z / ZSCALE;
+  const info = ctx.art.getInfo(spr.picnum);
+  const tex = ctx.art.get(spr.picnum);
+  const w = (info.w * spr.xrepeat) / 4; const hw = w >> 1;
+  const h = (info.h * spr.yrepeat) / 4; const hh = h >> 1;
+  const ang = spriteAngle(spr.ang);
+  const xo = (info.attrs.xoff * spr.xrepeat) / 4;
+  const yo = (info.attrs.yoff * spr.yrepeat) / 4 + (spr.cstat.realCenter ? 0 : hh);
+  const xf = spr.cstat.xflip; const yf = spr.cstat.yflip;
+  const sec = board.sectors[spr.sectnum];
+  const sectorShade = sec ? sec.floorshade : spr.shade;
+  const shade = spr.shade == -8 ? sectorShade : spr.shade;
+  const trans = (spr.cstat.translucent || spr.cstat.tranclucentReversed) ? 0.6 : 1;
   builder.tex = tex;
   builder.trans = trans;
 

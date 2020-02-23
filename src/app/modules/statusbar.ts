@@ -1,10 +1,15 @@
-import { drawToCanvas } from "../../utils/imgutils";
+import { create, Injector } from "../../utils/injector";
 import { AbstractPixelProvider, BlendFunc } from "../../utils/pixelprovider";
 import * as PROFILE from "../../utils/profiler";
-import { BuildContext } from "../apis/app";
+import { View, VIEW } from "../apis/app";
+import { BUS, MessageHandlerReflective } from "../apis/handler";
 import { PostFrame } from "../edit/messages";
-import { MessageHandlerReflective } from "../apis/handler";
 
+
+export async function StatusBarModule(injector: Injector) {
+  const bus = await injector.getInstance(BUS);
+  bus.connect(await create(injector, Statusbar, VIEW));
+}
 
 export class Statusbar extends MessageHandlerReflective {
   xpos: HTMLElement;
@@ -15,7 +20,9 @@ export class Statusbar extends MessageHandlerReflective {
   buffer: HTMLCanvasElement;
   bufferPixelProvider = new BufferPixelProvider(64, 8);
 
-  constructor() {
+  constructor(
+    private view: View
+  ) {
     super();
     this.xpos = document.getElementById('x_position');
     this.ypos = document.getElementById('y_position');
@@ -25,8 +32,8 @@ export class Statusbar extends MessageHandlerReflective {
     this.buffer = <HTMLCanvasElement>document.getElementById('buffer');
   }
 
-  public PostFrame(msg: PostFrame, ctx: BuildContext) {
-    let view = ctx.view;
+  public PostFrame(msg: PostFrame) {
+    const view = this.view;
     this.xpos.textContent = '' + view.x;
     this.ypos.textContent = '' + view.y;
     this.secpos.textContent = '' + view.sec;

@@ -1,30 +1,45 @@
-import { dot2d } from "../../../utils/mathutils";
+import { pushWall } from "../../../build/boardutils";
+import { Board } from "../../../build/structs";
+import { build2gl, createSlopeCalculator, sectorOfWall, wallNormal, ZSCALE } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 import { cyclicPairs } from "../../../utils/collections";
-import { BuildContext } from "../../apis/app";
-import { pushWall } from "../../../build/boardutils";
-import { MessageHandlerReflective } from "../../apis/handler";
-import { build2gl, createSlopeCalculator, sectorOfWall, wallNormal, ZSCALE } from "../../../build/utils";
+import { create, Injector } from "../../../utils/injector";
+import { dot2d } from "../../../utils/mathutils";
+import { ART, ArtProvider, BOARD, BuildReferenceTracker, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
+import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
+import { GRID, GridController } from "../../modules/context";
+import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
 import { MovingHandle } from "../handle";
-import { Frame, NamedMessage, Render, BoardInvalidate } from "../messages";
-import { BuildersFactory } from "../../modules/geometry/common";
+import { BoardInvalidate, Frame, NamedMessage, Render } from "../messages";
 
 const wallNormal_ = vec3.create();
 const wallNormal1_ = vec3.create();
 const target_ = vec3.create();
 const start_ = vec3.create();
 const dir_ = vec3.create();
+
+export async function PushWallModule(injector: Injector) {
+  const bus = await injector.getInstance(BUS);
+  bus.connect(await create(injector, PushWall, BUILDERS_FACTORY, VIEW, ART, BOARD, REFERENCE_TRACKER, BUS, GRID));
+}
+
 export class PushWall extends MessageHandlerReflective {
   private wallId = -1;
   private movingHandle = new MovingHandle();
 
   constructor(
     private builders: BuildersFactory,
+    private view: View,
+    private art: ArtProvider,
+    private board: Board,
+    private refs: BuildReferenceTracker,
+    private bus: MessageBus,
+    private grid: GridController,
     private wireframe = builders.wireframe('utils')
   ) { super(); }
 
-  private start(ctx: BuildContext) {
-    const target = ctx.view.snapTarget();
+  private start() {
+    const target = this.view.snapTarget();
     if (target.entity == null || !target.entity.isWall()) return;
     this.wallId = target.entity.id;
     this.movingHandle.start(build2gl(target_, target.coords));
@@ -35,54 +50,54 @@ export class PushWall extends MessageHandlerReflective {
     this.movingHandle.stop();
   }
 
-  private stop(ctx: BuildContext, copy: boolean) {
-    pushWall(ctx.board, this.wallId, this.getDistance(ctx), ctx.art, copy, ctx.refs);
-    ctx.commit();
-    ctx.message(new BoardInvalidate(null));
+  private stop(copy: boolean) {
+    pushWall(this.board, this.wallId, this.getDistance(), this.art, copy, this.refs);
+    // this.commit();
+    this.bus.handle(new BoardInvalidate(null));
     this.wallId = -1;
     this.movingHandle.stop();
   }
 
-  private getDistance(ctx: BuildContext): number {
+  private getDistance(): number {
     const dx = this.movingHandle.dx;
     const dy = this.movingHandle.dy;
-    const [nx, , ny] = wallNormal(wallNormal1_, ctx.board, this.wallId);
-    return ctx.snap(dot2d(nx, ny, dx, dy));
+    const [nx, , ny] = wallNormal(wallNormal1_, this.board, this.wallId);
+    return this.grid.snap(dot2d(nx, ny, dx, dy));
   }
 
-  public NamedMessage(msg: NamedMessage, ctx: BuildContext) {
+  public NamedMessage(msg: NamedMessage, ) {
     switch (msg.name) {
-      case 'push_wall': this.movingHandle.isActive() ? this.stop(ctx, false) : this.start(ctx); return;
-      case 'push_wall_copy': this.movingHandle.isActive() ? this.stop(ctx, true) : this.start(ctx); return;
+      case 'push_wall': this.movingHandle.isActive() ? this.stop(false) : this.start(); return;
+      case 'push_wall_copy': this.movingHandle.isActive() ? this.stop(true) : this.start(); return;
       case 'push_wall_stop': this.abort(); return;
     }
   }
 
-  public Frame(msg: Frame, ctx: BuildContext) {
+  public Frame(msg: Frame) {
     if (this.movingHandle.isActive()) {
-      const { start, dir } = ctx.view.dir();
+      const { start, dir } = this.view.dir();
       this.movingHandle.update(false, false, build2gl(start_, start), build2gl(dir_, dir));
     }
   }
 
-  public Render(msg: Render, ctx: BuildContext) {
+  public Render(msg: Render) {
     if (!this.movingHandle.isActive()) return;
-    this.updateWireframe(ctx);
+    this.updateWireframe();
     this.wireframe.accept(msg.consumer);
   }
 
-  private updateWireframe(ctx: BuildContext) {
+  private updateWireframe() {
     const buff = this.wireframe.buff;
     buff.allocate(8, 16);
-    const normal = wallNormal(wallNormal_, ctx.board, this.wallId);
-    const [nx, , ny] = vec3.scale(normal, normal, this.getDistance(ctx));
-    const wall = ctx.board.walls[this.wallId];
-    const wall2 = ctx.board.walls[wall.point2];
-    const sectorId = sectorOfWall(ctx.board, this.wallId);
-    const sector = ctx.board.sectors[sectorId];
+    const normal = wallNormal(wallNormal_, this.board, this.wallId);
+    const [nx, , ny] = vec3.scale(normal, normal, this.getDistance());
+    const wall = this.board.walls[this.wallId];
+    const wall2 = this.board.walls[wall.point2];
+    const sectorId = sectorOfWall(this.board, this.wallId);
+    const sector = this.board.sectors[sectorId];
     const x1 = wall.x + nx, y1 = wall.y + ny;
     const x2 = wall2.x + nx, y2 = wall2.y + ny;
-    const slopeCalc = createSlopeCalculator(ctx.board, sectorId);
+    const slopeCalc = createSlopeCalculator(this.board, sectorId);
     const z1 = slopeCalc(x1, y1, sector.floorheinum) + sector.floorz;
     const z2 = slopeCalc(x1, y1, sector.ceilingheinum) + sector.ceilingz;
     const z3 = slopeCalc(x2, y2, sector.ceilingheinum) + sector.ceilingz;

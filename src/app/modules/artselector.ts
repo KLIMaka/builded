@@ -3,7 +3,7 @@ import { DrawPanel, PixelDataProvider } from "../../utils/ui/drawpanel";
 import { dragElement } from "../../utils/ui/ui";
 import { ArtInfoProvider } from "../../build/art";
 import { Injector, Dependency } from "../../utils/injector";
-import { ArtProvider_ } from "../apis/app";
+import { ART } from "../apis/app";
 import { PicNumCallback } from "../edit/tools/selection";
 
 function createDrawPanel(arts: ArtInfoProvider, pal: Uint8Array, canvas: HTMLCanvasElement, cb: PicNumCallback) {
@@ -19,7 +19,7 @@ export const RAW_PAL_ = new Dependency<Uint8Array>('RawPal');
 
 export async function SelectorConstructor(injector: Injector) {
   return Promise.all([
-    injector.getInstance(ArtProvider_),
+    injector.getInstance(ART),
     injector.getInstance(RAW_PAL_)])
     .then(([art, pal]) => {
       const selector = new Selector(art, pal)

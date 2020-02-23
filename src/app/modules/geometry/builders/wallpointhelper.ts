@@ -1,10 +1,10 @@
-import { BuildContext } from "../../../apis/app";
-import { createSlopeCalculator, sectorOfWall, slope, ZSCALE } from "../../../../build/utils";
-import { Builders } from "../../../apis/builder";
 import { Board } from "../../../../build/structs";
-import { BuildBuffer } from "../../gl/buffers";
+import { createSlopeCalculator, sectorOfWall, slope, ZSCALE } from "../../../../build/utils";
 import { fastIterator } from "../../../../utils/collections";
-import { BuildersFactory, WireframeBuilder, PointSpriteBuilder } from "../common";
+import { Builders } from "../../../apis/builder";
+import { BuildBuffer } from "../../gl/buffers";
+import { RenderablesCacheContext } from "../cache";
+import { BuildersFactory, PointSpriteBuilder, WireframeBuilder } from "../common";
 
 export class WallPointHelperBuilder extends Builders {
   constructor(
@@ -14,8 +14,8 @@ export class WallPointHelperBuilder extends Builders {
   ) { super(fastIterator([points, line])) }
 }
 
-function updateWallLine(ctx: BuildContext, wallId: number, builder: WireframeBuilder): WireframeBuilder {
-  const board = ctx.board;
+function updateWallLine(ctx: RenderablesCacheContext, wallId: number, builder: WireframeBuilder): WireframeBuilder {
+  const board = ctx.board();
   const buff = builder.buff;
   buff.allocate(2, 2);
   const sectorId = sectorOfWall(board, wallId);
@@ -47,8 +47,8 @@ function fillBufferForWallPoint(offset: number, board: Board, wallId: number, bu
   buff.writeQuad(offset * 6, vtxOff, vtxOff + 1, vtxOff + 2, vtxOff + 3);
 }
 
-function addWallPoint(offset: number, builder: PointSpriteBuilder, ctx: BuildContext, ceiling: boolean, wallId: number, d: number): void {
-  const board = ctx.board;
+function addWallPoint(offset: number, builder: PointSpriteBuilder, ctx: RenderablesCacheContext, ceiling: boolean, wallId: number, d: number): void {
+  const board = ctx.board();
   const s = sectorOfWall(board, wallId);
   const sec = board.sectors[s];
   const slope = createSlopeCalculator(board, s);
@@ -59,8 +59,8 @@ function addWallPoint(offset: number, builder: PointSpriteBuilder, ctx: BuildCon
   fillBufferForWallPoint(offset, board, wallId, builder.buff, d, zz);
 }
 
-export function updateWallPoint(ctx: BuildContext, wallId: number, builder: WallPointHelperBuilder): WallPointHelperBuilder {
-  builder = builder == null ? new WallPointHelperBuilder(ctx.buildersFactory) : builder;
+export function updateWallPoint(ctx: RenderablesCacheContext, wallId: number, builder: WallPointHelperBuilder): WallPointHelperBuilder {
+  builder = builder == null ? new WallPointHelperBuilder(ctx.factory) : builder;
   builder.points.tex = ctx.art.get(-1);
   builder.points.buff.allocate(8, 12);
   addWallPoint(0, builder.points, ctx, true, wallId, 2.5);

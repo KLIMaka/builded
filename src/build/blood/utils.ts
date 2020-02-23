@@ -1,8 +1,10 @@
-import { Board_ } from "../../app/apis/app";
+import { BOARD } from "../../app/apis/app";
 import { RorLink, RorLinks } from "../../app/modules/view/boardrenderer3d";
 import { Injector } from "../../utils/injector";
 import { Sprite } from "../structs";
 import { BloodBoard } from "./structs";
+import { BUS, MessageHandlerReflective } from "../../app/apis/handler";
+import { LoadBoard } from "../../app/edit/messages";
 
 export const MIRROR_PIC = 504;
 
@@ -15,12 +17,17 @@ function isLowerLink(spr: Sprite) {
 }
 
 export async function BloodImplementationConstructor(injector: Injector) {
-  return injector.getInstance(Board_).then(board => {
-    const rorLinks = loadRorLinks(<BloodBoard>board);
-    return Promise.resolve({
-      rorLinks: () => rorLinks,
-      isMirrorPic(picnum: number) { return picnum == MIRROR_PIC },
-    })
+  const board = await injector.getInstance(BOARD);
+  const bus = await injector.getInstance(BUS);
+  let rorLinks = loadRorLinks(<BloodBoard>board());
+  bus.connect(new class extends MessageHandlerReflective {
+    LoadBoard(msg: LoadBoard) {
+      rorLinks = loadRorLinks(<BloodBoard>msg.board);
+    }
+  })
+  return Promise.resolve({
+    rorLinks: () => rorLinks,
+    isMirrorPic(picnum: number) { return picnum == MIRROR_PIC },
   })
 }
 

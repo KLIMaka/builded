@@ -1,10 +1,10 @@
-import { vec3 } from "../../../../libs_js/glmatrix";
-import { BuildContext } from "../../../apis/app";
 import { FACE_SPRITE, FLOOR_SPRITE, WALL_SPRITE } from "../../../../build/structs";
 import { ang2vec, spriteAngle, ZSCALE } from "../../../../build/utils";
-import { Builders } from "../../../apis/builder";
+import { vec3 } from "../../../../libs_js/glmatrix";
 import { fastIterator } from "../../../../utils/collections";
-import { BuildersFactory, WireframeBuilder, Type } from "../common";
+import { Builders } from "../../../apis/builder";
+import { RenderablesCacheContext } from "../cache";
+import { BuildersFactory, Type, WireframeBuilder } from "../common";
 
 export class SpriteHelperBuillder extends Builders {
   constructor(
@@ -72,8 +72,9 @@ function fillBuffersForFaceSpriteWireframe(x: number, y: number, z: number, xo: 
     builder);
 }
 
-function updateSpriteWireframe(ctx: BuildContext, sprId: number, builder: WireframeBuilder): WireframeBuilder {
-  let spr = ctx.board.sprites[sprId];
+function updateSpriteWireframe(ctx: RenderablesCacheContext, sprId: number, builder: WireframeBuilder): WireframeBuilder {
+  const board = ctx.board();
+  let spr = board.sprites[sprId];
   if (spr.picnum == 0 || spr.cstat.invisible)
     return builder;
 
@@ -98,11 +99,12 @@ function updateSpriteWireframe(ctx: BuildContext, sprId: number, builder: Wirefr
   return builder;
 }
 
-function updateSpriteAngle(ctx: BuildContext, spriteId: number, renderable: WireframeBuilder): WireframeBuilder {
+function updateSpriteAngle(ctx: RenderablesCacheContext, spriteId: number, renderable: WireframeBuilder): WireframeBuilder {
   renderable.mode = WebGLRenderingContext.TRIANGLES;
   let buff = renderable.buff;
+  const board = ctx.board();
   buff.allocate(3, 6);
-  let spr = ctx.board.sprites[spriteId];
+  let spr = board.sprites[spriteId];
   let x = spr.x, y = spr.y, z = spr.z / ZSCALE;
   let ang = spriteAngle(spr.ang);
   let size = 128;
@@ -118,8 +120,8 @@ function updateSpriteAngle(ctx: BuildContext, spriteId: number, renderable: Wire
   return renderable;
 }
 
-export function updateSpriteHelper(ctx: BuildContext, sprId: number, builder: SpriteHelperBuillder): SpriteHelperBuillder {
-  builder = builder == null ? new SpriteHelperBuillder(ctx.buildersFactory) : builder;
+export function updateSpriteHelper(ctx: RenderablesCacheContext, sprId: number, builder: SpriteHelperBuillder): SpriteHelperBuillder {
+  builder = builder == null ? new SpriteHelperBuillder(ctx.factory) : builder;
   updateSpriteWireframe(ctx, sprId, builder.wire);
   updateSpriteAngle(ctx, sprId, builder.angle);
   return builder;

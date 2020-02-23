@@ -9,13 +9,15 @@ import { Deck } from '../../../utils/collections';
 import { createTexture } from '../../../utils/gl/textures';
 import { Dependency, Injector } from '../../../utils/injector';
 import { Stream } from '../../../utils/stream';
-import { BoardManipulator_, Board_, BuildReferenceTracker, BuildResources, RESOURCES } from '../../apis/app';
+import { BoardManipulator_, BuildReferenceTracker, BuildResources, RESOURCES, DEFAULT_BOARD } from '../../apis/app';
+import { BUS, MessageHandlerReflective } from '../../apis/handler';
 import { ReferenceTrackerImpl } from '../../apis/referencetracker';
+import { LoadBoard, NamedMessage } from '../../edit/messages';
 import { RAW_PAL_ } from '../artselector';
 import { ArtFiles_, GL, ParallaxTextures_ } from '../buildartprovider';
 import { FileSystem, FS } from '../fs/fs';
 import { PALSWAPS, PAL_TEXTURE, PLU_TEXTURE, SHADOWSTEPS } from '../gl/buildgl';
-import { MapNames_, MapName_ } from '../selectmap';
+import { MAP_NAMES, showMapSelection } from '../selectmap';
 import { Implementation_ } from '../view/boardrenderer3d';
 
 const RAW_PLUs = new Dependency<Uint8Array[]>('Raw PLUs');
@@ -126,8 +128,17 @@ function createBoard() {
 }
 
 async function loadMap(injector: Injector) {
-  const map = await injector.getInstance(MapName_)
-  return !map ? createBoard() : loadMapImpl(map)(injector);
+  const bus = await injector.getInstance(BUS);
+  bus.connect(new class extends MessageHandlerReflective {
+    async NamedMessage(msg: NamedMessage) {
+      if (msg.name == 'load_map') {
+        const mapName = await showMapSelection(injector);
+        if (!mapName) return;
+        const map = await loadMapImpl(mapName)(injector);
+        bus.handle(new LoadBoard(map));
+      }
+    }
+  });
 }
 
 async function getMapNames(injector: Injector) {
@@ -190,6 +201,8 @@ export function BloodModule(injector: Injector) {
   injector.bind(PAL_TEXTURE, loadPalTexture);
   injector.bind(PLU_TEXTURE, loadPluTexture);
   injector.bind(Implementation_, BloodImplementationConstructor);
-  injector.bind(MapNames_, getMapNames);
-  injector.bind(Board_, loadMap);
+  injector.bind(MAP_NAMES, getMapNames);
+  injector.bindInstance(DEFAULT_BOARD, createBoard());
+
+  injector.install(loadMap);
 }

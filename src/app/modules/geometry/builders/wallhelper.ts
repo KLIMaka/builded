@@ -3,12 +3,12 @@ import { Board } from "../../../../build/structs";
 import { createSlopeCalculator, sectorOfWall, slope, ZSCALE } from "../../../../build/utils";
 import { fastIterator } from "../../../../utils/collections";
 import { int } from "../../../../utils/mathutils";
-import { BuildContext } from "../../../apis/app";
 import { Builders } from "../../../apis/builder";
+import { BuildRenderableProvider, LayeredRenderables, WallRenderable } from "../../../apis/renderable";
 import { BuildBuffer } from "../../gl/buffers";
-import { createGridMatrixProviderWall, text } from "./common";
-import { WallRenderable, LayeredRenderables, BuildRenderableProvider } from "../../../apis/renderable";
+import { RenderablesCacheContext } from "../cache";
 import { BuildersFactory, PointSpriteBuilder, SolidBuilder } from "../common";
+import { createGridMatrixProviderWall, text } from "./common";
 
 export class WallHelperBuilder extends Builders implements WallRenderable {
   constructor(
@@ -81,8 +81,8 @@ function getMaskedWallCoords(x1: number, y1: number, x2: number, y2: number, slo
   return [x1, y1, z1, x2, y2, z2, x2, y2, z3, x1, y1, z4];
 }
 
-export function updateWallWireframe(ctx: BuildContext, wallId: number, builder: WallHelperBuilder): WallHelperBuilder {
-  const board = ctx.board;
+export function updateWallWireframe(ctx: RenderablesCacheContext, wallId: number, builder: WallHelperBuilder): WallHelperBuilder {
+  const board = ctx.board();
   const wall = board.walls[wallId];
   const sectorId = sectorOfWall(board, wallId)
   const sector = board.sectors[sectorId];
@@ -140,8 +140,8 @@ function fillBufferForWallPoint(offset: number, board: Board, wallId: number, bu
   buff.writeQuad(offset * 6, vtxOff, vtxOff + 1, vtxOff + 2, vtxOff + 3);
 }
 
-function updateWallPoint(offset: number, builder: PointSpriteBuilder, ctx: BuildContext, ceiling: boolean, wallId: number, d: number): void {
-  const board = ctx.board;
+function updateWallPoint(offset: number, builder: PointSpriteBuilder, ctx: RenderablesCacheContext, ceiling: boolean, wallId: number, d: number): void {
+  const board = ctx.board();
   const s = sectorOfWall(board, wallId);
   const sec = board.sectors[s];
   const slope = createSlopeCalculator(board, s);
@@ -152,35 +152,37 @@ function updateWallPoint(offset: number, builder: PointSpriteBuilder, ctx: Build
   fillBufferForWallPoint(offset, board, wallId, builder.buff, d, zz);
 }
 
-function addWallPoints(ctx: BuildContext, builder: PointSpriteBuilder, wallId: number, ceiling: boolean): void {
+function addWallPoints(ctx: RenderablesCacheContext, builder: PointSpriteBuilder, wallId: number, ceiling: boolean): void {
   const pointTex = ctx.art.get(-1);
+  const board = ctx.board();
   builder.tex = pointTex;
   builder.buff.allocate(8, 12);
   updateWallPoint(0, builder, ctx, ceiling, wallId, 2.5);
-  const wallId2 = ctx.board.walls[wallId].point2;
+  const wallId2 = board.walls[wallId].point2;
   updateWallPoint(1, builder, ctx, ceiling, wallId2, 2.5);
 }
 
-function addLength(ctx: BuildContext, builder: PointSpriteBuilder, wallId: number, ceiling: boolean) {
-  const wallId2 = ctx.board.walls[wallId].point2;
-  const wall = ctx.board.walls[wallId];
-  const wall2 = ctx.board.walls[wallId2];
+function addLength(ctx: RenderablesCacheContext, builder: PointSpriteBuilder, wallId: number, ceiling: boolean) {
+  const board = ctx.board();
+  const wallId2 = board.walls[wallId].point2;
+  const wall = board.walls[wallId];
+  const wall2 = board.walls[wallId2];
   const cx = int(wall.x + (wall2.x - wall.x) * 0.5);
   const cy = int(wall.y + (wall2.y - wall.y) * 0.5);
-  const sectorId = sectorOfWall(ctx.board, wallId);
-  const sector = ctx.board.sectors[sectorId];
-  const fz = slope(ctx.board, sectorId, cx, cy, sector.floorheinum) + sector.floorz;
-  const cz = slope(ctx.board, sectorId, cx, cy, sector.ceilingheinum) + sector.ceilingz;
-  const length = walllen(ctx.board, wallId).toFixed(2).replace(/\.00$/, "");
+  const sectorId = sectorOfWall(board, wallId);
+  const sector = board.sectors[sectorId];
+  const fz = slope(board, sectorId, cx, cy, sector.floorheinum) + sector.floorz;
+  const cz = slope(board, sectorId, cx, cy, sector.ceilingheinum) + sector.ceilingz;
+  const length = walllen(board, wallId).toFixed(2).replace(/\.00$/, "");
   text(builder, length, cx, cy, (ceiling ? cz : fz) / ZSCALE, 8, 8, ctx.art.get(-2));
 }
 
-export function updateWallHelper(cache: BuildRenderableProvider, ctx: BuildContext, wallId: number, builder: WallHelperBuilder): WallHelperBuilder {
-  builder = builder == null ? new WallHelperBuilder(ctx.buildersFactory) : builder;
+export function updateWallHelper(cache: BuildRenderableProvider, ctx: RenderablesCacheContext, wallId: number, builder: WallHelperBuilder): WallHelperBuilder {
+  builder = builder == null ? new WallHelperBuilder(ctx.factory) : builder;
 
   updateWallWireframe(ctx, wallId, builder);
   const wallRenderable = cache.wall(wallId);
-  const gridMatrix = createGridMatrixProviderWall(ctx.board, wallId);
+  const gridMatrix = createGridMatrixProviderWall(ctx.board(), wallId);
 
   builder.topGrid.gridTexMatProvider = gridMatrix;
   builder.topGrid.solid = <SolidBuilder>wallRenderable.top;

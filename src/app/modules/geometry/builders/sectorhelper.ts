@@ -1,12 +1,12 @@
 import { Board, Sector } from "../../../../build/structs";
 import { createSlopeCalculator, sectorOfWall, ZSCALE } from "../../../../build/utils";
-import { fastIterator } from "../../../../utils/collections";
 import { Builders } from "../../../apis/builder";
-import { BuildRenderableProvider, LayeredRenderables, SectorRenderable } from "../../../apis/renderable";
+import { BuildRenderableProvider, LayeredRenderables, SectorRenderable, HELPER_GRID } from "../../../apis/renderable";
 import { BuildBuffer } from "../../gl/buffers";
 import { RenderablesCacheContext } from "../cache";
 import { BuildersFactory, PointSpriteBuilder, SolidBuilder, WireframeBuilder } from "../common";
 import { buildCeilingHinge, buildFloorHinge, gridMatrixProviderSector } from "./common";
+import { vec4 } from "../../../../libs_js/glmatrix";
 
 export class SectorHelperBuilder extends Builders implements SectorRenderable {
   constructor(
@@ -14,14 +14,14 @@ export class SectorHelperBuilder extends Builders implements SectorRenderable {
     readonly ceilpoints = factory.pointSprite('helper'),
     readonly ceilwire = factory.wireframe('helper'),
     readonly ceilhinge = factory.wireframe('helper'),
-    readonly ceilgrid = factory.grid('helper'),
+    readonly ceilgrid = factory.grid('helper').knd(HELPER_GRID),
     readonly floorpoints = factory.pointSprite('helper'),
     readonly floorwire = factory.wireframe('helper'),
     readonly floorhinge = factory.wireframe('helper'),
-    readonly floorgrid = factory.grid('helper'),
-    readonly ceiling = new LayeredRenderables(fastIterator([ceilpoints, ceilwire, ceilhinge, ceilgrid])),
-    readonly floor = new LayeredRenderables(fastIterator([floorpoints, floorwire, floorhinge, floorgrid])),
-  ) { super(fastIterator([ceilpoints, ceilwire, ceilhinge, ceilgrid, floorpoints, floorwire, floorhinge, floorgrid])) }
+    readonly floorgrid = factory.grid('helper').knd(HELPER_GRID),
+    readonly ceiling = new LayeredRenderables([ceilpoints, ceilwire, ceilhinge, ceilgrid]),
+    readonly floor = new LayeredRenderables([floorpoints, floorwire, floorhinge, floorgrid]),
+  ) { super([ceilpoints, ceilwire, ceilhinge, ceilgrid, floorpoints, floorwire, floorhinge, floorgrid]) }
 }
 
 function fillBufferForWallPoint(offset: number, board: Board, wallId: number, buff: BuildBuffer, d: number, z: number) {
@@ -95,6 +95,8 @@ export function updateSectorHelper(cache: BuildRenderableProvider, ctx: Renderab
     addWallPoint(i, builder.floorpoints, ctx, false, w, 2.5);
   }
 
+  vec4.set(builder.ceilwire.color, 1, 1, 1, -100);
+  vec4.set(builder.floorwire.color, 1, 1, 1, -100);
   fillBuffersForSectorWireframe(secId, sec, sec.ceilingheinum, sec.ceilingz, board, builder.ceilwire);
   fillBuffersForSectorWireframe(secId, sec, sec.floorheinum, sec.floorz, board, builder.floorwire);
 

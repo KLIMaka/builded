@@ -1,7 +1,6 @@
 import { FACE_SPRITE, FLOOR_SPRITE, WALL_SPRITE } from "../../../../build/structs";
 import { ang2vec, spriteAngle, ZSCALE } from "../../../../build/utils";
-import { vec3 } from "../../../../libs_js/glmatrix";
-import { fastIterator } from "../../../../utils/collections";
+import { vec3, vec4 } from "../../../../libs_js/glmatrix";
 import { Builders } from "../../../apis/builder";
 import { RenderablesCacheContext } from "../cache";
 import { BuildersFactory, Type, WireframeBuilder } from "../common";
@@ -11,7 +10,7 @@ export class SpriteHelperBuillder extends Builders {
     factory: BuildersFactory,
     readonly wire = factory.wireframe('helper'),
     readonly angle = factory.wireframe('helper')
-  ) { super(fastIterator([wire, angle])) }
+  ) { super([wire, angle]) }
 }
 
 function genQuadWireframe(coords: number[], normals: number[], builder: WireframeBuilder) {
@@ -74,6 +73,7 @@ function fillBuffersForFaceSpriteWireframe(x: number, y: number, z: number, xo: 
 
 function updateSpriteWireframe(ctx: RenderablesCacheContext, sprId: number, builder: WireframeBuilder): WireframeBuilder {
   const board = ctx.board();
+  vec4.set(builder.color, 1, 1, 1, -100);
   let spr = board.sprites[sprId];
   if (spr.picnum == 0 || spr.cstat.invisible)
     return builder;

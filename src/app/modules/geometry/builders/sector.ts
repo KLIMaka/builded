@@ -3,7 +3,6 @@ import { Board, Sector, Wall } from "../../../../build/structs";
 import { createSlopeCalculator, getFirstWallAngle, sectorNormal, ZSCALE } from "../../../../build/utils";
 import { mat4, Mat4Array, vec3, Vec3Array, vec4 } from "../../../../libs_js/glmatrix";
 import { tesselate } from "../../../../libs_js/glutess";
-import { fastIterator } from "../../../../utils/collections";
 import { Builders } from "../../../apis/builder";
 import { SectorRenderable } from "../../../apis/renderable";
 import { BuildBuffer } from "../../gl/buffers";
@@ -16,7 +15,7 @@ export class SectorBuilder extends Builders implements SectorRenderable {
     factory: BuildersFactory,
     readonly ceiling = factory.solid('sector'),
     readonly floor = factory.solid('sector')
-  ) { super(fastIterator([ceiling, floor])) }
+  ) { super([ceiling, floor]) }
 }
 
 function applySectorTextureTransform(sector: Sector, ceiling: boolean, walls: Wall[], info: ArtInfo, texMat: Mat4Array) {

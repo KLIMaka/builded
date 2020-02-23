@@ -10,7 +10,7 @@ import * as INPUT from './utils/input';
 import { addLogAppender, CONSOLE } from './utils/logger';
 
 addLogAppender(CONSOLE);
-const gl = createContextFromCanvas("display", { alpha: false, antialias: false, stencil: true });
+const gl = createContextFromCanvas("display", { alpha: false, antialias: true, stencil: true });
 INPUT.bind(<HTMLCanvasElement>gl.canvas);
 
 const injector = new Injector();

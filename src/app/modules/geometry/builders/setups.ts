@@ -95,11 +95,10 @@ export abstract class BufferRenderable<T extends BufferSetup> implements Builder
   abstract readonly buff: BuildBuffer;
   public mode: number = WebGLRenderingContext.TRIANGLES;
   protected drawCall: DrawCall;
-  private _hint: number;
-  get hint() { return this._hint }
+  public hint: number;
+  public kind = 0;
 
   constructor(private getSetup: (state: State) => T) { }
-
 
   draw(gl: WebGLRenderingContext, state: State): void {
     if (this.buff.getSize() == 0) return;
@@ -108,12 +107,13 @@ export abstract class BufferRenderable<T extends BufferSetup> implements Builder
       setup.buffer(this.buff).mode(this.mode);
       this.setup(setup);
       this.drawCall = setup.createDrawCall();
-      this._hint = hash(this.drawCall.values[1], this.buff.get().buffer, this.textureHint(), this.buff.get().idx.offset);
+      this.hint = hash(this.drawCall.values[1], this.buff.get().buffer, this.textureHint(), this.buff.get().idx.offset);
     }
     state.run(gl, this.drawCall);
   }
 
   public needToRebuild() { this.drawCall = null }
+  public knd(kind: number) { this.kind = kind; return this }
 
   abstract setup(setup: T): void;
   abstract reset(): void;

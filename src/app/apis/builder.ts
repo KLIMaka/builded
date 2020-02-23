@@ -1,4 +1,3 @@
-import { FastIterable } from "../../utils/collections";
 import { State } from "../../utils/gl/stategl";
 import { HintRenderable, Renderable, RenderableConsumer, RenderableProvider } from "./renderable";
 
@@ -9,30 +8,10 @@ export interface Builder extends RenderableProvider<HintRenderable> {
 }
 
 export class Builders implements Builder, RenderableProvider<HintRenderable> {
-  constructor(private builders: FastIterable<Builder>) { }
+  constructor(private builders: Iterable<Builder>) { }
   get() { return this }
-
-  reset() {
-    const size = this.builders.size;
-    const array = this.builders.array;
-    for (let i = 0; i < size; i++) array[i].reset()
-  }
-
-  draw(gl: WebGLRenderingContext, state: State) {
-    const size = this.builders.size;
-    const array = this.builders.array;
-    for (let i = 0; i < size; i++) array[i].get().draw(gl, state)
-  }
-
-  accept(consumer: RenderableConsumer<HintRenderable>): void {
-    const size = this.builders.size;
-    const array = this.builders.array;
-    for (let i = 0; i < size; i++) array[i].accept(consumer)
-  }
-
-  needToRebuild() {
-    const size = this.builders.size;
-    const array = this.builders.array;
-    for (let i = 0; i < size; i++) array[i].needToRebuild();
-  }
+  reset() { for (const b of this.builders) b.reset() }
+  draw(gl: WebGLRenderingContext, state: State) { for (const b of this.builders) b.get().draw(gl, state) }
+  accept(consumer: RenderableConsumer<HintRenderable>): void { for (const b of this.builders) b.accept(consumer) }
+  needToRebuild() { for (const b of this.builders) b.needToRebuild() }
 }

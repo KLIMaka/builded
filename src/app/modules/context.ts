@@ -14,7 +14,7 @@ import * as PROFILE from '../../utils/profiler';
 import { ART, BOARD, BoardManipulator_, BoardProvider, BuildReferenceTracker, REFERENCE_TRACKER, State, STATE, View, VIEW, DEFAULT_BOARD } from '../apis/app';
 import { BUS, DefaultMessageBus, Message, MessageBus, MessageHandlerReflective } from '../apis/handler';
 import { ReferenceTrackerImpl } from '../apis/referencetracker';
-import { consumerProvider, HintRenderable, SortingRenderable, WrapRenderable } from '../apis/renderable';
+import { consumerProvider, HintRenderable, SortingRenderable, WrapRenderable, LayeredRenderables } from '../apis/renderable';
 import { EntityFactoryConstructor, ENTITY_FACTORY } from '../edit/context';
 import { BoardInvalidate, Frame, LoadBoard, Mouse, NamedMessage, PostFrame, Render } from '../edit/messages';
 import { DrawSectorModule } from '../edit/tools/drawsector';
@@ -50,39 +50,28 @@ class StateImpl implements State {
 
   register<T>(name: string, defaultValue: T): void {
     let prevState = this.state[name];
-    if (prevState != undefined) warning(`Redefining state ${name}`, new Error().stack);
+    if (prevState != undefined) throw new Error(`Redefining state ${name}`);
     this.state[name] = defaultValue;
   }
 
   set<T>(name: string, value: T): void {
-    if (this.get(name) == undefined) return;
+    this.get(name);
     this.state[name] = value;
   }
 
   get<T>(name: string): T {
     let stateValue = this.state[name];
-    if (stateValue == undefined) warning(`State ${name} is unregistered`, new Error().stack);
+    if (stateValue == undefined) throw new Error(`State ${name} is unregistered`);
     return stateValue;
   }
 }
 
-const tools = consumerProvider<HintRenderable>();
-
 const FRAME = new Frame(0);
 const POSTFRAME = new PostFrame();
 const MOUSE = new Mouse(0, 0);
+const tools = consumerProvider<HintRenderable>();
 const RENDER = new Render(tools.consumer);
 const INVALIDATE_ALL = new BoardInvalidate(null);
-
-const onTopRenderable = new WrapRenderable(new SortingRenderable(tools.provider),
-  (gl: WebGLRenderingContext, state: StateGl) => {
-    gl.disable(WebGLRenderingContext.DEPTH_TEST);
-    gl.enable(WebGLRenderingContext.BLEND);
-  },
-  (gl: WebGLRenderingContext, state: StateGl) => {
-    gl.disable(WebGLRenderingContext.BLEND);
-    gl.enable(WebGLRenderingContext.DEPTH_TEST);
-  });
 
 class BuildReferenceTrackerImpl implements BuildReferenceTracker {
   readonly walls = new ReferenceTrackerImpl<number>(-1);
@@ -152,6 +141,32 @@ async function loadUtilityTextures(textures: [number, Promise<Texture>][]) {
   )
 }
 
+export async function BoardProviderConstructor(injector: Injector): Promise<BoardProvider> {
+  const bus = await injector.getInstance(BUS);
+  const cloner = await injector.getInstance(BoardManipulator_);
+  const defaultBoard = await injector.getInstance(DEFAULT_BOARD);
+  const history = new History();
+  let activeBoard: Board = cloner.cloneBoard(defaultBoard);
+  history.push(cloner.cloneBoard(defaultBoard));
+  bus.connect(new class extends MessageHandlerReflective {
+    NamedMessage(msg: NamedMessage) {
+      switch (msg.name) {
+        case 'undo':
+          history.pop();
+          activeBoard = cloner.cloneBoard(history.top());
+          bus.handle(INVALIDATE_ALL);
+          return;
+      }
+    }
+
+    LoadBoard(msg: LoadBoard) {
+      activeBoard = cloner.cloneBoard(msg.board);
+      history.push(cloner.cloneBoard(msg.board));
+      bus.handle(INVALIDATE_ALL);
+    }
+  })
+  return () => activeBoard;
+}
 
 export function ContextModule(injector: Injector) {
   injector.bindInstance(REFERENCE_TRACKER, new BuildReferenceTrackerImpl());
@@ -187,33 +202,6 @@ export function MainLoopConstructor(injector: Injector) {
   return create(injector, MainLoop, VIEW, BUS, STATE, KeymapConfig_);
 }
 
-export async function BoardProviderConstructor(injector: Injector): Promise<BoardProvider> {
-  const bus = await injector.getInstance(BUS);
-  const cloner = await injector.getInstance(BoardManipulator_);
-  const defaultBoard = await injector.getInstance(DEFAULT_BOARD);
-  const history = new History();
-  let activeBoard: Board = cloner.cloneBoard(defaultBoard);
-  history.push(cloner.cloneBoard(defaultBoard));
-  bus.connect(new class extends MessageHandlerReflective {
-    NamedMessage(msg: NamedMessage) {
-      switch (msg.name) {
-        case 'undo':
-          history.pop();
-          activeBoard = cloner.cloneBoard(history.top());
-          bus.handle(INVALIDATE_ALL);
-          return;
-      }
-    }
-
-    LoadBoard(msg: LoadBoard) {
-      activeBoard = cloner.cloneBoard(msg.board);
-      history.push(cloner.cloneBoard(msg.board));
-      bus.handle(INVALIDATE_ALL);
-    }
-  })
-  return () => activeBoard;
-}
-
 export class MainLoop extends MessageHandlerReflective {
   private view: View;
   private binder = new Binder();
@@ -244,7 +232,7 @@ export class MainLoop extends MessageHandlerReflective {
   private drawTools() {
     tools.clear();
     this.message(RENDER);
-    this.view.draw(onTopRenderable);
+    this.view.drawTools(tools.provider);
   }
 
   private message(msg: Message) {

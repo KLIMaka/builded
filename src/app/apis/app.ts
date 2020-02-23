@@ -8,7 +8,7 @@ import { InputState } from "../../utils/input";
 import { BuildersFactory } from "../modules/geometry/common";
 import { Context, MessageHandler } from "./handler";
 import { ReferenceTracker } from "./referencetracker";
-import { Renderable } from "./renderable";
+import { Renderable, RenderableProvider, HintRenderable } from "./renderable";
 
 export interface Storage {
   get(key: string): Promise<any>;
@@ -27,7 +27,7 @@ export interface ArtProvider extends ArtInfoProvider {
 export const ART = new Dependency<ArtProvider>('ArtProvider');
 
 export interface View extends MoveStruct, MessageHandler {
-  draw(renderable: Renderable): void;
+  drawTools(provider: RenderableProvider<HintRenderable>): void;
   target(): Target;
   snapTarget(): Target;
   dir(): Ray;

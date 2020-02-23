@@ -1,7 +1,6 @@
 import { walllen } from "../../../../build/boardutils";
 import { Board } from "../../../../build/structs";
 import { createSlopeCalculator, sectorOfWall, slope, ZSCALE } from "../../../../build/utils";
-import { fastIterator } from "../../../../utils/collections";
 import { int } from "../../../../utils/mathutils";
 import { Builders } from "../../../apis/builder";
 import { BuildRenderableProvider, LayeredRenderables, WallRenderable } from "../../../apis/renderable";
@@ -9,6 +8,7 @@ import { BuildBuffer } from "../../gl/buffers";
 import { RenderablesCacheContext } from "../cache";
 import { BuildersFactory, PointSpriteBuilder, SolidBuilder } from "../common";
 import { createGridMatrixProviderWall, text } from "./common";
+import { vec4 } from "../../../../libs_js/glmatrix";
 
 export class WallHelperBuilder extends Builders implements WallRenderable {
   constructor(
@@ -23,11 +23,11 @@ export class WallHelperBuilder extends Builders implements WallRenderable {
     readonly botGrid = factory.grid('helper'),
     readonly botPoints = factory.pointSprite('helper'),
     readonly botLength = factory.pointSprite('helper'),
-    readonly top = new LayeredRenderables(fastIterator([topWire, topGrid, topPoints, topLength])),
-    readonly mid = new LayeredRenderables(fastIterator([midWire, midGrid])),
-    readonly bot = new LayeredRenderables(fastIterator([botWire, botGrid, botPoints, botLength])),
+    readonly top = new LayeredRenderables([topWire, topGrid, topPoints, topLength]),
+    readonly mid = new LayeredRenderables([midWire, midGrid]),
+    readonly bot = new LayeredRenderables([botWire, botGrid, botPoints, botLength]),
   ) {
-    super(fastIterator([topWire, midWire, botWire, topGrid, midGrid, botGrid, topPoints, botPoints, topLength, botLength]));
+    super([topWire, midWire, botWire, topGrid, midGrid, botGrid, topPoints, botPoints, topLength, botLength]);
   }
 }
 
@@ -94,6 +94,9 @@ export function updateWallWireframe(ctx: RenderablesCacheContext, wallId: number
   const ceilingz = sector.ceilingz;
   const floorheinum = sector.floorheinum;
   const floorz = sector.floorz;
+  vec4.set(builder.topWire.color, 1, 1, 1, -100);
+  vec4.set(builder.midWire.color, 1, 1, 1, -100);
+  vec4.set(builder.botWire.color, 1, 1, 1, -100);
 
   if (wall.nextwall == -1 || wall.cstat.oneWay) {
     const coords = getWallCoords(x1, y1, x2, y2, slope, slope, ceilingheinum, floorheinum, ceilingz, floorz, false);

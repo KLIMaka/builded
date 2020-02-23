@@ -1,17 +1,17 @@
 import { ang2vec, spriteAngle, ZSCALE } from "../../../../build/utils";
 import { vec3 } from "../../../../libs_js/glmatrix";
-import { fastIterator } from "../../../../utils/collections";
 import { Builders } from "../../../apis/builder";
 import { RenderablesCacheContext } from "../cache";
 import { BuildersFactory, WireframeBuilder } from "../common";
 import { text } from "./common";
+import { SPRITE_LABEL } from "../../../apis/renderable";
 
 export class Sprite2dBuilder extends Builders {
   constructor(
     factory: BuildersFactory,
     readonly ang = factory.wireframe('2d'),
-    readonly label = factory.pointSprite('2d')
-  ) { super(fastIterator([ang, label])) }
+    readonly label = factory.pointSprite('2d').knd(SPRITE_LABEL),
+  ) { super([ang, label]) }
 }
 
 export function updateSpriteAngle(ctx: RenderablesCacheContext, spriteId: number, builder: WireframeBuilder): WireframeBuilder {

@@ -1,6 +1,5 @@
-import { Deck, FastIterable } from '../../utils/collections';
+import { Deck } from '../../utils/collections';
 import { State } from '../../utils/gl/stategl';
-
 
 export interface Renderable {
   draw(gl: WebGLRenderingContext, state: State): void;
@@ -27,23 +26,31 @@ export function consumerProvider<T extends Renderable>() {
   }
 }
 
+export const SPRITE_LABEL = 1 << 0;
+export const HELPER_GRID = 1 << 1;
+
 export interface HintRenderable extends Renderable {
   readonly hint: number;
+  readonly kind: number;
 }
 
 export class SortingRenderable implements Renderable {
   private drawList: [Renderable, number][] = [];
 
-  constructor(private provider: RenderableProvider<HintRenderable>) { }
+  constructor(
+    private provider: RenderableProvider<HintRenderable>,
+    private filter: (r: HintRenderable) => boolean = () => true
+  ) { }
 
   draw(gl: WebGLRenderingContext, state: State): void {
     this.drawList = [];
     this.provider.accept((r) => this.consume(r));
-    const sorted = this.drawList.sort((l, r) => l[1] - r[1]);
+    const sorted = this.drawList.sort((l, r) => r[1] - l[1]);
     for (const r of sorted) r[0].draw(gl, state);
   }
 
-  private consume(r: HintRenderable) {
+  protected consume(r: HintRenderable) {
+    if (!this.filter(r)) return;
     this.drawList.push([r, r.hint]);
   }
 }
@@ -53,29 +60,19 @@ export const NULL_RENDERABLE: Renderable = {
 }
 
 export class Renderables implements Renderable {
-  constructor(private renderables: FastIterable<Renderable>) { }
-  public draw(gl: WebGLRenderingContext, state: State): void {
-    const size = this.renderables.size;
-    const array = this.renderables.array;
-    for (let i = 0; i < size; i++) array[i].draw(gl, state)
-  }
+  constructor(private renderables: Iterable<Renderable>) { }
+  public draw(gl: WebGLRenderingContext, state: State): void { for (const r of this.renderables) r.draw(gl, state) }
 }
 
-export class LayeredRenderables implements RenderableProvider<HintRenderable> {
+export class LayeredRenderables implements RenderableProvider<HintRenderable>, Renderable {
   private list = new Deck<Renderable>();
 
-  constructor(private providers: FastIterable<RenderableProvider<HintRenderable>>) { }
-  accept(consumer: RenderableConsumer<HintRenderable>): void {
-    const size = this.providers.size;
-    const array = this.providers.array;
-    for (let i = 0; i < size; i++) array[i].accept(consumer);
-  }
+  constructor(private providers: Iterable<RenderableProvider<HintRenderable>>) { }
+  accept(consumer: RenderableConsumer<HintRenderable>): void { for (const p of this.providers) p.accept(consumer) }
 
   draw(gl: WebGLRenderingContext, state: State): void {
     this.list.clear();
-    const size = this.providers.size;
-    const array = this.providers.array;
-    for (let i = 0; i < size; i++) array[i].accept((r) => this.list.push(r));
+    for (const p of this.providers) p.accept((r) => this.list.push(r));
     for (const r of this.list) r.draw(gl, state);
   }
 }

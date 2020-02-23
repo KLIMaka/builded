@@ -6,7 +6,7 @@ import { Deck } from '../../../utils/collections';
 import { Injector } from '../../../utils/injector';
 import * as PROFILE from '../../../utils/profiler';
 import { BOARD, BoardProvider } from '../../apis/app';
-import { BuildRenderableProvider, HintRenderable, LayeredRenderables, RenderableProvider, SortingRenderable } from '../../apis/renderable';
+import { BuildRenderableProvider, HintRenderable, LayeredRenderables, RenderableProvider, SortingRenderable, SPRITE_LABEL, HELPER_GRID } from '../../apis/renderable';
 import { GridController, GRID } from '../context';
 import { RENDRABLES_CACHE } from '../geometry/cache';
 import { BuildersFactory, BUILDERS_FACTORY, GridBuilder } from '../geometry/common';
@@ -32,8 +32,13 @@ export async function Renderer2D(injector: Injector) {
 
 export class BoardRenderer2D {
   private grid: GridBuilder;
+  private upp = 1;
   private surfaces = new Deck<RenderableProvider<HintRenderable>>();
-  private pass = new SortingRenderable(new LayeredRenderables(this.surfaces));
+  private pass = new SortingRenderable(new LayeredRenderables(this.surfaces), r => {
+    const spriteLabel = r.kind & SPRITE_LABEL && this.upp > 10;
+    const gridHelper = r.kind & HELPER_GRID;
+    return !spriteLabel && !gridHelper;
+  });
 
   constructor(
     private bgl: BuildGl,
@@ -84,8 +89,19 @@ export class BoardRenderer2D {
     return this.grid;
   }
 
+  public drawTools(gl: WebGLRenderingContext, p: RenderableProvider<HintRenderable>) {
+    gl.disable(WebGLRenderingContext.DEPTH_TEST);
+    gl.enable(WebGLRenderingContext.BLEND);
+    this.surfaces.clear().push(p);
+    this.bgl.draw(gl, this.pass);
+    this.bgl.flush(gl);
+    gl.disable(WebGLRenderingContext.BLEND);
+    gl.enable(WebGLRenderingContext.DEPTH_TEST);
+  }
+
   public draw(view: View2d, campos: Vec3Array, dist: number, controller: Controller2D) {
     PROFILE.startProfile('processing');
+    this.upp = controller.getUnitsPerPixel();
     const result = visible.visit(this.board());
     PROFILE.endProfile();
     this.bgl.setProjectionMatrix(idMat4);

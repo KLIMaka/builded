@@ -3,7 +3,7 @@ import { Target } from "../../../build/hitscan";
 import { Board } from "../../../build/structs";
 import { findSector, sectorOfWall, ZSCALE } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
-import { Deck, fastIterator } from "../../../utils/collections";
+import { Deck } from "../../../utils/collections";
 import { Injector, create } from "../../../utils/injector";
 import { int, len2d } from "../../../utils/mathutils";
 import { MessageHandlerReflective, MessageBus, BUS } from "../../apis/handler";
@@ -26,7 +26,7 @@ class Contour {
     private contour = factory.wireframe('utils'),
     private contourPoints = factory.pointSprite('utils'),
     private length = factory.pointSprite('utils'),
-    private renderable = new LayeredRenderables(fastIterator([contour, contourPoints, length]))
+    private renderable = new LayeredRenderables([contour, contourPoints, length])
   ) { if (firstPoint) this.pushPoint(0, 0) }
 
   public setZ(z: number) { this.z = z }

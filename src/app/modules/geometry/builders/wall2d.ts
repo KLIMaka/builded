@@ -1,5 +1,4 @@
 import { vec4 } from "../../../../libs_js/glmatrix";
-import { fastIterator } from "../../../../utils/collections";
 import { Builders } from "../../../apis/builder";
 import { WallRenderable } from "../../../apis/renderable";
 import { RenderablesCacheContext } from "../cache";
@@ -11,7 +10,7 @@ export class Wall2dBuilder extends Builders implements WallRenderable {
     readonly top = factory.wireframe('2d'),
     readonly mid = factory.wireframe('2d'),
     readonly bot = factory.wireframe('2d')
-  ) { super(fastIterator([top, mid, bot])) }
+  ) { super([top, mid, bot]) }
 }
 
 let white = vec4.fromValues(1, 1, 1, 1);

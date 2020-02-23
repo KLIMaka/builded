@@ -2,7 +2,7 @@ import { splitWall } from "../../../build/boardutils";
 import { Board } from "../../../build/structs";
 import { sectorOfWall } from "../../../build/utils";
 import { Injector, create } from "../../../utils/injector";
-import { ArtProvider, ART, BOARD, BuildReferenceTracker, REFERENCE_TRACKER, VIEW, View } from "../../apis/app";
+import { ArtProvider, ART, BOARD, BuildReferenceTracker, REFERENCE_TRACKER, VIEW, View, BoardProvider } from "../../apis/app";
 import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
 import { invalidateSectorAndWalls } from "../editutils";
 import { NamedMessage } from "../messages";
@@ -16,7 +16,7 @@ export class SplitWall extends MessageHandlerReflective {
   constructor(
     private bus: MessageBus,
     private view: View,
-    private board: Board,
+    private board: BoardProvider,
     private art: ArtProvider,
     private refs: BuildReferenceTracker,
   ) { super() }
@@ -26,14 +26,15 @@ export class SplitWall extends MessageHandlerReflective {
     if (target.entity == null || !target.entity.isWall()) return;
     const [x, y] = target.coords;
     const id = target.entity.id;
+    const board = this.board();
 
-    splitWall(this.board, id, x, y, this.art, this.refs);
+    splitWall(board, id, x, y, this.art, this.refs);
     // this.commit();
-    let s = sectorOfWall(this.board, id);
-    invalidateSectorAndWalls(s, this.board, this.bus);
-    let nextsector = this.board.walls[id].nextsector;
+    let s = sectorOfWall(board, id);
+    invalidateSectorAndWalls(s, board, this.bus);
+    let nextsector = board.walls[id].nextsector;
     if (nextsector != -1) {
-      invalidateSectorAndWalls(nextsector, this.board, this.bus);
+      invalidateSectorAndWalls(nextsector, board, this.bus);
     }
   }
 

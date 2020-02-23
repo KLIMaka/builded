@@ -64,8 +64,12 @@ export class Binder {
 
   public updateState(input: InputState, state: State) {
     for (let i = 0; i < this.stateHandlers.length; i++) {
-      for (let value of this.stateValues[i]) {
-        state.set(value[0], this.stateHandlers[i](input) ? value[1] : value[2]);
+      for (let [name, on, off] of this.stateValues[i]) {
+        try {
+          state.set(name, this.stateHandlers[i](input) ? on : off);
+        } catch (e) {
+          warning(`Problem with setting state ${name}`);
+        }
       }
     }
   }

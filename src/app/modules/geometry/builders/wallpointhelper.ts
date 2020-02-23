@@ -1,6 +1,5 @@
 import { Board } from "../../../../build/structs";
 import { createSlopeCalculator, sectorOfWall, slope, ZSCALE } from "../../../../build/utils";
-import { fastIterator } from "../../../../utils/collections";
 import { Builders } from "../../../apis/builder";
 import { BuildBuffer } from "../../gl/buffers";
 import { RenderablesCacheContext } from "../cache";
@@ -11,7 +10,7 @@ export class WallPointHelperBuilder extends Builders {
     factory: BuildersFactory,
     readonly points = factory.pointSprite('helper'),
     readonly line = factory.wireframe('helper')
-  ) { super(fastIterator([points, line])) }
+  ) { super([points, line]) }
 }
 
 function updateWallLine(ctx: RenderablesCacheContext, wallId: number, builder: WireframeBuilder): WireframeBuilder {

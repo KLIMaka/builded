@@ -11,7 +11,7 @@ import { int } from "../../../utils/mathutils";
 import { DelayedValue } from "../../../utils/timed";
 import { ART, ArtProvider, BOARD, STATE, State, View, BoardProvider } from "../../apis/app";
 import { MessageHandlerReflective } from "../../apis/handler";
-import { Renderable } from "../../apis/renderable";
+import { Renderable, HintRenderable, RenderableProvider } from "../../apis/renderable";
 import { BoardInvalidate, Frame, Mouse, NamedMessage, LoadBoard } from "../../edit/messages";
 import { GL } from "../buildartprovider";
 import { GRID, GridController } from "../context";
@@ -84,7 +84,7 @@ export class View3d extends MessageHandlerReflective implements View {
   getPosition() { return this.control.getPosition() }
   getForward() { return this.control.getForward() }
   activate() { this.control.setPosition(this.playerstart.x, this.playerstart.z / ZSCALE + 1024, this.playerstart.y) }
-  draw(renderable: Renderable) { this.buildgl.draw(this.gl, renderable) }
+  drawTools(provider: RenderableProvider<HintRenderable>) { this.renderer.drawTools(this.gl, provider) }
   target(): Target { return this.hit.get() }
   snapTarget(): Target { return this.snapTargetValue.get() }
   dir(): Ray { return this.direction.get() }

@@ -110,6 +110,7 @@ export class WireframeBuilder extends BufferRenderable<WireframeSetup> {
   }
 
   protected textureHint() { return null }
+  public clr(r: number, g: number, b: number, a: number) { vec4.set(this.color, r, g, b, a); return this }
 
   public reset() {
     this.buff.deallocate();

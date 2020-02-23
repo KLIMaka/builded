@@ -2,7 +2,6 @@ import { ArtInfo } from "../../../../build/art";
 import { Wall } from "../../../../build/structs";
 import { createSlopeCalculator, sectorOfWall, wallNormal, ZSCALE } from "../../../../build/utils";
 import { mat4, Mat4Array, vec3, Vec3Array, vec4 } from "../../../../libs_js/glmatrix";
-import { fastIterator } from "../../../../utils/collections";
 import { len2d } from "../../../../utils/mathutils";
 import { Builders } from "../../../apis/builder";
 import { WallRenderable } from "../../../apis/renderable";
@@ -16,7 +15,7 @@ export class WallBuilder extends Builders implements WallRenderable {
     readonly top = factory.solid('wall'),
     readonly mid = factory.solid('wall'),
     readonly bot = factory.solid('wall')
-  ) { super(fastIterator([top, mid, bot])) }
+  ) { super([top, mid, bot]) }
 }
 
 function normals(n: Vec3Array) {

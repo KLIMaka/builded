@@ -5,8 +5,8 @@ import { create, Dependency, Injector } from "../../../utils/injector";
 import { int, len2d, tuple2 } from "../../../utils/mathutils";
 import { View, STATE, State } from "../../apis/app";
 import { BUS, Message, MessageHandler } from "../../apis/handler";
-import { Renderable } from "../../apis/renderable";
-import { NamedMessage } from "../../edit/messages";
+import { Renderable, RenderableProvider, HintRenderable } from "../../apis/renderable";
+import { NamedMessage, LoadBoard } from "../../edit/messages";
 import { GRID, GridController } from "../context";
 import { View2d, View2dConstructor } from "./view2d";
 import { View3d, View3dConstructor } from "./view3d";
@@ -71,7 +71,7 @@ export class SwappableView implements View, MessageHandler {
   target() { return this.view.target() }
   snapTarget() { return this.view.snapTarget() }
   dir() { return this.view.dir() }
-  draw(renderable: Renderable) { this.view.draw(renderable) }
+  drawTools(provider: RenderableProvider<HintRenderable>) { this.view.drawTools(provider) }
 
   handle(message: Message) {
     if (message instanceof NamedMessage && message.name == 'view_mode') {
@@ -80,6 +80,11 @@ export class SwappableView implements View, MessageHandler {
       this.gridController.setGridSize(this.lastGridScale);
       this.lastGridScale = gridScale;
       this.view.activate();
+      return;
+    }
+    if (message instanceof LoadBoard) {
+      this.view2d.handle(message);
+      this.view3d.handle(message);
       return;
     }
     this.view.handle(message)

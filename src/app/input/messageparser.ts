@@ -55,15 +55,13 @@ const NOOP_MESSAGE: Message = {};
 let factArgs = new Deck<any>();
 function createMessage(constr: Function, ...types: string[]) {
   let args = parseArgs(...types);
-  return () => {
-    factArgs.clear();
-    for (let v of args) factArgs.push(v);
-    try {
-      return Reflect.construct(constr, [...factArgs]);
-    } catch (e) {
-      error(`Invalid message constructor ${constr.name} (${types})`, factArgs);
-      return NOOP_MESSAGE;
-    }
+  factArgs.clear();
+  for (let v of args) factArgs.push(v);
+  try {
+    return Reflect.construct(constr, [...factArgs]);
+  } catch (e) {
+    error(`Invalid message constructor ${constr.name} (${types})`, factArgs);
+    return NOOP_MESSAGE;
   }
 }
 

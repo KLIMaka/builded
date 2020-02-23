@@ -5,7 +5,7 @@ import { vec3 } from "../../../libs_js/glmatrix";
 import { cyclicPairs } from "../../../utils/collections";
 import { create, Injector } from "../../../utils/injector";
 import { dot2d } from "../../../utils/mathutils";
-import { ART, ArtProvider, BOARD, BuildReferenceTracker, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
+import { ART, ArtProvider, BOARD, BuildReferenceTracker, REFERENCE_TRACKER, View, VIEW, BoardProvider } from "../../apis/app";
 import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
 import { GRID, GridController } from "../../modules/context";
 import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
@@ -31,7 +31,7 @@ export class PushWall extends MessageHandlerReflective {
     private builders: BuildersFactory,
     private view: View,
     private art: ArtProvider,
-    private board: Board,
+    private board: BoardProvider,
     private refs: BuildReferenceTracker,
     private bus: MessageBus,
     private grid: GridController,
@@ -51,7 +51,7 @@ export class PushWall extends MessageHandlerReflective {
   }
 
   private stop(copy: boolean) {
-    pushWall(this.board, this.wallId, this.getDistance(), this.art, copy, this.refs);
+    pushWall(this.board(), this.wallId, this.getDistance(), this.art, copy, this.refs);
     // this.commit();
     this.bus.handle(new BoardInvalidate(null));
     this.wallId = -1;
@@ -61,7 +61,7 @@ export class PushWall extends MessageHandlerReflective {
   private getDistance(): number {
     const dx = this.movingHandle.dx;
     const dy = this.movingHandle.dy;
-    const [nx, , ny] = wallNormal(wallNormal1_, this.board, this.wallId);
+    const [nx, , ny] = wallNormal(wallNormal1_, this.board(), this.wallId);
     return this.grid.snap(dot2d(nx, ny, dx, dy));
   }
 
@@ -88,16 +88,17 @@ export class PushWall extends MessageHandlerReflective {
 
   private updateWireframe() {
     const buff = this.wireframe.buff;
+    const board = this.board();
     buff.allocate(8, 16);
-    const normal = wallNormal(wallNormal_, this.board, this.wallId);
+    const normal = wallNormal(wallNormal_, board, this.wallId);
     const [nx, , ny] = vec3.scale(normal, normal, this.getDistance());
-    const wall = this.board.walls[this.wallId];
-    const wall2 = this.board.walls[wall.point2];
-    const sectorId = sectorOfWall(this.board, this.wallId);
-    const sector = this.board.sectors[sectorId];
+    const wall = board.walls[this.wallId];
+    const wall2 = board.walls[wall.point2];
+    const sectorId = sectorOfWall(board, this.wallId);
+    const sector = board.sectors[sectorId];
     const x1 = wall.x + nx, y1 = wall.y + ny;
     const x2 = wall2.x + nx, y2 = wall2.y + ny;
-    const slopeCalc = createSlopeCalculator(this.board, sectorId);
+    const slopeCalc = createSlopeCalculator(board, sectorId);
     const z1 = slopeCalc(x1, y1, sector.floorheinum) + sector.floorz;
     const z2 = slopeCalc(x1, y1, sector.ceilingheinum) + sector.ceilingz;
     const z3 = slopeCalc(x2, y2, sector.ceilingheinum) + sector.ceilingz;

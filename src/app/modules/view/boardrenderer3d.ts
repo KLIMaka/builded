@@ -2,7 +2,7 @@ import { unpackWallId } from '../../../build/boardutils';
 import { AllBoardVisitorResult, createSectorCollector, createWallCollector, PvsBoardVisitorResult, VisResult } from '../../../build/boardvisitor';
 import { Board } from '../../../build/structs';
 import { wallVisible, ZSCALE } from '../../../build/utils';
-import { Deck, fastIterator } from '../../../utils/collections';
+import { Deck } from '../../../utils/collections';
 import { State } from '../../../utils/gl/stategl';
 import { Dependency, Injector } from '../../../utils/injector';
 import { dot2d } from '../../../utils/mathutils';
@@ -81,6 +81,16 @@ export class Boardrenderer3D {
     private board: BoardProvider,
     private renderables: BuildRenderableProvider
   ) { }
+
+  public drawTools(gl: WebGLRenderingContext, p: RenderableProvider<HintRenderable>) {
+    gl.disable(WebGLRenderingContext.DEPTH_TEST);
+    gl.enable(WebGLRenderingContext.BLEND);
+    this.surfaces.clear().push(p);
+    this.bgl.draw(gl, this.surfaces);
+    this.bgl.flush(gl);
+    gl.disable(WebGLRenderingContext.BLEND);
+    gl.enable(WebGLRenderingContext.DEPTH_TEST);
+  }
 
   public draw(view: View3d) {
     this.drawGeometry(view);
@@ -281,8 +291,8 @@ export class Boardrenderer3D {
 
   private spriteSolids = new WrapRenderable(this.sprites, polyOffsetOn, polyOffsetOff);
   private spriteTransparent = new WrapRenderable(this.spritesTrans, polyOffsetOn, polyOffsetOff);
-  private transparent = new WrapRenderable(new Renderables(fastIterator([this.surfacesTrans, this.spriteTransparent])), blendOn, blendOff);
-  private pass = new Renderables(fastIterator([this.surfaces, this.spriteSolids, this.transparent]));
+  private transparent = new WrapRenderable(new Renderables([this.surfacesTrans, this.spriteTransparent]), blendOn, blendOff);
+  private pass = new Renderables([this.surfaces, this.spriteSolids, this.transparent]);
 
   private drawRooms(view: View3d, result: VisResult) {
     PROFILE.startProfile('processing');

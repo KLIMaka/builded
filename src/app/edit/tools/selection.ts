@@ -96,8 +96,6 @@ const target_ = vec3.create();
 const start_ = vec3.create();
 const dir_ = vec3.create();
 
-export const Selection_ = new Dependency<Selection>('Selection');
-
 export async function SelectionModule(injector: Injector) {
   const bus = await injector.getInstance(BUS);
   bus.connect(await create(injector, Selection, PicNumSelector_, RENDRABLES_CACHE, ENTITY_FACTORY));
@@ -245,44 +243,46 @@ export class Selection extends MessageHandlerReflective {
 
   private print() {
     const target = this.ctx.view.target();
+    const board = this.ctx.board();
     if (target.entity == null) return;
     switch (target.entity.type) {
       case EntityType.CEILING:
       case EntityType.FLOOR:
-        info(target.entity.id, this.ctx.board().sectors[target.entity.id]);
+        info(target.entity.id, board.sectors[target.entity.id]);
         break;
       case EntityType.UPPER_WALL:
       case EntityType.MID_WALL:
       case EntityType.LOWER_WALL:
-        info(target.entity.id, this.ctx.board().walls[target.entity.id]);
+        info(target.entity.id, board.walls[target.entity.id]);
         break;
       case EntityType.SPRITE:
-        info(target.entity.id, this.ctx.board().sprites[target.entity.id]);
+        info(target.entity.id, board.sprites[target.entity.id]);
         break;
     }
   }
 
   private copy() {
     const target = this.ctx.view.target();
+    const board = this.ctx.board();
     if (target.entity == null) return;
     switch (target.entity.type) {
       case EntityType.CEILING:
-        clipboardShade.value = this.ctx.board().sectors[target.entity.id].ceilingshade;
-        clipboardPicnum.picnum = this.ctx.board().sectors[target.entity.id].ceilingpicnum;
+        clipboardShade.value = board.sectors[target.entity.id].ceilingshade;
+        clipboardPicnum.picnum = board.sectors[target.entity.id].ceilingpicnum;
         break;
       case EntityType.FLOOR:
-        clipboardShade.value = this.ctx.board().sectors[target.entity.id].floorshade;
-        clipboardPicnum.picnum = this.ctx.board().sectors[target.entity.id].floorpicnum;
+        clipboardShade.value = board.sectors[target.entity.id].floorshade;
+        clipboardPicnum.picnum = board.sectors[target.entity.id].floorpicnum;
         break;
       case EntityType.LOWER_WALL:
       case EntityType.MID_WALL:
       case EntityType.UPPER_WALL:
-        clipboardShade.value = this.ctx.board().walls[target.entity.id].shade;
-        clipboardPicnum.picnum = this.ctx.board().walls[target.entity.id].picnum;
+        clipboardShade.value = board.walls[target.entity.id].shade;
+        clipboardPicnum.picnum = board.walls[target.entity.id].picnum;
         break;
       case EntityType.SPRITE:
-        clipboardShade.value = this.ctx.board().sprites[target.entity.id].shade;
-        clipboardPicnum.picnum = this.ctx.board().sprites[target.entity.id].picnum;
+        clipboardShade.value = board.sprites[target.entity.id].shade;
+        clipboardPicnum.picnum = board.sprites[target.entity.id].picnum;
         break;
     }
   }

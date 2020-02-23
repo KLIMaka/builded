@@ -1,11 +1,6 @@
 import { cyclic } from "./mathutils";
 
-export interface FastIterable<T> {
-  readonly array: T[],
-  readonly size: number
-}
-
-export interface Collection<T> extends Iterable<T>, FastIterable<T> {
+export interface Collection<T> extends Iterable<T> {
   get(i: number): T;
   length(): number;
   isEmpty(): boolean;
@@ -18,8 +13,6 @@ export interface MutableCollection<T> extends Collection<T> {
 export const TERMINAL_ITERATOR_RESULT: IteratorResult<any> = { value: null, done: true };
 export const EMPTY_ITERATOR = { next: () => TERMINAL_ITERATOR_RESULT };
 export const EMPTY_COLLECTION: MutableCollection<any> = {
-  array: undefined,
-  size: 0,
   get: (i: number) => undefined,
   length: () => 0,
   [Symbol.iterator]: () => EMPTY_ITERATOR,
@@ -139,8 +132,6 @@ export function reverse<T>(c: Collection<T>): Collection<T> {
   return c.isEmpty()
     ? EMPTY_COLLECTION
     : {
-      array: c.array,
-      size: c.size,
       get: (i: number) => c.get(c.length() - 1 - i),
       length: () => c.length(),
       isEmpty: () => false,
@@ -152,8 +143,6 @@ export function subCollection<T>(c: Collection<T>, start: number, length: number
   return length == 0
     ? EMPTY_COLLECTION
     : {
-      array: c.array,
-      size: c.size,
       get: (i: number) => c.get(start + i),
       length: () => length,
       isEmpty: () => false,
@@ -202,11 +191,4 @@ export function* rect(w: number, h: number): Generator<[number, number]> {
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++)
       yield [x, y]
-}
-
-export function fastIterator<T>(arr: T[]): FastIterable<T> {
-  return {
-    array: arr,
-    size: arr.length
-  }
 }

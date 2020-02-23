@@ -35,7 +35,7 @@ export class BoardRenderer2D {
   private upp = 1;
   private surfaces = new Deck<RenderableProvider<HintRenderable>>();
   private pass = new SortingRenderable(new LayeredRenderables(this.surfaces), r => {
-    const spriteLabel = r.kind & SPRITE_LABEL && this.upp > 10;
+    const spriteLabel = r.kind & SPRITE_LABEL && this.upp > 20;
     const gridHelper = r.kind & HELPER_GRID;
     return !spriteLabel && !gridHelper;
   });

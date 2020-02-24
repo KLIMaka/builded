@@ -104,8 +104,16 @@ export interface WallRenderable extends RenderableProvider<HintRenderable>, Rend
   readonly bot: RenderableProvider<HintRenderable> & Renderable;
 }
 
+export interface ClusterRenderable {
+  readonly solids: RenderableProvider<HintRenderable>;
+  readonly sprites: RenderableProvider<HintRenderable>;
+  readonly transSolids: RenderableProvider<HintRenderable>;
+  readonly transSprites: RenderableProvider<HintRenderable>;
+}
+
 export interface BuildRenderableProvider {
   sector(id: number): SectorRenderable;
+  sectorCluster(id: number): ClusterRenderable;
   wall(id: number): WallRenderable;
   wallPoint(id: number): RenderableProvider<HintRenderable>;
   sprite(id: number): RenderableProvider<HintRenderable>;

@@ -8,7 +8,7 @@ import { createTexture } from "../../../utils/gl/textures";
 import { Dependency, Injector } from "../../../utils/injector";
 import { BoardManipulator_, BOARD, BuildReferenceTracker } from "../../apis/app";
 import { ReferenceTrackerImpl } from "../../apis/referencetracker";
-import { RAW_PAL_ } from "../artselector";
+import { RAW_PAL } from "../artselector";
 import { ArtFiles_, GL, ParallaxTextures_ } from "../buildartprovider";
 import { PALSWAPS, PAL_TEXTURE, PLU_TEXTURE, SHADOWSTEPS } from "../gl/buildgl";
 import { FS } from "../fs/fs";
@@ -32,7 +32,7 @@ async function loadPal(injector: Injector) {
 }
 
 async function loadPalTexture(injector: Injector) {
-  return Promise.all([injector.getInstance(RAW_PAL_), injector.getInstance(GL)]).then(
+  return Promise.all([injector.getInstance(RAW_PAL), injector.getInstance(GL)]).then(
     ([pal, gl]) => createTexture(256, 1, gl, { filter: gl.NEAREST }, pal, gl.RGB, 3))
 }
 
@@ -155,7 +155,7 @@ export function DukeModule(injector: Injector) {
   injector.bind(SHADOWSTEPS, shadowsteps);
   injector.bind(GRP, loadGrp);
   injector.bind(ArtFiles_, loadArtFiles);
-  injector.bind(RAW_PAL_, loadPal);
+  injector.bind(RAW_PAL, loadPal);
   injector.bind(LOOKUPS, loadLookups);
   injector.bind(SHADOW_TABLE, loadShadowTable);
   injector.bind(PAL_TEXTURE, loadPalTexture);

@@ -4,11 +4,9 @@ import { Board } from "../../build/structs";
 import { MoveStruct } from "../../build/utils";
 import { Texture } from "../../utils/gl/drawstruct";
 import { Dependency } from "../../utils/injector";
-import { InputState } from "../../utils/input";
-import { BuildersFactory } from "../modules/geometry/common";
-import { Context, MessageHandler } from "./handler";
+import { MessageHandler } from "./handler";
 import { ReferenceTracker } from "./referencetracker";
-import { Renderable, RenderableProvider, HintRenderable } from "./renderable";
+import { HintRenderable, RenderableProvider } from "./renderable";
 
 export interface Storage {
   get(key: string): Promise<any>;

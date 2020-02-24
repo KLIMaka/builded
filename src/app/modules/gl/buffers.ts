@@ -23,7 +23,6 @@ export interface BuildBuffer {
 export interface BuildBufferFactory {
   get(hint: string): BuildBuffer;
 }
-
 export const BUFFER_FACTORY = new Dependency<BuildBufferFactory>('Build Buffer Factory');
 
 export async function DefaultBufferFactory(injector: Injector) {

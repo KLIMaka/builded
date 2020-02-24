@@ -15,12 +15,12 @@ function createDrawPanel(arts: ArtInfoProvider, pal: Uint8Array, canvas: HTMLCan
   return new DrawPanel(canvas, provider, cb);
 }
 
-export const RAW_PAL_ = new Dependency<Uint8Array>('RawPal');
+export const RAW_PAL = new Dependency<Uint8Array>('RawPal');
 
 export async function SelectorConstructor(injector: Injector) {
   return Promise.all([
     injector.getInstance(ART),
-    injector.getInstance(RAW_PAL_)])
+    injector.getInstance(RAW_PAL)])
     .then(([art, pal]) => {
       const selector = new Selector(art, pal)
       return (cb: PicNumCallback) => selector.modal(cb);

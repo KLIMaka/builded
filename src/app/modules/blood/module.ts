@@ -13,7 +13,7 @@ import { BoardManipulator_, BuildReferenceTracker, BuildResources, RESOURCES, DE
 import { BUS, MessageHandlerReflective } from '../../apis/handler';
 import { ReferenceTrackerImpl } from '../../apis/referencetracker';
 import { LoadBoard, NamedMessage } from '../../edit/messages';
-import { RAW_PAL_ } from '../artselector';
+import { RAW_PAL } from '../artselector';
 import { ArtFiles_, GL, ParallaxTextures_ } from '../buildartprovider';
 import { FileSystem, FS } from '../fs/fs';
 import { PALSWAPS, PAL_TEXTURE, PLU_TEXTURE, SHADOWSTEPS } from '../gl/buildgl';
@@ -40,7 +40,7 @@ async function loadPLUs(injector: Injector) {
 }
 
 async function loadPalTexture(injector: Injector) {
-  const [pal, gl] = await Promise.all([injector.getInstance(RAW_PAL_), injector.getInstance(GL)]);
+  const [pal, gl] = await Promise.all([injector.getInstance(RAW_PAL), injector.getInstance(GL)]);
   return createTexture(256, 1, gl, { filter: gl.NEAREST }, pal, gl.RGB, 3);
 }
 
@@ -127,7 +127,7 @@ function createBoard() {
   return board;
 }
 
-async function loadMap(injector: Injector) {
+async function mapLoader(injector: Injector) {
   const bus = await injector.getInstance(BUS);
   bus.connect(new class extends MessageHandlerReflective {
     async NamedMessage(msg: NamedMessage) {
@@ -143,7 +143,7 @@ async function loadMap(injector: Injector) {
 
 async function getMapNames(injector: Injector) {
   const res = await injector.getInstance(RESOURCES);
-  return (await res.list()).filter(f => f.toLowerCase().endsWith('.map'));
+  return () => res.list().then(list => list.filter(f => f.toLowerCase().endsWith('.map')));
 }
 
 async function loadRffFile(injector: Injector) {
@@ -171,7 +171,6 @@ async function loadPal(injector: Injector) {
   return new Uint8Array(await res.get('BLOOD.PAL'));
 }
 
-
 async function BloodResources(injector: Injector): Promise<BuildResources> {
   const fs = await injector.getInstance(FS);
   const rfffs = await loadRffFs(injector);
@@ -195,7 +194,7 @@ export function BloodModule(injector: Injector) {
   injector.bindInstance(SHADOWSTEPS, 64);
   injector.bind(RESOURCES, BloodResources);
   injector.bind(ArtFiles_, loadArtFiles);
-  injector.bind(RAW_PAL_, loadPal);
+  injector.bind(RAW_PAL, loadPal);
   injector.bind(RAW_PLUs, loarRawPlus);
   injector.bind(PALSWAPS, loadPLUs);
   injector.bind(PAL_TEXTURE, loadPalTexture);
@@ -204,5 +203,5 @@ export function BloodModule(injector: Injector) {
   injector.bind(MAP_NAMES, getMapNames);
   injector.bindInstance(DEFAULT_BOARD, createBoard());
 
-  injector.install(loadMap);
+  injector.install(mapLoader);
 }

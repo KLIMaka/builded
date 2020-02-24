@@ -2,7 +2,7 @@ import { Dependency, Injector } from "../../utils/injector";
 import { span, Table } from "../../utils/ui/ui";
 import { UI, Window } from "../apis/ui";
 
-export const MAP_NAMES = new Dependency<string[]>('MapNames');
+export const MAP_NAMES = new Dependency<() => Promise<string[]>>('MapNames');
 
 let selectMapWindow: Window;
 async function getWindow(injector: Injector) {
@@ -20,7 +20,8 @@ async function getWindow(injector: Injector) {
 
 export function showMapSelection(injector: Injector): Promise<string> {
   return new Promise(async resolve => {
-    const mapNames = await injector.getInstance(MAP_NAMES);
+    const mapNamesProvider = await injector.getInstance(MAP_NAMES);
+    const mapNames = await mapNamesProvider();
     const win = await getWindow(injector);
     win.onclose = () => resolve(null);
     const table = new Table();

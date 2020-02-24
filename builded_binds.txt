@@ -55,6 +55,7 @@ ALT+SHIFT+DELETE delete_full
 CTRL+SHIFT+F    show_files
 0               print_info
 F3              load_map
+F4              print_usage
 
 +W              forward
 +S              backward

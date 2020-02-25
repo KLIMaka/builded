@@ -1,6 +1,6 @@
-import { walllen } from '../../../../build/boardutils';
+import { walllen, DEFAULT_REPEAT_RATE } from '../../../../build/boardutils';
 import { Board } from '../../../../build/structs';
-import { slope, ZSCALE } from '../../../../build/utils';
+import { slope, ZSCALE, sectorOfWall } from '../../../../build/utils';
 import { mat4, vec4 } from '../../../../libs_js/glmatrix';
 import { Texture } from '../../../../utils/gl/drawstruct';
 import { int, len2d } from '../../../../utils/mathutils';
@@ -21,11 +21,17 @@ export function createGridMatrixProviderWall(board: Board, id: number) {
   const wall2 = board.walls[wall1.point2];
   const dx = wall2.x - wall1.x;
   const dy = wall2.y - wall1.y;
+  const sector = board.sectors[sectorOfWall(board, id)];
+  const zbase = wall1.cstat.alignBottom ? sector.floorz : sector.ceilingz;
   const wlen = walllen(board, id);
   return (scale: number) => {
+    const sx = (wall1.xrepeat * DEFAULT_REPEAT_RATE) / wlen;
+    const sy = wall1.yrepeat / 8;
     mat4.identity(texMat);
+    vec4.set(tmp, sx, sy, 1, 1);
+    mat4.scale(texMat, texMat, tmp);
     mat4.rotateY(texMat, texMat, -Math.atan2(-dy, dx));
-    vec4.set(tmp, -wall1.x, 0, -wall1.y, 0);
+    vec4.set(tmp, -wall1.x, zbase / ZSCALE, -wall1.y, 0);
     return mat4.translate(texMat, texMat, tmp);
   }
 }

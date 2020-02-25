@@ -97,7 +97,7 @@ void clip() {
 
 void writeColor(vec3 c, vec4 m) {
   if (m.a == 0.0) discard;
-  if (m.a < 0.0) fragColor = vec4(vec3(m.rgb * c), (sin(sys.x / -m.a) + 1.0) / 2.0 );
+  if (m.a < 0.0) fragColor = vec4(vec3(m.rgb * c), (sin(sys.x / -m.a) + 1.0) / 2.0);
   else fragColor = vec4(vec3(m.rgb * c), m.a);
 }
 

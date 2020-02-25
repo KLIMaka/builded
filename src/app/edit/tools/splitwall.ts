@@ -5,7 +5,7 @@ import { Injector, create } from "../../../utils/injector";
 import { ArtProvider, ART, BOARD, BuildReferenceTracker, REFERENCE_TRACKER, VIEW, View, BoardProvider } from "../../apis/app";
 import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
 import { invalidateSectorAndWalls } from "../editutils";
-import { NamedMessage } from "../messages";
+import { NamedMessage, COMMIT } from "../messages";
 
 export async function SplitWallModule(injector: Injector) {
   const bus = await injector.getInstance(BUS);
@@ -29,7 +29,7 @@ export class SplitWall extends MessageHandlerReflective {
     const board = this.board();
 
     splitWall(board, id, x, y, this.art, this.refs);
-    // this.commit();
+    this.bus.handle(COMMIT);
     let s = sectorOfWall(board, id);
     invalidateSectorAndWalls(s, board, this.bus);
     let nextsector = board.walls[id].nextsector;

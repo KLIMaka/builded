@@ -3,21 +3,24 @@ import { IndexBuffer, VertexBuffer } from '../../../utils/gl/drawstruct';
 import { Dependency, Injector } from '../../../utils/injector';
 import { GL } from '../buildartprovider';
 
-export interface BuildBuffer {
+export interface GenericBuildBuffer {
   get(): Pointer;
   getSize(): number;
   allocate(vtxCount: number, triIndexCount: number): void;
   deallocate(): void;
   writePos(off: number, x: number, y: number, z: number): number;
-  writeNormal(off: number, x: number, y: number, z: number): number;
-  writeTcLighting(off: number, u: number, v: number, pal?: number, shade?: number): number;
+  getIdxBuffer(): IndexBuffer;
+  getPosBuffer(): VertexBuffer;
   writeTriangle(off: number, a: number, b: number, c: number): number;
   writeQuad(off: number, a: number, b: number, c: number, d: number): number;
   writeLine(off: number, a: number, b: number): number;
-  getPosBuffer(): VertexBuffer;
+}
+
+export interface BuildBuffer extends GenericBuildBuffer {
+  writeNormal(off: number, x: number, y: number, z: number): number;
+  writeTcLighting(off: number, u: number, v: number, pal?: number, shade?: number): number;
   getNormBuffer(): VertexBuffer;
   getTexCoordBuffer(): VertexBuffer;
-  getIdxBuffer(): IndexBuffer;
 }
 
 export interface BuildBufferFactory {

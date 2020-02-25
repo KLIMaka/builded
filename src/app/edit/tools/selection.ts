@@ -11,7 +11,7 @@ import { BUS, Message, MessageHandler, MessageHandlerList, MessageHandlerReflect
 import { RenderablesCache, RENDRABLES_CACHE } from "../../modules/geometry/cache";
 import { EntityFactory, ENTITY_FACTORY } from "../context";
 import { MovingHandle } from "../handle";
-import { BoardInvalidate, EndMove, Frame, Highlight, Move, NamedMessage, Render, SetPicnum, Shade, StartMove } from "../messages";
+import { BoardInvalidate, EndMove, Frame, Highlight, Move, NamedMessage, Render, SetPicnum, Shade, StartMove, COMMIT } from "../messages";
 
 export type PicNumCallback = (picnum: number) => void;
 export type PicNumSelector = (cb: PicNumCallback) => void;
@@ -137,11 +137,11 @@ export class Selection extends MessageHandlerReflective {
 
   public NamedMessage(msg: NamedMessage) {
     switch (msg.name) {
-      case 'set_picnum': this.setTexture(); /*this.ctx.commit();*/ return;
-      case 'insert_sprite': this.insertSprite(); /*this.ctx.commit();*/ return;
+      case 'set_picnum': this.setTexture(); return;
+      case 'insert_sprite': this.insertSprite(); return;
       case 'copy': this.copy(); return;
-      case 'paste_shade': this.selection.handle(clipboardShade); /*this.ctx.commit();*/ return;
-      case 'paste_picnum': this.selection.handle(clipboardPicnum); /*this.ctx.commit();*/ return;
+      case 'paste_shade': this.selection.handle(clipboardShade); this.ctx.bus.handle(COMMIT); return;
+      case 'paste_picnum': this.selection.handle(clipboardPicnum); this.ctx.bus.handle(COMMIT); return;
       case 'print_selected': this.print(); return;
       case 'set_first_wall': this.setFirstWall(); return;
       case 'fill_inner_sector': this.fillInnerLoop(); return;
@@ -178,7 +178,7 @@ export class Selection extends MessageHandlerReflective {
     } else if (!this.ctx.state.get(MOVE_STATE)) {
       handle.stop();
       this.selection.handle(END_MOVE);
-      // this.ctx.commit();
+      this.ctx.bus.handle(COMMIT);
       return;
     }
 
@@ -192,7 +192,7 @@ export class Selection extends MessageHandlerReflective {
     const target = this.ctx.view.snapTarget();
     if (target.entity == null || !target.entity.isWall()) return;
     setFirstWall(this.ctx.board(), sectorOfWall(this.ctx.board(), target.entity.id), target.entity.id, this.ctx.refs);
-    // this.ctx.commit();
+    this.ctx.bus.handle(COMMIT);
     this.ctx.bus.handle(new BoardInvalidate(null));
   }
 
@@ -200,7 +200,7 @@ export class Selection extends MessageHandlerReflective {
     const target = this.ctx.view.snapTarget();
     if (target.entity == null || !target.entity.isWall()) return;
     fillInnerLoop(this.ctx.board(), target.entity.id, this.ctx.refs);
-    // this.ctx.commit();
+    this.ctx.bus.handle(COMMIT);
     this.ctx.bus.handle(new BoardInvalidate(null));
   }
 
@@ -208,7 +208,7 @@ export class Selection extends MessageHandlerReflective {
     const target = this.ctx.view.snapTarget();
     if (target.entity == null || !target.entity.isWall()) return;
     deleteLoop(this.ctx.board(), target.entity.id, this.ctx.refs);
-    // this.ctx.commit();
+    this.ctx.bus.handle(COMMIT);
     this.ctx.bus.handle(new BoardInvalidate(null));
   }
 
@@ -218,7 +218,7 @@ export class Selection extends MessageHandlerReflective {
     if (target.entity.isWall()) deleteLoopFull(this.ctx.board(), target.entity.id, this.ctx.refs);
     else if (target.entity.isSector()) deleteSectorFull(this.ctx.board(), target.entity.id, this.ctx.refs);
     else return;
-    // this.ctx.commit();
+    this.ctx.bus.handle(COMMIT);
     this.ctx.bus.handle(new BoardInvalidate(null));
   }
 
@@ -228,6 +228,7 @@ export class Selection extends MessageHandlerReflective {
       if (picnum == -1) return;
       SET_PICNUM.picnum = picnum;
       sel.handle(SET_PICNUM);
+      this.ctx.bus.handle(COMMIT);
     })
   }
 
@@ -237,8 +238,10 @@ export class Selection extends MessageHandlerReflective {
     const [x, y, z] = target.coords;
     this.picnumSelector((picnum: number) => {
       if (picnum == -1) return;
-      const spriteId = insertSprite(this.ctx.board(), x, y, z);
-      this.ctx.board().sprites[spriteId].picnum = picnum;
+      const board = this.ctx.board();
+      const spriteId = insertSprite(board, x, y, z);
+      board.sprites[spriteId].picnum = picnum;
+      this.ctx.bus.handle(COMMIT);
     });
   }
 
@@ -280,56 +283,59 @@ export class Selection extends MessageHandlerReflective {
   }
 
   private printPicUsage() {
-    const board = this.ctx.board();
-    const results: [string, number][] = [];
-    const picsStat = new Map<number, Set<number>>();
-    for (let s = 0; s < board.numsectors; s++) {
-      const pics = [...this.getSectorPics(board, s)];
-      results.push([pics.sort().join(','), s]);
-      pics.forEach(p => {
-        let sectors = picsStat.get(p);
-        if (sectors == undefined) {
-          sectors = new Set();
-          picsStat.set(p, sectors);
-        }
-        sectors.add(s);
-      })
-    }
-    info([...picsStat.values()].sort((l, r) => l.size - r.size));
-
-    const imgStats = new Map<string, Set<number>>();
-    const art = this.ctx.art;
-    for (let i = 0; i < 4096; i++) {
-      const info = art.getInfo(i);
-      if (info == null) continue;
-      const key = `${info.w}x${info.h}`;
-      let ids = imgStats.get(key);
-      if (ids == undefined) {
-        ids = new Set();
-        imgStats.set(key, ids);
-      }
-      ids.add(i);
-    }
-    info([...imgStats.entries()].sort((l, r) => l[1].size - r[1].size));
-    // const target = this.ctx.view.target();
-    // if (!target.entity.isSector()) return;
     // const board = this.ctx.board();
-    // const sectorId = target.entity.id;
-    // const pics = new Set<number>();
-    // const sectors = new Set<number>();
-
-    // const sector = board.sectors[sectorId];
-    // this.getSectorPics(board, sectorId).forEach(p => pics.add(p));
-    // const wallend = sector.wallptr + sector.wallnum;
-    // for (let w = sector.wallptr; w < wallend; w++) {
-    //   const wall = board.walls[w];
-    //   if (wall.nextsector == -1) continue;
-    //   const nextsector = wall.nextsector;
-    //   if (sectors.has(nextsector)) continue;
-    //   this.getSectorPics(board, nextsector).forEach(p => pics.add(p));
-    //   sectors.add(nextsector);
+    // const results: [string, number][] = [];
+    // const picsStat = new Map<number, Set<number>>();
+    // for (let s = 0; s < board.numsectors; s++) {
+    //   const pics = [...this.getSectorPics(board, s)];
+    //   results.push([pics.sort().join(','), s]);
+    //   pics.forEach(p => {
+    //     let sectors = picsStat.get(p);
+    //     if (sectors == undefined) {
+    //       sectors = new Set();
+    //       picsStat.set(p, sectors);
+    //     }
+    //     sectors.add(s);
+    //   })
     // }
-    // info(pics, sectors)
+    // info([...picsStat.values()].sort((l, r) => l.size - r.size));
+
+    // const imgStats = new Map<string, Set<number>>();
+    // const art = this.ctx.art;
+    // for (let i = 0; i < 4096; i++) {
+    //   const info = art.getInfo(i);
+    //   if (info == null) continue;
+    //   const key = `${info.w}x${info.h}`;
+    //   let ids = imgStats.get(key);
+    //   if (ids == undefined) {
+    //     ids = new Set();
+    //     imgStats.set(key, ids);
+    //   }
+    //   ids.add(i);
+    // }
+    // info([...imgStats.entries()].sort((l, r) => l[1].size - r[1].size));
+    const target = this.ctx.view.target();
+    if (!target.entity.isSector()) return;
+    const board = this.ctx.board();
+    const art = this.ctx.art;
+    const sectorId = target.entity.id;
+    const pics = new Set<number>();
+    const sectors = new Set<number>();
+    const sizes = new Set<string>();
+
+    const sector = board.sectors[sectorId];
+    const pf = (p: number) => { pics.add(p); const i = art.getInfo(p); sizes.add(`${i.w}x${i.h}`) };
+    this.getSectorPics(board, sectorId).forEach(pf);
+    const wallend = sector.wallptr + sector.wallnum;
+    for (let w = sector.wallptr; w < wallend; w++) {
+      const wall = board.walls[w];
+      if (wall.nextsector == -1) continue;
+      const nextsector = wall.nextsector;
+      if (sectors.has(nextsector)) continue;
+      this.getSectorPics(board, nextsector).forEach(pf);
+      sectors.add(nextsector);
+    }
+    info(pics, sectors, sizes);
   }
 
   private print() {

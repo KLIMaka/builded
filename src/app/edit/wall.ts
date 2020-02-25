@@ -8,7 +8,7 @@ import { cyclic, tuple } from "../../utils/mathutils";
 import { Message, MessageHandlerReflective } from "../apis/handler";
 import { EditContext } from "./context";
 import { invalidateSectorAndWalls } from "./editutils";
-import { BoardInvalidate, EndMove, Flip, Highlight, Move, NamedMessage, Palette, PanRepeat, SetPicnum, Shade, StartMove } from "./messages";
+import { BoardInvalidate, EndMove, Flip, Highlight, Move, NamedMessage, Palette, PanRepeat, SetPicnum, Shade, StartMove, COMMIT } from "./messages";
 import { MOVE_COPY } from "./tools/selection";
 
 function collectConnectedWalls(board: Board, wallId: number) {
@@ -138,7 +138,7 @@ export class WallEnt extends MessageHandlerReflective {
   public NamedMessage(msg: NamedMessage) {
     if (msg.name == 'delete') {
       deleteWall(this.ctx.board(), this.wallId, this.ctx.refs);
-      // this.ctx.commit();
+      this.ctx.bus.handle(COMMIT);
       this.ctx.bus.handle(new BoardInvalidate(null));
     }
   }

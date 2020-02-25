@@ -10,7 +10,7 @@ import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
 import { GRID, GridController } from "../../modules/context";
 import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
 import { MovingHandle } from "../handle";
-import { BoardInvalidate, Frame, NamedMessage, Render } from "../messages";
+import { BoardInvalidate, Frame, NamedMessage, Render, COMMIT } from "../messages";
 
 const wallNormal_ = vec3.create();
 const wallNormal1_ = vec3.create();
@@ -52,7 +52,7 @@ export class PushWall extends MessageHandlerReflective {
 
   private stop(copy: boolean) {
     pushWall(this.board(), this.wallId, this.getDistance(), this.art, copy, this.refs);
-    // this.commit();
+    this.bus.handle(COMMIT);
     this.bus.handle(new BoardInvalidate(null));
     this.wallId = -1;
     this.movingHandle.stop();

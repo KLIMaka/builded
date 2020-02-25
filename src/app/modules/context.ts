@@ -156,6 +156,9 @@ export async function BoardProviderConstructor(injector: Injector): Promise<Boar
           activeBoard = cloner.cloneBoard(history.top());
           bus.handle(INVALIDATE_ALL);
           return;
+        case 'commit':
+          history.push(cloner.cloneBoard(activeBoard));
+          return;
       }
     }
 
@@ -231,22 +234,18 @@ export class MainLoop extends MessageHandlerReflective {
 
   private drawTools() {
     tools.clear();
-    this.message(RENDER);
+    this.bus.handle(RENDER);
     this.view.drawTools(tools.provider);
-  }
-
-  private message(msg: Message) {
-    this.bus.handle(msg);
   }
 
   frame(input: InputState, dt: number) {
     PROFILE.start();
     this.mouseMove(input);
     FRAME.dt = dt;
-    this.message(FRAME);
-    for (const message of this.poolMessages(input)) this.message(message);
+    this.bus.handle(FRAME);
+    for (const message of this.poolMessages(input)) this.bus.handle(message);
     this.drawTools();
     PROFILE.endProfile();
-    this.message(POSTFRAME);
+    this.bus.handle(POSTFRAME);
   }
 }

@@ -5,7 +5,7 @@ import * as GLM from "../../libs_js/glmatrix";
 import { cyclic, tuple } from "../../utils/mathutils";
 import { Message, MessageHandlerReflective } from "../apis/handler";
 import { EditContext } from "./context";
-import { BoardInvalidate, Flip, Highlight, Move, NamedMessage, Palette, PanRepeat, SetPicnum, SetSpriteCstat, Shade, SpriteMode, StartMove } from "./messages";
+import { BoardInvalidate, Flip, Highlight, Move, NamedMessage, Palette, PanRepeat, SetPicnum, SetSpriteCstat, Shade, SpriteMode, StartMove, COMMIT } from "./messages";
 import { MOVE_COPY, MOVE_ROTATE } from "./tools/selection";
 
 export class SpriteEnt extends MessageHandlerReflective {
@@ -113,7 +113,7 @@ export class SpriteEnt extends MessageHandlerReflective {
     switch (msg.name) {
       case 'delete':
         deleteSprite(board, this.spriteId);
-        // this.ctx.commit();
+        this.ctx.bus.handle(COMMIT);
         this.ctx.bus.handle(new BoardInvalidate(null));
         return;
     }
@@ -128,7 +128,7 @@ export class SpriteEnt extends MessageHandlerReflective {
     const spr = board.sprites[this.spriteId];
     const stat = spr.cstat[msg.name];
     spr.cstat[msg.name] = stat ? 0 : 1;
-    // this.ctx.commit();
+    this.ctx.bus.handle(COMMIT);
     this.ctx.bus.handle(new BoardInvalidate(new Entity(this.spriteId, EntityType.SPRITE)));
   }
 

@@ -1,10 +1,9 @@
 import { ang2vec, spriteAngle, ZSCALE } from "../../../../build/utils";
 import { vec3 } from "../../../../libs_js/glmatrix";
 import { Builders } from "../../../apis/builder";
-import { RenderablesCacheContext } from "../cache";
-import { BuildersFactory, WireframeBuilder, PointSpriteBuilder, SolidBuilder } from "../common";
-import { text } from "./common";
 import { SPRITE_LABEL } from "../../../apis/renderable";
+import { RenderablesCacheContext } from "../cache";
+import { BuildersFactory, SolidBuilder, WireframeBuilder } from "../common";
 
 export class Sprite2dBuilder extends Builders {
   constructor(

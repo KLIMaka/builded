@@ -26,3 +26,5 @@ export class Mouse implements Message { constructor(public x: number, public y: 
 export class SetWallCstat implements Message { constructor(public name: string, public value = false, public toggle = true) { } }
 export class SetSectorCstat implements Message { constructor(public name: string, public value = false, public toggle = true) { } }
 export class SetSpriteCstat implements Message { constructor(public name: string, public value = false, public toggle = true) { } }
+
+export const COMMIT = new NamedMessage('commit');

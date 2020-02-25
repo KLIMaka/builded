@@ -6,7 +6,7 @@ import { cyclic, tuple } from "../../utils/mathutils";
 import { Message, MessageHandlerReflective } from "../apis/handler";
 import { EditContext } from "./context";
 import { invalidateSectorAndWalls } from "./editutils";
-import { BoardInvalidate, Highlight, Move, NamedMessage, Palette, PanRepeat, ResetPanRepeat, SetPicnum, SetSectorCstat, Shade, StartMove } from "./messages";
+import { BoardInvalidate, Highlight, Move, NamedMessage, Palette, PanRepeat, ResetPanRepeat, SetPicnum, SetSectorCstat, Shade, StartMove, COMMIT } from "./messages";
 import { MOVE_ROTATE, MOVE_VERTICAL } from "./tools/selection";
 
 const resetPanrepeat = new PanRepeat(0, 0, 0, 0, true);
@@ -137,7 +137,7 @@ export class SectorEnt extends MessageHandlerReflective {
     switch (msg.name) {
       case 'delete':
         deleteSector(this.ctx.board(), this.sectorEnt.id, this.ctx.refs);
-        // ctx.commit();
+        this.ctx.bus.handle(COMMIT);
         this.ctx.bus.handle(new BoardInvalidate(null));
         return;
     }

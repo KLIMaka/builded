@@ -11,7 +11,7 @@ import { LayeredRenderables } from "../../apis/renderable";
 import { writeText } from "../../modules/geometry/builders/common";
 import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
 import { getClosestSectorZ } from "../editutils";
-import { BoardInvalidate, Frame, NamedMessage, Render } from "../messages";
+import { BoardInvalidate, Frame, NamedMessage, Render, COMMIT } from "../messages";
 import { ArtProvider, View, BuildReferenceTracker, ART, VIEW, BOARD, REFERENCE_TRACKER, BoardProvider } from "../../apis/app";
 
 class Contour {
@@ -275,7 +275,7 @@ export class DrawSector extends MessageHandlerReflective {
     if (sectorId != -1)
       createInnerLoop(board, sectorId, this.points, this.refs);
     createNewSector(board, this.points, this.refs);
-    // ctx.commit();
+    this.bus.handle(COMMIT);
     this.bus.handle(new BoardInvalidate(null));
     this.points.clear();
     this.contour.clear();
@@ -284,7 +284,7 @@ export class DrawSector extends MessageHandlerReflective {
 
   private splitSector(sectorId: number) {
     if (splitSector(this.board(), sectorId, this.points, this.refs) != -1) {
-      // ctx.commit();
+      this.bus.handle(COMMIT);
       this.bus.handle(new BoardInvalidate(null));
     }
     this.points.clear();

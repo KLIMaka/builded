@@ -5,29 +5,23 @@ import { Texture } from "../../../../utils/gl/drawstruct";
 import { DrawCall, State } from "../../../../utils/gl/stategl";
 import { Builder } from "../../../apis/builder";
 import { HintRenderable, RenderableConsumer } from "../../../apis/renderable";
-import { BuildBuffer } from "../../gl/buffers";
+import { BuildBuffer, GenericBuildBuffer } from "../../gl/buffers";
 
 export interface StateSetup {
   createDrawCall(): DrawCall;
 }
 
-export class BufferSetup implements StateSetup {
+export class GenericBufferSetup implements StateSetup {
   protected values = new Deck<any>();
   protected buff: Buffer;
   protected offset: number;
   protected size: number;
-  protected _mode: number;
+  protected mode: number;
 
   constructor(state: State) {
     this.register('shader', state);
     this.register('aIndex', state);
     this.register('aPos', state);
-    this.register('aNorm', state);
-    this.register('aTcps', state);
-  }
-
-  public createDrawCall() {
-    return new DrawCall([...this.values], this.buff, this.offset, this.size, this._mode);
   }
 
   protected register(name: string, state: State) {
@@ -35,18 +29,35 @@ export class BufferSetup implements StateSetup {
     this.values.push(null);
   }
 
-  public shader(shader: string) { this.values.set(1, shader); return this }
-  public mode(mode: number) { this._mode = mode; return this }
+  createDrawCall(): DrawCall {
+    return new DrawCall([...this.values], this.buff, this.offset, this.size, this.mode);
+  }
 
-  public buffer(buffer: BuildBuffer) {
+  public shader(shader: string) { this.values.set(1, shader); return this }
+  public drawMode(mode: number) { this.mode = mode; return this }
+
+  public buffer(buffer: GenericBuildBuffer) {
     this.values.set(3, buffer.getIdxBuffer());
     this.values.set(5, buffer.getPosBuffer());
-    this.values.set(7, buffer.getNormBuffer());
-    this.values.set(9, buffer.getTexCoordBuffer());
     const pointer = buffer.get();
     this.buff = pointer.buffer;
     this.offset = pointer.idx.offset;
     this.size = buffer.getSize();
+    return this;
+  }
+}
+
+export class BufferSetup extends GenericBufferSetup {
+  constructor(state: State) {
+    super(state);
+    this.register('aNorm', state);
+    this.register('aTcps', state);
+  }
+
+  public buffer(buffer: BuildBuffer) {
+    super.buffer(buffer);
+    this.values.set(7, buffer.getNormBuffer())
+    this.values.set(9, buffer.getTexCoordBuffer())
     return this;
   }
 }
@@ -104,7 +115,7 @@ export abstract class BufferRenderable<T extends BufferSetup> implements Builder
     if (this.buff.getSize() == 0) return;
     if (this.drawCall == null) {
       const setup = this.getSetup(state);
-      setup.buffer(this.buff).mode(this.mode);
+      setup.buffer(this.buff).drawMode(this.mode);
       this.setup(setup);
       this.drawCall = setup.createDrawCall();
       this.hint = hash(this.drawCall.values[1], this.buff.get().buffer, this.textureHint(), this.buff.get().idx.offset);

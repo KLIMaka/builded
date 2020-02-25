@@ -3,7 +3,7 @@ import { Board } from "../../../build/structs";
 import { create, Injector } from "../../../utils/injector";
 import { BOARD, BuildReferenceTracker, REFERENCE_TRACKER, VIEW, View } from "../../apis/app";
 import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
-import { BoardInvalidate, NamedMessage } from "../messages";
+import { BoardInvalidate, NamedMessage, COMMIT } from "../messages";
 
 export async function JoinSectorsModule(injector: Injector) {
   const bus = await injector.getInstance(BUS);
@@ -34,7 +34,7 @@ export class JoinSectors extends MessageHandlerReflective {
     if (this.sectorId1 != -1 && this.sectorId2 != -1) {
       let result = joinSectors(this.board, this.sectorId1, this.sectorId2, this.refs);
       if (result == 0) {
-        // ctx.commit();
+        this.bus.handle(COMMIT);
         this.bus.handle(new BoardInvalidate(null));
       }
       this.sectorId1 = -1;

@@ -100,6 +100,19 @@ void writeColor(vec3 c, vec4 m) {
   else gl_FragColor = vec4(vec3(m.rgb * c), m.a);
 }
 
+float foo(float x) {
+  float v1 = fract(x);
+  float v2 = 1.0 - fract(x);
+  return pow(v1, 32.0)*2.0 + pow(v2, 32.0)*2.0;
+}
+
+vec4 renderGrid() {
+  float x = foo(gridtc.x);
+  float y = foo(gridtc.y);
+  float c = x+y;
+  return vec4(vec3(c), 0.1*c);
+}
+
 void main() {
   clip();
 #if defined FLAT
@@ -113,8 +126,8 @@ void main() {
 #elif defined NORMAL
   writeColor(vec3((wnormal + 1.0) / 2.0), color);
 #elif defined GRID
-  vec4 grid = texture2D(grid, gridtc);
-  writeColor(vec3(1.0), grid);
+  vec4 grid1 = texture2D(grid, gridtc);
+  writeColor(vec3(1.0), renderGrid());
 #elif defined SPRITE_FACE
   writeColor(color.rgb, texture2D(base, tcps.xy));
 #else

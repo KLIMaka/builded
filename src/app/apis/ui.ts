@@ -5,7 +5,6 @@ export interface Window {
   readonly contentElement: HTMLElement;
   readonly winElement: HTMLElement;
   onclose: () => void;
-  close(): void;
   show(): void;
   hide(): void;
 }

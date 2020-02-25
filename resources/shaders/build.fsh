@@ -102,9 +102,9 @@ void writeColor(vec3 c, vec4 m) {
 }
 
 vec4 renderGrid() {
-  vec3 coord = wpos.xyz / sys1.x + 0.0003;
-  vec3 grid = abs(fract(coord - 0.5) - 0.5) / fwidth(coord);
-  float line = min(min(grid.x, grid.y), grid.z);
+  vec2 coord = gridtc.xy / sys1.x;
+  vec2 grid = abs(fract(coord - 0.5) - 0.5) / fwidth(coord);
+  float line = min(grid.x, grid.y);
   float a = 1.0 - min(line, 1.0);
   return vec4(0.4, 0.4, 0.4, a);
 }

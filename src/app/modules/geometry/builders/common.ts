@@ -9,16 +9,13 @@ import { BuildBuffer } from '../../gl/buffers';
 import { RenderablesCacheContext } from '../cache';
 import { PointSpriteBuilder, WireframeBuilder } from '../common';
 
+const gridSectorMat = mat4.create();
+mat4.identity(gridSectorMat);
+mat4.rotateX(gridSectorMat, gridSectorMat, -Math.PI / 2);
+export const gridMatrixProviderSector = (scale: number) => gridSectorMat;
+
 let tmp = vec4.create();
 let texMat = mat4.create();
-export const gridMatrixProviderSector = (scale: number) => {
-  mat4.identity(texMat);
-  vec4.set(tmp, 1 / scale, 1 / scale, 1, 1);
-  mat4.scale(texMat, texMat, tmp);
-  mat4.rotateX(texMat, texMat, Math.PI / 2);
-  return texMat;
-}
-
 export function createGridMatrixProviderWall(board: Board, id: number) {
   const wall1 = board.walls[id];
   const wall2 = board.walls[wall1.point2];
@@ -26,10 +23,7 @@ export function createGridMatrixProviderWall(board: Board, id: number) {
   const dy = wall2.y - wall1.y;
   const wlen = walllen(board, id);
   return (scale: number) => {
-    const d = scale / (wlen / wall1.xrepeat);
     mat4.identity(texMat);
-    vec4.set(tmp, d / scale, 1 / scale, 1, 1);
-    mat4.scale(texMat, texMat, tmp);
     mat4.rotateY(texMat, texMat, -Math.atan2(-dy, dx));
     vec4.set(tmp, -wall1.x, 0, -wall1.y, 0);
     return mat4.translate(texMat, texMat, tmp);

@@ -1,21 +1,19 @@
 import { AllBoardVisitorResult, VisResult } from '../../../build/boardvisitor';
 import { Board } from '../../../build/structs';
-import { mat4, vec3, Vec3Array } from '../../../libs_js/glmatrix';
+import { Vec3Array } from '../../../libs_js/glmatrix';
 import { Controller2D } from '../../../utils/camera/controller2d';
 import { Deck } from '../../../utils/collections';
 import { Injector } from '../../../utils/injector';
 import * as PROFILE from '../../../utils/profiler';
 import { BOARD, BoardProvider } from '../../apis/app';
-import { BuildRenderableProvider, HintRenderable, LayeredRenderables, RenderableProvider, SortingRenderable, SPRITE_LABEL, HELPER_GRID } from '../../apis/renderable';
-import { GridController, GRID } from '../context';
+import { BuildRenderableProvider, HELPER_GRID, HintRenderable, LayeredRenderables, RenderableProvider, SortingRenderable, SPRITE_LABEL } from '../../apis/renderable';
+import { GRID, GridController } from '../context';
 import { RENDRABLES_CACHE } from '../geometry/cache';
 import { BuildersFactory, BUILDERS_FACTORY, GridBuilder } from '../geometry/common';
 import { BuildGl, BUILD_GL } from '../gl/buildgl';
 import { View2d } from './view2d';
+import { gridMatrixProviderSector } from '../geometry/builders/common';
 
-const scale = vec3.create();
-const offset = vec3.create();
-const gridMatrix = mat4.create();
 const visible = new AllBoardVisitorResult();
 
 export async function Renderer2D(injector: Injector) {
@@ -48,28 +46,7 @@ export class BoardRenderer2D {
   ) { }
 
   private getGrid(controller: Controller2D) {
-    if (this.grid != null) {
-      const upp = controller.getUnitsPerPixel();
-      const w = controller.getWidth();
-      const h = controller.getHeight();
-      const hw = w / 2;
-      const hh = h / 2;
-      const gridScale = this.gridController.getGridSize();
-      const xs = (hw * upp) / gridScale;
-      const ys = (hh * upp) / gridScale;
-      const x = controller.getPosition()[0];
-      const y = controller.getPosition()[2];
-      const xo = x / upp / hw;
-      const yo = y / upp / hh;
-
-      vec3.set(scale, xs, ys, 1);
-      vec3.set(offset, xo, -yo, 0);
-      mat4.identity(gridMatrix);
-      mat4.scale(gridMatrix, gridMatrix, scale);
-      mat4.translate(gridMatrix, gridMatrix, offset);
-      return this.grid;
-    }
-
+    if (this.grid != null) return this.grid;
     const gridSolid = this.builders.solid('utils');
     gridSolid.trans = 0.2;
     const buff = gridSolid.buff;
@@ -85,7 +62,7 @@ export class BoardRenderer2D {
     buff.writeTcLighting(3, -1, 1);
     buff.writeQuad(0, 3, 2, 1, 0);
     this.grid = new GridBuilder(this.gridController);
-    this.grid.gridTexMatProvider = (scale: number) => gridMatrix;
+    this.grid.gridTexMatProvider = gridMatrixProviderSector;
     this.grid.solid = gridSolid;
     return this.grid;
   }

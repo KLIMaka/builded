@@ -66,8 +66,8 @@ export class GridBuilder extends BufferRenderable<GridSetup> {
   protected textureHint() { return null }
 
   public setup(setup: GridSetup) {
-    setup.shader('grid')
-      .grid(this.gridTexMatProvider(this.gridController.getGridSize()));
+    setup.shader('grid');
+    // .grid(this.gridTexMatProvider(this.gridController.getGridSize()));
   }
 
   public draw(gl: WebGLRenderingContext, state: State): void {

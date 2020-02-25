@@ -6,7 +6,8 @@ import { Dependency, Injector } from '../../../utils/injector';
 import { info } from '../../../utils/logger';
 import * as PROFILER from '../../../utils/profiler';
 import { Renderable } from '../../apis/renderable';
-import { GL, UtilityTextures_ } from '../buildartprovider';
+import { GL } from '../buildartprovider';
+import { GRID, GridController } from '../context';
 
 export const PAL_TEXTURE = new Dependency<Texture>('PAL Texture');
 export const PLU_TEXTURE = new Dependency<Texture>('PLU Texture');
@@ -21,9 +22,9 @@ export function BuildGlConstructor(injector: Injector): Promise<BuildGl> {
     injector.getInstance(PLU_TEXTURE),
     injector.getInstance(PALSWAPS),
     injector.getInstance(SHADOWSTEPS),
-    injector.getInstance(UtilityTextures_),
-  ]).then(([gl, pal, plus, plaswaps, shadowsteps, util]) => {
-    const buildgl = new BuildGl(plaswaps, shadowsteps, gl, pal, plus, util[-3], () => resolve(buildgl))
+    injector.getInstance(GRID),
+  ]).then(([gl, pal, plus, plaswaps, shadowsteps, grid]) => {
+    const buildgl = new BuildGl(plaswaps, shadowsteps, gl, pal, plus, grid, () => resolve(buildgl))
   }));
 }
 
@@ -35,7 +36,7 @@ const clipPlane = vec4.create();
 export class BuildGl {
   private state = new State();
 
-  constructor(palswaps: number, shadowsteps: number, gl: WebGLRenderingContext, pal: Texture, plus: Texture, grid: Texture, cb: () => void) {
+  constructor(palswaps: number, shadowsteps: number, gl: WebGLRenderingContext, pal: Texture, plus: Texture, private gridController: GridController, cb: () => void) {
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.enable(gl.CULL_FACE);
     gl.enable(gl.DEPTH_TEST);
@@ -54,7 +55,6 @@ export class BuildGl {
     ]).then(r => {
       this.state.setTexture('pal', pal);
       this.state.setTexture('plu', plus);
-      this.state.setTexture('grid', grid);
       cb()
     });
   }
@@ -89,6 +89,7 @@ export class BuildGl {
     gl.clearDepth(1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
     this.state.setUniform('sys', [performance.now(), 2 / gl.drawingBufferWidth, 2 / gl.drawingBufferHeight, 0]);
+    this.state.setUniform('sys1', [this.gridController.getGridSize(), 0, 0, 0]);
   }
 
   private updateProfile(profile: Profile) {

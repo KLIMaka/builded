@@ -76,10 +76,10 @@ export class SolidSetup extends BufferSetup {
 export class GridSetup extends BufferSetup {
   constructor(state: State) {
     super(state);
-    this.register('GT', state);
+    // this.register('GT', state);
   }
 
-  public grid(grid: Mat4Array) { this.values.set(11, grid); return this }
+  // public grid(grid: Mat4Array) { this.values.set(11, grid); return this }
 }
 
 export class WireframeSetup extends BufferSetup {

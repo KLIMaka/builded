@@ -59,7 +59,7 @@ export class ShaderImpl implements Shader {
 }
 
 export async function createShader(gl: WebGLRenderingContext, name: string, defines: string[] = []): Promise<Shader> {
-  const deftext = defines.map(d => "#define " + d).join("\n") + "\n";
+  const deftext = '#version 300 es\n' + defines.map(d => "#define " + d).join("\n") + "\n";
   return Promise.all([loadString(name + '.vsh'), loadString(name + '.fsh')]).then(([vsh, fsh]) => {
     return Promise.all([preprocess(vsh), preprocess(fsh)]).then(([pvhs, pfsh]) => {
       const program = compileProgram(gl, deftext + pvhs, deftext + pfsh);

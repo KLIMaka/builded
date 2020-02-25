@@ -16,7 +16,6 @@ import { View2d } from './view2d';
 const scale = vec3.create();
 const offset = vec3.create();
 const gridMatrix = mat4.create();
-const idMat4 = mat4.create();
 const visible = new AllBoardVisitorResult();
 
 export async function Renderer2D(injector: Injector) {
@@ -70,19 +69,21 @@ export class BoardRenderer2D {
       mat4.translate(gridMatrix, gridMatrix, offset);
       return this.grid;
     }
+
     const gridSolid = this.builders.solid('utils');
-    gridSolid.trans = 0.5;
+    gridSolid.trans = 0.2;
     const buff = gridSolid.buff;
+    const size = 64 * 1024;
     buff.allocate(4, 6);
-    buff.writePos(0, -1, 1, 0);
-    buff.writePos(1, 1, 1, 0);
-    buff.writePos(2, 1, -1, 0);
-    buff.writePos(3, -1, -1, 0);
+    buff.writePos(0, -size, 0, size);
+    buff.writePos(1, size, 0, size);
+    buff.writePos(2, size, 0, -size);
+    buff.writePos(3, -size, 0, -size);
     buff.writeTcLighting(0, -1, 1);
     buff.writeTcLighting(1, 1, 1);
     buff.writeTcLighting(2, 1, -1);
     buff.writeTcLighting(3, -1, 1);
-    buff.writeQuad(0, 0, 1, 2, 3);
+    buff.writeQuad(0, 3, 2, 1, 0);
     this.grid = new GridBuilder(this.gridController);
     this.grid.gridTexMatProvider = (scale: number) => gridMatrix;
     this.grid.solid = gridSolid;
@@ -104,17 +105,17 @@ export class BoardRenderer2D {
     this.upp = controller.getUnitsPerPixel();
     const result = visible.visit(this.board());
     PROFILE.endProfile();
-    this.bgl.setProjectionMatrix(idMat4);
-    this.bgl.setViewMatrix(idMat4);
+
+    this.bgl.setProjectionMatrix(view.getProjectionMatrix());
+    this.bgl.setViewMatrix(view.getTransformMatrix());
+    this.bgl.setPosition(view.getPosition());
+
     view.gl.disable(WebGLRenderingContext.DEPTH_TEST);
     view.gl.enable(WebGLRenderingContext.BLEND);
     this.bgl.draw(view.gl, this.getGrid(controller));
     this.bgl.flush(view.gl);
     view.gl.disable(WebGLRenderingContext.BLEND);
 
-    this.bgl.setProjectionMatrix(view.getProjectionMatrix());
-    this.bgl.setViewMatrix(view.getTransformMatrix());
-    this.bgl.setPosition(view.getPosition());
     this.drawRooms(view, result);
     view.gl.enable(WebGLRenderingContext.DEPTH_TEST);
   }

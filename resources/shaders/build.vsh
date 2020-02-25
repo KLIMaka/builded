@@ -6,14 +6,14 @@ uniform mat4 IV;
 uniform mat4 GT;
 uniform vec4 sys;
 
-attribute vec3 aNorm;
-attribute vec3 aPos;
-attribute vec4 aTcps;
+in vec3 aNorm;
+in vec3 aPos;
+in vec4 aTcps;
 
-varying vec4 tcps;
-varying vec2 gridtc;
-varying vec3 wpos;
-varying vec3 wnormal;
+out vec4 tcps;
+out vec2 gridtc;
+out vec3 wpos;
+out vec3 wnormal;
 
 void main() {
   wpos = aPos;

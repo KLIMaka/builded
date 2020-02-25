@@ -3,20 +3,21 @@ precision highp float;
 uniform sampler2D base;
 uniform sampler2D pal;
 uniform sampler2D plu;
-uniform sampler2D grid;
 
 uniform vec3 curpos;
 uniform vec3 eyepos;
 uniform vec4 clipPlane;
 uniform vec4 sys;
+uniform vec4 sys1;
 
 uniform vec4 color;
-uniform int shade;
 
-varying vec4 tcps;
-varying vec2 gridtc;
-varying vec3 wpos;
-varying vec3 wnormal;
+in vec4 tcps;
+in vec2 gridtc;
+in vec3 wpos;
+in vec3 wnormal;
+
+out vec4 fragColor;
 
 const float trans = float(255.0/256.0);
 const float PI = 3.1415926538;
@@ -75,13 +76,13 @@ float lightOffset(float lightLevel) {
 
 vec3 sampleColor(float palIdx, float lightLevel, float overbright) {
   float off = palLightOffset(lightLevel);
-  float pluIdx = texture2D(plu, vec2(palIdx, off)).r;
-  vec3 color = texture2D(pal, vec2(pluIdx, 0)).rgb;
+  float pluIdx = texture(plu, vec2(palIdx, off)).r;
+  vec3 color = texture(pal, vec2(pluIdx, 0)).rgb;
   return color * overbright * lightOffset(lightLevel);
 }
 
 vec3 palLookup(vec2 tc) {
-  float palIdx = texture2D(base, fract(tc)).r;
+  float palIdx = textureGrad(base, fract(tc), dFdx(tc), dFdy(tc)).r;
   if (palIdx >= trans)
     discard;
   float lightLevel = clamp(lightOffset() + diffuse() + specular(), 0.5, SHADOWSTEPS - 0.5) / SHADOWSTEPS;
@@ -96,21 +97,16 @@ void clip() {
 
 void writeColor(vec3 c, vec4 m) {
   if (m.a == 0.0) discard;
-  if (m.a < 0.0) gl_FragColor = vec4(vec3(m.rgb * c), (sin(sys.x / -m.a) + 1.0) / 2.0 );
-  else gl_FragColor = vec4(vec3(m.rgb * c), m.a);
-}
-
-float foo(float x) {
-  float v1 = fract(x);
-  float v2 = 1.0 - fract(x);
-  return pow(v1, 32.0)*2.0 + pow(v2, 32.0)*2.0;
+  if (m.a < 0.0) fragColor = vec4(vec3(m.rgb * c), (sin(sys.x / -m.a) + 1.0) / 2.0 );
+  else fragColor = vec4(vec3(m.rgb * c), m.a);
 }
 
 vec4 renderGrid() {
-  float x = foo(gridtc.x);
-  float y = foo(gridtc.y);
-  float c = x+y;
-  return vec4(vec3(c), 0.1*c);
+  vec3 coord = wpos.xyz / sys1.x + 0.0003;
+  vec3 grid = abs(fract(coord - 0.5) - 0.5) / fwidth(coord);
+  float line = min(min(grid.x, grid.y), grid.z);
+  float a = 1.0 - min(line, 1.0);
+  return vec4(0.4, 0.4, 0.4, a);
 }
 
 void main() {
@@ -126,10 +122,9 @@ void main() {
 #elif defined NORMAL
   writeColor(vec3((wnormal + 1.0) / 2.0), color);
 #elif defined GRID
-  vec4 grid1 = texture2D(grid, gridtc);
   writeColor(vec3(1.0), renderGrid());
 #elif defined SPRITE_FACE
-  writeColor(color.rgb, texture2D(base, tcps.xy));
+  writeColor(color.rgb, texture(base, tcps.xy));
 #else
   writeColor(palLookup(tcps.xy), color);
 #endif

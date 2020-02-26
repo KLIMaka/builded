@@ -82,7 +82,8 @@ export function arcsIntersects(a1s: number, a1e: number, a2s: number, a2e: numbe
 }
 
 export function cyclic(x: number, max: number): number {
-  return x > 0 ? (x % max) : (max + x % max);
+  const mod = x % max;
+  return x >= 0 ? mod : mod == 0 ? max - 1 : max + mod;
 }
 
 export function reverse(x: number, max: number) {

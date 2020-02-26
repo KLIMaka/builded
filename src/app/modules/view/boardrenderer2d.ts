@@ -1,6 +1,6 @@
 import { AllBoardVisitorResult, VisResult } from '../../../build/boardvisitor';
 import { Board } from '../../../build/structs';
-import { Vec3Array } from '../../../libs_js/glmatrix';
+import { Vec3Array, mat4 } from '../../../libs_js/glmatrix';
 import { Controller2D } from '../../../utils/camera/controller2d';
 import { Deck } from '../../../utils/collections';
 import { Injector } from '../../../utils/injector';
@@ -12,19 +12,18 @@ import { RENDRABLES_CACHE } from '../geometry/cache';
 import { BuildersFactory, BUILDERS_FACTORY, GridBuilder } from '../geometry/common';
 import { BuildGl, BUILD_GL } from '../gl/buildgl';
 import { View2d } from './view2d';
-import { gridMatrixProviderSector } from '../geometry/builders/common';
+import { GRID_SECTOR_MATRIX } from '../geometry/builders/common';
 
 const visible = new AllBoardVisitorResult();
 
 export async function Renderer2D(injector: Injector) {
-  const [bgl, builders, renderables, grid, board] = await Promise.all([
+  const [bgl, builders, renderables, board] = await Promise.all([
     injector.getInstance(BUILD_GL),
     injector.getInstance(BUILDERS_FACTORY),
     injector.getInstance(RENDRABLES_CACHE),
-    injector.getInstance(GRID),
     injector.getInstance(BOARD),
   ]);
-  return new BoardRenderer2D(bgl, builders, renderables.topdown, grid, board);
+  return new BoardRenderer2D(bgl, builders, renderables.topdown, board);
 }
 
 export class BoardRenderer2D {
@@ -41,11 +40,10 @@ export class BoardRenderer2D {
     private bgl: BuildGl,
     private builders: BuildersFactory,
     private renderables: BuildRenderableProvider,
-    private gridController: GridController,
     private board: BoardProvider
   ) { }
 
-  private getGrid(controller: Controller2D) {
+  private getGrid() {
     if (this.grid != null) return this.grid;
     const gridSolid = this.builders.solid('utils');
     gridSolid.trans = 0.2;
@@ -61,8 +59,8 @@ export class BoardRenderer2D {
     buff.writeTcLighting(2, 1, -1);
     buff.writeTcLighting(3, -1, 1);
     buff.writeQuad(0, 3, 2, 1, 0);
-    this.grid = new GridBuilder(this.gridController);
-    this.grid.gridTexMatProvider = gridMatrixProviderSector;
+    this.grid = new GridBuilder();
+    mat4.copy(this.grid.gridTexMat, GRID_SECTOR_MATRIX);
     this.grid.solid = gridSolid;
     return this.grid;
   }
@@ -89,7 +87,7 @@ export class BoardRenderer2D {
 
     view.gl.disable(WebGLRenderingContext.DEPTH_TEST);
     view.gl.enable(WebGLRenderingContext.BLEND);
-    this.bgl.draw(view.gl, this.getGrid(controller));
+    this.bgl.draw(view.gl, this.getGrid());
     this.bgl.flush(view.gl);
     view.gl.disable(WebGLRenderingContext.BLEND);
 

@@ -7,8 +7,8 @@ import { BuildRenderableProvider, LayeredRenderables, WallRenderable } from "../
 import { BuildBuffer } from "../../gl/buffers";
 import { RenderablesCacheContext } from "../cache";
 import { BuildersFactory, PointSpriteBuilder, SolidBuilder } from "../common";
-import { createGridMatrixProviderWall, text } from "./common";
-import { vec4 } from "../../../../libs_js/glmatrix";
+import { text, createGridWallMatrix, WallGridType } from "./common";
+import { vec4, mat4 } from "../../../../libs_js/glmatrix";
 
 export class WallHelperBuilder extends Builders implements WallRenderable {
   constructor(
@@ -185,17 +185,18 @@ export function updateWallHelper(cache: BuildRenderableProvider, ctx: Renderable
 
   updateWallWireframe(ctx, wallId, builder);
   const wallRenderable = cache.wall(wallId);
-  const gridMatrix = createGridMatrixProviderWall(ctx.board(), wallId);
+  const board = ctx.board();
+  const wall = board.walls[wallId];
 
-  builder.topGrid.gridTexMatProvider = gridMatrix;
+  mat4.copy(builder.topGrid.gridTexMat, createGridWallMatrix(board, wallId, WallGridType.TOP));
   builder.topGrid.solid = <SolidBuilder>wallRenderable.top;
   addWallPoints(ctx, builder.topPoints, wallId, true);
   addLength(ctx, builder.topLength, wallId, true);
 
-  builder.midGrid.gridTexMatProvider = gridMatrix;
+  mat4.copy(builder.midGrid.gridTexMat, createGridWallMatrix(board, wallId, wall.nextsector == -1 ? WallGridType.VOID : WallGridType.TOP));
   builder.midGrid.solid = <SolidBuilder>wallRenderable.mid;
 
-  builder.botGrid.gridTexMatProvider = gridMatrix;
+  mat4.copy(builder.botGrid.gridTexMat, createGridWallMatrix(board, wallId, WallGridType.BOT));
   builder.botGrid.solid = <SolidBuilder>wallRenderable.bot;
   addWallPoints(ctx, builder.botPoints, wallId, false);
   addLength(ctx, builder.botLength, wallId, false);

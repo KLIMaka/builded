@@ -1,4 +1,4 @@
-import { Mat4Array, vec4 } from "../../../libs_js/glmatrix";
+import { Mat4Array, vec4, mat4 } from "../../../libs_js/glmatrix";
 import { Texture } from "../../../utils/gl/drawstruct";
 import { State } from "../../../utils/gl/stategl";
 import { Dependency, Injector } from "../../../utils/injector";
@@ -16,10 +16,9 @@ export const BUILDERS_FACTORY = new Dependency<BuildersFactory>('Builder Factory
 
 export async function DefaultBuildersFactory(injector: Injector) {
   const bufferFactory = await injector.getInstance(BUFFER_FACTORY);
-  const gridController = await injector.getInstance(GRID);
   return {
     solid: (hint: string) => new SolidBuilder(bufferFactory.get('solid-' + hint)),
-    grid: (hint: string) => new GridBuilder(gridController),
+    grid: (hint: string) => new GridBuilder(),
     pointSprite: (hint: string) => new PointSpriteBuilder(bufferFactory.get('pointsprite-' + hint)),
     wireframe: (hint: string) => new WireframeBuilder(bufferFactory.get('wireframe-' + hint))
   }
@@ -57,17 +56,17 @@ export class SolidBuilder extends BufferRenderable<SolidSetup> {
 
 export class GridBuilder extends BufferRenderable<GridSetup> {
   public solid: SolidBuilder;
-  public gridTexMatProvider: (scale: number) => Mat4Array;
+  public gridTexMat = mat4.create();
 
-  constructor(private gridController: GridController) { super(GRID_SETUP) }
+  constructor() { super(GRID_SETUP) }
 
   public get buff() { return this.solid.buff }
-  public reset() { }
+  public reset() { mat4.identity(this.gridTexMat) }
   protected textureHint() { return null }
 
   public setup(setup: GridSetup) {
     setup.shader('grid')
-      .grid(this.gridTexMatProvider(this.gridController.getGridSize()));
+      .grid(this.gridTexMat);
   }
 
   public draw(gl: WebGLRenderingContext, state: State): void {

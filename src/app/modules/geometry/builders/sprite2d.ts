@@ -1,11 +1,11 @@
-import { ang2vec, spriteAngle, ZSCALE } from "../../../../build/utils";
-import { vec3, vec4 } from "../../../../libs_js/glmatrix";
+import { FACE_SPRITE, WALL_SPRITE } from "../../../../build/structs";
+import { spriteAngle, ZSCALE } from "../../../../build/utils";
+import { vec4 } from "../../../../libs_js/glmatrix";
+import { cyclicPairs } from "../../../../utils/collections";
 import { Builders } from "../../../apis/builder";
 import { SPRITE_LABEL } from "../../../apis/renderable";
 import { RenderablesCacheContext } from "../cache";
 import { BuildersFactory, SolidBuilder, WireframeBuilder } from "../common";
-import { WALL_SPRITE, FACE_SPRITE } from "../../../../build/structs";
-import { cyclicPairs } from "../../../../utils/collections";
 
 export class Sprite2dBuilder extends Builders {
   constructor(
@@ -89,8 +89,8 @@ function updateSpriteLine(ctx: RenderablesCacheContext, spriteId: number, builde
   const ang = spriteAngle(sprite.ang);
   const dx = Math.sin(ang) * hw;
   const dy = Math.cos(ang) * hw;
-  const dxt = Math.sin(ang + Math.PI / 2) * 32;
-  const dyt = Math.cos(ang + Math.PI / 2) * 32;
+  const dxt = Math.sin(ang + Math.PI / 2) * 16;
+  const dyt = Math.cos(ang + Math.PI / 2) * 16;
   const x = sprite.x;
   const y = sprite.y;
   const z = sprite.z / ZSCALE;
@@ -98,8 +98,8 @@ function updateSpriteLine(ctx: RenderablesCacheContext, spriteId: number, builde
   builder.mode = WebGLRenderingContext.TRIANGLES;
   const buff = builder.buff;
   buff.allocate(4, 6);
-  buff.writePos(0, x - dx, z, y - dy);
-  buff.writePos(1, x + dx, z, y + dy);
+  buff.writePos(0, x - dx - dxt, z, y - dy - dyt);
+  buff.writePos(1, x + dx - dxt, z, y + dy - dyt);
   buff.writePos(2, x + dx + dxt, z, y + dy + dyt);
   buff.writePos(3, x - dx + dxt, z, y - dy + dyt);
   buff.writeQuad(0, 3, 2, 1, 0);

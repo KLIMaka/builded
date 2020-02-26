@@ -80,6 +80,7 @@ function updateSpriteImage(ctx: RenderablesCacheContext, spriteId: number, build
   buff.writeQuad(0, 0, 1, 2, 3);
 }
 
+const WALL_SPRITE_LINE_WIDTH = 32;
 function updateSpriteLine(ctx: RenderablesCacheContext, spriteId: number, builder: WireframeBuilder) {
   const board = ctx.board();
   const sprite = board.sprites[spriteId];
@@ -89,8 +90,8 @@ function updateSpriteLine(ctx: RenderablesCacheContext, spriteId: number, builde
   const ang = spriteAngle(sprite.ang);
   const dx = Math.sin(ang) * hw;
   const dy = Math.cos(ang) * hw;
-  const dxt = Math.sin(ang + Math.PI / 2) * 16;
-  const dyt = Math.cos(ang + Math.PI / 2) * 16;
+  const dxt = Math.sin(ang + Math.PI / 2) * (WALL_SPRITE_LINE_WIDTH / 2);
+  const dyt = Math.cos(ang + Math.PI / 2) * (WALL_SPRITE_LINE_WIDTH / 2);
   const x = sprite.x;
   const y = sprite.y;
   const z = sprite.z / ZSCALE;
@@ -98,11 +99,11 @@ function updateSpriteLine(ctx: RenderablesCacheContext, spriteId: number, builde
   builder.mode = WebGLRenderingContext.TRIANGLES;
   const buff = builder.buff;
   buff.allocate(4, 6);
-  buff.writePos(0, x - dx - dxt, z, y - dy - dyt);
-  buff.writePos(1, x + dx - dxt, z, y + dy - dyt);
-  buff.writePos(2, x + dx + dxt, z, y + dy + dyt);
-  buff.writePos(3, x - dx + dxt, z, y - dy + dyt);
-  buff.writeQuad(0, 3, 2, 1, 0);
+  buff.writePos(0, x - dx + dxt, z, y - dy + dyt);
+  buff.writePos(1, x + dx + dxt, z, y + dy + dyt);
+  buff.writePos(2, x + dx - dxt, z, y + dy - dyt);
+  buff.writePos(3, x - dx - dxt, z, y - dy - dyt);
+  buff.writeQuad(0, 0, 1, 2, 3);
 }
 
 export function updateSprite2d(ctx: RenderablesCacheContext, sprId: number, builder: Sprite2dBuilder): Sprite2dBuilder {

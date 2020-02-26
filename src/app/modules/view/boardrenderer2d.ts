@@ -1,18 +1,17 @@
 import { AllBoardVisitorResult, VisResult } from '../../../build/boardvisitor';
 import { Board } from '../../../build/structs';
-import { Vec3Array, mat4 } from '../../../libs_js/glmatrix';
+import { mat4, Vec3Array } from '../../../libs_js/glmatrix';
 import { Controller2D } from '../../../utils/camera/controller2d';
 import { Deck } from '../../../utils/collections';
 import { Injector } from '../../../utils/injector';
 import * as PROFILE from '../../../utils/profiler';
 import { BOARD, BoardProvider } from '../../apis/app';
 import { BuildRenderableProvider, HELPER_GRID, HintRenderable, LayeredRenderables, RenderableProvider, SortingRenderable, SPRITE_LABEL } from '../../apis/renderable';
-import { GRID, GridController } from '../context';
+import { GRID_SECTOR_MATRIX } from '../geometry/builders/common';
 import { RENDRABLES_CACHE } from '../geometry/cache';
 import { BuildersFactory, BUILDERS_FACTORY, GridBuilder } from '../geometry/common';
 import { BuildGl, BUILD_GL } from '../gl/buildgl';
 import { View2d } from './view2d';
-import { GRID_SECTOR_MATRIX } from '../geometry/builders/common';
 
 const visible = new AllBoardVisitorResult();
 

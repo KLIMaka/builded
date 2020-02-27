@@ -9,7 +9,7 @@ import { cyclic, len2d, tuple } from "../../utils/mathutils";
 import { Message, MessageHandlerReflective } from "../apis/handler";
 import { EditContext } from "./context";
 import { invalidateSectorAndWalls } from "./editutils";
-import { BoardInvalidate, EndMove, Flip, Highlight, Move, Palette, PanRepeat, ResetPanRepeat, SetPicnum, SetWallCstat, Shade, StartMove } from "./messages";
+import { BoardInvalidate, EndMove, Flip, Highlight, Move, Palette, PanRepeat, ResetPanRepeat, Rotate, SetPicnum, SetWallCstat, Shade, StartMove } from "./messages";
 
 function getClosestWallByIds(board: Board, target: Target, ids: Iterable<number>): number {
   let id = -1;
@@ -127,6 +127,23 @@ export class WallSegmentsEnt extends MessageHandlerReflective {
   public EndMove(msg: EndMove) {
     this.active = false;
     for (let w of this.wallIds) mergePoints(this.ctx.board(), w, this.ctx.refs);
+  }
+
+  public Rotate(msg: Rotate) {
+    const board = this.ctx.board();
+    const target = this.ctx.view.snapTarget();
+    const [cx, cy] = target.coords;
+    for (const w of this.wallIds) {
+      const wall = board.walls[w];
+      const dx = wall.x - cx;
+      const dy = wall.y - cy;
+      const sn = Math.sin((msg.da / 128) * (Math.PI / 8));
+      const cs = Math.cos((msg.da / 128) * (Math.PI / 8));
+      const ndx = dx * cs - dy * sn;
+      const ndy = dx * sn + dy * cs;
+      moveWall(board, w, cx + ndx, cy + ndy);
+    }
+    this.invalidate();
   }
 
   public Highlight(msg: Highlight) {

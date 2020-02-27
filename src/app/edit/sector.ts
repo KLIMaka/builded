@@ -1,13 +1,13 @@
 import { deleteSector } from "../../build/boardutils";
 import { Entity, EntityType } from "../../build/hitscan";
-import { heinumCalc, sectorZ, setSectorHeinum, setSectorPicnum, setSectorZ, ZSCALE } from "../../build/utils";
+import { sectorHeinum, sectorZ, setSectorHeinum, setSectorPicnum, setSectorZ, ZSCALE } from "../../build/utils";
 import * as GLM from "../../libs_js/glmatrix";
 import { cyclic, tuple } from "../../utils/mathutils";
 import { Message, MessageHandlerReflective } from "../apis/handler";
 import { EditContext } from "./context";
 import { invalidateSectorAndWalls } from "./editutils";
-import { BoardInvalidate, Highlight, Move, NamedMessage, Palette, PanRepeat, ResetPanRepeat, SetPicnum, SetSectorCstat, Shade, StartMove, COMMIT } from "./messages";
-import { MOVE_ROTATE, MOVE_VERTICAL } from "./tools/selection";
+import { BoardInvalidate, COMMIT, Highlight, Move, NamedMessage, Palette, PanRepeat, ResetPanRepeat, Rotate, SetPicnum, SetSectorCstat, Shade, StartMove } from "./messages";
+import { MOVE_VERTICAL } from "./tools/selection";
 
 const resetPanrepeat = new PanRepeat(0, 0, 0, 0, true);
 
@@ -34,14 +34,7 @@ export class SectorEnt extends MessageHandlerReflective {
   }
 
   public Move(msg: Move) {
-    if (this.ctx.state.get(MOVE_ROTATE)) {
-      let x = this.origin[0];
-      let y = this.origin[1];
-      let z = this.ctx.gridController.snap(this.originz + msg.dz * ZSCALE);
-      let h = heinumCalc(this.ctx.board(), this.sectorEnt.id, x, y, z);
-      if (setSectorHeinum(this.ctx.board(), this.sectorEnt, h))
-        invalidateSectorAndWalls(this.sectorEnt.id, this.ctx.board(), this.ctx.bus);
-    } else if (this.ctx.state.get(MOVE_VERTICAL)) {
+    if (this.ctx.state.get(MOVE_VERTICAL)) {
       const ent = this.ctx.view.target().entity;
       let z = ent != null && ent.isSector() && ent.id != this.sectorEnt.id
         ? sectorZ(this.ctx.board(), ent) / ZSCALE
@@ -49,6 +42,13 @@ export class SectorEnt extends MessageHandlerReflective {
       if (setSectorZ(this.ctx.board(), this.sectorEnt, z * ZSCALE))
         invalidateSectorAndWalls(this.sectorEnt.id, this.ctx.board(), this.ctx.bus);
     }
+  }
+
+  public Rotate(msg: Rotate) {
+    const board = this.ctx.board();
+    const h = sectorHeinum(board, this.sectorEnt);
+    setSectorHeinum(board, this.sectorEnt, h + msg.da);
+    invalidateSectorAndWalls(this.sectorEnt.id, board, this.ctx.bus);
   }
 
   public Highlight(msg: Highlight) {

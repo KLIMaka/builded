@@ -146,7 +146,7 @@ export function closestSpriteInSectorDist(board: Board, secId: number, x: number
 
 export function closestSpriteInSector(board: Board, secId: number, x: number, y: number, d: number): number {
   const [s, dist] = closestSpriteInSectorDist(board, secId, x, y);
-  return dist <= dist ? s : -1;
+  return dist <= d ? s : -1;
 }
 
 export function wallInSector(board: Board, secId: number, x: number, y: number) {

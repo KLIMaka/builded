@@ -236,14 +236,15 @@ export class Selection extends MessageHandlerReflective {
     const target = this.ctx.view.snapTarget();
     if (target.entity == null) return;
     const [x, y, z] = target.coords;
+    const ent = target.entity;
     this.picnumSelector((picnum: number) => {
       if (picnum == -1) return;
       const board = this.ctx.board();
-      if (target.entity.isWall()) {
-        const normal = wallNormal(vec3.create(), board, target.entity.id);
+      if (ent.isWall()) {
+        const normal = wallNormal(vec3.create(), board, ent.id);
         const offx = normal[0] * 2;
         const offy = normal[2] * 2;
-        const spriteId = insertSprite(board, x + offx, y + offy, int(z));
+        const spriteId = insertSprite(board, x + offx, y + offy, this.ctx.gridController.snap(z));
         const sprite = board.sprites[spriteId];
         sprite.picnum = picnum;
         sprite.cstat.type = WALL_SPRITE;

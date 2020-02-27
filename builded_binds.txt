@@ -22,6 +22,8 @@ wheelUp         msg shade 1 false
 wheelDown       msg shade -1 false
 SHIFT+wheelUp   msg shade 8 false
 SHIFT+wheelDown msg shade -8 false
+ALT+wheelDown   msg rotate -128
+ALT+wheelUp     msg rotate 128
 K               msg wallcstat swapBottoms true true
 M               msg wallcstat alignBottom true true
 R               msg sprite_mode

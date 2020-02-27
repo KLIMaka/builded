@@ -17,7 +17,7 @@ import { GL } from "../buildartprovider";
 import { GRID, GridController } from "../context";
 import { BuildGl, BUILD_GL } from "../gl/buildgl";
 import { Boardrenderer3D, Renderer3D } from "./boardrenderer3d";
-import { snapWall, TargetImpl } from "./view";
+import { snapWall, TargetImpl, ViewPosition } from "./view";
 
 export async function View3dConstructor(injector: Injector) {
   const [gl, renderer, buildgl, board, state, grid, art] = await Promise.all([
@@ -34,7 +34,7 @@ export async function View3dConstructor(injector: Injector) {
 
 export class View3d extends MessageHandlerReflective implements View {
   readonly gl: WebGLRenderingContext;
-  private playerstart: Sprite;
+  private position: ViewPosition;
   private aspect: number;
   private control = new Controller3D();
   private mouseX = 0;
@@ -74,20 +74,25 @@ export class View3d extends MessageHandlerReflective implements View {
     this.loadBoard(board());
   }
 
-  get sec() { return this.playerstart.sectnum }
-  get x() { return this.playerstart.x }
-  get y() { return this.playerstart.y }
-  get z() { return this.playerstart.z }
+  get sec() { return this.position.sec }
+  get x() { return this.position.x }
+  get y() { return this.position.y }
+  get z() { return this.position.z }
 
   getProjectionMatrix() { return this.control.getProjectionMatrix(this.aspect) }
   getTransformMatrix() { return this.control.getTransformMatrix() }
   getPosition() { return this.control.getPosition() }
   getForward() { return this.control.getForward() }
-  activate() { this.control.setPosition(this.playerstart.x, this.playerstart.z / ZSCALE + 1024, this.playerstart.y) }
   drawTools(provider: RenderableProvider<HintRenderable>) { this.renderer.drawTools(this.gl, provider) }
   target(): Target { return this.hit.get() }
   snapTarget(): Target { return this.snapTargetValue.get() }
   dir(): Ray { return this.direction.get() }
+  getViewPosition() { return this.position }
+
+  activate(pos: ViewPosition) {
+    this.position = pos;
+    this.control.setPosition(this.position.x, this.position.z / ZSCALE + 1024, this.position.y);
+  }
 
   Mouse(msg: Mouse) {
     this.mouseX = msg.x;
@@ -118,11 +123,11 @@ export class View3d extends MessageHandlerReflective implements View {
 
     const board = this.board();
     const p = this.control.getPosition();
-    this.playerstart.x = int(p[0]);
-    this.playerstart.y = int(p[2]);
-    this.playerstart.z = int(p[1] * ZSCALE);
-    if (!inSector(board, this.playerstart.x, this.playerstart.y, this.playerstart.sectnum))
-      this.playerstart.sectnum = findSector(board, this.playerstart.x, this.playerstart.y, this.playerstart.sectnum);
+    this.position.x = int(p[0]);
+    this.position.y = int(p[2]);
+    this.position.z = int(p[1] * ZSCALE);
+    if (!inSector(board, this.position.x, this.position.y, this.position.sec))
+      this.position.sec = findSector(board, this.position.x, this.position.y, this.position.sec);
   }
 
   NamedMessage(msg: NamedMessage) {
@@ -138,8 +143,9 @@ export class View3d extends MessageHandlerReflective implements View {
   }
 
   private loadBoard(board: Board) {
-    this.playerstart = getPlayerStart(board);
-    this.control.setPosition(this.playerstart.x, this.playerstart.z / ZSCALE + 1024, this.playerstart.y);
+    const sprite = getPlayerStart(board);
+    this.position = { x: sprite.x, y: sprite.y, z: sprite.z, sec: sprite.sectnum };
+    this.control.setPosition(this.position.x, this.position.z / ZSCALE + 1024, this.position.y);
     this.invalidateTarget();
   }
 

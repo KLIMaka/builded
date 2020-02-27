@@ -1,12 +1,12 @@
 import { deleteLoop, deleteLoopFull, deleteSectorFull, fillInnerLoop, insertSprite, loopWalls, loopWallsFull, nextwall, setFirstWall } from "../../../build/boardutils";
 import { Entity, EntityType, Target } from "../../../build/hitscan";
-import { Board } from "../../../build/structs";
-import { build2gl, sectorOfWall, slope } from "../../../build/utils";
+import { Board, WALL_SPRITE } from "../../../build/structs";
+import { build2gl, sectorOfWall, slope, wallNormal, vec2ang } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 import { Collection, Deck } from "../../../utils/collections";
 import { create, Dependency, Injector } from "../../../utils/injector";
 import { error, info } from "../../../utils/logger";
-import { detuple0, detuple1 } from "../../../utils/mathutils";
+import { detuple0, detuple1, int } from "../../../utils/mathutils";
 import { BUS, Message, MessageHandler, MessageHandlerList, MessageHandlerReflective } from "../../apis/handler";
 import { RenderablesCache, RENDRABLES_CACHE } from "../../modules/geometry/cache";
 import { EntityFactory, ENTITY_FACTORY } from "../context";
@@ -234,13 +234,25 @@ export class Selection extends MessageHandlerReflective {
 
   private insertSprite() {
     const target = this.ctx.view.snapTarget();
-    if (target.entity == null || !target.entity.isSector()) return;
+    if (target.entity == null) return;
     const [x, y, z] = target.coords;
     this.picnumSelector((picnum: number) => {
       if (picnum == -1) return;
       const board = this.ctx.board();
-      const spriteId = insertSprite(board, x, y, z);
-      board.sprites[spriteId].picnum = picnum;
+      if (target.entity.isWall()) {
+        const normal = wallNormal(vec3.create(), board, target.entity.id);
+        const offx = normal[0] * 2;
+        const offy = normal[2] * 2;
+        const spriteId = insertSprite(board, x + offx, y + offy, int(z));
+        const sprite = board.sprites[spriteId];
+        sprite.picnum = picnum;
+        sprite.cstat.type = WALL_SPRITE;
+        sprite.ang = vec2ang(normal[0], normal[2]);
+      } else {
+        const spriteId = insertSprite(board, x, y, z);
+        const sprite = board.sprites[spriteId];
+        sprite.picnum = picnum;
+      }
       this.ctx.bus.handle(COMMIT);
     });
   }

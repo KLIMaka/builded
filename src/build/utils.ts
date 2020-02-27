@@ -379,3 +379,7 @@ export function ang2vec(ang: number): GLM.Vec3Array {
 export function spriteAngle(ang: number): number {
   return MU.PI2 - (ang * ANGSCALE * 2) * MU.PI2;
 }
+
+export function vec2ang(x: number, y: number) {
+  return MU.int((MU.monoatan2(y, x) / MU.PI2) / ANGSCALE / 2);
+}

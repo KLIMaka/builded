@@ -4,7 +4,7 @@ import { vec4 } from "../../../../libs_js/glmatrix";
 import { cyclicPairs } from "../../../../utils/collections";
 import { Builders } from "../../../apis/builder";
 import { SPRITE_LABEL } from "../../../apis/renderable";
-import { RenderablesCacheContext } from "../cache";
+import { RenderablesCacheContext, SPRITE_COLOR } from "../cache";
 import { BuildersFactory, SolidBuilder, WireframeBuilder } from "../common";
 
 export class Sprite2dBuilder extends Builders {
@@ -17,14 +17,14 @@ export class Sprite2dBuilder extends Builders {
   ) { super([ang, img, lines]) }
 }
 
-const CIRCLE_SECTIONS = 8;
+const CIRCLE_SECTIONS = 12;
 const CIRCLE_OUT_RADIUS = 48;
-const CIRCLE_IN_RADIUS = 32;
+const CIRCLE_IN_RADIUS = 40;
 function genSpriteMarker(builder: WireframeBuilder, x: number, y: number, z: number, ang: number, color: [number, number, number, number]) {
   builder.mode = WebGLRenderingContext.TRIANGLES;
   vec4.copy(builder.color, color);
   const buff = builder.buff;
-  buff.allocate(CIRCLE_SECTIONS * 2, CIRCLE_SECTIONS * 6);
+  buff.allocate(CIRCLE_SECTIONS * 2 + 4, CIRCLE_SECTIONS * 6 + 6);
   let off = 0;
   for (let i = 0; i < CIRCLE_SECTIONS; i++) {
     const ang = Math.PI * 2 * (i / CIRCLE_SECTIONS);
@@ -36,6 +36,16 @@ function genSpriteMarker(builder: WireframeBuilder, x: number, y: number, z: num
     buff.writePos(off + 1, x + dxi, z, y + dyi);
     off += 2;
   }
+  const angle = spriteAngle(ang | 0);
+  const hw = ((CIRCLE_OUT_RADIUS - CIRCLE_IN_RADIUS) / 2);
+  const dx = Math.sin(angle) * hw;
+  const dy = Math.cos(angle) * hw;
+  const dx1 = Math.sin(angle + Math.PI / 2) * CIRCLE_IN_RADIUS;
+  const dy1 = Math.cos(angle + Math.PI / 2) * CIRCLE_IN_RADIUS;
+  buff.writePos(off++, x - dx + dx1, z, y - dy + dy1);
+  buff.writePos(off++, x + dx + dx1, z, y + dy + dy1);
+  buff.writePos(off++, x + dx, z, y + dy);
+  buff.writePos(off++, x - dx, z, y - dy);
   off = 0;
   for (const [i1, i2] of cyclicPairs(CIRCLE_SECTIONS)) {
     const off1 = i1 * 2;
@@ -44,13 +54,15 @@ function genSpriteMarker(builder: WireframeBuilder, x: number, y: number, z: num
     buff.writeTriangle(off + 3, off1 + 1, off2, off2 + 1);
     off += 6;
   }
+  const vtxoff = CIRCLE_SECTIONS * 2;
+  buff.writeQuad(off, vtxoff, vtxoff + 1, vtxoff + 2, vtxoff + 3);
 }
 
 function updateSpriteAngle(ctx: RenderablesCacheContext, spriteId: number, builder: WireframeBuilder): WireframeBuilder {
   builder.mode = WebGLRenderingContext.TRIANGLES;
   const board = ctx.board();
   const sprite = board.sprites[spriteId];
-  genSpriteMarker(builder, sprite.x, sprite.y, sprite.z / ZSCALE, sprite.ang, [1, 1, 1, 1]);
+  genSpriteMarker(builder, sprite.x, sprite.y, sprite.z / ZSCALE, sprite.ang, ctx.state.get(SPRITE_COLOR));
   return builder;
 }
 
@@ -95,7 +107,7 @@ function updateSpriteLine(ctx: RenderablesCacheContext, spriteId: number, builde
   const x = sprite.x;
   const y = sprite.y;
   const z = sprite.z / ZSCALE;
-  vec4.set(builder.color, 0, 0, 1, 1);
+  vec4.copy(builder.color, ctx.state.get(SPRITE_COLOR));
   builder.mode = WebGLRenderingContext.TRIANGLES;
   const buff = builder.buff;
   buff.allocate(4, 6);

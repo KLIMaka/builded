@@ -1,8 +1,7 @@
-import { Mat4Array, vec4, mat4 } from "../../../libs_js/glmatrix";
+import { mat4, vec4 } from "../../../libs_js/glmatrix";
 import { Texture } from "../../../utils/gl/drawstruct";
 import { State } from "../../../utils/gl/stategl";
 import { Dependency, Injector } from "../../../utils/injector";
-import { GRID, GridController } from "../context";
 import { BUFFER_FACTORY, BuildBuffer } from "../gl/buffers";
 import { BufferRenderable, GridSetup, GRID_SETUP, PointSpriteSetup, POINT_SPRITE_SETUP, SolidSetup, SOLID_SETUP, WireframeSetup, WIREFRAME_SETUP } from "./builders/setups";
 

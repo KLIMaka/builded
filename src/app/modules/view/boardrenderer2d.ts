@@ -68,6 +68,7 @@ export class BoardRenderer2D {
     gl.disable(WebGLRenderingContext.DEPTH_TEST);
     gl.enable(WebGLRenderingContext.BLEND);
     this.surfaces.clear().push(p);
+    this.bgl.modulation(0.984, 0.78, 0.118, 1);
     this.bgl.draw(gl, this.pass);
     this.bgl.flush(gl);
     gl.disable(WebGLRenderingContext.BLEND);

@@ -58,6 +58,8 @@ CTRL+SHIFT+F    show_files
 0               print_info
 F3              load_map
 F4              print_usage
+mouse0          add_selection
+CTRL+D          clear_selection
 
 +W              forward
 +S              backward
@@ -71,5 +73,4 @@ F4              print_usage
 +mouse0         move
 +SHIFT          move.parallel
 +ALT            move.vertical
-+ALT+SHIFT      move.rotate
 +CTRL           move.copy

@@ -1,17 +1,17 @@
 import { deleteLoop, deleteLoopFull, deleteSectorFull, fillInnerLoop, insertSprite, loopWalls, loopWallsFull, nextwall, setFirstWall } from "../../../build/boardutils";
 import { Entity, EntityType, Target } from "../../../build/hitscan";
 import { Board, WALL_SPRITE } from "../../../build/structs";
-import { build2gl, sectorOfWall, slope, wallNormal, vec2ang } from "../../../build/utils";
+import { build2gl, sectorOfWall, slope, vec2ang, wallNormal } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 import { Collection, Deck } from "../../../utils/collections";
 import { create, Dependency, Injector } from "../../../utils/injector";
 import { error, info } from "../../../utils/logger";
-import { detuple0, detuple1, int } from "../../../utils/mathutils";
+import { detuple0, detuple1 } from "../../../utils/mathutils";
 import { BUS, Message, MessageHandler, MessageHandlerList, MessageHandlerReflective } from "../../apis/handler";
 import { RenderablesCache, RENDRABLES_CACHE } from "../../modules/geometry/cache";
 import { EntityFactory, ENTITY_FACTORY } from "../context";
 import { MovingHandle } from "../handle";
-import { BoardInvalidate, EndMove, Frame, Highlight, Move, NamedMessage, Render, SetPicnum, Shade, StartMove, COMMIT } from "../messages";
+import { BoardInvalidate, COMMIT, EndMove, Frame, Highlight, Move, NamedMessage, Render, SetPicnum, Shade, StartMove } from "../messages";
 
 export type PicNumCallback = (picnum: number) => void;
 export type PicNumSelector = (cb: PicNumCallback) => void;
@@ -33,7 +33,6 @@ const SNAP_DIST = 'select.snap_dist';
 export const MOVE_COPY = 'move.copy';
 export const MOVE_VERTICAL = 'move.vertical';
 export const MOVE_PARALLEL = 'move.parallel';
-export const MOVE_ROTATE = 'move.rotate';
 
 const clipboardPicnum = new SetPicnum(0);
 const clipboardShade = new Shade(0, true);
@@ -103,6 +102,7 @@ export async function SelectionModule(injector: Injector) {
 
 export class Selection extends MessageHandlerReflective {
   private selection = new MessageHandlerList();
+  private highlighted = new MessageHandlerList();
   private valid = true;
 
   constructor(
@@ -115,14 +115,13 @@ export class Selection extends MessageHandlerReflective {
     ctx.state.register(MOVE_COPY, false);
     ctx.state.register(MOVE_VERTICAL, false);
     ctx.state.register(MOVE_PARALLEL, false);
-    ctx.state.register(MOVE_ROTATE, false);
     ctx.state.register(LOOP_STATE, false);
     ctx.state.register(FULL_LOOP_STATE, false);
     ctx.state.register(SNAP_DIST, 32);
   }
 
   public Frame(msg: Frame) {
-    if (!handle.isActive()) this.selection.list().clear().pushAll(getFromHitscan(this.factory));
+    if (!handle.isActive()) this.updateSelection();
     if (this.selection.list().isEmpty()) return;
     if (this.activeMove()) {
       this.updateHandle();
@@ -133,6 +132,12 @@ export class Selection extends MessageHandlerReflective {
         error(e);
       }
     }
+  }
+
+  private updateSelection() {
+    const underCursor = getFromHitscan(this.factory);
+    this.highlighted.list().clear().pushAll(underCursor);
+    // this.selection.list().clear().pushAll(underCursor);
   }
 
   public NamedMessage(msg: NamedMessage) {
@@ -148,6 +153,8 @@ export class Selection extends MessageHandlerReflective {
       case 'delete_loop': this.deleteLoop(); return;
       case 'delete_full': this.deleteFull(); return;
       case 'print_usage': this.printPicUsage(); return;
+      case 'add_selection': this.selection.list().pushAll(this.highlighted.list()); return;
+      case 'clear_selection': this.selection.list().clear(); return;
       default: this.selection.handle(msg);
     }
   }
@@ -399,6 +406,7 @@ export class Selection extends MessageHandlerReflective {
 
   public Render(msg: Render) {
     HIGHLIGHT.set.clear();
+    // this.highlighted.handle(HIGHLIGHT);
     this.selection.handle(HIGHLIGHT);
     for (const v of HIGHLIGHT.set.keys()) {
       const type = detuple0(v);

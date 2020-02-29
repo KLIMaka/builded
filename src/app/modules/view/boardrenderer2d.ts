@@ -50,7 +50,7 @@ export class BoardRenderer2D {
     const gridSolid = this.builders.solid('utils');
     gridSolid.trans = 0.2;
     const buff = gridSolid.buff;
-    const size = 64 * 1024;
+    const size = 1024 * 1024;
     buff.allocate(4, 6);
     buff.writePos(0, -size, 0, size);
     buff.writePos(1, size, 0, size);

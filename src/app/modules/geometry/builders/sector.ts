@@ -84,12 +84,8 @@ function triangulate(sector: Sector, walls: Wall[]): [number[][], number[]] {
   return tesselate(contours);
 }
 
-function cacheTriangulate(board: Board, sec: Sector): [number[][], number[]] {
-  return triangulate(sec, board.walls);
-}
-
 function fillBuffersForSector(ceil: boolean, board: Board, s: number, sec: Sector, builder: SectorBuilder, normal: Vec3Array, t: Mat4Array) {
-  const [vtxs, vidxs] = cacheTriangulate(board, sec);
+  const [vtxs, vidxs] = triangulate(sec, board.walls);
   const d = ceil ? builder.ceiling : builder.floor;
   d.buff.allocate(vtxs.length, vidxs.length);
   fillBuffersForSectorNormal(ceil, board, s, sec, d.buff, vtxs, vidxs, normal, t);

@@ -284,7 +284,7 @@ export class Boardrenderer3D {
   private spriteVisitor(board: Board, spriteId: number) {
     let spriter = this.renderables.sprite(spriteId);
     let sprite = board.sprites[spriteId];
-    let trans = sprite.cstat.tranclucentReversed == 1 || sprite.cstat.translucent == 1;
+    let trans = sprite.cstat.translucent == 1;
     (trans ? this.spritesTrans : this.sprites).add(spriter);
     PROFILE.incCount('sprites');
   }

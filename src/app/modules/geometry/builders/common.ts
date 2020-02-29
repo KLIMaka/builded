@@ -31,7 +31,7 @@ export function createGridMatrixProviderWall(board: Board, id: number) {
     vec4.set(tmp, sx, sy, 1, 1);
     mat4.scale(texMat, texMat, tmp);
     mat4.rotateY(texMat, texMat, -Math.atan2(-dy, dx));
-    vec4.set(tmp, -wall1.x, zbase / ZSCALE, -wall1.y, 0);
+    vec4.set(tmp, -wall1.x, -zbase / ZSCALE, -wall1.y, 0);
     return mat4.translate(texMat, texMat, tmp);
   }
 }

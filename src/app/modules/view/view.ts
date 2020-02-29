@@ -3,10 +3,10 @@ import { Entity, Target } from "../../../build/hitscan";
 import { Board } from "../../../build/structs";
 import { create, Dependency, Injector } from "../../../utils/injector";
 import { int, len2d, tuple2 } from "../../../utils/mathutils";
-import { View, STATE, State } from "../../apis/app";
+import { STATE, State, View } from "../../apis/app";
 import { BUS, Message, MessageHandler } from "../../apis/handler";
-import { Renderable, RenderableProvider, HintRenderable } from "../../apis/renderable";
-import { NamedMessage, LoadBoard } from "../../edit/messages";
+import { HintRenderable, RenderableProvider } from "../../apis/renderable";
+import { LoadBoard, NamedMessage } from "../../edit/messages";
 import { GRID, GridController } from "../context";
 import { View2d, View2dConstructor } from "./view2d";
 import { View3d, View3dConstructor } from "./view3d";
@@ -16,6 +16,13 @@ export class TargetImpl implements Target {
   public entity_: Entity = null;
   get coords() { return this.coords_ }
   get entity() { return this.entity_ }
+}
+
+export interface ViewPosition {
+  x: number;
+  y: number;
+  z: number;
+  sec: number;
 }
 
 const snapResult: [number, number] = [0, 0];
@@ -75,11 +82,12 @@ export class SwappableView implements View, MessageHandler {
 
   handle(message: Message) {
     if (message instanceof NamedMessage && message.name == 'view_mode') {
+      const viewPos = this.view.getViewPosition();
       this.view = this.view == this.view3d ? this.view2d : this.view3d;
       const gridScale = this.gridController.getGridSize();
       this.gridController.setGridSize(this.lastGridScale);
       this.lastGridScale = gridScale;
-      this.view.activate();
+      this.view.activate(viewPos);
       return;
     }
     if (message instanceof LoadBoard) {

@@ -1,7 +1,7 @@
 import { vec4 } from "../../../../libs_js/glmatrix";
 import { Builders } from "../../../apis/builder";
 import { WallRenderable } from "../../../apis/renderable";
-import { RenderablesCacheContext } from "../cache";
+import { RenderablesCacheContext, MASKED_WALL_COLOR, WALL_COLOR, INTERSECTOR_WALL_COLOR } from "../cache";
 import { BuildersFactory } from "../common";
 
 export class Wall2dBuilder extends Builders implements WallRenderable {
@@ -13,9 +13,6 @@ export class Wall2dBuilder extends Builders implements WallRenderable {
   ) { super([top, mid, bot]) }
 }
 
-let white = vec4.fromValues(1, 1, 1, 1);
-let red = vec4.fromValues(1, 0, 0, 1);
-let blue = vec4.fromValues(0, 0, 1, 1);
 export function updateWall2d(ctx: RenderablesCacheContext, wallId: number, builder: Wall2dBuilder): Wall2dBuilder {
   builder = builder == null ? new Wall2dBuilder(ctx.factory) : builder;
   let board = ctx.board();
@@ -26,6 +23,11 @@ export function updateWall2d(ctx: RenderablesCacheContext, wallId: number, build
   buff.writePos(0, wall.x, 0, wall.y);
   buff.writePos(1, wall2.x, 0, wall2.y);
   buff.writeLine(0, 0, 1);
-  vec4.copy(builder.mid.color, wall.cstat.masking ? blue : wall.nextwall == -1 ? white : red);
+  const state = ctx.state;
+  vec4.copy(builder.mid.color, wall.cstat.masking
+    ? state.get(MASKED_WALL_COLOR)
+    : wall.nextwall == -1
+      ? state.get(WALL_COLOR)
+      : state.get(INTERSECTOR_WALL_COLOR));
   return builder;
 }

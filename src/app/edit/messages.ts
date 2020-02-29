@@ -10,6 +10,7 @@ export class LoadBoard implements Message { constructor(public board: Board) { }
 export class StartMove implements Message { }
 export class Move implements Message { constructor(public dx: number, public dy: number, public dz: number) { } }
 export class EndMove implements Message { }
+export class Rotate implements Message { constructor(public da: number) { } };
 export class Highlight implements Message { constructor(public set: Set<number> = new Set()) { } }
 export class Render implements Message { constructor(public consumer: RenderableConsumer<HintRenderable>) { } }
 export class SetPicnum implements Message { constructor(public picnum: number) { } }

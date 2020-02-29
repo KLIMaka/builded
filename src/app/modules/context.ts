@@ -3,18 +3,16 @@ import { Board } from '../../build/structs';
 import { Deck, map } from '../../utils/collections';
 import { loadString } from '../../utils/getter';
 import { Texture } from '../../utils/gl/drawstruct';
-import { State as StateGl } from '../../utils/gl/stategl';
 import { createTexture } from '../../utils/gl/textures';
 import { loadImage } from '../../utils/imgutils';
 import { create, Dependency, Injector } from '../../utils/injector';
 import { InputState } from '../../utils/input';
-import { warning } from '../../utils/logger';
 import { cyclic } from '../../utils/mathutils';
 import * as PROFILE from '../../utils/profiler';
-import { ART, BOARD, BoardManipulator_, BoardProvider, BuildReferenceTracker, REFERENCE_TRACKER, State, STATE, View, VIEW, DEFAULT_BOARD } from '../apis/app';
-import { BUS, DefaultMessageBus, Message, MessageBus, MessageHandlerReflective } from '../apis/handler';
+import { ART, BOARD, BoardManipulator_, BoardProvider, BuildReferenceTracker, DEFAULT_BOARD, REFERENCE_TRACKER, State, STATE, View, VIEW } from '../apis/app';
+import { BUS, DefaultMessageBus, MessageBus, MessageHandlerReflective } from '../apis/handler';
 import { ReferenceTrackerImpl } from '../apis/referencetracker';
-import { consumerProvider, HintRenderable, SortingRenderable, WrapRenderable, LayeredRenderables } from '../apis/renderable';
+import { consumerProvider, HintRenderable } from '../apis/renderable';
 import { EntityFactoryConstructor, ENTITY_FACTORY } from '../edit/context';
 import { BoardInvalidate, Frame, LoadBoard, Mouse, NamedMessage, PostFrame, Render } from '../edit/messages';
 import { DrawSectorModule } from '../edit/tools/drawsector';
@@ -32,18 +30,6 @@ import { BUILDERS_FACTORY, DefaultBuildersFactory } from './geometry/common';
 import { BUFFER_FACTORY, DefaultBufferFactory } from './gl/buffers';
 import { BuildGlConstructor, BUILD_GL } from './gl/buildgl';
 import { SwappableViewConstructor } from './view/view';
-
-class History {
-  private history: Deck<Board> = new Deck();
-
-  public push(board: Board) { this.history.push(board) }
-  public pop() { if (this.history.length() > 1) this.history.pop() }
-  public top() { return this.history.top() }
-}
-
-function snapGrid(coord: number, gridSize: number): number {
-  return Math.round(coord / gridSize) * gridSize;
-}
 
 class StateImpl implements State {
   private state: { [index: string]: any } = {};
@@ -105,10 +91,11 @@ export class GridControllerImpl extends MessageHandlerReflective {
     }
   }
 
+  private snapGrid(coord: number): number { const gridSize = this.getGridSize(); return Math.round(coord / gridSize) * gridSize }
   public getGridSize(): number { return this.gridSizes[this.gridSizeIdx] }
   public incGridSize() { this.gridSizeIdx = cyclic(this.gridSizeIdx + 1, this.gridSizes.length) }
   public decGridSize() { this.gridSizeIdx = cyclic(this.gridSizeIdx - 1, this.gridSizes.length) }
-  public snap(x: number) { return snapGrid(x, this.getGridSize()) }
+  public snap(x: number) { return this.snapGrid(x) }
 
   NamedMessage(msg: NamedMessage) {
     switch (msg.name) {
@@ -139,6 +126,14 @@ async function loadUtilityTextures(textures: [number, Promise<Texture>][]) {
       return result;
     }
   )
+}
+
+class History {
+  private history: Deck<Board> = new Deck();
+
+  public push(board: Board) { this.history.push(board) }
+  public pop() { if (this.history.length() > 1) this.history.pop() }
+  public top() { return this.history.top() }
 }
 
 export async function BoardProviderConstructor(injector: Injector): Promise<BoardProvider> {
@@ -178,7 +173,6 @@ export function ContextModule(injector: Injector) {
   injector.bindPromise(UtilityTextures_, injector.getInstance(GL).then(gl => loadUtilityTextures([
     [-1, loadTexture(gl, 'resources/point1.png', { filter: WebGLRenderingContext.NEAREST, repeat: WebGLRenderingContext.CLAMP_TO_EDGE })],
     [-2, loadTexture(gl, 'resources/img/font.png', { filter: WebGLRenderingContext.NEAREST, repeat: WebGLRenderingContext.CLAMP_TO_EDGE })],
-    [-3, loadTexture(gl, 'resources/grid.png', { filter: WebGLRenderingContext.LINEAR_MIPMAP_LINEAR, repeat: WebGLRenderingContext.REPEAT, aniso: true })],
   ])));
   injector.bind(GRID, GridControllerConstructor);
   injector.bind(ART, BuildArtProviderConstructor);

@@ -90,6 +90,11 @@ export class BuildGl {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
     this.state.setUniform('sys', [performance.now(), 2 / gl.drawingBufferWidth, 2 / gl.drawingBufferHeight, 0]);
     this.state.setUniform('sys1', [this.gridController.getGridSize(), 0, 0, 0]);
+    this.modulation(1, 1, 1, 1);
+  }
+
+  public modulation(r: number, g: number, b: number, a: number) {
+    if (this.state.isUniformEnabled('modulation')) this.state.setUniform('modulation', [r, g, b, a]);
   }
 
   private updateProfile(profile: Profile) {

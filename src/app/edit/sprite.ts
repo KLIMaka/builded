@@ -5,8 +5,8 @@ import * as GLM from "../../libs_js/glmatrix";
 import { cyclic, tuple } from "../../utils/mathutils";
 import { Message, MessageHandlerReflective } from "../apis/handler";
 import { EditContext } from "./context";
-import { BoardInvalidate, Flip, Highlight, Move, NamedMessage, Palette, PanRepeat, SetPicnum, SetSpriteCstat, Shade, SpriteMode, StartMove, COMMIT } from "./messages";
-import { MOVE_COPY, MOVE_ROTATE } from "./tools/selection";
+import { BoardInvalidate, COMMIT, Flip, Highlight, Move, NamedMessage, Palette, PanRepeat, Rotate, SetPicnum, SetSpriteCstat, Shade, SpriteMode, StartMove } from "./messages";
+import { MOVE_COPY } from "./tools/selection";
 
 export class SpriteEnt extends MessageHandlerReflective {
 
@@ -27,18 +27,19 @@ export class SpriteEnt extends MessageHandlerReflective {
 
   public Move(msg: Move) {
     const board = this.ctx.board();
-    if (this.ctx.state.get(MOVE_ROTATE)) {
-      const spr = board.sprites[this.spriteId];
-      spr.ang = this.ctx.gridController.snap(this.origAng + msg.dz);
+    let x = this.ctx.gridController.snap(this.origin[0] + msg.dx);
+    let y = this.ctx.gridController.snap(this.origin[2] + msg.dy);
+    let z = this.ctx.gridController.snap(this.origin[1] + msg.dz) * ZSCALE;
+    if (moveSprite(board, this.spriteId, x, y, z)) {
       this.ctx.bus.handle(new BoardInvalidate(new Entity(this.spriteId, EntityType.SPRITE)));
-    } else {
-      let x = this.ctx.gridController.snap(this.origin[0] + msg.dx);
-      let y = this.ctx.gridController.snap(this.origin[2] + msg.dy);
-      let z = this.ctx.gridController.snap(this.origin[1] + msg.dz) * ZSCALE;
-      if (moveSprite(board, this.spriteId, x, y, z)) {
-        this.ctx.bus.handle(new BoardInvalidate(new Entity(this.spriteId, EntityType.SPRITE)));
-      }
     }
+  }
+
+  public Rotate(msg: Rotate) {
+    const board = this.ctx.board();
+    const spr = board.sprites[this.spriteId];
+    spr.ang = this.ctx.gridController.snap(spr.ang + msg.da);
+    this.ctx.bus.handle(new BoardInvalidate(new Entity(this.spriteId, EntityType.SPRITE)));
   }
 
   public Highlight(msg: Highlight) {

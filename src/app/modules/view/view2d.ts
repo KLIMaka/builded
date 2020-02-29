@@ -1,4 +1,4 @@
-import { closestWallPoint, closestWallSegment } from "../../../build/boardutils";
+import { closestWallPoint, closestWallSegment, closestSpriteInSector } from "../../../build/boardutils";
 import { Entity, EntityType, Hitscan, hitscan, Ray, Target } from "../../../build/hitscan";
 import { Board, Sprite } from "../../../build/structs";
 import { findSector, getPlayerStart, inSector, ZSCALE } from "../../../build/utils";
@@ -9,15 +9,15 @@ import { Injector } from "../../../utils/injector";
 import { NumberInterpolator } from "../../../utils/interpolator";
 import { int, len2d } from "../../../utils/mathutils";
 import { DelayedValue } from "../../../utils/timed";
-import { ART, ArtProvider, BOARD, STATE, State, View, BoardProvider } from "../../apis/app";
+import { ART, ArtProvider, BOARD, BoardProvider, STATE, State, View } from "../../apis/app";
 import { Message, MessageHandlerReflective } from "../../apis/handler";
-import { Renderable, RenderableProvider, HintRenderable } from "../../apis/renderable";
-import { BoardInvalidate, Mouse, LoadBoard } from "../../edit/messages";
+import { HintRenderable, RenderableProvider } from "../../apis/renderable";
+import { BoardInvalidate, LoadBoard, Mouse } from "../../edit/messages";
 import { GL } from "../buildartprovider";
 import { GRID, GridController } from "../context";
 import { BuildGl, BUILD_GL } from "../gl/buildgl";
 import { BoardRenderer2D, Renderer2D } from "./boardrenderer2d";
-import { snapWall, TargetImpl } from "./view";
+import { snapWall, TargetImpl, ViewPosition } from "./view";
 
 
 export async function View2dConstructor(injector: Injector) {
@@ -35,7 +35,7 @@ export async function View2dConstructor(injector: Injector) {
 
 export class View2d extends MessageHandlerReflective implements View {
   readonly gl: WebGLRenderingContext;
-  private playerstart: Sprite;
+  private position: ViewPosition;
   private control = new Controller2D();
   private pointer = vec3.create();
   private hit = new CachedValue((h: Hitscan) => this.updateHitscan(h), new Hitscan());
@@ -65,39 +65,40 @@ export class View2d extends MessageHandlerReflective implements View {
     this.loadBoard(board());
   }
 
-  get sec() { return this.playerstart.sectnum }
-  get x() { return this.playerstart.x }
-  get y() { return this.playerstart.y }
-  get z() { return this.playerstart.z }
+  get sec() { return this.position.sec }
+  get x() { return this.position.x }
+  get y() { return this.position.y }
+  get z() { return this.position.z }
 
   getProjectionMatrix() { return this.control.getProjectionMatrix() }
   getTransformMatrix() { return this.control.getTransformMatrix() }
   getPosition() { return this.pointer }
-  activate() { this.control.setPosition(this.playerstart.x, this.playerstart.y, 1024 * ZSCALE) }
   drawTools(renderable: RenderableProvider<HintRenderable>) { this.renderer.drawTools(this.gl, renderable) }
   target(): Target { return this.hit.get() }
   snapTarget(): Target { return this.snapTargetValue.get() }
   dir(): Ray { return this.direction.get() }
   isWireframe() { return true }
+  getViewPosition() { return this.position }
+
+  activate(pos: ViewPosition) {
+    this.position = pos;
+    this.control.setPosition(this.position.x, this.position.y, this.position.z);
+  }
 
   Mouse(msg: Mouse) {
-    if (this.playerstart == null) return;
-
     this.control.track(msg.x, msg.y, 1024 * ZSCALE, this.state.get('lookaim'));
     const x = (msg.x / this.gl.drawingBufferWidth) * 2 - 1;
     const y = (msg.y / this.gl.drawingBufferHeight) * 2 - 1;
     const p = this.control.getPointerPosition(this.pointer, x, y);
 
-    this.playerstart.x = int(p[0]);
-    this.playerstart.y = int(p[2]);
+    this.position.x = int(p[0]);
+    this.position.y = int(p[2]);
     const board = this.board();
-    if (!inSector(board, this.playerstart.x, this.playerstart.y, this.playerstart.sectnum))
-      this.playerstart.sectnum = findSector(board, this.playerstart.x, this.playerstart.y, this.playerstart.sectnum);
+    if (!inSector(board, this.position.x, this.position.y, this.position.sec))
+      this.position.sec = findSector(board, this.position.x, this.position.y, this.position.sec);
   }
 
   Frame(msg: Message) {
-    if (this.playerstart == null) return;
-
     this.invalidateTarget();
     this.control.setSize(this.gl.drawingBufferWidth, this.gl.drawingBufferHeight);
     const max = this.control.getPointerPosition(this.pointer, 1, 1);
@@ -132,8 +133,9 @@ export class View2d extends MessageHandlerReflective implements View {
   }
 
   private loadBoard(board: Board) {
-    this.playerstart = getPlayerStart(board);
-    this.control.setPosition(this.playerstart.x, this.playerstart.y, 1024 * ZSCALE);
+    const sprite = getPlayerStart(board);
+    this.position = { x: sprite.x, y: sprite.y, z: sprite.z, sec: sprite.sectnum };
+    this.control.setPosition(this.position.x, this.position.y, 1024 * ZSCALE);
     this.invalidateTarget();
   }
 
@@ -144,7 +146,16 @@ export class View2d extends MessageHandlerReflective implements View {
 
   private updateSnapTarget(target: TargetImpl) {
     const board = this.board();
-    const d = this.gridController.getGridSize() / 2;
+    const d = this.gridController.getGridSize() / 8;
+    const s = closestSpriteInSector(board, this.sec, this.x, this.y, d);
+    if (s != -1) {
+      const sprite = board.sprites[s];
+      target.coords_[0] = sprite.x
+      target.coords_[1] = sprite.y;
+      target.coords_[2] = sprite.z;
+      target.entity_ = new Entity(s, EntityType.SPRITE);
+      return target;
+    }
     const w = closestWallPoint(board, this.x, this.y, d);
     if (w != -1) {
       const wall = board.walls[w];

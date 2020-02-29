@@ -1,5 +1,5 @@
 import { walllen, DEFAULT_REPEAT_RATE } from '../../../../build/boardutils';
-import { Board } from '../../../../build/structs';
+import { Board, Sector, Wall } from '../../../../build/structs';
 import { slope, ZSCALE, sectorOfWall } from '../../../../build/utils';
 import { mat4, vec4 } from '../../../../libs_js/glmatrix';
 import { Texture } from '../../../../utils/gl/drawstruct';
@@ -9,58 +9,67 @@ import { BuildBuffer } from '../../gl/buffers';
 import { RenderablesCacheContext } from '../cache';
 import { PointSpriteBuilder, WireframeBuilder } from '../common';
 
-const gridSectorMat = mat4.create();
-mat4.identity(gridSectorMat);
-mat4.rotateX(gridSectorMat, gridSectorMat, -Math.PI / 2);
-export const gridMatrixProviderSector = (scale: number) => gridSectorMat;
+export const GRID_SECTOR_MATRIX = mat4.create();
+mat4.identity(GRID_SECTOR_MATRIX);
+mat4.rotateX(GRID_SECTOR_MATRIX, GRID_SECTOR_MATRIX, -Math.PI / 2);
+
+export enum WallGridType { VOID, BOT, TOP, MID }
+function getBaseZ(type: WallGridType, wall: Wall, sector: Sector, nextsector: Sector) {
+  if (nextsector == undefined) return wall.cstat.alignBottom ? sector.floorz : sector.ceilingz;
+  switch (type) {
+    case WallGridType.VOID: return wall.cstat.alignBottom ? sector.floorz : sector.ceilingz;
+    case WallGridType.BOT: return wall.cstat.alignBottom ? sector.ceilingz : nextsector.floorz;
+    case WallGridType.TOP: return wall.cstat.alignBottom ? sector.ceilingz : nextsector.ceilingz;
+    case WallGridType.MID: return wall.cstat.alignBottom ? Math.min(sector.floorz, nextsector.floorz) : Math.max(sector.ceilingz, nextsector.ceilingz);
+  }
+}
 
 let tmp = vec4.create();
 let texMat = mat4.create();
-export function createGridMatrixProviderWall(board: Board, id: number) {
+export function createGridWallMatrix(board: Board, id: number, type: WallGridType) {
   const wall1 = board.walls[id];
   const wall2 = board.walls[wall1.point2];
   const dx = wall2.x - wall1.x;
   const dy = wall2.y - wall1.y;
   const sector = board.sectors[sectorOfWall(board, id)];
-  const zbase = wall1.cstat.alignBottom ? sector.floorz : sector.ceilingz;
+  const nextsector = board.sectors[wall1.nextsector];
+  const zbase = getBaseZ(type, wall1, sector, nextsector);
   const wlen = walllen(board, id);
-  return (scale: number) => {
-    const sx = (wall1.xrepeat * DEFAULT_REPEAT_RATE) / wlen;
-    const sy = wall1.yrepeat / 8;
-    mat4.identity(texMat);
-    vec4.set(tmp, sx, sy, 1, 1);
-    mat4.scale(texMat, texMat, tmp);
-    mat4.rotateY(texMat, texMat, -Math.atan2(-dy, dx));
-    vec4.set(tmp, -wall1.x, -zbase / ZSCALE, -wall1.y, 0);
-    return mat4.translate(texMat, texMat, tmp);
-  }
+  const sx = (wall1.xrepeat * DEFAULT_REPEAT_RATE) / wlen;
+  const sy = wall1.yrepeat / 8;
+  mat4.identity(texMat);
+  vec4.set(tmp, sx, sy, 1, 1);
+  mat4.scale(texMat, texMat, tmp);
+  mat4.rotateY(texMat, texMat, -Math.atan2(-dy, dx));
+  vec4.set(tmp, -wall1.x, -zbase / ZSCALE, -wall1.y, 0);
+  return mat4.translate(texMat, texMat, tmp);
 }
 
 export function buildCeilingHinge(ctx: RenderablesCacheContext, sectorId: number, builder: WireframeBuilder): WireframeBuilder { return prepareHinge(ctx, sectorId, true, builder) }
 export function buildFloorHinge(ctx: RenderablesCacheContext, sectorId: number, builder: WireframeBuilder): WireframeBuilder { return prepareHinge(ctx, sectorId, false, builder) }
 
 function prepareHinge(ctx: RenderablesCacheContext, sectorId: number, ceiling: boolean, builder: WireframeBuilder): WireframeBuilder {
-  let board = ctx.board();
+  const board = ctx.board();
   builder.mode = WebGLRenderingContext.TRIANGLES;
   vec4.set(builder.color, 0.7, 0.7, 0.7, 0.7);
-  let size = 128;
-  let buff = builder.buff;
+  const size = 128;
+  const buff = builder.buff;
   buff.allocate(6, 24);
-  let sec = board.sectors[sectorId];
-  let wall1 = board.walls[sec.wallptr];
-  let wall2 = board.walls[wall1.point2];
+  const sec = board.sectors[sectorId];
+  const wall1 = board.walls[sec.wallptr];
+  const wall2 = board.walls[wall1.point2];
   let dx = (wall2.x - wall1.x); let dy = (wall2.y - wall1.y);
-  let dl = len2d(dx, dy);
-  let x = wall1.x + dx / 2; let y = wall1.y + dy / 2;
+  const dl = len2d(dx, dy);
+  const x = wall1.x + dx / 2; const y = wall1.y + dy / 2;
   dx /= dl; dy /= dl;
-  let z = (ceiling ? sec.ceilingz : sec.floorz) / ZSCALE;
-  let dz = ceiling ? -size / 2 : size / 2;
-  let x1 = x - dx * size; let y1 = y - dy * size;
-  let x2 = x + dx * size; let y2 = y + dy * size;
-  let x3 = x1 - dy * (size / 2); let y3 = y1 + dx * (size / 2);
-  let x4 = x2 - dy * (size / 2); let y4 = y2 + dx * (size / 2);
-  let heinum = ceiling ? sec.ceilingheinum : sec.floorheinum;
-  let s = slope(board, sectorId, x3, y3, heinum) / ZSCALE;
+  const z = (ceiling ? sec.ceilingz : sec.floorz) / ZSCALE;
+  const dz = ceiling ? -size / 2 : size / 2;
+  const x1 = x - dx * size; const y1 = y - dy * size;
+  const x2 = x + dx * size; const y2 = y + dy * size;
+  const x3 = x1 - dy * (size / 2); const y3 = y1 + dx * (size / 2);
+  const x4 = x2 - dy * (size / 2); const y4 = y2 + dx * (size / 2);
+  const heinum = ceiling ? sec.ceilingheinum : sec.floorheinum;
+  const s = slope(board, sectorId, x3, y3, heinum) / ZSCALE;
   buff.writePos(0, x1, z, y1);
   buff.writePos(1, x2, z, y2);
   buff.writePos(2, x3, z + s, y3);

@@ -93,7 +93,7 @@ function createBoard() {
   board.sprites = [];
   board.numwalls = 0;
   board.numsectors = 0;
-  board.numsprites = 1;
+  board.numsprites = 0;
 
   const points = new Deck<[number, number]>();
 
@@ -113,17 +113,6 @@ function createBoard() {
 
   board.sectors[0].floorz = 0;
   board.sectors[0].ceilingz = -16 * 4096;
-
-  const sprite = new BloodSprite();
-  sprite.x = 1024;
-  sprite.y = 1024;
-  sprite.z = 0;
-  sprite.picnum = 0;
-  sprite.lotag = 1;
-  sprite.sectnum = 0;
-  sprite.cstat = new SpriteStats();
-  sprite.extra = 65535;
-  board.sprites.push(sprite);
   return board;
 }
 

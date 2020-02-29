@@ -128,6 +128,27 @@ export function closestWallSegmentInSector(board: Board, secId: number, x: numbe
   return dist <= d ? w : -1;
 }
 
+const closestSpriteInSectorDist_: [number, number] = [0, 0];
+export function closestSpriteInSectorDist(board: Board, secId: number, x: number, y: number): [number, number] {
+  let spriteId = -1;
+  let mindist = Number.MAX_VALUE;
+  for (let s = 0; s < board.numsprites; s++) {
+    const sprite = board.sprites[s];
+    if (sprite.sectnum != secId) continue;
+    const dist = len2d(sprite.x - x, sprite.y - y);
+    if (dist < mindist) {
+      mindist = dist;
+      spriteId = s;
+    }
+  }
+  return tuple2(closestSpriteInSectorDist_, spriteId, mindist);
+}
+
+export function closestSpriteInSector(board: Board, secId: number, x: number, y: number, d: number): number {
+  const [s, dist] = closestSpriteInSectorDist(board, secId, x, y);
+  return dist <= d ? s : -1;
+}
+
 export function wallInSector(board: Board, secId: number, x: number, y: number) {
   let sec = board.sectors[secId];
   let end = sec.wallptr + sec.wallnum;

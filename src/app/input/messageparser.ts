@@ -1,7 +1,7 @@
 import { Collection, Deck } from "../../utils/collections";
 import { Lexer, LexerRule } from "../../utils/lexer";
 import { error } from "../../utils/logger";
-import { EndMove, Flip, Move, NamedMessage, Palette, PanRepeat, ResetPanRepeat, SetPicnum, SetSectorCstat, SetWallCstat, Shade, SpriteMode, StartMove, SetSpriteCstat } from "../edit/messages";
+import { EndMove, Flip, Move, NamedMessage, Palette, PanRepeat, ResetPanRepeat, SetPicnum, SetSectorCstat, SetWallCstat, Shade, SpriteMode, StartMove, SetSpriteCstat, Rotate } from "../edit/messages";
 import { Message } from "../apis/handler";
 
 class MessageParser {
@@ -76,6 +76,7 @@ function tryParseMessage(): Collection<Message> {
     case 'wallcstat': return parsdMessages.push(createMessage(SetWallCstat, 'ID', 'BOOLEAN', 'BOOLEAN'));
     case 'sectorcstat': return parsdMessages.push(createMessage(SetSectorCstat, 'ID', 'BOOLEAN', 'BOOLEAN'));
     case 'spritecstat': return parsdMessages.push(createMessage(SetSpriteCstat, 'ID', 'BOOLEAN', 'BOOLEAN'));
+    case 'rotate': return parsdMessages.push(createMessage(Rotate, 'INT'));
     case 'flip': return parsdMessages.push(new Flip());
     case 'sprite_mode': return parsdMessages.push(new SpriteMode());
     case 'reset_panrepeat': return parsdMessages.push(new ResetPanRepeat());

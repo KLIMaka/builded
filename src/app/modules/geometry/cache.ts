@@ -1,5 +1,5 @@
 import { create, Dependency, Injector } from '../../../utils/injector';
-import { ART, ArtProvider, BOARD, BoardProvider } from '../../apis/app';
+import { ART, ArtProvider, BOARD, BoardProvider, STATE, State } from '../../apis/app';
 import { Builder } from '../../apis/builder';
 import { BUS, MessageHandler, MessageHandlerReflective } from '../../apis/handler';
 import { BuildRenderableProvider, ClusterRenderable, HintRenderable, RenderableProvider, SectorRenderable, WallRenderable } from '../../apis/renderable';
@@ -155,24 +155,37 @@ export class RenderablesCacheContext {
   readonly board: BoardProvider;
   readonly art: ArtProvider;
   readonly factory: BuildersFactory;
+  readonly state: State;
 }
 const RENDERABLES_CACHE_CONTEXT = new Dependency<RenderablesCacheContext>('RenderablesCacheContext');
 async function RenderablesCacheContextConstructor(injector: Injector): Promise<RenderablesCacheContext> {
-  const [board, art, factory] = await Promise.all([
+  const [board, art, factory, state] = await Promise.all([
     injector.getInstance(BOARD),
     injector.getInstance(ART),
     injector.getInstance(BUILDERS_FACTORY),
+    injector.getInstance(STATE),
   ]);
-  return { board, art, factory }
+  return { board, art, factory, state }
 }
 
 async function RenderablesCacheConstructor(injector: Injector) {
   return create(injector, RenderablesCacheImpl, RENDERABLES_CACHE_CONTEXT);
 }
 
+export const WALL_COLOR = 'wallColor';
+export const MASKED_WALL_COLOR = 'maskedWallColor';
+export const INTERSECTOR_WALL_COLOR = 'intersectorWallColor';
+export const SPRITE_COLOR = 'spriteColor';
+
 export async function RenderablesCacheModule(injector: Injector) {
   injector.bind(RENDERABLES_CACHE_CONTEXT, RenderablesCacheContextConstructor);
   injector.bind(RENDRABLES_CACHE, RenderablesCacheConstructor);
+  const state = await injector.getInstance(STATE);
+  state.register(WALL_COLOR, [1, 1, 1, 1]);
+  state.register(INTERSECTOR_WALL_COLOR, [1, 0, 0, 1]);
+  state.register(MASKED_WALL_COLOR, [0, 0, 1, 1]);
+  state.register(SPRITE_COLOR, [0, 1, 1, 1]);
+
   const bus = await injector.getInstance(BUS);
   const cache = await injector.getInstance(RENDRABLES_CACHE);
   bus.connect(cache);

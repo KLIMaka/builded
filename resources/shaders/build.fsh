@@ -11,6 +11,7 @@ uniform vec4 sys;
 uniform vec4 sys1;
 
 uniform vec4 color;
+uniform vec4 modulation;
 
 in vec4 tcps;
 in vec2 gridtc;
@@ -112,7 +113,7 @@ vec4 renderGrid() {
 void main() {
   clip();
 #if defined FLAT
-  writeColor(vec3(1.0), color);
+  writeColor(vec3(1.0), color * modulation);
 #elif defined PARALLAX
   vec3 toPixel = normalize(wpos - eyepos);
   float hang = (atan(toPixel.z, toPixel.x) + PI) / (2.0 * PI);

@@ -2,14 +2,14 @@ import { connectedWalls, fixxrepeat, lastwall, mergePoints, moveWall, nextwall }
 import { Entity, EntityType, Target } from "../../build/hitscan";
 import { Board } from "../../build/structs";
 import { sectorOfWall } from "../../build/utils";
-import { vec2 } from "../../libs_js/glmatrix";
+import { vec2, mat2d } from "../../libs_js/glmatrix";
 import { Collection, Deck, IndexedDeck } from "../../utils/collections";
 import { List } from "../../utils/list";
-import { cyclic, len2d, tuple } from "../../utils/mathutils";
+import { cyclic, len2d, tuple, int } from "../../utils/mathutils";
 import { Message, MessageHandlerReflective } from "../apis/handler";
 import { EditContext } from "./context";
 import { invalidateSectorAndWalls } from "./editutils";
-import { BoardInvalidate, EndMove, Flip, Highlight, Move, Palette, PanRepeat, ResetPanRepeat, SetPicnum, SetWallCstat, Shade, StartMove } from "./messages";
+import { BoardInvalidate, EndMove, Flip, Highlight, Move, Palette, PanRepeat, ResetPanRepeat, Rotate, SetPicnum, SetWallCstat, Shade, StartMove } from "./messages";
 
 function getClosestWallByIds(board: Board, target: Target, ids: Iterable<number>): number {
   let id = -1;
@@ -127,6 +127,23 @@ export class WallSegmentsEnt extends MessageHandlerReflective {
   public EndMove(msg: EndMove) {
     this.active = false;
     for (let w of this.wallIds) mergePoints(this.ctx.board(), w, this.ctx.refs);
+  }
+
+  public Rotate(msg: Rotate) {
+    const board = this.ctx.board();
+    const target = this.ctx.view.snapTarget();
+    const [cx, cy] = target.coords;
+    const ang = (msg.da / 128) * (Math.PI / 8);
+    const matrix = mat2d.create();
+    mat2d.translate(matrix, matrix, [cx, cy]);
+    mat2d.rotate(matrix, matrix, ang);
+    mat2d.translate(matrix, matrix, [-cx, -cy]);
+    for (const w of this.wallIds) {
+      const wall = board.walls[w];
+      const [x, y] = vec2.transformMat2d([], [wall.x, wall.y], matrix);
+      moveWall(board, w, int(x), int(y));
+    }
+    this.invalidate();
   }
 
   public Highlight(msg: Highlight) {

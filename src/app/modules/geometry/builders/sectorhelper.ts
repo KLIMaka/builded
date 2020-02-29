@@ -5,8 +5,8 @@ import { BuildRenderableProvider, LayeredRenderables, SectorRenderable, HELPER_G
 import { BuildBuffer } from "../../gl/buffers";
 import { RenderablesCacheContext } from "../cache";
 import { BuildersFactory, PointSpriteBuilder, SolidBuilder, WireframeBuilder } from "../common";
-import { buildCeilingHinge, buildFloorHinge, gridMatrixProviderSector } from "./common";
-import { vec4 } from "../../../../libs_js/glmatrix";
+import { buildCeilingHinge, buildFloorHinge, GRID_SECTOR_MATRIX } from "./common";
+import { vec4, mat4 } from "../../../../libs_js/glmatrix";
 
 export class SectorHelperBuilder extends Builders implements SectorRenderable {
   constructor(
@@ -104,10 +104,10 @@ export function updateSectorHelper(cache: BuildRenderableProvider, ctx: Renderab
   buildFloorHinge(ctx, secId, builder.floorhinge);
 
   const sectorRenderable = cache.sector(secId);
-  builder.ceilgrid.gridTexMatProvider = gridMatrixProviderSector;
+  mat4.copy(builder.ceilgrid.gridTexMat, GRID_SECTOR_MATRIX);
   builder.ceilgrid.solid = <SolidBuilder>sectorRenderable.ceiling;
 
-  builder.floorgrid.gridTexMatProvider = gridMatrixProviderSector;
+  mat4.copy(builder.floorgrid.gridTexMat, GRID_SECTOR_MATRIX);
   builder.floorgrid.solid = <SolidBuilder>sectorRenderable.floor;
 
   return builder;

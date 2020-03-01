@@ -104,10 +104,10 @@ function createBoard() {
   }
 
   createNewSector(board, points.clear()
-    .push([0, 0])
-    .push([4096, 0])
+    .push([-4096, -4096])
+    .push([4096, -4096])
     .push([4096, 4096])
-    .push([0, 4096]),
+    .push([-4096, 4096]),
     NULL_TRACKER
   );
 

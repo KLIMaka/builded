@@ -12,6 +12,10 @@ import { RenderablesCache, RENDRABLES_CACHE } from "../../modules/geometry/cache
 import { EntityFactory, ENTITY_FACTORY } from "../context";
 import { MovingHandle } from "../handle";
 import { BoardInvalidate, COMMIT, EndMove, Frame, Highlight, Move, NamedMessage, Render, SetPicnum, Shade, StartMove } from "../messages";
+import { SectorEnt } from "../sector";
+import { SpriteEnt } from "../sprite";
+import { WallEnt } from "../wall";
+import { WallSegmentsEnt } from "../wallsegment";
 
 export type PicNumCallback = (picnum: number) => void;
 export type PicNumSelector = (cb: PicNumCallback) => void;
@@ -46,7 +50,6 @@ const clipboardShade = new Shade(0, true);
 // }
 
 const list = new Deck<MessageHandler>();
-const segment = new Deck<number>();
 export function getFromHitscan(factory: EntityFactory): Deck<MessageHandler> {
   const target = factory.ctx.view.snapTarget();
   list.clear();
@@ -86,8 +89,7 @@ function wallSegment(fullLoop: (board: Board, wallId: number) => Collection<numb
     list.push(factory.wallSegment(fullLoop(board, w), bottom));
   } else {
     const w1 = nextwall(board, w);
-    segment.clear().push(w).push(w1);
-    list.push(factory.wallSegment(segment, bottom));
+    list.push(factory.wallSegment([w, w1], bottom));
   }
 }
 
@@ -136,8 +138,22 @@ export class Selection extends MessageHandlerReflective {
 
   private updateSelection() {
     const underCursor = getFromHitscan(this.factory);
-    this.highlighted.list().clear().pushAll(underCursor);
-    // this.selection.list().clear().pushAll(underCursor);
+    this.highlighted.list().clear().pushAll(underCursor.clone());
+  }
+
+  private selectedUnderCursor(): boolean {
+    const snapTarget = this.ctx.view.snapTarget();
+    if (snapTarget.entity == null) return false;
+    const ent = snapTarget.entity;
+    for (const s of this.selection.list()) {
+      if (ent.isSector() && s instanceof SectorEnt && ent.id == s.sectorEnt.id && ent.type == s.sectorEnt.type) return true;
+      if (ent.isSprite() && s instanceof SpriteEnt && ent.id == s.spriteId) return true;
+      if (ent.isWall()) {
+        if (s instanceof WallEnt && ent.id == s.wallId) return true;
+        if (s instanceof WallSegmentsEnt) for (const w of s.highlighted) if (w == ent.id) return true;
+      }
+    }
+    return false;
   }
 
   public NamedMessage(msg: NamedMessage) {
@@ -153,7 +169,8 @@ export class Selection extends MessageHandlerReflective {
       case 'delete_loop': this.deleteLoop(); return;
       case 'delete_full': this.deleteFull(); return;
       case 'print_usage': this.printPicUsage(); return;
-      case 'add_selection': this.selection.list().pushAll(this.highlighted.list()); return;
+      case 'replace_selection': if (!handle.isActive()) this.selection.list().clear().pushAll(this.highlighted.list().clone()); return;
+      case 'add_selection': this.selection.list().pushAll(this.highlighted.list().clone()); return;
       case 'clear_selection': this.selection.list().clear(); return;
       default: this.selection.handle(msg);
     }
@@ -163,8 +180,12 @@ export class Selection extends MessageHandlerReflective {
     this.selection.handle(msg);
   }
 
+  private isStartMove() {
+    return !handle.isActive() && this.ctx.state.get(MOVE_STATE) && this.selectedUnderCursor();
+  }
+
   private activeMove() {
-    const start = !handle.isActive() && this.ctx.state.get(MOVE_STATE);
+    const start = this.isStartMove();
     if (this.valid == false && start) this.valid = true;
     const move = handle.isActive() && this.ctx.state.get(MOVE_STATE);
     const end = handle.isActive() && !this.ctx.state.get(MOVE_STATE);
@@ -179,7 +200,7 @@ export class Selection extends MessageHandlerReflective {
   }
 
   private updateMove() {
-    if (!handle.isActive() && this.ctx.state.get(MOVE_STATE)) {
+    if (this.isStartMove()) {
       handle.start(build2gl(target_, this.ctx.view.target().coords));
       this.selection.handle(START_MOVE);
     } else if (!this.ctx.state.get(MOVE_STATE)) {

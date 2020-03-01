@@ -18,8 +18,8 @@ export class Sprite2dBuilder extends Builders {
 }
 
 const CIRCLE_SECTIONS = 12;
-const CIRCLE_OUT_RADIUS = 48;
-const CIRCLE_IN_RADIUS = 40;
+const CIRCLE_OUT_RADIUS = 96;
+const CIRCLE_IN_RADIUS = 80;
 function genSpriteMarker(builder: WireframeBuilder, x: number, y: number, z: number, ang: number, color: [number, number, number, number]) {
   builder.mode = WebGLRenderingContext.TRIANGLES;
   vec4.copy(builder.color, color);

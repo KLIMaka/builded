@@ -146,6 +146,7 @@ export const SOLID_SETUP = lazySingletonTransformer((state: State) => new SolidS
 export const GRID_SETUP = lazySingletonTransformer((state: State) => new GridSetup(state));
 export const POINT_SPRITE_SETUP = lazySingletonTransformer((state: State) => new PointSpriteSetup(state));
 export const WIREFRAME_SETUP = lazySingletonTransformer((state: State) => new WireframeSetup(state));
+export const FLAT_SETUP = lazySingletonTransformer((state: State) => new BufferSetup(state));
 
 const textureMap = new Map<Texture, number>();
 const bufferMap = new Map<Buffer, number>();

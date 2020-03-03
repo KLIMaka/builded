@@ -1,17 +1,17 @@
-import { deleteLoop, deleteLoopFull, deleteSectorFull, fillInnerLoop, insertSprite, loopWalls, loopWallsFull, nextwall, setFirstWall } from "../../../build/boardutils";
+import { loopWalls, loopWallsFull, nextwall } from "../../../build/boardutils";
 import { Entity, EntityType, Target } from "../../../build/hitscan";
-import { Board, WALL_SPRITE } from "../../../build/structs";
-import { build2gl, sectorOfWall, slope, vec2ang, wallNormal } from "../../../build/utils";
+import { Board } from "../../../build/structs";
+import { build2gl } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 import { Collection, Deck } from "../../../utils/collections";
 import { create, Dependency, Injector } from "../../../utils/injector";
-import { error, info } from "../../../utils/logger";
+import { error } from "../../../utils/logger";
 import { detuple0, detuple1 } from "../../../utils/mathutils";
 import { BUS, Message, MessageHandler, MessageHandlerList, MessageHandlerReflective } from "../../apis/handler";
 import { RenderablesCache, RENDRABLES_CACHE } from "../../modules/geometry/cache";
 import { EntityFactory, ENTITY_FACTORY } from "../context";
 import { MovingHandle } from "../handle";
-import { BoardInvalidate, COMMIT, EndMove, Frame, Highlight, Move, NamedMessage, Render, SetPicnum, Shade, StartMove } from "../messages";
+import { COMMIT, EndMove, Frame, Highlight, Move, NamedMessage, Render, SetPicnum, Shade, StartMove } from "../messages";
 import { SectorEnt } from "../sector";
 import { SpriteEnt } from "../sprite";
 import { WallEnt } from "../wall";
@@ -28,11 +28,9 @@ const END_MOVE = new EndMove();
 const SET_PICNUM = new SetPicnum(-1);
 const HIGHLIGHT = new Highlight();
 
-
 const MOVE_STATE = 'move';
 const LOOP_STATE = 'select_loop_mod';
 const FULL_LOOP_STATE = 'select_full_loop_mod';
-const SNAP_DIST = 'select.snap_dist';
 
 export const MOVE_COPY = 'move.copy';
 export const MOVE_VERTICAL = 'move.vertical';
@@ -40,14 +38,6 @@ export const MOVE_PARALLEL = 'move.parallel';
 
 const clipboardPicnum = new SetPicnum(0);
 const clipboardShade = new Shade(0, true);
-
-// function getAttachedSector(board: Board, hit: Hitscan): MessageHandler {
-//   const wall = board.walls[hit.ent.id];
-//   const sectorId = wall.nextsector == -1 ? sectorOfWall(board, hit.ent.id) : wall.nextsector;
-//   const [x, y, z] = hit.target();
-//   const type = getClosestSectorZ(board, sectorId, x, y, z)[0];
-//   return SectorEnt.create(hit.ent.clone());
-// }
 
 const list = new Deck<MessageHandler>();
 export function getFromHitscan(factory: EntityFactory): Deck<MessageHandler> {
@@ -119,7 +109,6 @@ export class Selection extends MessageHandlerReflective {
     ctx.state.register(MOVE_PARALLEL, false);
     ctx.state.register(LOOP_STATE, false);
     ctx.state.register(FULL_LOOP_STATE, false);
-    ctx.state.register(SNAP_DIST, 32);
   }
 
   public Frame(msg: Frame) {
@@ -141,43 +130,55 @@ export class Selection extends MessageHandlerReflective {
     this.highlighted.list().clear().pushAll(underCursor.clone());
   }
 
+  private checkSelected(ent: Entity, s: any) {
+    if (ent.isSector() && s instanceof SectorEnt && ent.id == s.sectorEnt.id && ent.type == s.sectorEnt.type) return true;
+    if (ent.isSprite() && s instanceof SpriteEnt && ent.id == s.spriteId) return true;
+    if (ent.isWall()) {
+      if (s instanceof WallEnt && ent.id == s.wallId) return true;
+      if (s instanceof WallSegmentsEnt) for (const w of s.highlighted) if (w == ent.id) return true;
+    }
+    return false;
+  }
+
   private selectedUnderCursor(): boolean {
     const snapTarget = this.ctx.view.snapTarget();
     if (snapTarget.entity == null) return false;
     const ent = snapTarget.entity;
-    for (const s of this.selection.list()) {
-      if (ent.isSector() && s instanceof SectorEnt && ent.id == s.sectorEnt.id && ent.type == s.sectorEnt.type) return true;
-      if (ent.isSprite() && s instanceof SpriteEnt && ent.id == s.spriteId) return true;
-      if (ent.isWall()) {
-        if (s instanceof WallEnt && ent.id == s.wallId) return true;
-        if (s instanceof WallSegmentsEnt) for (const w of s.highlighted) if (w == ent.id) return true;
-      }
-    }
+    for (const s of this.selection.list()) if (this.checkSelected(ent, s)) return true;
+    for (const s of this.highlighted.list()) if (this.checkSelected(ent, s)) return true;
     return false;
   }
 
   public NamedMessage(msg: NamedMessage) {
     switch (msg.name) {
       case 'set_picnum': this.setTexture(); return;
-      case 'insert_sprite': this.insertSprite(); return;
       case 'copy': this.copy(); return;
-      case 'paste_shade': this.selection.handle(clipboardShade); this.ctx.bus.handle(COMMIT); return;
-      case 'paste_picnum': this.selection.handle(clipboardPicnum); this.ctx.bus.handle(COMMIT); return;
-      case 'print_selected': this.print(); return;
-      case 'set_first_wall': this.setFirstWall(); return;
-      case 'fill_inner_sector': this.fillInnerLoop(); return;
-      case 'delete_loop': this.deleteLoop(); return;
-      case 'delete_full': this.deleteFull(); return;
-      case 'print_usage': this.printPicUsage(); return;
+      case 'paste_shade': this.handleSelected(clipboardShade); this.commit(); return;
+      case 'paste_picnum': this.handleSelected(clipboardPicnum); this.commit(); return;
       case 'replace_selection': if (!handle.isActive()) this.selection.list().clear().pushAll(this.highlighted.list().clone()); return;
       case 'add_selection': this.selection.list().pushAll(this.highlighted.list().clone()); return;
       case 'clear_selection': this.selection.list().clear(); return;
-      default: this.selection.handle(msg);
+      default: this.handleSelected(msg);
     }
   }
 
   public handleDefault(msg: Message) {
+    this.handleSelected(msg);
+  }
+
+  private handleSelected(msg: Message) {
+    this.highlighted.handle(msg);
     this.selection.handle(msg);
+  }
+
+  private commit() {
+    this.ctx.bus.handle(COMMIT);
+  }
+
+  private cloneSelected() {
+    const selected = this.highlighted.clone();
+    selected.list().pushAll(this.selection.list());
+    return selected;
   }
 
   private isStartMove() {
@@ -202,201 +203,28 @@ export class Selection extends MessageHandlerReflective {
   private updateMove() {
     if (this.isStartMove()) {
       handle.start(build2gl(target_, this.ctx.view.target().coords));
-      this.selection.handle(START_MOVE);
+      this.handleSelected(START_MOVE);
     } else if (!this.ctx.state.get(MOVE_STATE)) {
       handle.stop();
-      this.selection.handle(END_MOVE);
-      this.ctx.bus.handle(COMMIT);
+      this.handleSelected(END_MOVE);
+      this.commit();
       return;
     }
 
     MOVE.dx = handle.dx;
     MOVE.dy = handle.dy;
     MOVE.dz = handle.dz;
-    this.selection.handle(MOVE);
-  }
-
-  private setFirstWall() {
-    const target = this.ctx.view.snapTarget();
-    if (target.entity == null || !target.entity.isWall()) return;
-    setFirstWall(this.ctx.board(), sectorOfWall(this.ctx.board(), target.entity.id), target.entity.id, this.ctx.refs);
-    this.ctx.bus.handle(COMMIT);
-    this.ctx.bus.handle(new BoardInvalidate(null));
-  }
-
-  private fillInnerLoop() {
-    const target = this.ctx.view.snapTarget();
-    if (target.entity == null || !target.entity.isWall()) return;
-    fillInnerLoop(this.ctx.board(), target.entity.id, this.ctx.refs);
-    this.ctx.bus.handle(COMMIT);
-    this.ctx.bus.handle(new BoardInvalidate(null));
-  }
-
-  private deleteLoop() {
-    const target = this.ctx.view.snapTarget();
-    if (target.entity == null || !target.entity.isWall()) return;
-    deleteLoop(this.ctx.board(), target.entity.id, this.ctx.refs);
-    this.ctx.bus.handle(COMMIT);
-    this.ctx.bus.handle(new BoardInvalidate(null));
-  }
-
-  private deleteFull() {
-    const target = this.ctx.view.snapTarget();
-    if (target.entity == null) return;
-    if (target.entity.isWall()) deleteLoopFull(this.ctx.board(), target.entity.id, this.ctx.refs);
-    else if (target.entity.isSector()) deleteSectorFull(this.ctx.board(), target.entity.id, this.ctx.refs);
-    else return;
-    this.ctx.bus.handle(COMMIT);
-    this.ctx.bus.handle(new BoardInvalidate(null));
+    this.handleSelected(MOVE);
   }
 
   private setTexture() {
-    const sel = this.selection.clone();
+    const sel = this.cloneSelected();
     this.picnumSelector((picnum: number) => {
       if (picnum == -1) return;
       SET_PICNUM.picnum = picnum;
       sel.handle(SET_PICNUM);
-      this.ctx.bus.handle(COMMIT);
+      this.commit();
     })
-  }
-
-  private insertSprite() {
-    const target = this.ctx.view.snapTarget();
-    if (target.entity == null) return;
-    const [x, y, z] = target.coords;
-    const ent = target.entity;
-    this.picnumSelector((picnum: number) => {
-      if (picnum == -1) return;
-      const board = this.ctx.board();
-      if (ent.isWall()) {
-        const normal = wallNormal(vec3.create(), board, ent.id);
-        const offx = normal[0] * 2;
-        const offy = normal[2] * 2;
-        const spriteId = insertSprite(board, x + offx, y + offy, this.ctx.gridController.snap(z));
-        const sprite = board.sprites[spriteId];
-        sprite.picnum = picnum;
-        sprite.cstat.type = WALL_SPRITE;
-        sprite.ang = vec2ang(normal[0], normal[2]);
-      } else {
-        const spriteId = insertSprite(board, x, y, z);
-        const sprite = board.sprites[spriteId];
-        sprite.picnum = picnum;
-      }
-      this.ctx.bus.handle(COMMIT);
-    });
-  }
-
-  private getSectorPics(board: Board, sectorId: number) {
-    const sector = board.sectors[sectorId];
-    const pics = new Set<number>();
-    pics.add(sector.ceilingpicnum);
-    pics.add(sector.floorpicnum);
-    const wallend = sector.wallptr + sector.wallnum;
-    for (let w = sector.wallptr; w < wallend; w++) {
-      const wall = board.walls[w];
-      if (wall.nextwall == -1) {
-        pics.add(wall.picnum);
-      } else {
-        const wall2 = board.walls[wall.point2];
-        const nextwall = board.walls[wall.nextwall];
-        const nextwall2 = board.walls[nextwall.nextwall];
-        const nextsectorId = wall.nextsector;
-        const nextsector = board.sectors[nextsectorId];
-        const cz1 = slope(board, sectorId, wall.x, wall.y, sector.ceilingheinum) + sector.ceilingz;
-        const cz2 = slope(board, sectorId, wall2.x, wall2.y, sector.ceilingheinum) + sector.ceilingz;
-        const czn1 = slope(board, nextsectorId, nextwall.x, nextwall.y, nextsector.ceilingheinum) + sector.ceilingz;
-        const czn2 = slope(board, nextsectorId, nextwall2.x, nextwall2.y, nextsector.ceilingheinum) + sector.ceilingz;
-        if (cz1 < czn1 || cz2 < czn2) pics.add(wall.picnum);
-
-        const fz1 = slope(board, sectorId, wall.x, wall.y, sector.floorheinum) + sector.floorz;
-        const fz2 = slope(board, sectorId, wall2.x, wall2.y, sector.floorheinum) + sector.floorz;
-        const fzn1 = slope(board, nextsectorId, nextwall.x, nextwall.y, nextsector.floorheinum) + sector.floorz;
-        const fzn2 = slope(board, nextsectorId, nextwall2.x, nextwall2.y, nextsector.floorheinum) + sector.floorz;
-        if (fz1 > fzn1 || fz2 > fzn2) {
-          if (wall.cstat.swapBottoms) pics.add(wall2.picnum);
-          else pics.add(wall.picnum);
-        }
-
-        if (wall.cstat.masking) pics.add(wall.overpicnum);
-      }
-    }
-    return pics;
-  }
-
-  private printPicUsage() {
-    // const board = this.ctx.board();
-    // const results: [string, number][] = [];
-    // const picsStat = new Map<number, Set<number>>();
-    // for (let s = 0; s < board.numsectors; s++) {
-    //   const pics = [...this.getSectorPics(board, s)];
-    //   results.push([pics.sort().join(','), s]);
-    //   pics.forEach(p => {
-    //     let sectors = picsStat.get(p);
-    //     if (sectors == undefined) {
-    //       sectors = new Set();
-    //       picsStat.set(p, sectors);
-    //     }
-    //     sectors.add(s);
-    //   })
-    // }
-    // info([...picsStat.values()].sort((l, r) => l.size - r.size));
-
-    // const imgStats = new Map<string, Set<number>>();
-    // const art = this.ctx.art;
-    // for (let i = 0; i < 4096; i++) {
-    //   const info = art.getInfo(i);
-    //   if (info == null) continue;
-    //   const key = `${info.w}x${info.h}`;
-    //   let ids = imgStats.get(key);
-    //   if (ids == undefined) {
-    //     ids = new Set();
-    //     imgStats.set(key, ids);
-    //   }
-    //   ids.add(i);
-    // }
-    // info([...imgStats.entries()].sort((l, r) => l[1].size - r[1].size));
-    const target = this.ctx.view.target();
-    if (!target.entity.isSector()) return;
-    const board = this.ctx.board();
-    const art = this.ctx.art;
-    const sectorId = target.entity.id;
-    const pics = new Set<number>();
-    const sectors = new Set<number>();
-    const sizes = new Set<string>();
-
-    const sector = board.sectors[sectorId];
-    const pf = (p: number) => { pics.add(p); const i = art.getInfo(p); sizes.add(`${i.w}x${i.h}`) };
-    this.getSectorPics(board, sectorId).forEach(pf);
-    const wallend = sector.wallptr + sector.wallnum;
-    for (let w = sector.wallptr; w < wallend; w++) {
-      const wall = board.walls[w];
-      if (wall.nextsector == -1) continue;
-      const nextsector = wall.nextsector;
-      if (sectors.has(nextsector)) continue;
-      this.getSectorPics(board, nextsector).forEach(pf);
-      sectors.add(nextsector);
-    }
-    info(pics, sectors, sizes);
-  }
-
-  private print() {
-    const target = this.ctx.view.target();
-    const board = this.ctx.board();
-    if (target.entity == null) return;
-    switch (target.entity.type) {
-      case EntityType.CEILING:
-      case EntityType.FLOOR:
-        info(target.entity.id, board.sectors[target.entity.id]);
-        break;
-      case EntityType.UPPER_WALL:
-      case EntityType.MID_WALL:
-      case EntityType.LOWER_WALL:
-        info(target.entity.id, board.walls[target.entity.id]);
-        break;
-      case EntityType.SPRITE:
-        info(target.entity.id, board.sprites[target.entity.id]);
-        break;
-    }
   }
 
   private copy() {
@@ -427,8 +255,7 @@ export class Selection extends MessageHandlerReflective {
 
   public Render(msg: Render) {
     HIGHLIGHT.set.clear();
-    // this.highlighted.handle(HIGHLIGHT);
-    this.selection.handle(HIGHLIGHT);
+    this.handleSelected(HIGHLIGHT);
     for (const v of HIGHLIGHT.set.keys()) {
       const type = detuple0(v);
       const id = detuple1(v);

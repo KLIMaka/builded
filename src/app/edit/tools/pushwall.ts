@@ -1,16 +1,15 @@
 import { pushWall } from "../../../build/boardutils";
-import { Board } from "../../../build/structs";
 import { build2gl, createSlopeCalculator, sectorOfWall, wallNormal, ZSCALE } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 import { cyclicPairs } from "../../../utils/collections";
 import { create, Injector } from "../../../utils/injector";
 import { dot2d } from "../../../utils/mathutils";
-import { ART, ArtProvider, BOARD, BuildReferenceTracker, REFERENCE_TRACKER, View, VIEW, BoardProvider } from "../../apis/app";
+import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
 import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
 import { GRID, GridController } from "../../modules/context";
 import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
 import { MovingHandle } from "../handle";
-import { BoardInvalidate, Frame, NamedMessage, Render, COMMIT } from "../messages";
+import { COMMIT, Frame, INVALIDATE_ALL, NamedMessage, Render } from "../messages";
 
 const wallNormal_ = vec3.create();
 const wallNormal1_ = vec3.create();
@@ -28,7 +27,7 @@ export class PushWall extends MessageHandlerReflective {
   private movingHandle = new MovingHandle();
 
   constructor(
-    private builders: BuildersFactory,
+    builders: BuildersFactory,
     private view: View,
     private art: ArtProvider,
     private board: BoardProvider,
@@ -53,7 +52,7 @@ export class PushWall extends MessageHandlerReflective {
   private stop(copy: boolean) {
     pushWall(this.board(), this.wallId, this.getDistance(), this.art, copy, this.refs);
     this.bus.handle(COMMIT);
-    this.bus.handle(new BoardInvalidate(null));
+    this.bus.handle(INVALIDATE_ALL);
     this.wallId = -1;
     this.movingHandle.stop();
   }

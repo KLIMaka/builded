@@ -14,12 +14,12 @@ import { BUS, DefaultMessageBus, MessageBus, MessageHandlerReflective } from '..
 import { ReferenceTrackerImpl } from '../apis/referencetracker';
 import { consumerProvider, HintRenderable } from '../apis/renderable';
 import { EntityFactoryConstructor, ENTITY_FACTORY } from '../edit/context';
-import { BoardInvalidate, Frame, LoadBoard, Mouse, NamedMessage, PostFrame, Render } from '../edit/messages';
+import { Frame, INVALIDATE_ALL, LoadBoard, Mouse, NamedMessage, PostFrame, Render } from '../edit/messages';
 import { DrawSectorModule } from '../edit/tools/drawsector';
 import { JoinSectorsModule } from '../edit/tools/joinsectors';
 import { PushWallModule } from '../edit/tools/pushwall';
 import { PicNumSelector_, SelectionModule } from '../edit/tools/selection';
-import { SplitWallModule } from '../edit/tools/splitwall';
+import { UtilsModule } from '../edit/tools/utils';
 import { Binder, loadBinds } from '../input/keymap';
 import { messageParser } from '../input/messageparser';
 import { InfoModule } from '../modules/info';
@@ -57,7 +57,6 @@ const POSTFRAME = new PostFrame();
 const MOUSE = new Mouse(0, 0);
 const tools = consumerProvider<HintRenderable>();
 const RENDER = new Render(tools.consumer);
-const INVALIDATE_ALL = new BoardInvalidate(null);
 
 class BuildReferenceTrackerImpl implements BuildReferenceTracker {
   readonly walls = new ReferenceTrackerImpl<number>(-1);
@@ -76,7 +75,7 @@ export const GRID = new Dependency<GridController>('GridController');
 
 export class GridControllerImpl extends MessageHandlerReflective {
   private gridSizes = [16, 32, 64, 128, 256, 512, 1024];
-  private gridSizeIdx = 3;
+  private gridSizeIdx = 4;
 
   public setGridSize(size: number) {
     if (size < this.gridSizes[0]) this.gridSizeIdx = 0;
@@ -185,7 +184,6 @@ export function ContextModule(injector: Injector) {
   injector.bind(BOARD, BoardProviderConstructor);
   injector.bind(ENTITY_FACTORY, EntityFactoryConstructor);
 
-  injector.install(SplitWallModule);
   injector.install(JoinSectorsModule);
   injector.install(DrawSectorModule);
   injector.install(PushWallModule);
@@ -193,6 +191,7 @@ export function ContextModule(injector: Injector) {
   injector.install(SelectionModule);
   injector.install(InfoModule);
   injector.install(StatusBarModule);
+  injector.install(UtilsModule);
 }
 
 export function MainLoopConstructor(injector: Injector) {

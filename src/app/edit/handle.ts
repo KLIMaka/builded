@@ -1,8 +1,7 @@
 import { vec3, Vec3Array } from "../../libs_js/glmatrix";
 import { len2d } from "../../utils/mathutils";
-import { Mover } from "./messages";
 
-export class MovingHandle implements Mover {
+export class MovingHandle {
   private startPoint = vec3.create();
   private currentPoint = vec3.create();
   private dzoff = 0;

@@ -193,7 +193,7 @@ export function updateWallHelper(cache: BuildRenderableProvider, ctx: Renderable
   addWallPoints(ctx, builder.topPoints, wallId, true);
   addLength(ctx, builder.topLength, wallId, true);
 
-  mat4.copy(builder.midGrid.gridTexMat, createGridWallMatrix(board, wallId, wall.nextsector == -1 ? WallGridType.VOID : WallGridType.TOP));
+  mat4.copy(builder.midGrid.gridTexMat, createGridWallMatrix(board, wallId, wall.nextsector == -1 ? WallGridType.VOID : WallGridType.MID));
   builder.midGrid.solid = <SolidBuilder>wallRenderable.mid;
 
   mat4.copy(builder.botGrid.gridTexMat, createGridWallMatrix(board, wallId, WallGridType.BOT));

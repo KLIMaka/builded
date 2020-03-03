@@ -3,8 +3,6 @@ import { Message } from "../apis/handler";
 import { Entity } from "../../build/hitscan";
 import { Board } from "../../build/structs";
 
-export interface Mover { readonly dx: number; readonly dy: number; readonly dz: number; }
-
 export class NamedMessage implements Message { constructor(public name: string) { } }
 export class LoadBoard implements Message { constructor(public board: Board) { } }
 export class StartMove implements Message { }
@@ -29,3 +27,4 @@ export class SetSectorCstat implements Message { constructor(public name: string
 export class SetSpriteCstat implements Message { constructor(public name: string, public value = false, public toggle = true) { } }
 
 export const COMMIT = new NamedMessage('commit');
+export const INVALIDATE_ALL = new BoardInvalidate(null);

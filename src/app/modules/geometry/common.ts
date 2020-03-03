@@ -3,11 +3,12 @@ import { Texture } from "../../../utils/gl/drawstruct";
 import { State } from "../../../utils/gl/stategl";
 import { Dependency, Injector } from "../../../utils/injector";
 import { BUFFER_FACTORY, BuildBuffer } from "../gl/buffers";
-import { BufferRenderable, GridSetup, GRID_SETUP, PointSpriteSetup, POINT_SPRITE_SETUP, SolidSetup, SOLID_SETUP, WireframeSetup, WIREFRAME_SETUP } from "./builders/setups";
+import { BufferRenderable, GridSetup, GRID_SETUP, PointSpriteSetup, POINT_SPRITE_SETUP, SolidSetup, SOLID_SETUP, WireframeSetup, WIREFRAME_SETUP, BufferSetup, FLAT_SETUP } from "./builders/setups";
 
 export interface BuildersFactory {
   solid(hint: string): SolidBuilder;
   grid(hint: string): GridBuilder;
+  flat(hint: string): FlatBuilder;
   pointSprite(hint: string): PointSpriteBuilder;
   wireframe(hint: string): WireframeBuilder;
 }
@@ -18,6 +19,7 @@ export async function DefaultBuildersFactory(injector: Injector) {
   return {
     solid: (hint: string) => new SolidBuilder(bufferFactory.get('solid-' + hint)),
     grid: (hint: string) => new GridBuilder(),
+    flat: (hint: string) => new FlatBuilder(),
     pointSprite: (hint: string) => new PointSpriteBuilder(bufferFactory.get('pointsprite-' + hint)),
     wireframe: (hint: string) => new WireframeBuilder(bufferFactory.get('wireframe-' + hint))
   }
@@ -67,6 +69,22 @@ export class GridBuilder extends BufferRenderable<GridSetup> {
     setup.shader('grid')
       .grid(this.gridTexMat);
   }
+
+  public draw(gl: WebGLRenderingContext, state: State): void {
+    this.needToRebuild();
+    super.draw(gl, state);
+  }
+}
+
+export class FlatBuilder extends BufferRenderable<BufferSetup> {
+  public solid: SolidBuilder;
+
+  constructor() { super(FLAT_SETUP) }
+
+  public get buff() { return this.solid.buff }
+  public reset() { }
+  protected textureHint() { return null }
+  public setup(setup: BufferSetup) { setup.shader('baseFlatShader') }
 
   public draw(gl: WebGLRenderingContext, state: State): void {
     this.needToRebuild();

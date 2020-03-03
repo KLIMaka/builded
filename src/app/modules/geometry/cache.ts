@@ -14,7 +14,8 @@ import { updateWall } from './builders/wall';
 import { updateWall2d } from './builders/wall2d';
 import { updateWallHelper, WallHelperBuilder } from './builders/wallhelper';
 import { updateWallPoint } from './builders/wallpointhelper';
-import { BuildersFactory, BUILDERS_FACTORY } from './common';
+import { BuildersFactory, BUILDERS_FACTORY, FlatBuilder, SolidBuilder } from './common';
+import { updateSectorSelected, SectorSelectedBuilder, updateWallSelected, WallSelectedBuilder } from './builders/selected';
 
 class Entry<T> {
   constructor(public value: T, public valid: boolean = false) { }
@@ -111,6 +112,21 @@ export class CachedBuildRenderableProvider implements BuildRenderableProvider {
   }
 }
 
+export class CachedSelectedRenderableProvider implements BuildRenderableProvider {
+  private sectors = new CacheMap((ctx, id, value: SectorSelectedBuilder) => updateSectorSelected(this.cache, ctx, id, value));
+  private walls = new CacheMap((ctx, id, value: WallSelectedBuilder) => updateWallSelected(this.cache, ctx, id, value));
+
+  constructor(
+    private ctx: RenderablesCacheContext,
+    readonly cache: CachedBuildRenderableProvider
+  ) { }
+
+  sector(id: number): SectorRenderable { return this.sectors.get(id, this.ctx) }
+  sectorCluster(id: number): ClusterRenderable { throw new Error('Cant render clusters') }
+  wall(id: number): WallRenderable { return this.walls.get(id, this.ctx) }
+  wallPoint(id: number): RenderableProvider<HintRenderable> { return null }
+  sprite(id: number): RenderableProvider<HintRenderable> { return null }
+}
 
 export class CachedHelperBuildRenderableProvider implements BuildRenderableProvider {
   private sectors = new CacheMap((ctx: RenderablesCacheContext, id: number, value: SectorHelperBuilder) => updateSectorHelper(this.cache, ctx, id, value));
@@ -148,6 +164,7 @@ export interface RenderablesCache extends MessageHandler {
   readonly geometry: CachedBuildRenderableProvider;
   readonly helpers: CachedHelperBuildRenderableProvider;
   readonly topdown: CachedTopDownBuildRenderableProvider;
+  readonly selected: CachedSelectedRenderableProvider;
 }
 export const RENDRABLES_CACHE = new Dependency<RenderablesCache>('RenderablesCache');
 
@@ -195,6 +212,7 @@ export class RenderablesCacheImpl extends MessageHandlerReflective implements Re
   readonly geometry: CachedBuildRenderableProvider;
   readonly helpers: CachedHelperBuildRenderableProvider;
   readonly topdown: CachedTopDownBuildRenderableProvider;
+  readonly selected: CachedSelectedRenderableProvider;
 
   constructor(
     private ctx: RenderablesCacheContext
@@ -203,6 +221,7 @@ export class RenderablesCacheImpl extends MessageHandlerReflective implements Re
     this.geometry = new CachedBuildRenderableProvider(ctx);
     this.helpers = new CachedHelperBuildRenderableProvider(ctx, this.geometry);
     this.topdown = new CachedTopDownBuildRenderableProvider(ctx);
+    this.selected = new CachedSelectedRenderableProvider(ctx, this.geometry);
     this.prebuild();
   }
 

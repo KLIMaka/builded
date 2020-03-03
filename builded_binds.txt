@@ -58,7 +58,6 @@ CTRL+SHIFT+F    show_files
 0               print_info
 F3              load_map
 F4              print_usage
-mouse0          replace_selection
 SHIFT+mouse0    add_selection
 CTRL+D          clear_selection
 

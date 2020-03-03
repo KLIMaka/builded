@@ -86,6 +86,7 @@ export class Boardrenderer3D {
     gl.disable(WebGLRenderingContext.DEPTH_TEST);
     gl.enable(WebGLRenderingContext.BLEND);
     this.surfaces.clear().push(p);
+    this.bgl.modulation(0.984, 0.78, 0.118, 1);
     this.bgl.draw(gl, this.surfaces);
     this.bgl.flush(gl);
     gl.disable(WebGLRenderingContext.BLEND);

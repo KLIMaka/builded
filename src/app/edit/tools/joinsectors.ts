@@ -1,9 +1,8 @@
 import { joinSectors } from "../../../build/boardutils";
-import { Board } from "../../../build/structs";
 import { create, Injector } from "../../../utils/injector";
-import { BOARD, BuildReferenceTracker, REFERENCE_TRACKER, VIEW, View } from "../../apis/app";
+import { BOARD, BoardProvider, BuildReferenceTracker, REFERENCE_TRACKER, VIEW, View } from "../../apis/app";
 import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
-import { BoardInvalidate, NamedMessage, COMMIT } from "../messages";
+import { COMMIT, INVALIDATE_ALL, NamedMessage } from "../messages";
 
 export async function JoinSectorsModule(injector: Injector) {
   const bus = await injector.getInstance(BUS);
@@ -17,7 +16,7 @@ export class JoinSectors extends MessageHandlerReflective {
   constructor(
     private bus: MessageBus,
     private view: View,
-    private board: Board,
+    private board: BoardProvider,
     private refs: BuildReferenceTracker,
   ) { super() }
 
@@ -32,10 +31,10 @@ export class JoinSectors extends MessageHandlerReflective {
     }
 
     if (this.sectorId1 != -1 && this.sectorId2 != -1) {
-      let result = joinSectors(this.board, this.sectorId1, this.sectorId2, this.refs);
+      let result = joinSectors(this.board(), this.sectorId1, this.sectorId2, this.refs);
       if (result == 0) {
         this.bus.handle(COMMIT);
-        this.bus.handle(new BoardInvalidate(null));
+        this.bus.handle(INVALIDATE_ALL);
       }
       this.sectorId1 = -1;
       this.sectorId2 = -1;

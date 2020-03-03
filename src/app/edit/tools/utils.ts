@@ -111,9 +111,9 @@ class Utils extends MessageHandlerReflective {
 
     splitWall(board, id, x, y, this.art, this.refs);
     this.commit();
-    let s = sectorOfWall(board, id);
+    const s = sectorOfWall(board, id);
     invalidateSectorAndWalls(s, board, this.bus);
-    let nextsector = board.walls[id].nextsector;
+    const nextsector = board.walls[id].nextsector;
     if (nextsector != -1) {
       invalidateSectorAndWalls(nextsector, board, this.bus);
     }

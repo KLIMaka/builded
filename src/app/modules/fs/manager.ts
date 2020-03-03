@@ -1,8 +1,8 @@
-import { Dependency, Injector } from "../../../utils/injector";
-import { Table, span, stopPropagation } from "../../../utils/ui/ui";
-import { UI, Ui, Window } from "../../apis/ui";
+import { Dependency, Injector, create } from "../../../utils/injector";
+import { span, stopPropagation, Table } from "../../../utils/ui/ui";
 import { BUS } from "../../apis/handler";
-import { NamedMessage } from "../../edit/messages";
+import { UI, Ui, Window } from "../../apis/ui";
+import { namedMessageHandler } from "../../edit/messages";
 
 export interface FsManager {
   read(name: string): Promise<ArrayBuffer>;
@@ -82,7 +82,6 @@ class FileBrowser {
     this.refreshContent();
   }
 
-
   public async show() {
     await this.refreshContent();
     this.window.show()
@@ -91,18 +90,16 @@ class FileBrowser {
 
 let browser: FileBrowser;
 async function getFileBrowser(injector: Injector) {
-  if (browser == null) {
-    browser = new FileBrowser(await injector.getInstance(UI), await injector.getInstance(FS_MANAGER));
-  }
+  if (browser == null) browser = await create(injector, FileBrowser, UI, FS_MANAGER);
   return browser;
-}
-
-export async function FileBrowserModule(injector: Injector) {
-  const bus = await injector.getInstance(BUS);
-  bus.connect({ handle: msg => { if (msg instanceof NamedMessage && msg.name == 'show_files') showFileBrowser(injector) } });
 }
 
 export async function showFileBrowser(injector: Injector) {
   const browser = await getFileBrowser(injector);
   browser.show();
+}
+
+export async function FileBrowserModule(injector: Injector) {
+  const bus = await injector.getInstance(BUS);
+  bus.connect(namedMessageHandler('show_files', () => showFileBrowser(injector)));
 }

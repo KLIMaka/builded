@@ -1,5 +1,5 @@
 import { HintRenderable, RenderableConsumer } from "../apis/renderable";
-import { Message } from "../apis/handler";
+import { Message, MessageHandler } from "../apis/handler";
 import { Entity } from "../../build/hitscan";
 import { Board } from "../../build/structs";
 
@@ -28,3 +28,7 @@ export class SetSpriteCstat implements Message { constructor(public name: string
 
 export const COMMIT = new NamedMessage('commit');
 export const INVALIDATE_ALL = new BoardInvalidate(null);
+
+export function namedMessageHandler(name: string, handler: () => void): MessageHandler {
+  return { handle: (msg: Message) => { if (msg instanceof NamedMessage && msg.name == name) handler() } }
+}

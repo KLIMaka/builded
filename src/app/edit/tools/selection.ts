@@ -113,7 +113,7 @@ export class Selection extends MessageHandlerReflective {
 
   public Frame(msg: Frame) {
     if (!handle.isActive()) this.updateSelection();
-    if (this.selection.list().isEmpty()) return;
+    if (this.selection.list().isEmpty() && this.highlighted.list().isEmpty()) return;
     if (this.activeMove()) {
       this.updateHandle();
       try {

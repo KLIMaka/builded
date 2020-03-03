@@ -1,15 +1,14 @@
 import { ArtFile, ArtFiles, createArts } from '../../../build/art';
 import { cloneBoard, loadBloodMap } from '../../../build/blood/maploader';
-import { BloodBoard, BloodSprite } from '../../../build/blood/structs';
+import { BloodBoard } from '../../../build/blood/structs';
 import { BloodImplementationConstructor } from '../../../build/blood/utils';
 import { createNewSector } from '../../../build/boardutils';
 import { RffFile } from '../../../build/rff';
-import { SpriteStats } from '../../../build/structs';
 import { Deck } from '../../../utils/collections';
 import { createTexture } from '../../../utils/gl/textures';
 import { Dependency, Injector } from '../../../utils/injector';
 import { Stream } from '../../../utils/stream';
-import { BoardManipulator_, BuildReferenceTracker, BuildResources, RESOURCES, DEFAULT_BOARD } from '../../apis/app';
+import { BoardManipulator_, BuildReferenceTracker, BuildResources, DEFAULT_BOARD, RESOURCES } from '../../apis/app';
 import { BUS, MessageHandlerReflective } from '../../apis/handler';
 import { ReferenceTrackerImpl } from '../../apis/referencetracker';
 import { LoadBoard, NamedMessage } from '../../edit/messages';

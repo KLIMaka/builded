@@ -1,6 +1,6 @@
 import { BloodModule } from './app/modules/blood/module';
 import { GL } from './app/modules/buildartprovider';
-import { ContextModule, MainLoopConstructor } from './app/modules/context';
+import { DefaultSetupModule, MainLoopConstructor } from './app/modules/context';
 import { DbFsModule } from './app/modules/fs/db';
 import { FileBrowserModule } from './app/modules/fs/manager';
 import { PhotonUiModule } from './app/modules/photonui';
@@ -16,7 +16,7 @@ INPUT.bind(<HTMLCanvasElement>gl.canvas);
 const injector = new Injector();
 injector.bindInstance(GL, gl);
 injector.install(DbFsModule('resources/engines/blood/'));
-injector.install(ContextModule);
+injector.install(DefaultSetupModule);
 injector.install(BloodModule);
 injector.install(PhotonUiModule);
 injector.install(FileBrowserModule);

@@ -9,12 +9,12 @@ import { create, Dependency, Injector } from '../../utils/injector';
 import { InputState } from '../../utils/input';
 import { cyclic } from '../../utils/mathutils';
 import * as PROFILE from '../../utils/profiler';
-import { ART, BOARD, BoardManipulator_, BoardProvider, BuildReferenceTracker, DEFAULT_BOARD, REFERENCE_TRACKER, State, STATE, View, VIEW } from '../apis/app';
+import { ART, BOARD, BoardManipulator_, BoardProvider, BuildReferenceTracker, DEFAULT_BOARD, REFERENCE_TRACKER, State, STATE, View, VIEW, STORAGES } from '../apis/app';
 import { BUS, DefaultMessageBus, MessageBus, MessageHandlerReflective } from '../apis/handler';
 import { ReferenceTrackerImpl } from '../apis/referencetracker';
 import { consumerProvider, HintRenderable } from '../apis/renderable';
 import { EntityFactoryConstructor, ENTITY_FACTORY } from '../edit/context';
-import { Frame, INVALIDATE_ALL, LoadBoard, Mouse, NamedMessage, PostFrame, Render } from '../edit/messages';
+import { Frame, INVALIDATE_ALL, LoadBoard, Mouse, NamedMessage, PostFrame, Render, namedMessageHandler } from '../edit/messages';
 import { DrawSectorModule } from '../edit/tools/drawsector';
 import { JoinSectorsModule } from '../edit/tools/joinsectors';
 import { PushWallModule } from '../edit/tools/pushwall';
@@ -129,7 +129,6 @@ async function loadUtilityTextures(textures: [number, Promise<Texture>][]) {
 
 class History {
   private history: Deck<Board> = new Deck();
-
   public push(board: Board) { this.history.push(board) }
   public pop() { if (this.history.length() > 1) this.history.pop() }
   public top() { return this.history.top() }
@@ -165,13 +164,32 @@ export async function BoardProviderConstructor(injector: Injector): Promise<Boar
   return () => activeBoard;
 }
 
-export function ContextModule(injector: Injector) {
+async function mapBackupService(injector: Injector) {
+  const storages = await injector.getInstance(STORAGES);
+  const store = await storages('session');
+  const bus = await injector.getInstance(BUS);
+  const board = await injector.getInstance(BOARD);
+  bus.connect(namedMessageHandler('commit', () => store.set('map_bak', board())));
+}
+
+async function loadBakMap(injector: Injector) {
+  const storages = await injector.getInstance(STORAGES);
+  const store = await storages('session');
+  const map = <Board>await store.get('map_bak');
+  if (map) {
+    const bus = await injector.getInstance(BUS);
+    bus.handle(new LoadBoard(map));
+  }
+}
+
+export function DefaultSetupModule(injector: Injector) {
   injector.bindInstance(REFERENCE_TRACKER, new BuildReferenceTrackerImpl());
   injector.bindInstance(STATE, new StateImpl());
   injector.bindPromise(KeymapConfig_, loadString('builded_binds.txt'));
+  const opts = { filter: WebGLRenderingContext.NEAREST, repeat: WebGLRenderingContext.CLAMP_TO_EDGE };
   injector.bindPromise(UtilityTextures_, injector.getInstance(GL).then(gl => loadUtilityTextures([
-    [-1, loadTexture(gl, 'resources/point1.png', { filter: WebGLRenderingContext.NEAREST, repeat: WebGLRenderingContext.CLAMP_TO_EDGE })],
-    [-2, loadTexture(gl, 'resources/img/font.png', { filter: WebGLRenderingContext.NEAREST, repeat: WebGLRenderingContext.CLAMP_TO_EDGE })],
+    [-1, loadTexture(gl, 'resources/point1.png', opts)],
+    [-2, loadTexture(gl, 'resources/img/font.png', opts)],
   ])));
   injector.bind(GRID, GridControllerConstructor);
   injector.bind(ART, BuildArtProviderConstructor);
@@ -192,6 +210,9 @@ export function ContextModule(injector: Injector) {
   injector.install(InfoModule);
   injector.install(StatusBarModule);
   injector.install(UtilsModule);
+
+  injector.install(mapBackupService);
+  injector.install(loadBakMap);
 }
 
 export function MainLoopConstructor(injector: Injector) {

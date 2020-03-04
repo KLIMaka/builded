@@ -37,7 +37,7 @@ class Db implements Storage {
 
   set(key: string, value: any) {
     return new Promise(async (ok, error) => {
-      const request = (await this.request('readwrite')).add({ key: key.toUpperCase(), name: key, data: value });
+      const request = (await this.request('readwrite')).put({ key: key.toUpperCase(), name: key, data: value });
       request.onsuccess = () => ok();
       request.onerror = (e) => error(e);
     })

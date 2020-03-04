@@ -9,9 +9,9 @@ import { createTexture } from '../../../utils/gl/textures';
 import { Dependency, Injector } from '../../../utils/injector';
 import { Stream } from '../../../utils/stream';
 import { BoardManipulator_, BuildReferenceTracker, BuildResources, DEFAULT_BOARD, RESOURCES } from '../../apis/app';
-import { BUS, MessageHandlerReflective } from '../../apis/handler';
+import { BUS } from '../../apis/handler';
 import { ReferenceTrackerImpl } from '../../apis/referencetracker';
-import { LoadBoard, NamedMessage, namedMessageHandler } from '../../edit/messages';
+import { LoadBoard, namedMessageHandler } from '../../edit/messages';
 import { RAW_PAL } from '../artselector';
 import { ArtFiles_, GL, ParallaxTextures_ } from '../buildartprovider';
 import { FileSystem, FS } from '../fs/fs';
@@ -92,7 +92,6 @@ function createBoard() {
   board.numsectors = 0;
   board.numsprites = 0;
 
-  const points = new Deck<[number, number]>();
 
   const NULL_TRACKER: BuildReferenceTracker = {
     walls: new ReferenceTrackerImpl<number>(-1),
@@ -100,7 +99,7 @@ function createBoard() {
     sprites: new ReferenceTrackerImpl<number>(-1),
   }
 
-  createNewSector(board, points.clear()
+  createNewSector(board, new Deck<[number, number]>()
     .push([-4096, -4096])
     .push([4096, -4096])
     .push([4096, 4096])

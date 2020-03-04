@@ -99,6 +99,23 @@ export class WallSegmentsEnt extends MessageHandlerReflective {
     }
   }
 
+  private getWall(w: number) {
+    const board = this.ctx.board();
+    const wall = board.walls[w];
+    return wall.cstat.swapBottoms && this.bottom && wall.nextwall != -1
+      ? board.walls[wall.nextwall]
+      : wall;
+  }
+
+  private invalidateWall(w: number) {
+    const board = this.ctx.board();
+    this.ctx.bus.handle(new BoardInvalidate(new Entity(w, EntityType.WALL_POINT)));
+    let wall = board.walls[w];
+    if (wall.cstat.swapBottoms && wall.nextwall != -1 ||
+      wall.nextwall != -1 && board.walls[wall.nextwall].cstat.swapBottoms)
+      this.ctx.bus.handle(new BoardInvalidate(new Entity(wall.nextwall, EntityType.WALL_POINT)));
+  }
+
   public StartMove(msg: StartMove) {
     const board = this.ctx.board();
     this.refwall = getClosestWallByIds(board, this.ctx.view.target(), this.wallIds);
@@ -163,23 +180,6 @@ export class WallSegmentsEnt extends MessageHandlerReflective {
       let hwalls = this.highlighted;
       for (let w of hwalls) msg.set.add(tuple(2, w));
     }
-  }
-
-  private getWall(w: number) {
-    const board = this.ctx.board();
-    const wall = board.walls[w];
-    return wall.cstat.swapBottoms && this.bottom && wall.nextwall != -1
-      ? board.walls[wall.nextwall]
-      : wall;
-  }
-
-  private invalidateWall(w: number) {
-    const board = this.ctx.board();
-    this.ctx.bus.handle(new BoardInvalidate(new Entity(w, EntityType.WALL_POINT)));
-    let wall = board.walls[w];
-    if (wall.cstat.swapBottoms && wall.nextwall != -1 ||
-      wall.nextwall != -1 && board.walls[wall.nextwall].cstat.swapBottoms)
-      this.ctx.bus.handle(new BoardInvalidate(new Entity(wall.nextwall, EntityType.WALL_POINT)));
   }
 
   public SetPicnum(msg: SetPicnum) {

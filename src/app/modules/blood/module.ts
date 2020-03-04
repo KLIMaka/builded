@@ -11,7 +11,7 @@ import { Stream } from '../../../utils/stream';
 import { BoardManipulator_, BuildReferenceTracker, BuildResources, DEFAULT_BOARD, RESOURCES } from '../../apis/app';
 import { BUS, MessageHandlerReflective } from '../../apis/handler';
 import { ReferenceTrackerImpl } from '../../apis/referencetracker';
-import { LoadBoard, NamedMessage } from '../../edit/messages';
+import { LoadBoard, NamedMessage, namedMessageHandler } from '../../edit/messages';
 import { RAW_PAL } from '../artselector';
 import { ArtFiles_, GL, ParallaxTextures_ } from '../buildartprovider';
 import { FileSystem, FS } from '../fs/fs';
@@ -66,16 +66,14 @@ async function loarRawPlus(injector: Injector) {
 }
 
 async function loadPluTexture(injector: Injector) {
-  return Promise.all([
+  const [plus, gl, shadowsteps] = await Promise.all([
     injector.getInstance(RAW_PLUs),
     injector.getInstance(GL),
-    injector.getInstance(SHADOWSTEPS)])
-    .then(([plus, gl, shadowsteps]) => {
-      const tex = new Uint8Array(256 * shadowsteps * plus.length);
-      let i = 0;
-      for (const plu of plus) tex.set(plu, 256 * shadowsteps * i++);
-      return createTexture(256, shadowsteps * plus.length, gl, { filter: gl.NEAREST }, tex, gl.LUMINANCE)
-    })
+    injector.getInstance(SHADOWSTEPS)]);
+  const tex = new Uint8Array(256 * shadowsteps * plus.length);
+  let i = 0;
+  for (const plu of plus) tex.set(plu, 256 * shadowsteps * i++);
+  return createTexture(256, shadowsteps * plus.length, gl, { filter: gl.NEAREST }, tex, gl.LUMINANCE)
 }
 
 function loadMapImpl(name: string) {
@@ -117,16 +115,12 @@ function createBoard() {
 
 async function mapLoader(injector: Injector) {
   const bus = await injector.getInstance(BUS);
-  bus.connect(new class extends MessageHandlerReflective {
-    async NamedMessage(msg: NamedMessage) {
-      if (msg.name == 'load_map') {
-        const mapName = await showMapSelection(injector);
-        if (!mapName) return;
-        const map = await loadMapImpl(mapName)(injector);
-        bus.handle(new LoadBoard(map));
-      }
-    }
-  });
+  bus.connect(namedMessageHandler('load_map', async () => {
+    const mapName = await showMapSelection(injector);
+    if (!mapName) return;
+    const map = await loadMapImpl(mapName)(injector);
+    bus.handle(new LoadBoard(map));
+  }));
 }
 
 async function getMapNames(injector: Injector) {

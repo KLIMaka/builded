@@ -12,12 +12,8 @@ export type FileListProvider = () => Promise<string[]>;
 export function UrlFs(path: string): InstanceProvider<FileSystem> {
   return async (injector: Injector) => {
     return {
-      get: async (name) => loadBin(path + name),
+      get: async name => loadBin(path + name),
       list: async () => [],
-      info: async (name) => {
-        const file = await loadBin(path + name);
-        return file ? { name: name, size: file.byteLength, source: 'url' } : null;
-      }
     }
   }
 }

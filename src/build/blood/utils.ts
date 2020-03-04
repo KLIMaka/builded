@@ -25,10 +25,10 @@ export async function BloodImplementationConstructor(injector: Injector) {
       rorLinks = loadRorLinks(<BloodBoard>msg.board);
     }
   })
-  return Promise.resolve({
+  return {
     rorLinks: () => rorLinks,
     isMirrorPic(picnum: number) { return picnum == MIRROR_PIC },
-  })
+  }
 }
 
 export function loadRorLinks(board: BloodBoard): RorLinks {

@@ -1,6 +1,6 @@
-import { closestWallPoint, closestWallSegment, closestSpriteInSector } from "../../../build/boardutils";
+import { closestSpriteInSector, closestWallPoint, closestWallSegment } from "../../../build/boardutils";
 import { Entity, EntityType, Hitscan, hitscan, Ray, Target } from "../../../build/hitscan";
-import { Board, Sprite } from "../../../build/structs";
+import { Board } from "../../../build/structs";
 import { findSector, getPlayerStart, inSector, ZSCALE } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 import { CachedValue } from "../../../utils/cachedvalue";
@@ -34,30 +34,24 @@ export async function View2dConstructor(injector: Injector) {
 }
 
 export class View2d extends MessageHandlerReflective implements View {
-  readonly gl: WebGLRenderingContext;
   private position: ViewPosition;
   private control = new Controller2D();
   private pointer = vec3.create();
   private hit = new CachedValue((h: Hitscan) => this.updateHitscan(h), new Hitscan());
   private snapTargetValue = new CachedValue((t: TargetImpl) => this.updateSnapTarget(t), new TargetImpl());
   private direction = new CachedValue((r: Ray) => this.updateDir(r), new Ray());
-  private gridController: GridController;
   private upp = new DelayedValue(100, 1, NumberInterpolator);
-  private buildgl: BuildGl;
-  private renderer: BoardRenderer2D;
-  private board: BoardProvider;
-  private art: ArtProvider;
-  private state: State;
 
-  constructor(gl: WebGLRenderingContext, renderer: BoardRenderer2D, gridController: GridController, buildgl: BuildGl, board: BoardProvider, art: ArtProvider, state: State) {
+  constructor(
+    readonly gl: WebGLRenderingContext,
+    private renderer: BoardRenderer2D,
+    private gridController: GridController,
+    private buildgl: BuildGl,
+    private board: BoardProvider,
+    private art: ArtProvider,
+    private state: State
+  ) {
     super();
-    this.gl = gl;
-    this.gridController = gridController;
-    this.buildgl = buildgl;
-    this.renderer = renderer;
-    this.board = board;
-    this.art = art;
-    this.state = state;
 
     state.register('zoom+', false);
     state.register('zoom-', false);
@@ -146,7 +140,7 @@ export class View2d extends MessageHandlerReflective implements View {
 
   private updateSnapTarget(target: TargetImpl) {
     const board = this.board();
-    const d = this.gridController.getGridSize() / 8;
+    const d = this.gridController.getGridSize() / 2;
     const s = closestSpriteInSector(board, this.sec, this.x, this.y, d);
     if (s != -1) {
       const sprite = board.sprites[s];

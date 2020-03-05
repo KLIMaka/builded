@@ -1,11 +1,10 @@
-import { connectedWalls, fixxrepeat, lastwall, mergePoints, moveWall, nextwall } from "../../build/boardutils";
+import { connectedWalls, fixxrepeat, lastwall, mergePoints, moveWall } from "../../build/boardutils";
 import { Entity, EntityType, Target } from "../../build/hitscan";
 import { Board } from "../../build/structs";
 import { sectorOfWall } from "../../build/utils";
-import { vec2, mat2d } from "../../libs_js/glmatrix";
-import { Collection, Deck, IndexedDeck } from "../../utils/collections";
-import { List } from "../../utils/list";
-import { cyclic, len2d, tuple, int } from "../../utils/mathutils";
+import { mat2d, vec2 } from "../../libs_js/glmatrix";
+import { Deck, IndexedDeck } from "../../utils/collections";
+import { cyclic, int, len2d, tuple } from "../../utils/mathutils";
 import { Message, MessageHandlerReflective } from "../apis/handler";
 import { EditContext } from "./context";
 import { invalidateSectorAndWalls } from "./editutils";
@@ -26,50 +25,10 @@ function getClosestWallByIds(board: Board, target: Target, ids: Iterable<number>
   return id == -1 ? ids[Symbol.iterator]().next().value : id;
 }
 
-function collectHighlightedWalls(board: Board, walls: Iterable<number>): Collection<number> {
-  let result = new Deck<number>();
-  let chains = new Deck<List<number>>();
-  for (let w of walls) {
-    let partOfOldChain = false;
-    for (let c = 0; c < chains.length(); c++) {
-      let chain = chains.get(c);
-      if (nextwall(board, w) == chain.first().obj) {
-        chain.insertBefore(w);
-        partOfOldChain = true;
-        break;
-      } else if (lastwall(board, w) == chain.last().obj) {
-        chain.insertAfter(w);
-        partOfOldChain = true;
-        break;
-      }
-    }
-    if (!partOfOldChain) {
-      let l = new List<number>();
-      l.push(w);
-      chains.push(l);
-    }
-  }
-  for (let chain of chains) {
-    if (chain.first().next != chain.terminator()) {
-      let w1 = chain.first().obj;
-      let w2 = chain.last().obj;
-      if (board.walls[w2].point2 != w1)
-        chain.pop();
-    }
-    for (let w of chain) result.push(w);
-  }
-  return result;
-}
-
 function collectConnectedWalls(board: Board, walls: Iterable<number>) {
   let result = new Deck<number>();
   for (let w of walls) connectedWalls(board, w, result);
   return result;
-}
-
-function collectMotionSectors(board: Board, walls: Iterable<number>): Set<number> {
-  let sectors = new Set<number>();
-  return sectors;
 }
 
 export class WallSegmentsEnt extends MessageHandlerReflective {
@@ -77,14 +36,13 @@ export class WallSegmentsEnt extends MessageHandlerReflective {
 
   constructor(
     public wallIds: Iterable<number>,
+    public highlighted: Iterable<number>,
     public bottom: boolean,
     public ctx: EditContext,
     public origin = vec2.create(),
     public refwall = -1,
     public active = false,
-    public highlighted = collectHighlightedWalls(ctx.board(), wallIds),
     public connectedWalls = collectConnectedWalls(ctx.board(), wallIds),
-    public motionSectors = collectMotionSectors(ctx.board(), wallIds),
     private valid = true) { super() }
 
   private invalidate() {
@@ -164,22 +122,22 @@ export class WallSegmentsEnt extends MessageHandlerReflective {
   }
 
   public Highlight(msg: Highlight) {
-    const board = this.ctx.board();
-    if (this.active) {
-      let cwalls = this.connectedWalls;
-      for (let w of cwalls) {
-        let s = sectorOfWall(board, w);
-        let p = lastwall(board, w);
-        msg.set.add(tuple(2, w));
-        msg.set.add(tuple(3, w));
-        msg.set.add(tuple(2, p));
-        msg.set.add(tuple(0, s));
-        msg.set.add(tuple(1, s));
-      }
-    } else {
-      let hwalls = this.highlighted;
-      for (let w of hwalls) msg.set.add(tuple(2, w));
-    }
+    // const board = this.ctx.board();
+    // if (this.active) {
+    //   let cwalls = this.connectedWalls;
+    //   for (let w of cwalls) {
+    //     let s = sectorOfWall(board, w);
+    //     let p = lastwall(board, w);
+    //     msg.set.add(tuple(2, w));
+    //     msg.set.add(tuple(3, w));
+    //     msg.set.add(tuple(2, p));
+    //     msg.set.add(tuple(0, s));
+    //     msg.set.add(tuple(1, s));
+    //   }
+    // } else {
+    let hwalls = this.highlighted;
+    for (let w of hwalls) msg.set.add(tuple(2, w));
+    // }
   }
 
   public SetPicnum(msg: SetPicnum) {

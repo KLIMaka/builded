@@ -68,7 +68,8 @@ function sector(fullLoop: (board: Board, wallId: number) => Collection<number>, 
   if (fullLoop) {
     const firstWall = board.sectors[target.entity.id].wallptr;
     list.push(factory.wallSegment(fullLoop(board, firstWall)));
-    list.push(factory.sector(new Entity(target.entity.id, target.entity.type == EntityType.CEILING ? EntityType.FLOOR : EntityType.CEILING)));
+    const type = target.entity.type == EntityType.CEILING ? EntityType.FLOOR : EntityType.CEILING;
+    list.push(factory.sector(new Entity(target.entity.id, type)));
   }
   list.push(factory.sector(target.entity.clone()));
 }
@@ -76,10 +77,11 @@ function sector(fullLoop: (board: Board, wallId: number) => Collection<number>, 
 function wallSegment(fullLoop: (board: Board, wallId: number) => Collection<number>, factory: EntityFactory, w: number, bottom: boolean) {
   const board = factory.ctx.board();
   if (fullLoop) {
-    list.push(factory.wallSegment(fullLoop(board, w), bottom));
+    const loop = fullLoop(board, w);
+    list.push(factory.wallSegment(loop, loop, bottom));
   } else {
     const w1 = nextwall(board, w);
-    list.push(factory.wallSegment([w, w1], bottom));
+    list.push(factory.wallSegment([w, w1], [w], bottom));
   }
 }
 

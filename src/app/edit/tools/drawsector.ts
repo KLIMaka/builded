@@ -1,4 +1,4 @@
-import { createInnerLoop, createNewSector, splitSector, wallInSector } from "../../../build/boardutils";
+import { createInnerLoop, createNewSector, splitSector, wallInSector, closestWallPoint, closestWallPointDist } from "../../../build/boardutils";
 import { Target } from "../../../build/hitscan";
 import { Board } from "../../../build/structs";
 import { findSector, sectorOfWall, ZSCALE } from "../../../build/utils";
@@ -137,7 +137,6 @@ export class DrawSector extends MessageHandlerReflective {
   private points = new Deck<[number, number]>();
   private pointer = vec3.create();
   private hintSector = -1;
-  private valid = false;
   private isRect = true;
 
   constructor(
@@ -179,12 +178,17 @@ export class DrawSector extends MessageHandlerReflective {
   private predrawUpdate() {
     if (this.points.length() > 0) return false;
     const target = this.view.snapTarget();
+    const board = this.board();
     if (target.entity == null) {
-      this.valid = false;
+      const [x, y] = target.coords;
+      const [w] = closestWallPointDist(board, x, y);
+      const z = board.sectors[sectorOfWall(board, w)].ceilingz;
+      vec3.set(this.pointer, x, y, z);
+      this.contour.setZ(z / ZSCALE);
+      this.contour.updateLastPoint(x, y);
+      this.hintSector = -1;
     } else {
-      this.valid = true;
       let [x, y,] = target.coords;
-      const board = this.board();
       let z = this.getPointerZ(board, target);
       vec3.set(this.pointer, x, y, z);
       this.contour.setZ(z / ZSCALE);
@@ -207,7 +211,6 @@ export class DrawSector extends MessageHandlerReflective {
 
   private insertPoint(rect: boolean) {
     if (this.points.length() == 0) this.isRect = rect;
-    if (!this.valid) return;
     if (this.checkFinish()) return;
 
     if (this.isRect) {

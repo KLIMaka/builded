@@ -71,13 +71,13 @@ export class WallEnt extends MessageHandlerReflective {
       let cwalls = this.connectedWalls;
       for (let i = 0; i < cwalls.length(); i++) {
         let w = cwalls.get(i);
-        let s = sectorOfWall(board, w);
+        // let s = sectorOfWall(board, w);
         let p = lastwall(board, w);
         msg.set.add(tuple(2, w));
         msg.set.add(tuple(3, w));
         msg.set.add(tuple(2, p));
-        msg.set.add(tuple(0, s));
-        msg.set.add(tuple(1, s));
+        // msg.set.add(tuple(0, s));
+        // msg.set.add(tuple(1, s));
       }
     } else {
       msg.set.add(tuple(3, this.wallId));

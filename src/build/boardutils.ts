@@ -4,7 +4,7 @@ import { Collection, cyclicPairs, cyclicRange, Deck, findFirst, indexed, Indexed
 import { BuildReferenceTracker } from '../app/apis/app';
 import { ArtInfoProvider } from './art';
 import { Board, FACE_SPRITE, Sector, SectorStats, Sprite, SpriteStats, Wall, WallStats } from './structs';
-import { findSector, sectorOfWall, wallNormal } from './utils';
+import { findSector, sectorOfWall, wallNormal, ZSCALE } from './utils';
 
 export const DEFAULT_REPEAT_RATE = 128;
 const NULL_WALL = new Wall();
@@ -427,7 +427,7 @@ function newSector(): Sector {
   sector.ceilingstat = newSectorStats();
   sector.ceilingxpanning = 0;
   sector.ceilingypanning = 0;
-  sector.ceilingz = -(32 << 8);
+  sector.ceilingz = 2048 * ZSCALE;
   sector.extra = 65535;
   sector.floorheinum = 0;
   sector.floorpal = 0;
@@ -436,7 +436,7 @@ function newSector(): Sector {
   sector.floorstat = newSectorStats();
   sector.floorxpanning = 0;
   sector.floorypanning = 0;
-  sector.floorz = (32 << 8);
+  sector.floorz = 0;
   sector.hitag = 0;
   sector.lotag = 0;
   sector.visibility = 0;

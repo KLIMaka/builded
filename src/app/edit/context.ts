@@ -37,7 +37,7 @@ export class EntityFactory {
   public sector(ent: Entity): SectorEnt { return new SectorEnt(ent, this.ctx) }
   public sprite(id: number): SpriteEnt { return new SpriteEnt(id, this.ctx) }
   public wall(id: number): WallEnt { return new WallEnt(id, this.ctx) }
-  public wallSegment(ids: Iterable<number>, bottom = false): WallSegmentsEnt { return new WallSegmentsEnt(ids, bottom, this.ctx) }
+  public wallSegment(ids: Iterable<number>, hids: Iterable<number> = ids, bottom = false): WallSegmentsEnt { return new WallSegmentsEnt(ids, hids, bottom, this.ctx) }
 }
 export const ENTITY_FACTORY = new Dependency<EntityFactory>('Entity Factory');
 

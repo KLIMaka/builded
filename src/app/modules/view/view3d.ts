@@ -33,7 +33,6 @@ export async function View3dConstructor(injector: Injector) {
 }
 
 export class View3d extends MessageHandlerReflective implements View {
-  readonly gl: WebGLRenderingContext;
   private position: ViewPosition;
   private aspect: number;
   private control = new Controller3D();
@@ -45,22 +44,18 @@ export class View3d extends MessageHandlerReflective implements View {
   private cursor = vec3.create();
   private forwardDamper = new DelayedValue(50, 0, NumberInterpolator);
   private sideDamper = new DelayedValue(50, 0, NumberInterpolator);
-  private buildgl: BuildGl;
-  private renderer: Boardrenderer3D;
-  private board: BoardProvider;
-  private gridController: GridController;
-  private state: State;
-  private art: ArtProvider;
 
-  constructor(gl: WebGLRenderingContext, renderer: Boardrenderer3D, buildgl: BuildGl, board: BoardProvider, state: State, gridController: GridController, art: ArtProvider) {
+  constructor(
+    readonly gl: WebGLRenderingContext,
+    private renderer: Boardrenderer3D,
+    private buildgl: BuildGl,
+    private board: BoardProvider,
+    private state: State,
+    private gridController: GridController,
+    private art: ArtProvider,
+    private lastGridSize = gridController.getGridSize()
+  ) {
     super();
-    this.gl = gl;
-    this.renderer = renderer;
-    this.buildgl = buildgl;
-    this.board = board;
-    this.gridController = gridController;
-    this.state = state;
-    this.art = art;
 
     this.aspect = this.gl.drawingBufferWidth / this.gl.drawingBufferHeight;
     this.control.setFov(90);
@@ -214,9 +209,37 @@ export class View3d extends MessageHandlerReflective implements View {
     return t;
   }
 
+  private minScale(x: number) {
+    let scale = 1;
+    x = int(x);
+    while ((x & 1) == 0 && scale <= 1024) {
+      x >>= 1;
+      scale <<= 1;
+    }
+    return scale;
+  }
+
+  private updateGridSize() {
+    const target = this.target();
+    if (target.entity == null) return;
+    const board = this.board();
+    const d = this.gridController.getGridSize() / 2;
+    const w = this.getClosestWall(target, d);
+    if (w != -1) {
+      const wall = board.walls[w];
+      const scale = Math.min(this.minScale(wall.x), this.minScale(wall.y), this.gridController.getGridSize());
+      this.gridController.setGridSize(scale);
+    } else if (target.entity.isSprite()) {
+      const sprite = board.sprites[target.entity.id];
+      const scale = Math.min(this.minScale(sprite.x), this.minScale(sprite.y), this.gridController.getGridSize());
+      this.gridController.setGridSize(scale);
+    }
+  }
+
   private updateSnapTarget(t: TargetImpl): Target {
     const target = this.target();
     if (target.entity == null) return this.copyTarget(target, t);
+    this.updateGridSize();
     const d = this.gridController.getGridSize() / 2;
     const w = this.getClosestWall(target, d);
     if (w != -1) {

@@ -169,7 +169,12 @@ async function mapBackupService(injector: Injector) {
   const store = await storages('session');
   const bus = await injector.getInstance(BUS);
   const board = await injector.getInstance(BOARD);
+  const defaultBoard = await injector.getInstance(DEFAULT_BOARD);
   bus.connect(namedMessageHandler('commit', () => store.set('map_bak', board())));
+  bus.connect(namedMessageHandler('new_board', () => {
+    bus.handle(new LoadBoard(defaultBoard));
+    store.set('map_bak', defaultBoard);
+  }));
 }
 
 async function loadBakMap(injector: Injector) {

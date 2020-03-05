@@ -182,7 +182,7 @@ export class DrawSector extends MessageHandlerReflective {
     if (target.entity == null) {
       const [x, y] = target.coords;
       const [w] = closestWallPointDist(board, x, y);
-      const z = board.sectors[sectorOfWall(board, w)].ceilingz;
+      const z = w == -1 ? 0 : board.sectors[sectorOfWall(board, w)].ceilingz;
       vec3.set(this.pointer, x, y, z);
       this.contour.setZ(z / ZSCALE);
       this.contour.updateLastPoint(x, y);

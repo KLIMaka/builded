@@ -91,24 +91,6 @@ function createBoard() {
   board.numwalls = 0;
   board.numsectors = 0;
   board.numsprites = 0;
-
-
-  const NULL_TRACKER: BuildReferenceTracker = {
-    walls: new ReferenceTrackerImpl<number>(-1),
-    sectors: new ReferenceTrackerImpl<number>(-1),
-    sprites: new ReferenceTrackerImpl<number>(-1),
-  }
-
-  createNewSector(board, new Deck<[number, number]>()
-    .push([-4096, -4096])
-    .push([4096, -4096])
-    .push([4096, 4096])
-    .push([-4096, 4096]),
-    NULL_TRACKER
-  );
-
-  board.sectors[0].floorz = 0;
-  board.sectors[0].ceilingz = -16 * 4096;
   return board;
 }
 

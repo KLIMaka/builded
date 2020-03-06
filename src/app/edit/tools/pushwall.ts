@@ -3,7 +3,7 @@ import { build2gl, createSlopeCalculator, sectorOfWall, wallNormal, ZSCALE } fro
 import { vec3 } from "../../../libs_js/glmatrix";
 import { cyclicPairs } from "../../../utils/collections";
 import { create, Injector } from "../../../utils/injector";
-import { dot2d } from "../../../utils/mathutils";
+import { dot2d, int } from "../../../utils/mathutils";
 import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
 import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
 import { GRID, GridController } from "../../modules/context";
@@ -95,8 +95,8 @@ export class PushWall extends MessageHandlerReflective {
     const wall2 = board.walls[wall.point2];
     const sectorId = sectorOfWall(board, this.wallId);
     const sector = board.sectors[sectorId];
-    const x1 = wall.x + nx, y1 = wall.y + ny;
-    const x2 = wall2.x + nx, y2 = wall2.y + ny;
+    const x1 = int(wall.x + nx), y1 = int(wall.y + ny);
+    const x2 = int(wall2.x + nx), y2 = int(wall2.y + ny);
     const slopeCalc = createSlopeCalculator(board, sectorId);
     const z1 = slopeCalc(x1, y1, sector.floorheinum) + sector.floorz;
     const z2 = slopeCalc(x1, y1, sector.ceilingheinum) + sector.ceilingz;

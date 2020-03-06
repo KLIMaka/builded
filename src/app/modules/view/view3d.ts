@@ -1,6 +1,6 @@
 import { closestWallInSector, closestWallSegmentInSector } from "../../../build/boardutils";
 import { Entity, EntityType, Hitscan, hitscan, Ray, Target } from "../../../build/hitscan";
-import { Board, Sprite } from "../../../build/structs";
+import { Board } from "../../../build/structs";
 import { build2gl, findSector, getPlayerStart, gl2build, inSector, sectorOfWall, ZSCALE } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 import { CachedValue } from "../../../utils/cachedvalue";
@@ -9,10 +9,10 @@ import { Injector } from "../../../utils/injector";
 import { NumberInterpolator } from "../../../utils/interpolator";
 import { int } from "../../../utils/mathutils";
 import { DelayedValue } from "../../../utils/timed";
-import { ART, ArtProvider, BOARD, STATE, State, View, BoardProvider } from "../../apis/app";
+import { ART, ArtProvider, BOARD, BoardProvider, STATE, State, View } from "../../apis/app";
 import { MessageHandlerReflective } from "../../apis/handler";
-import { Renderable, HintRenderable, RenderableProvider } from "../../apis/renderable";
-import { BoardInvalidate, Frame, Mouse, NamedMessage, LoadBoard } from "../../edit/messages";
+import { HintRenderable, RenderableProvider } from "../../apis/renderable";
+import { BoardInvalidate, Frame, LoadBoard, Mouse, NamedMessage } from "../../edit/messages";
 import { GL } from "../buildartprovider";
 import { GRID, GridController } from "../context";
 import { BuildGl, BUILD_GL } from "../gl/buildgl";
@@ -220,6 +220,7 @@ export class View3d extends MessageHandlerReflective implements View {
   }
 
   private updateGridSize() {
+    if (this.state.get('move')) return;
     const target = this.target();
     if (target.entity == null) return;
     const board = this.board();
@@ -233,6 +234,12 @@ export class View3d extends MessageHandlerReflective implements View {
       const sprite = board.sprites[target.entity.id];
       const scale = Math.min(this.minScale(sprite.x), this.minScale(sprite.y), this.gridController.getGridSize());
       this.gridController.setGridSize(scale);
+      // } else if (target.entity.isWall()) {
+      //   const [x, y] = snapWall(target.entity.id, target.coords[0], target.coords[1], board, this.gridController);
+      //   const scale = Math.min(this.minScale(x), this.minScale(y), this.gridController.getGridSize());
+      //   this.gridController.setGridSize(scale);
+    } else if (target.entity.isSector()) {
+      this.gridController.setGridSize(512)
     }
   }
 

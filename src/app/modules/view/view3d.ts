@@ -224,7 +224,7 @@ export class View3d extends MessageHandlerReflective implements View {
     const target = this.target();
     if (target.entity == null) return;
     const board = this.board();
-    const d = this.gridController.getGridSize() / 2;
+    const d = 64;
     const w = this.getClosestWall(target, d);
     if (w != -1) {
       const wall = board.walls[w];
@@ -238,9 +238,9 @@ export class View3d extends MessageHandlerReflective implements View {
       //   const [x, y] = snapWall(target.entity.id, target.coords[0], target.coords[1], board, this.gridController);
       //   const scale = Math.min(this.minScale(x), this.minScale(y), this.gridController.getGridSize());
       //   this.gridController.setGridSize(scale);
-    } else if (target.entity.isSector()) {
+    } /*else if (target.entity.isSector()) {
       this.gridController.setGridSize(512)
-    }
+    }*/
   }
 
   private updateSnapTarget(t: TargetImpl): Target {

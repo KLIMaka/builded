@@ -1,15 +1,16 @@
-import { Range, Interpolator } from "./interpolator";
+import { Interpolator } from "./interpolator";
 
 export type TimedValue<T> = (time: number) => T;
 
 export function constTimed<T>(value: T): TimedValue<T> { return () => value }
 
 export function timed<T>(startTime: number, startValue: T, endTime: number, endValue: T, interpolator: Interpolator<T>): TimedValue<T> {
-  const range = new Range(startValue, endValue, interpolator);
   const dt = endTime - startTime;
   return (time: number) => {
+    if (time < startTime) return startValue;
+    if (time > endTime) return endValue;
     const t = (time - startTime) / dt;
-    return range.get(t);
+    return interpolator(startValue, endValue, t);
   }
 }
 
@@ -19,19 +20,27 @@ export function delayed<T>(dt: number, last: T, next: T, inter: Interpolator<T>)
 }
 
 export class DelayedValue<T> {
-  private value: TimedValue<T>;
+  private startValue: T;
+  private endValue: T;
+  private time: number;
 
-  constructor(private delay: number, private start: T, private inter: Interpolator<T>) {
-    this.value = constTimed(start);
+  constructor(private delay: number, value: T, private inter: Interpolator<T>) {
+    this.endValue = value;
+    this.startValue = value;
+    this.time = 0;
   }
 
   public set(val: T) {
-    const now = performance.now();
-    const last = this.value(now);
-    this.value = delayed(this.delay, last, val, this.inter);
+    if (this.endValue == val) return;
+    this.startValue = this.get();
+    this.time = performance.now();
+    this.endValue = val;
   }
 
   public get() {
-    return this.value(performance.now());
+    const t = performance.now() - this.time;
+    if (t < 0) return this.startValue;
+    if (t > this.delay) return this.endValue;
+    return this.inter(this.startValue, this.endValue, t / this.delay);
   }
 }

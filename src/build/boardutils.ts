@@ -824,12 +824,11 @@ export function setFirstWall(board: Board, sectorId: number, newFirstWall: numbe
 function clockwise(walls: Collection<[number, number]>): boolean {
   let minx = Number.MAX_VALUE;
   let minwall = -1;
-  for (let w = 0; w < walls.length(); w++) {
-    let w2 = cyclic(w + 1, walls.length());
+  for (const [w1, w2] of cyclicPairs(walls.length())) {
     let wall2 = walls.get(w2);
     if (wall2[0] < minx) {
       minx = wall2[0];
-      minwall = w;
+      minwall = w1;
     }
   }
   let wall0 = walls.get(minwall);

@@ -848,12 +848,12 @@ function order(points: Collection<[number, number]>, cw = true): Collection<[num
 
 function searchMatchWall(board: Board, p1: [number, number], p2: [number, number]): [number, number] {
   for (let s = 0; s < board.numsectors; s++) {
-    let sec = board.sectors[s];
-    let end = sec.wallptr + sec.wallnum;
+    const sec = board.sectors[s];
+    const end = sec.wallptr + sec.wallnum;
     for (let w = sec.wallptr; w < end; w++) {
-      let wall1 = board.walls[w];
+      const wall1 = board.walls[w];
       if (wall1 == null || wall1.nextwall != -1) continue;
-      let wall2 = board.walls[wall1.point2];
+      const wall2 = board.walls[wall1.point2];
       if (wall1.x == p2[0] && wall1.y == p2[1] && wall2.x == p1[0] && wall2.y == p1[1]) {
         return [s, w];
       }
@@ -863,9 +863,9 @@ function searchMatchWall(board: Board, p1: [number, number], p2: [number, number
 }
 
 function matchWalls(board: Board, points: Collection<[number, number]>) {
-  let walls = Array<[number, number]>(points.length());
-  for (let [w1, w2] of cyclicPairs(points.length())) {
-    walls[w1] = searchMatchWall(board, points.get(w1), points.get(w2));
+  const walls = Array<[number, number]>(points.length());
+  for (const [w1, w2] of cyclicPairs(points.length())) {
+    walls.push(searchMatchWall(board, points.get(w1), points.get(w2)));
   }
   return walls;
 }
@@ -873,21 +873,6 @@ function matchWalls(board: Board, points: Collection<[number, number]>) {
 function commonSectorWall(board: Board, matched: [number, number][]): [Sector, Wall] {
   for (let m of matched) if (m != null) return [board.sectors[m[0]], board.walls[m[1]]];
   return [newSector(), newWall(0, 0)];
-}
-
-export function createNewSector(board: Board, points: Collection<[number, number]>, refs: BuildReferenceTracker) {
-  points = order(points);
-  let mwalls = matchWalls(board, points);
-  let [commonSector, commonWall] = commonSectorWall(board, mwalls);
-  let sector = copySector(commonSector);
-  let sectorId = addSector(board, sector);
-  let walls = createNewWalls(points, mwalls, commonWall, board);
-
-  loopPoints.clear().push(points.length());
-  recreateSectorWalls(board, sectorId, walls, loopPoints, refs);
-  for (let w = sector.wallptr; w < sector.wallptr + sector.wallnum; w++) {
-    fixxrepeat(board, w);
-  }
 }
 
 function createNewWalls(points: Collection<[number, number]>, mwalls: [number, number][], commonWall: Wall, board: Board) {
@@ -904,6 +889,21 @@ function createNewWalls(points: Collection<[number, number]>, mwalls: [number, n
     walls.push(wall);
   }
   return walls;
+}
+
+export function createNewSector(board: Board, points: Collection<[number, number]>, refs: BuildReferenceTracker) {
+  points = order(points);
+  let mwalls = matchWalls(board, points);
+  let [commonSector, commonWall] = commonSectorWall(board, mwalls);
+  let sector = copySector(commonSector);
+  let sectorId = addSector(board, sector);
+  let walls = createNewWalls(points, mwalls, commonWall, board);
+
+  loopPoints.clear().push(points.length());
+  recreateSectorWalls(board, sectorId, walls, loopPoints, refs);
+  for (let w = sector.wallptr; w < sector.wallptr + sector.wallnum; w++) {
+    fixxrepeat(board, w);
+  }
 }
 
 export function createInnerLoop(board: Board, sectorId: number, points: Collection<[number, number]>, refs: BuildReferenceTracker) {
@@ -1006,48 +1006,6 @@ function polygonSector(board: Board, points: Collection<[number, number]>, hintS
   }
   return sectorId;
 }
-
-function matchPoints(board: Board, points: Collection<[number, number]>, sectorId: number): [number[], number[]] {
-  let pmap = {};
-  for (let [p, i] of indexed(points)) pmap[`${p[0]},${p[1]}`] = i;
-  let wmap = {};
-  let sector = board.sectors[sectorId];
-  for (let i = 0; i < sector.wallnum; i++) {
-    let w = sector.wallptr + i;
-    let wall = board.walls[w];
-    wmap[`${wall.x},${wall.y}`] = i;
-  }
-  let p2w: number[] = [];
-  for (let p of points) p2w.push(wmap[`${p[0]},${p[1]}`] | -1);
-  let w2p: number[] = [];
-  for (let i = 0; i < sector.wallnum; i++) {
-    let w = sector.wallptr + i;
-    let wall = board.walls[w];
-    w2p.push(pmap[`${wall.x},${wall.y}`] | -1);
-  }
-  return [p2w, w2p];
-}
-
-export function insertPolygon(board: Board, points: Collection<[number, number]>, hintSectorId: number): boolean {
-  points = order(points);
-  let sectorId = polygonSector(board, points, hintSectorId);
-  if (sectorId == -1) return;
-  let mwalls = matchWalls(board, points);
-  let [p2w, w2p] = matchPoints(board, points, sectorId);
-  let sector = board.sectors[sectorId];
-
-  // let w =
-
-
-  // for (let i = 0; i < sector.wallnum; i++) {
-  //   let w = sector.wallptr + i;
-  //   if (w2p[i] != -1) {
-  //     let j = w2p[i];
-  //     while (p2w[j] == -1) j = cyclic(j + 1, points.length());
-  //   }
-  // }
-}
-
 
 let newLoops = new Deck<Wall>();
 let restLoop = new Deck<Wall>();

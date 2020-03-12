@@ -1,6 +1,6 @@
 import { DEFAULT_REPEAT_RATE, nextwall } from "../../../build/boardutils";
 import { Entity, Target } from "../../../build/hitscan";
-import { Board } from "../../../build/structs";
+import { Board } from "../../../build/board/structs";
 import { create, Dependency, Injector } from "../../../utils/injector";
 import { int, len2d, tuple2 } from "../../../utils/mathutils";
 import { STATE, State, View } from "../../apis/app";

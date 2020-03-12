@@ -1,6 +1,6 @@
 import { createInnerLoop, createNewSector, splitSector, wallInSector, closestWallPoint, closestWallPointDist } from "../../../build/boardutils";
 import { Target } from "../../../build/hitscan";
-import { Board } from "../../../build/structs";
+import { Board } from "../../../build/board/structs";
 import { findSector, sectorOfWall, ZSCALE } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 import { Deck } from "../../../utils/collections";

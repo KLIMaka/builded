@@ -1,6 +1,6 @@
 import { unpackWallId } from '../../../build/boardutils';
 import { AllBoardVisitorResult, createSectorCollector, createWallCollector, PvsBoardVisitorResult, VisResult } from '../../../build/boardvisitor';
-import { Board } from '../../../build/structs';
+import { Board } from '../../../build/board/structs';
 import { wallVisible, ZSCALE } from '../../../build/utils';
 import { Deck } from '../../../utils/collections';
 import { State } from '../../../utils/gl/stategl';

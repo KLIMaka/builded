@@ -1,5 +1,5 @@
 import { struct, bits, ushort, int, short, byte, ubyte, uint, Stream, array } from '../utils/stream';
-import { SectorStats, Sector, WallStats, Wall, SpriteStats, Sprite, Board } from './structs';
+import { SectorStats, Sector, WallStats, Wall, SpriteStats, Sprite, Board } from './board/structs';
 
 let sectorStats = struct(SectorStats)
   .field('parallaxing', bits(1))

@@ -1,5 +1,5 @@
-import { ArtInfo } from "../../../../build/art";
-import { Wall } from "../../../../build/structs";
+import { ArtInfo } from "../../../../build/formats/art";
+import { Wall } from "../../../../build/board/structs";
 import { createSlopeCalculator, sectorOfWall, wallNormal, ZSCALE } from "../../../../build/utils";
 import { mat4, Mat4Array, vec3, Vec3Array, vec4 } from "../../../../libs_js/glmatrix";
 import { len2d } from "../../../../utils/mathutils";

@@ -1,7 +1,7 @@
 import { axisSwap, RGBPalPixelProvider } from "../../utils/pixelprovider";
 import { DrawPanel, PixelDataProvider } from "../../utils/ui/drawpanel";
 import { dragElement } from "../../utils/ui/ui";
-import { ArtInfoProvider } from "../../build/art";
+import { ArtInfoProvider } from "../../build/formats/art";
 import { Injector, Dependency } from "../../utils/injector";
 import { ART } from "../apis/app";
 import { PicNumCallback } from "../edit/tools/selection";

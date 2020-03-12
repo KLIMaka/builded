@@ -1,4 +1,4 @@
-import { FACE_SPRITE, FLOOR_SPRITE, WALL_SPRITE } from "../../../../build/structs";
+import { FACE_SPRITE, FLOOR_SPRITE, WALL_SPRITE } from "../../../../build/board/structs";
 import { ang2vec, spriteAngle, ZSCALE } from "../../../../build/utils";
 import { mat4, Mat4Array, Vec3Array, vec4 } from "../../../../libs_js/glmatrix";
 import { BuildBuffer } from "../../gl/buffers";

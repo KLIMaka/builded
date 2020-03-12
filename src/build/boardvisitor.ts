@@ -3,7 +3,7 @@ import * as GLM from '../libs_js/glmatrix';
 import { Deck, IndexedDeck } from '../utils/collections';
 import * as PROFILE from '../utils/profiler';
 import { nextwall, packWallSectorId, unpackSectorId, unpackWallId } from './boardutils';
-import { Board } from './structs';
+import { Board } from './board/structs';
 import * as U from './utils';
 
 export interface VisResult {

@@ -1,4 +1,4 @@
-import { Board, Sector } from "../../../../build/structs";
+import { Board, Sector } from "../../../../build/board/structs";
 import { createSlopeCalculator, sectorOfWall, ZSCALE } from "../../../../build/utils";
 import { Builders } from "../../../apis/builder";
 import { BuildRenderableProvider, LayeredRenderables, SectorRenderable, HELPER_GRID } from "../../../apis/renderable";

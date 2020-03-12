@@ -1,5 +1,5 @@
 import { walllen, DEFAULT_REPEAT_RATE } from '../../../../build/boardutils';
-import { Board, Sector, Wall } from '../../../../build/structs';
+import { Board, Sector, Wall } from '../../../../build/board/structs';
 import { slope, ZSCALE, sectorOfWall } from '../../../../build/utils';
 import { mat4, vec4 } from '../../../../libs_js/glmatrix';
 import { Texture } from '../../../../utils/gl/drawstruct';

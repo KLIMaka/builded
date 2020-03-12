@@ -1,4 +1,4 @@
-import { Sector, Wall, Sprite, Board } from "../structs";
+import { Sector, Wall, Sprite, Board } from "../board/structs";
 
 export class SectorExtra {
   public reference: number;

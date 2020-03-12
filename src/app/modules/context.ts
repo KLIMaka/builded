@@ -1,5 +1,5 @@
 import { SelectorConstructor } from '../../app/modules/artselector';
-import { Board } from '../../build/structs';
+import { Board } from '../../build/board/structs';
 import { Deck, map } from '../../utils/collections';
 import { loadString } from '../../utils/getter';
 import { Texture } from '../../utils/gl/drawstruct';

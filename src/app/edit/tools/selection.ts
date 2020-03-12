@@ -1,6 +1,6 @@
 import { loopWalls, loopWallsFull, nextwall } from "../../../build/boardutils";
 import { Entity, EntityType, Target } from "../../../build/hitscan";
-import { Board } from "../../../build/structs";
+import { Board } from "../../../build/board/structs";
 import { build2gl } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 import { Collection, Deck } from "../../../utils/collections";

@@ -2,8 +2,8 @@ import { cross2d, cyclic, int, len2d, lenPointToLine, tuple2 } from '../utils/ma
 import { vec3 } from '../libs_js/glmatrix';
 import { Collection, cyclicPairs, cyclicRange, Deck, findFirst, indexed, IndexedDeck, map, reverse } from '../utils/collections';
 import { BuildReferenceTracker } from '../app/apis/app';
-import { ArtInfoProvider } from './art';
-import { Board, FACE_SPRITE, Sector, SectorStats, Sprite, SpriteStats, Wall, WallStats } from './structs';
+import { ArtInfoProvider } from './formats/art';
+import { Board, FACE_SPRITE, Sector, SectorStats, Sprite, SpriteStats, Wall, WallStats } from './board/structs';
 import { findSector, sectorOfWall, wallNormal, ZSCALE } from './utils';
 
 export const DEFAULT_REPEAT_RATE = 128;

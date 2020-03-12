@@ -1,5 +1,5 @@
 import { AllBoardVisitorResult, VisResult } from '../../../build/boardvisitor';
-import { Board } from '../../../build/structs';
+import { Board } from '../../../build/board/structs';
 import { mat4, Vec3Array } from '../../../libs_js/glmatrix';
 import { Controller2D } from '../../../utils/camera/controller2d';
 import { Deck } from '../../../utils/collections';

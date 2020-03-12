@@ -1,4 +1,4 @@
-import { Board } from "../../../../build/structs";
+import { Board } from "../../../../build/board/structs";
 import { createSlopeCalculator, sectorOfWall, slope, ZSCALE } from "../../../../build/utils";
 import { Builders } from "../../../apis/builder";
 import { BuildBuffer } from "../../gl/buffers";

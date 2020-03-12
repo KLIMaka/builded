@@ -1,6 +1,6 @@
 import { connectedWalls, deleteWall, lastwall, mergePoints, moveWall, splitWall } from "../../build/boardutils";
 import { Entity, EntityType } from "../../build/hitscan";
-import { Board } from "../../build/structs";
+import { Board } from "../../build/board/structs";
 import { sectorOfWall } from "../../build/utils";
 import { vec2 } from "../../libs_js/glmatrix";
 import { Deck, IndexedDeck } from "../../utils/collections";

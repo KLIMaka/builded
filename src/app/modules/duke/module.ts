@@ -2,7 +2,7 @@ import { ArtFile, ArtFiles, createArts } from "../../../build/art";
 import { createNewSector } from "../../../build/boardutils";
 import { createPalette, GrpFile, loadShadeTables, loadPlus } from "../../../build/grp";
 import { cloneBoard, loadBuildMap } from '../../../build/maploader';
-import { Board, Sprite, SpriteStats } from "../../../build/structs";
+import { Board, Sprite, SpriteStats } from "../../../build/board/structs";
 import { Deck } from "../../../utils/collections";
 import { createTexture } from "../../../utils/gl/textures";
 import { Dependency, Injector } from "../../../utils/injector";
@@ -12,7 +12,7 @@ import { RAW_PAL } from "../artselector";
 import { ArtFiles_, GL, ParallaxTextures_ } from "../buildartprovider";
 import { PALSWAPS, PAL_TEXTURE, PLU_TEXTURE, SHADOWSTEPS } from "../gl/buildgl";
 import { FS } from "../fs/fs";
-import { MAP_NAMES, MapName_ } from "../selectmap";
+import { MAP_NAMES } from "../selectmap";
 import { Implementation_, RorLinks } from "../view/boardrenderer3d";
 
 const GRP = new Dependency<GrpFile>('Grp File');

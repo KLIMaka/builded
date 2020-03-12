@@ -1,6 +1,6 @@
 import { deleteLoop, deleteLoopFull, deleteSectorFull, fillInnerLoop, insertSprite, setFirstWall, splitWall } from "../../../build/boardutils";
 import { EntityType } from "../../../build/hitscan";
-import { Board, WALL_SPRITE } from "../../../build/structs";
+import { Board, WALL_SPRITE } from "../../../build/board/structs";
 import { sectorOfWall, slope, vec2ang, wallNormal } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 import { create, Injector } from "../../../utils/injector";

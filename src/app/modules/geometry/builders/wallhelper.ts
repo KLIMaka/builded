@@ -1,5 +1,5 @@
 import { walllen } from "../../../../build/boardutils";
-import { Board } from "../../../../build/structs";
+import { Board } from "../../../../build/board/structs";
 import { createSlopeCalculator, sectorOfWall, slope, ZSCALE } from "../../../../build/utils";
 import { int } from "../../../../utils/mathutils";
 import { Builders } from "../../../apis/builder";

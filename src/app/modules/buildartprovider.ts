@@ -2,7 +2,7 @@ import { Dependency, Injector } from "../../utils/injector";
 import { warning } from "../../utils/logger";
 import { createTexture } from "../../utils/gl/textures";
 import { ArtProvider } from "../apis/app";
-import { ArtFiles, ArtInfo, Attributes } from "../../build/art";
+import { ArtFiles, ArtInfo, Attributes } from "../../build/formats/art";
 import { rect } from "../../utils/collections";
 import { Texture } from "../../utils/gl/drawstruct";
 

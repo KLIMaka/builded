@@ -1,16 +1,13 @@
-import { ArtFile, ArtFiles, createArts } from '../../../build/art';
 import { cloneBoard, loadBloodMap } from '../../../build/blood/maploader';
 import { BloodBoard } from '../../../build/blood/structs';
 import { BloodImplementationConstructor } from '../../../build/blood/utils';
-import { createNewSector } from '../../../build/boardutils';
-import { RffFile } from '../../../build/rff';
-import { Deck } from '../../../utils/collections';
+import { ArtFile, ArtFiles } from '../../../build/formats/art';
+import { RffFile } from '../../../build/formats/rff';
 import { createTexture } from '../../../utils/gl/textures';
 import { Dependency, Injector } from '../../../utils/injector';
 import { Stream } from '../../../utils/stream';
-import { BoardManipulator_, BuildReferenceTracker, BuildResources, DEFAULT_BOARD, RESOURCES } from '../../apis/app';
+import { BoardManipulator_, BuildResources, DEFAULT_BOARD, RESOURCES } from '../../apis/app';
 import { BUS } from '../../apis/handler';
-import { ReferenceTrackerImpl } from '../../apis/referencetracker';
 import { LoadBoard, namedMessageHandler } from '../../edit/messages';
 import { RAW_PAL } from '../artselector';
 import { ArtFiles_, GL, ParallaxTextures_ } from '../buildartprovider';
@@ -31,7 +28,7 @@ async function loadArtFiles(injector: Injector): Promise<ArtFiles> {
     else break;
   }
   if (arts.length == 0) throw new Error('No ART files was loaded');
-  return createArts(arts);
+  return new ArtFiles(arts);
 }
 
 async function loadPLUs(injector: Injector) {

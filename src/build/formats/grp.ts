@@ -1,4 +1,4 @@
-import { Stream, atomic_array, ubyte } from '../utils/stream';
+import { Stream, atomic_array, ubyte } from "../../utils/stream";
 
 export class GrpFile {
   private data: Stream;

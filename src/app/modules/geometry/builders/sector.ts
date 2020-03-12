@@ -1,5 +1,5 @@
-import { ArtInfo } from "../../../../build/art";
-import { Board, Sector, Wall } from "../../../../build/structs";
+import { ArtInfo } from "../../../../build/formats/art";
+import { Board, Sector, Wall } from "../../../../build/board/structs";
 import { createSlopeCalculator, getFirstWallAngle, sectorNormal, ZSCALE } from "../../../../build/utils";
 import { mat4, Mat4Array, vec3, Vec3Array, vec4 } from "../../../../libs_js/glmatrix";
 import { tesselate } from "../../../../libs_js/glutess";

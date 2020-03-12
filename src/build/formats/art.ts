@@ -1,4 +1,4 @@
-import { struct, bits, Stream, array, ushort, atomic_array, ubyte, byte } from "../utils/stream";
+import { struct, bits, Stream, array, ushort, atomic_array, ubyte, byte } from "../../utils/stream";
 
 export class ArtInfo {
   constructor(public w: number, public h: number, public attrs: Attributes, public img: Uint8Array) { }
@@ -103,14 +103,4 @@ export class ArtFiles implements ArtInfoProvider {
     if (art == null) return null;
     return art.getInfo(id - art.getStart());
   }
-}
-
-
-
-export function create(stream: Stream): ArtFile {
-  return new ArtFile(stream);
-}
-
-export function createArts(arts: ArtFile[]): ArtFiles {
-  return new ArtFiles(arts);
 }

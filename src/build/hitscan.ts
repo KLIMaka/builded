@@ -1,7 +1,7 @@
 import { cross2d, dot2d, int, len2d, sign, sqrLen2d } from "../utils/mathutils";
 import { Deck, IndexedDeck, range } from "../utils/collections";
-import { ArtInfo, ArtInfoProvider } from "./art";
-import { Board, FACE_SPRITE, FLOOR_SPRITE, Sector, WALL_SPRITE } from "./structs";
+import { ArtInfo, ArtInfoProvider } from "./formats/art";
+import { Board, FACE_SPRITE, FLOOR_SPRITE, Sector, WALL_SPRITE } from "./board/structs";
 import { ANGSCALE, groupSprites, inPolygon, inSector, rayIntersect, slope, spriteAngle, ZSCALE } from "./utils";
 import { vec3, Vec3Array } from "../libs_js/glmatrix";
 

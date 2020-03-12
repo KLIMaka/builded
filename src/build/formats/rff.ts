@@ -1,4 +1,4 @@
-import { struct, string, uint, array, byte, ubyte, Stream, atomic_array } from "../utils/stream";
+import { struct, string, uint, array, byte, ubyte, Stream, atomic_array } from "../../utils/stream";
 
 class Header {
   public sign: string;

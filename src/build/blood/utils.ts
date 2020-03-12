@@ -1,7 +1,7 @@
 import { BOARD } from "../../app/apis/app";
 import { RorLink, RorLinks } from "../../app/modules/view/boardrenderer3d";
 import { Injector } from "../../utils/injector";
-import { Sprite } from "../structs";
+import { Sprite } from "../board/structs";
 import { BloodBoard } from "./structs";
 import { BUS, MessageHandlerReflective } from "../../app/apis/handler";
 import { LoadBoard } from "../../app/edit/messages";

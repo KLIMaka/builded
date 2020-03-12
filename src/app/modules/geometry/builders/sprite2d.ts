@@ -1,4 +1,4 @@
-import { FACE_SPRITE, WALL_SPRITE } from "../../../../build/structs";
+import { FACE_SPRITE, WALL_SPRITE } from "../../../../build/board/structs";
 import { spriteAngle, ZSCALE } from "../../../../build/utils";
 import { vec4 } from "../../../../libs_js/glmatrix";
 import { cyclicPairs } from "../../../../utils/collections";

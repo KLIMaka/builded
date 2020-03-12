@@ -1,5 +1,5 @@
 import { Collection, cyclicPairs } from '../utils/collections';
-import { Board, Sector, Sprite, Wall } from './structs';
+import { Board, Sector, Sprite, Wall } from './board/structs';
 import { EntityType, Entity } from './hitscan';
 import { cross2d, len2d, PI2, monoatan2, int } from '../utils/mathutils';
 import { Vec3Array, vec3, vec2 } from '../libs_js/glmatrix';
@@ -41,12 +41,6 @@ export interface MoveStruct {
   readonly y: number;
   readonly z: number;
   readonly sec: number;
-}
-
-export function getSector(board: Board, ms: MoveStruct): number {
-  if (inSector(board, ms.x, ms.y, ms.sec))
-    return ms.sec;
-  return -1;
 }
 
 export function inPolygon(x: number, y: number, xs: Collection<number>, ys: Collection<number>) {

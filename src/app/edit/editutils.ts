@@ -1,5 +1,5 @@
 import { Entity, EntityType } from "../../build/hitscan";
-import { Board } from "../../build/structs";
+import { Board } from "../../build/board/structs";
 import { slope } from "../../build/utils";
 import { tuple2 } from "../../utils/mathutils";
 import { MessageBus } from "../apis/handler";

@@ -1,6 +1,6 @@
 import { closestSpriteInSector, closestWallPoint, closestWallSegment } from "../../../build/boardutils";
 import { Entity, EntityType, Hitscan, hitscan, Ray, Target } from "../../../build/hitscan";
-import { Board } from "../../../build/structs";
+import { Board } from "../../../build/board/structs";
 import { findSector, getPlayerStart, inSector, ZSCALE } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 import { CachedValue } from "../../../utils/cachedvalue";

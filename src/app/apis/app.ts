@@ -1,6 +1,6 @@
-import { ArtInfoProvider } from "../../build/art";
+import { ArtInfoProvider } from "../../build/formats/art";
 import { Ray, Target } from "../../build/hitscan";
-import { Board } from "../../build/structs";
+import { Board } from "../../build/board/structs";
 import { MoveStruct } from "../../build/utils";
 import { Texture } from "../../utils/gl/drawstruct";
 import { Dependency } from "../../utils/injector";

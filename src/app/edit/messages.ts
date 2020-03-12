@@ -1,7 +1,7 @@
 import { HintRenderable, RenderableConsumer } from "../apis/renderable";
 import { Message, MessageHandler } from "../apis/handler";
 import { Entity } from "../../build/hitscan";
-import { Board } from "../../build/structs";
+import { Board } from "../../build/board/structs";
 
 export class NamedMessage implements Message { constructor(public name: string) { } }
 export class LoadBoard implements Message { constructor(public board: Board) { } }

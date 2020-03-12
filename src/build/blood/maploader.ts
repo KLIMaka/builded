@@ -1,6 +1,6 @@
 import { array, atomic_array, bits, int, short, Stream, struct, ubyte } from '../../utils/stream';
 import { BloodBoard, BloodSector, BloodSprite, BloodWall, SectorExtra, SpriteExtra, WallExtra } from './structs';
-import { Header1 } from '../structs';
+import { Header1 } from '../board/structs';
 import { sectorStruct, wallStruct, spriteStruct } from '../maploader';
 
 

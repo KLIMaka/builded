@@ -216,7 +216,10 @@ export class Selection extends MessageHandlerReflective {
     MOVE.dx = handle.dx;
     MOVE.dy = handle.dy;
     MOVE.dz = handle.dz;
-    this.handleSelected(MOVE);
+    if (MOVE.dx > this.ctx.gridController.getGridSize()
+      || MOVE.dy > this.ctx.gridController.getGridSize()
+      || MOVE.dz > this.ctx.gridController.getGridSize())
+      this.handleSelected(MOVE);
   }
 
   private setTexture() {

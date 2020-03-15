@@ -82,8 +82,31 @@ vec3 sampleColor(float palIdx, float lightLevel, float overbright) {
   return color * overbright * lightOffset(lightLevel);
 }
 
-vec3 palLookup(vec2 tc) {
+
+const float dith[4] = float[4](0.25, 0.75, 1.0, 0.5);
+float getPalIdx(vec2 tc) {
+  // vec2 size = vec2(textureSize(base, 0));
+  // vec2 texel = 1.0 / size;
+  // vec2 pixel = tc * size + 0.5;
+  // vec2 frac = fract(pixel);
+  // pixel = (floor(pixel) / size) - texel / 2.0;
+
+  // float C11 = texture(base, fract(pixel + vec2( 0.0     , 0.0))).r;
+  // float C21 = texture(base, fract(pixel + vec2( texel.x , 0.0))).r;
+  // float C12 = texture(base, fract(pixel + vec2( 0.0     , texel.y))).r;
+  // float C22 = texture(base, fract(pixel + vec2( texel.x , texel.y))).r;
+
+  // float off = dith[(int(tc.y*size.y*4.0)%2)*2+ int(tc.x*size.x*4.0) % 2];
+  // float x1 = frac.x < off ? C11 : C21;
+  // float x2 = frac.x < off ? C12 : C22;
+  // return frac.y < off ? x1 : x2;
+
   float palIdx = textureGrad(base, fract(tc), dFdx(tc), dFdy(tc)).r;
+  return palIdx;
+}
+
+vec3 palLookup(vec2 tc) {
+  float palIdx = getPalIdx(tc);
   if (palIdx >= trans)
     discard;
   float lightLevel = clamp(lightOffset() + diffuse() + specular(), 0.5, SHADOWSTEPS - 0.5) / SHADOWSTEPS;

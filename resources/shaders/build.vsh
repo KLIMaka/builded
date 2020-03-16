@@ -29,7 +29,7 @@ void main() {
 #elif defined SPRITE_FACE
   vec4 epos = P * V * vec4(aPos, 1.0);
   epos /= epos.w;
-  epos.xy += aNorm.xy * sys.yz;
+  epos.xy += aNorm.xy * (2.0 / sys.yz);
   gl_Position = epos;
 #else
   gl_Position = P * V * vec4(aPos, 1.0);

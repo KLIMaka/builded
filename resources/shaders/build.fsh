@@ -82,47 +82,55 @@ vec3 sampleColor(float palIdx, float lightLevel, float overbright) {
   return color * overbright * lightOffset(lightLevel);
 }
 
-
+#ifdef DITHERING
 const float dith[16] = float[16](
   0.0   , 0.5   , 0.125 , 0.625 , 
   0.75  , 0.25  , 0.875 , 0.375 , 
   0.1875, 0.6875, 0.0625, 0.5625, 
   0.9375, 0.4375, 0.8125, 0.3125
 );
+#endif
+
+vec2 repeat(vec2 tc) {
+#ifdef SPRITE
+  return tc;
+#else
+  return fract(tc);
+#endif
+}
 
 float getPalIdx(vec2 tc) {
+#ifdef DITHERING
   vec2 size = vec2(textureSize(base, 0));
   vec2 texel = 1.0 / size;
   vec2 pixel = tc * size + 0.5;
   vec2 frac = fract(pixel);
   pixel = (floor(pixel) / size) - texel / 2.0;
 
-  float C11 = texture(base, fract(pixel + vec2( 0.0     , 0.0))).r;
-  float C21 = texture(base, fract(pixel + vec2( texel.x , 0.0))).r;
-  float C12 = texture(base, fract(pixel + vec2( 0.0     , texel.y))).r;
-  float C22 = texture(base, fract(pixel + vec2( texel.x , texel.y))).r;
+  float C11 = texture(base, repeat(pixel + vec2( 0.0     , 0.0))).r;
+  float C21 = texture(base, repeat(pixel + vec2( texel.x , 0.0))).r;
+  float C12 = texture(base, repeat(pixel + vec2( 0.0     , texel.y))).r;
+  float C22 = texture(base, repeat(pixel + vec2( texel.x , texel.y))).r;
 
   float off = dith[int(gl_FragCoord.x) % 4 * 4 + int(gl_FragCoord.y) % 4];
   float x1 = frac.x < off ? C11 : C21;
   float x2 = frac.x < off ? C12 : C22;
   return frac.y < off ? x1 : x2;
-
-  // float palIdx = textureGrad(base, fract(tc), dFdx(tc), dFdy(tc)).r;
-  // return palIdx;
+#else
+  return textureGrad(base, repeat(tc), dFdx(tc), dFdy(tc)).r;
+#endif
 }
 
 vec3 palLookup(vec2 tc) {
   float palIdx = getPalIdx(tc);
-  if (palIdx >= trans)
-    discard;
+  if (palIdx >= trans) discard;
   float lightLevel = clamp(lightOffset() + diffuse() + specular(), 0.5, SHADOWSTEPS - 0.5) / SHADOWSTEPS;
   float overbright = highlight();
   return sampleColor(palIdx, lightLevel, overbright);
 }
 
 void clip() {
-  if (dot(wpos, clipPlane.xyz) + clipPlane.w > 0.0)
-    discard;
+  if (dot(wpos, clipPlane.xyz) + clipPlane.w > 0.0) discard;
 }
 
 void writeColor(vec3 c, vec4 m) {

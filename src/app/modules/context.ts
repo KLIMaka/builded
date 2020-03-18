@@ -1,13 +1,13 @@
-import { SelectorConstructor } from '../../app/modules/artselector';
+import { SelectorConstructor, RAW_PAL } from '../../app/modules/artselector';
 import { Board } from '../../build/board/structs';
 import { Deck, map } from '../../utils/collections';
 import { loadString } from '../../utils/getter';
 import { Texture } from '../../utils/gl/drawstruct';
 import { createTexture } from '../../utils/gl/textures';
-import { loadImage } from '../../utils/imgutils';
+import { loadImage, loadImageFromBuffer } from '../../utils/imgutils';
 import { create, Dependency, Injector } from '../../utils/injector';
 import { InputState } from '../../utils/input';
-import { cyclic } from '../../utils/mathutils';
+import { cyclic, int } from '../../utils/mathutils';
 import * as PROFILE from '../../utils/profiler';
 import { ART, BOARD, BoardManipulator_, BoardProvider, BuildReferenceTracker, DEFAULT_BOARD, REFERENCE_TRACKER, State, STATE, View, VIEW, STORAGES } from '../apis/app';
 import { BUS, DefaultMessageBus, MessageBus, MessageHandlerReflective } from '../apis/handler';
@@ -30,6 +30,9 @@ import { BUILDERS_FACTORY, DefaultBuildersFactory } from './geometry/common';
 import { BUFFER_FACTORY, DefaultBufferFactory } from './gl/buffers';
 import { BuildGlConstructor, BUILD_GL } from './gl/buildgl';
 import { SwappableViewConstructor } from './view/view';
+import { FS } from './fs/fs';
+import { Lexer, LexerRule } from '../../utils/lexer';
+import { convertPal, rgb2xyz, xyz2lab, findHsl, dither, ditherMatrix } from '../../utils/color';
 
 class StateImpl implements State {
   private state: { [index: string]: any } = {};
@@ -187,15 +190,78 @@ async function loadBakMap(injector: Injector) {
   }
 }
 
+function createLexer(str: string) {
+  const lexer = new Lexer();
+  lexer.addRule(new LexerRule(/^[ \t\r\v\n]+/, 'WS'));
+  lexer.addRule(new LexerRule(/^[a-zA-Z_][a-zA-Z0-9_]+/, 'ID'));
+  lexer.addRule(new LexerRule(/^\-?[0-9]+/, 'INT', 0, parseInt));
+  lexer.addRule(new LexerRule(/^"([^"]*)"/, 'STRING', 1));
+  lexer.addRule(new LexerRule(/^;/, 'SEMICOLON'));
+  lexer.setSource(str);
+
+  return {
+    get: <T>(expected: string, value: T = null): T => {
+      for (; lexer.next() == 'WS';);
+      if (lexer.isEoi()) throw new Error();
+      let tokenId = lexer.rule().name;
+      let actual = lexer.value();
+      if (tokenId != expected || value != null && value != actual) throw new Error();
+      return lexer.value();
+    }
+  }
+}
+
+async function AdditionalTextures(injector: Injector) {
+  const textures: { [index: number]: Texture } = {};
+  const gl = await injector.getInstance(GL);
+  const fs = await injector.getInstance(FS);
+  const pal = [...await injector.getInstance(RAW_PAL)];
+  const file = await fs.get('texlist.lst');
+  const decoder = new TextDecoder('utf-8');
+  const list = decoder.decode(file);
+  const lexer = createLexer(list);
+  const xyzPal = convertPal(pal, rgb2xyz);
+  const labPal = convertPal(xyzPal, xyz2lab);
+
+  try {
+    for (; ;) {
+      const id = lexer.get<number>('INT');
+      const path = lexer.get<string>('STRING');
+      const options = lexer.get<string>('ID');
+      lexer.get('SEMICOLON');
+
+      if (options == 'plain') {
+        const opts = { filter: WebGLRenderingContext.NEAREST, repeat: WebGLRenderingContext.CLAMP_TO_EDGE };
+        textures[id] = await loadTexture(gl, path, opts);
+      } else if (options == 'palletize') {
+        const texture = await fs.get(path);
+        const img = await loadImageFromBuffer(texture);
+        const size = img[0] * img[1];
+        const buff = img[2];
+        const indexed = new Uint8Array(size);
+        for (let i = 0; i < size; i++) {
+          const off = i * 4;
+          const xyz = rgb2xyz(buff[off + 0], buff[off + 1], buff[off + 2]);
+          const lab = xyz2lab(xyz[0], xyz[1], xyz[2]);
+          const [i1, i2, t] = findHsl(labPal, lab[0], lab[1], lab[2]);
+          const idx = dither(i % img[0], int(i / img[0]), t, ditherMatrix) ? i1 : i2;
+          indexed[i] = idx;
+        }
+        const repeat = WebGLRenderingContext.CLAMP_TO_EDGE;
+        const filter = WebGLRenderingContext.NEAREST;
+        textures[id] = createTexture(img[0], img[1], gl, { filter: filter, repeat: repeat }, indexed, gl.LUMINANCE, 1);
+      }
+    }
+  } finally {
+    return textures;
+  }
+}
+
 export function DefaultSetupModule(injector: Injector) {
   injector.bindInstance(REFERENCE_TRACKER, new BuildReferenceTrackerImpl());
   injector.bindInstance(STATE, new StateImpl());
   injector.bindPromise(KeymapConfig_, loadString('builded_binds.txt'));
-  const opts = { filter: WebGLRenderingContext.NEAREST, repeat: WebGLRenderingContext.CLAMP_TO_EDGE };
-  injector.bindPromise(UtilityTextures_, injector.getInstance(GL).then(gl => loadUtilityTextures([
-    [-1, loadTexture(gl, 'resources/point1.png', opts)],
-    [-2, loadTexture(gl, 'resources/img/font.png', opts)],
-  ])));
+  injector.bind(UtilityTextures_, AdditionalTextures);
   injector.bind(GRID, GridControllerConstructor);
   injector.bind(ART, BuildArtProviderConstructor);
   injector.bind(PicNumSelector_, SelectorConstructor);

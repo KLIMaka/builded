@@ -1,5 +1,5 @@
 import { Dependency, Injector, create } from "../../../utils/injector";
-import { span, stopPropagation, Table } from "../../../utils/ui/ui";
+import { span, stopPropagation, Table, addDragAndDrop } from "../../../utils/ui/ui";
 import { BUS } from "../../apis/handler";
 import { UI, Ui, Window } from "../../apis/ui";
 import { namedMessageHandler } from "../../edit/messages";
@@ -29,10 +29,7 @@ class FileBrowser {
       .build();
 
     const win = this.window.winElement;
-    win.addEventListener("dragenter", stopPropagation, false);
-    win.addEventListener("dragover", stopPropagation, false);
-    win.addEventListener("drop", (e) => {
-      stopPropagation(e);
+    addDragAndDrop(win, e => {
       for (const file of e.dataTransfer.files) {
         const fileReader = new FileReader();
         const name = file.name;
@@ -43,7 +40,7 @@ class FileBrowser {
           this.refreshContent();
         }
       }
-    }, false);
+    })
   }
 
   private async refreshContent() {

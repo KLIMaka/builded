@@ -22,17 +22,6 @@ function getMagFilter(filter: number): number {
   }
 }
 
-function isMipmapped(filter: number) {
-  switch (filter) {
-    case WebGLRenderingContext.LINEAR_MIPMAP_LINEAR:
-    case WebGLRenderingContext.NEAREST_MIPMAP_LINEAR:
-    case WebGLRenderingContext.NEAREST_MIPMAP_NEAREST:
-    case WebGLRenderingContext.LINEAR_MIPMAP_NEAREST:
-      return true;
-  }
-  return false;
-}
-
 export class TextureImpl implements DS.Texture {
 
   public id: WebGLTexture;
@@ -67,10 +56,6 @@ export class TextureImpl implements DS.Texture {
     this.data = img;
     gl.texImage2D(gl.TEXTURE_2D, 0, this.format, width, height, 0, this.format, this.type, this.data);
 
-    if (isMipmapped(options.filter)) {
-      gl.generateMipmap(gl.TEXTURE_2D);
-    }
-
     gl.bindTexture(gl.TEXTURE_2D, null);
   }
 
@@ -97,6 +82,12 @@ export class TextureImpl implements DS.Texture {
   public reload(gl: WebGLRenderingContext): void {
     gl.bindTexture(gl.TEXTURE_2D, this.id);
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, this.width, this.height, this.getFormat(), this.getType(), this.data);
+  }
+
+  public mip(gl: WebGLRenderingContext, level: number, width: number, height: number, data: Uint8Array) {
+    gl.bindTexture(gl.TEXTURE_2D, this.id);
+    gl.texImage2D(gl.TEXTURE_2D, level, this.format, width, height, 0, this.format, this.type, data);
+    gl.bindTexture(gl.TEXTURE_2D, null);
   }
 }
 

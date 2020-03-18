@@ -262,3 +262,12 @@ export function stopPropagation(e: Event) {
   e.stopPropagation();
   e.preventDefault();
 }
+
+export function addDragAndDrop(elem: HTMLElement, dropHandler: (e: DragEvent) => void) {
+  elem.addEventListener("dragenter", stopPropagation, false);
+  elem.addEventListener("dragover", stopPropagation, false);
+  elem.addEventListener("drop", (e) => {
+    stopPropagation(e);
+    dropHandler(e);
+  }, false);
+}

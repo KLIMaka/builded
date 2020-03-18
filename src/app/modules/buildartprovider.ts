@@ -1,10 +1,11 @@
 import { Dependency, Injector } from "../../utils/injector";
 import { warning } from "../../utils/logger";
-import { createTexture } from "../../utils/gl/textures";
+import { createTexture, TextureImpl } from "../../utils/gl/textures";
 import { ArtProvider } from "../apis/app";
 import { ArtFiles, ArtInfo, Attributes } from "../../build/formats/art";
 import { rect } from "../../utils/collections";
 import { Texture } from "../../utils/gl/drawstruct";
+import { ispow2, int } from "../../utils/mathutils";
 
 export const GL = new Dependency<WebGLRenderingContext>('GL');
 export const ArtFiles_ = new Dependency<ArtFiles>('ArtFiles');
@@ -33,8 +34,29 @@ export class BuildArtProvider implements ArtProvider {
 
   private createTexture(w: number, h: number, arr: Uint8Array): Texture {
     const repeat = WebGLRenderingContext.CLAMP_TO_EDGE;
-    const filter = WebGLRenderingContext.NEAREST;
-    return createTexture(w, h, this.gl, { filter: filter, repeat: repeat }, arr, this.gl.LUMINANCE);
+    const filter = WebGLRenderingContext.NEAREST_MIPMAP_NEAREST;
+    const tex = createTexture(w, h, this.gl, { filter: filter, repeat: repeat }, arr, this.gl.LUMINANCE);
+    this.addMipMaps(w, h, arr, tex);
+    return tex;
+  }
+
+  addMipMaps(w: number, h: number, arr: Uint8Array, tex: TextureImpl) {
+    let div = 2;
+    let level = 1;
+    while (int(w / div) >= 1 || int(h / div) >= 1) {
+      const dw = Math.max(1, int(w / div));
+      const dh = Math.max(1, int(h / div));
+      const mip = new Uint8Array(dw * dh);
+      for (let y = 0; y < dh; y++) {
+        for (let x = 0; x < dw; x++) {
+          const idx = x * div + y * w * div;
+          mip[y * dw + x] = arr[idx];
+        }
+      }
+      tex.mip(this.gl, level, dw, dh, mip);
+      div *= 2;
+      level++;
+    }
   }
 
   public get(picnum: number): Texture {
@@ -99,7 +121,7 @@ export class BuildArtProvider implements ArtProvider {
     if (info != undefined) return info;
     const add = this.addTextures[picnum];
     info = add != undefined
-      ? new ArtInfo(add.getWidth(), add.getHeight(), new Attributes(), null)
+      ? new ArtInfo(add.getWidth(), add.getHeight(), new Attributes(), (<TextureImpl>add).data)
       : this.arts.getInfo(picnum);
     this.infos[picnum] = info;
     return info;

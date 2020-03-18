@@ -3,7 +3,8 @@ export class CachedValue<T> {
   private valid = false;
   constructor(
     private supplier: (value: T) => T,
-    private cached: T = null) { }
+    private cached: T = null
+  ) { }
 
   public get() {
     if (!this.valid) {

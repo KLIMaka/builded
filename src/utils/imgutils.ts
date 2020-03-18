@@ -37,7 +37,7 @@ export function clearCanvas(canvas: HTMLCanvasElement, style: string) {
 }
 
 export function loadImageFromBuffer(buff: ArrayBuffer): Promise<[number, number, Uint8Array]> {
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     const blob = new Blob([buff]);
     const urlCreator = window.URL;
     const imageUrl = urlCreator.createObjectURL(blob);
@@ -57,7 +57,7 @@ export function loadImageFromBuffer(buff: ArrayBuffer): Promise<[number, number,
 }
 
 export function loadImage(name: string): Promise<[number, number, Uint8Array]> {
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     const image = new Image();
     image.src = name;
     image.onload = (evt) => {

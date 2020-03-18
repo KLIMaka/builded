@@ -52,8 +52,7 @@ export class View3d extends MessageHandlerReflective implements View {
     private board: BoardProvider,
     private state: State,
     private gridController: GridController,
-    private art: ArtProvider,
-    private lastGridSize = gridController.getGridSize()
+    private art: ArtProvider
   ) {
     super();
 

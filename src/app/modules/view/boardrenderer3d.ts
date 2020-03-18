@@ -121,7 +121,6 @@ export class Boardrenderer3D {
     gl.colorMask(true, true, true, true);
   }
 
-
   private drawGeometry(view: View3d) {
     PROFILE.startProfile('processing');
     const board = this.board();

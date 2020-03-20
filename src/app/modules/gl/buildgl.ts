@@ -43,7 +43,7 @@ export class BuildGl {
     gl.enable(gl.POLYGON_OFFSET_FILL);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-    const defs = ['PALSWAPS (' + palswaps + '.0)', 'SHADOWSTEPS (' + shadowsteps + '.0)', 'PAL_LIGHTING']
+    const defs = ['PALSWAPS (' + palswaps + '.0)', 'SHADOWSTEPS (' + shadowsteps + '.0)', 'PAL_LIGHTING'/*, 'DITHERING'*/]
     Promise.all([
       createShader(gl, SHADER_NAME, [...defs]).then(shader => this.state.registerShader('baseShader', shader)),
       createShader(gl, SHADER_NAME, [...defs, 'SPRITE']).then(shader => this.state.registerShader('spriteShader', shader)),

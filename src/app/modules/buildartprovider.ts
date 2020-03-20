@@ -1,62 +1,66 @@
-import { Dependency, Injector } from "../../utils/injector";
-import { warning } from "../../utils/logger";
-import { createTexture, TextureImpl } from "../../utils/gl/textures";
-import { ArtProvider } from "../apis/app";
 import { ArtFiles, ArtInfo, Attributes } from "../../build/formats/art";
 import { rect } from "../../utils/collections";
+import { convertPal, resizeIndexed, rgb2xyz, xyz2lab } from "../../utils/color";
 import { Texture } from "../../utils/gl/drawstruct";
-import { ispow2, int } from "../../utils/mathutils";
+import { createTexture, TextureImpl } from "../../utils/gl/textures";
+import { Dependency, Injector } from "../../utils/injector";
+import { warning } from "../../utils/logger";
+import { int } from "../../utils/mathutils";
+import { ArtProvider } from "../apis/app";
+import { RAW_PAL } from "./artselector";
 
 export const GL = new Dependency<WebGLRenderingContext>('GL');
 export const ArtFiles_ = new Dependency<ArtFiles>('ArtFiles');
 export const UtilityTextures_ = new Dependency<{ [index: number]: Texture }>('UtilityTextures');
 export const ParallaxTextures_ = new Dependency<number>('Number of parallax textures');
 
+export function createIndexedTexture(gl: WebGLRenderingContext, w: number, h: number, arr: Uint8Array, pal: number[], labpal: number[], mipmaps = true): Texture {
+  const repeat = WebGLRenderingContext.CLAMP_TO_EDGE;
+  const filter = mipmaps ? WebGLRenderingContext.NEAREST_MIPMAP_NEAREST : WebGLRenderingContext.NEAREST;
+  const tex = createTexture(w, h, gl, { filter: filter, repeat: repeat }, arr, gl.LUMINANCE);
+  if (mipmaps) addMipMaps(gl, w, h, arr, tex, pal, labpal);
+  return tex;
+}
+
+function addMipMaps(gl: WebGLRenderingContext, w: number, h: number, arr: Uint8Array, tex: TextureImpl, pal: number[], labpal: number[]) {
+  let div = 2;
+  let level = 1;
+  while (int(w / div) >= 1 || int(h / div) >= 1) {
+    const dw = Math.max(1, int(w / div));
+    const dh = Math.max(1, int(h / div));
+    const mip = resizeIndexed(dw, dh, w, h, arr, pal, labpal);
+    tex.mip(gl, level, dw, dh, mip);
+    div *= 2;
+    level++;
+  }
+}
+
 export async function BuildArtProviderConstructor(injector: Injector) {
-  const [art, util, gl, parallax] = await Promise.all([
+  const [art, util, gl, parallax, pal] = await Promise.all([
     injector.getInstance(ArtFiles_),
     injector.getInstance(UtilityTextures_),
     injector.getInstance(GL),
-    injector.getInstance(ParallaxTextures_)]);
-  return new BuildArtProvider(art, util, gl, parallax);
+    injector.getInstance(ParallaxTextures_),
+    injector.getInstance(RAW_PAL)]);
+  return new BuildArtProvider(art, util, gl, parallax, pal);
 }
 
 export class BuildArtProvider implements ArtProvider {
   private textures: Texture[] = [];
   private parallaxTextures: Texture[] = [];
   private infos: ArtInfo[] = [];
+  private pal: number[];
+  private labpal: number[];
 
   constructor(
     private arts: ArtFiles,
     private addTextures: { [index: number]: Texture },
     private gl: WebGLRenderingContext,
-    private parallaxPics: number) { }
-
-  private createTexture(w: number, h: number, arr: Uint8Array): Texture {
-    const repeat = WebGLRenderingContext.CLAMP_TO_EDGE;
-    const filter = WebGLRenderingContext.NEAREST_MIPMAP_NEAREST;
-    const tex = createTexture(w, h, this.gl, { filter: filter, repeat: repeat }, arr, this.gl.LUMINANCE);
-    this.addMipMaps(w, h, arr, tex);
-    return tex;
-  }
-
-  addMipMaps(w: number, h: number, arr: Uint8Array, tex: TextureImpl) {
-    let div = 2;
-    let level = 1;
-    while (int(w / div) >= 1 || int(h / div) >= 1) {
-      const dw = Math.max(1, int(w / div));
-      const dh = Math.max(1, int(h / div));
-      const mip = new Uint8Array(dw * dh);
-      for (let y = 0; y < dh; y++) {
-        for (let x = 0; x < dw; x++) {
-          const idx = x * div + y * w * div;
-          mip[y * dw + x] = arr[idx];
-        }
-      }
-      tex.mip(this.gl, level, dw, dh, mip);
-      div *= 2;
-      level++;
-    }
+    private parallaxPics: number,
+    pal: Uint8Array) {
+    this.pal = [...pal];
+    const xyzPal = convertPal(this.pal, rgb2xyz);
+    this.labpal = convertPal(xyzPal, xyz2lab);
   }
 
   public get(picnum: number): Texture {
@@ -68,7 +72,7 @@ export class BuildArtProvider implements ArtProvider {
     const info = this.arts.getInfo(picnum);
     if (info.h <= 0 || info.w <= 0) return this.get(0);
     const arr = this.axisSwap(info.img, info.h, info.w);
-    tex = this.createTexture(info.w, info.h, arr);
+    tex = createIndexedTexture(this.gl, info.w, info.h, arr, this.pal, this.labpal);
 
     this.textures[picnum] = tex;
     return tex;
@@ -93,7 +97,7 @@ export class BuildArtProvider implements ArtProvider {
     const w = infos[0].w;
     const h = infos[0].h;
     const merged = this.mergeParallax(w, h, axisSwapped);
-    tex = this.createTexture(w * this.parallaxPics, h, merged);
+    tex = createIndexedTexture(this.gl, w * this.parallaxPics, h, merged, this.pal, this.labpal);
 
     this.parallaxTextures[picnum] = tex;
     return tex;

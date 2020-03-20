@@ -1,3 +1,5 @@
+import { rect } from "./collections";
+import { int } from "./mathutils";
 
 export function rgb2hsl(r: number, g: number, b: number): [number, number, number] {
   // convert RGB to HSV
@@ -88,16 +90,16 @@ export function convertPal(srcPal: number[], conv: (a: number, b: number, c: num
   return dst;
 }
 
-export function findHsl(pal: number[], h: number, s: number, l: number): [number, number, number] {
+export function findLab(pal: number[], l: number, a: number, b: number): [number, number, number] {
   let mindist = Number.MAX_VALUE;
   let mindist1 = Number.MAX_VALUE;
   let idx = 0;
   let idx1 = 0;
   for (let i = 0; i < 256; i++) {
     const off = i * 3;
-    const dh = h - pal[off + 0];
-    const ds = s - pal[off + 1];
-    const dl = l - pal[off + 2];
+    const dh = l - pal[off + 0];
+    const ds = a - pal[off + 1];
+    const dl = b - pal[off + 2];
     const dist = Math.sqrt(dh * dh + ds * ds + dl * dl);
     if (dist < mindist) {
       mindist1 = mindist;
@@ -107,6 +109,41 @@ export function findHsl(pal: number[], h: number, s: number, l: number): [number
     }
   }
   return [idx, idx1, mindist / mindist1];
+}
+
+export function resizeIndexed(dstw: number, dsth: number, srcw: number, srch: number, src: Uint8Array, pal: number[], labpal: number[]): Uint8Array {
+  const dst = new Uint8Array(dstw * dsth);
+  const dx = srcw / dstw;
+  const dy = srch / dsth;
+  for (const [x, y] of rect(dstw, dsth))
+    dst[y * dstw + x] = convoluteIndexed(x * dx, y * dy, dx, dy, srcw, src, pal, labpal);
+  return dst;
+}
+
+export function convoluteIndexed(x: number, y: number, w: number, h: number, imgw: number, img: Uint8Array, pal: number[], labpal: number[]): number {
+  if (w == int(w) && h == int(h) && x == int(x) && y == int(y)) {
+    const sum = [0, 0, 0];
+    let trans = 0;
+    for (const [xx, yy] of rect(w, h)) {
+      const off = (yy + y) * imgw + xx + x;
+      const idx = img[off] * 3;
+      if (idx == 255 * 3) {
+        trans++;
+        if (trans > (w * h) / 2) return 255;
+      } else {
+        sum[0] += pal[idx + 0];
+        sum[1] += pal[idx + 1];
+        sum[2] += pal[idx + 2];
+      }
+    }
+    const weight = 1 / (w * h - trans);
+    const xyz = rgb2xyz(sum[0] * weight, sum[1] * weight, sum[2] * weight);
+    const lab = xyz2lab(xyz[0], xyz[1], xyz[2]);
+    const [i] = findLab(labpal, lab[0], lab[1], lab[2]);
+    return i;
+  } else {
+    return img[int(y) * imgw + int(x)];
+  }
 }
 
 export const ditherMatrix = [

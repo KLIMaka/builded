@@ -24,7 +24,7 @@ import { Binder, loadBinds } from '../input/keymap';
 import { messageParser } from '../input/messageparser';
 import { InfoModule } from '../modules/info';
 import { StatusBarModule } from '../modules/statusbar';
-import { BuildArtProviderConstructor, GL, UtilityTextures_ } from './buildartprovider';
+import { BuildArtProviderConstructor, GL, UtilityTextures_, createIndexedTexture } from './buildartprovider';
 import { RenderablesCacheModule } from './geometry/cache';
 import { BUILDERS_FACTORY, DefaultBuildersFactory } from './geometry/common';
 import { BUFFER_FACTORY, DefaultBufferFactory } from './gl/buffers';
@@ -32,7 +32,7 @@ import { BuildGlConstructor, BUILD_GL } from './gl/buildgl';
 import { SwappableViewConstructor } from './view/view';
 import { FS } from './fs/fs';
 import { Lexer, LexerRule } from '../../utils/lexer';
-import { convertPal, rgb2xyz, xyz2lab, findHsl, dither, ditherMatrix } from '../../utils/color';
+import { convertPal, rgb2xyz, xyz2lab, findLab, dither, ditherMatrix } from '../../utils/color';
 
 class StateImpl implements State {
   private state: { [index: string]: any } = {};
@@ -243,13 +243,11 @@ async function AdditionalTextures(injector: Injector) {
           const off = i * 4;
           const xyz = rgb2xyz(buff[off + 0], buff[off + 1], buff[off + 2]);
           const lab = xyz2lab(xyz[0], xyz[1], xyz[2]);
-          const [i1, i2, t] = findHsl(labPal, lab[0], lab[1], lab[2]);
-          const idx = dither(i % img[0], int(i / img[0]), t, ditherMatrix) ? i1 : i2;
-          indexed[i] = idx;
+          const [i1, i2, t] = findLab(labPal, lab[0], lab[1], lab[2]);
+          // const idx = dither(i % img[0], int(i / img[0]), t, ditherMatrix) ? i1 : i2;
+          indexed[i] = i1;
         }
-        const repeat = WebGLRenderingContext.CLAMP_TO_EDGE;
-        const filter = WebGLRenderingContext.NEAREST;
-        textures[id] = createTexture(img[0], img[1], gl, { filter: filter, repeat: repeat }, indexed, gl.LUMINANCE, 1);
+        textures[id] = createIndexedTexture(gl, img[0], img[1], indexed, pal, labPal);
       }
     }
   } finally {

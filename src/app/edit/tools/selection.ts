@@ -213,13 +213,14 @@ export class Selection extends MessageHandlerReflective {
       return;
     }
 
-    MOVE.dx = handle.dx;
-    MOVE.dy = handle.dy;
-    MOVE.dz = handle.dz;
-    if (MOVE.dx > this.ctx.gridController.getGridSize()
-      || MOVE.dy > this.ctx.gridController.getGridSize()
-      || MOVE.dz > this.ctx.gridController.getGridSize())
+    if (Math.abs(MOVE.dx - handle.dx) >= this.ctx.gridController.getGridSize() / 2
+      || Math.abs(MOVE.dy - handle.dy) >= this.ctx.gridController.getGridSize() / 2
+      || Math.abs(MOVE.dz - handle.dx) >= this.ctx.gridController.getGridSize() / 2) {
+      MOVE.dx = handle.dx;
+      MOVE.dy = handle.dy;
+      MOVE.dz = handle.dz;
       this.handleSelected(MOVE);
+    }
   }
 
   private setTexture() {

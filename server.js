@@ -4,7 +4,7 @@ var path = require('path');
 var url = require('url');
 
 function replaceUrl(url) {
-  var m = url.match(/.*\/distr\/.*\.(map|js)/);
+  var m = url.match(/.*\/distr\/.*\.(map|js|wasm)/);
   if (m) return url;
   var m = url.match(/.*\/distr\/.*/);
   if (m) return url + '.js';
@@ -20,6 +20,7 @@ function contentType(url) {
     case '.png': return 'image/png';
     case '.jpg': return 'image/jpg';
     case '.wav': return 'audio/wav';
+    case '.wasm': return 'application/wasm';
     default: return 'text/html';
   }
 }

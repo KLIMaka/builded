@@ -33,6 +33,7 @@ import { SwappableViewConstructor } from './view/view';
 import { FS } from './fs/fs';
 import { Lexer, LexerRule } from '../../utils/lexer';
 import { convertPal, rgb2xyz, xyz2lab, findLab, dither, ditherMatrix } from '../../utils/color';
+import init, { ImgLib } from '../../libs_js/wasm_lib';
 
 class StateImpl implements State {
   private state: { [index: string]: any } = {};
@@ -215,13 +216,16 @@ async function AdditionalTextures(injector: Injector) {
   const textures: { [index: number]: Texture } = {};
   const gl = await injector.getInstance(GL);
   const fs = await injector.getInstance(FS);
-  const pal = [...await injector.getInstance(RAW_PAL)];
+  const rawpal = await injector.getInstance(RAW_PAL);
+  const pal = [...rawpal];
   const file = await fs.get('texlist.lst');
   const decoder = new TextDecoder('utf-8');
   const list = decoder.decode(file);
   const lexer = createLexer(list);
   const xyzPal = convertPal(pal, rgb2xyz);
   const labPal = convertPal(xyzPal, xyz2lab);
+  await init();
+  const lib = ImgLib.init(rawpal, 256);
 
   try {
     for (; ;) {
@@ -247,7 +251,7 @@ async function AdditionalTextures(injector: Injector) {
           // const idx = dither(i % img[0], int(i / img[0]), t, ditherMatrix) ? i1 : i2;
           indexed[i] = i1;
         }
-        textures[id] = createIndexedTexture(gl, img[0], img[1], indexed, pal, labPal);
+        textures[id] = createIndexedTexture(gl, img[0], img[1], indexed, pal, labPal, true, lib);
       }
     }
   } finally {

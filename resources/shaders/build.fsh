@@ -161,8 +161,8 @@ float getPalIdx(vec2 tc) {
   }
   return result;
 #else
-  // return textureGrad(base, repeat(tc), dFdx(tc), dFdy(tc)).r;
-  return ditherSample(tc, ditherOffset());
+  return textureGrad(base, repeat(tc), dFdx(tc), dFdy(tc)).r;
+  // return ditherSample(tc, ditherOffset());
 #endif
 }
 
@@ -190,7 +190,8 @@ vec4 renderGrid() {
   vec2 grid = abs(fract(coord - 0.5) - 0.5) / fwidth(coord);
   float line = min(grid.x, grid.y);
   float a = 1.0 - min(line, 1.0);
-  return vec4(0.4, 0.4, 0.4, a);
+  float dist = 1.0 - pow(smoothstep(0.0, sys1.x * 4.0, length(curpos - wpos)), 32.0);
+  return vec4(0.4, 0.4, 0.4, a * dist);
 }
 
 void main() {

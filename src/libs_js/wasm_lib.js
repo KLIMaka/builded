@@ -61,16 +61,16 @@ let cachedTextEncoder = new TextEncoder('utf-8');
 
 const encodeString = (typeof cachedTextEncoder.encodeInto === 'function'
     ? function (arg, view) {
-        return cachedTextEncoder.encodeInto(arg, view);
-    }
+    return cachedTextEncoder.encodeInto(arg, view);
+}
     : function (arg, view) {
-        const buf = cachedTextEncoder.encode(arg);
-        view.set(buf);
-        return {
-            read: arg.length,
-            written: buf.length
-        };
-    });
+    const buf = cachedTextEncoder.encode(arg);
+    view.set(buf);
+    return {
+        read: arg.length,
+        written: buf.length
+    };
+});
 
 function passStringToWasm0(arg, malloc, realloc) {
 
@@ -137,12 +137,13 @@ export class ImgLib {
     /**
     * @param {Uint8Array} pal
     * @param {number} palsize
+    * @param {number} trans_idx
     * @returns {ImgLib}
     */
-    static init(pal, palsize) {
+    static init(pal, palsize, trans_idx) {
         var ptr0 = passArray8ToWasm0(pal, wasm.__wbindgen_malloc);
         var len0 = WASM_VECTOR_LEN;
-        var ret = wasm.imglib_init(ptr0, len0, palsize);
+        var ret = wasm.imglib_init(ptr0, len0, palsize, trans_idx);
         return ImgLib.__wrap(ret);
     }
     /**
@@ -165,6 +166,24 @@ export class ImgLib {
             wasm.__wbindgen_free(ptr0, len0 * 1);
         }
     }
+    /**
+    * @param {number} w
+    * @param {number} h
+    * @param {Uint8Array} img
+    * @param {Uint8Array} dst
+    */
+    palettize(w, h, img, dst) {
+        try {
+            var ptr0 = passArray8ToWasm0(img, wasm.__wbindgen_malloc);
+            var len0 = WASM_VECTOR_LEN;
+            var ptr1 = passArray8ToWasm0(dst, wasm.__wbindgen_malloc);
+            var len1 = WASM_VECTOR_LEN;
+            wasm.imglib_palettize(this.ptr, w, h, ptr0, len0, ptr1, len1);
+        } finally {
+            dst.set(getUint8Memory0().subarray(ptr1 / 1, ptr1 / 1 + len1));
+            wasm.__wbindgen_free(ptr1, len1 * 1);
+        }
+    }
 }
 
 function init(module) {
@@ -174,28 +193,28 @@ function init(module) {
     let result;
     const imports = {};
     imports.wbg = {};
-    imports.wbg.__wbg_new_59cb74e423758ede = function () {
+    imports.wbg.__wbg_new_59cb74e423758ede = function() {
         var ret = new Error();
         return addHeapObject(ret);
     };
-    imports.wbg.__wbg_stack_558ba5917b466edd = function (arg0, arg1) {
+    imports.wbg.__wbg_stack_558ba5917b466edd = function(arg0, arg1) {
         var ret = getObject(arg1).stack;
         var ptr0 = passStringToWasm0(ret, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         var len0 = WASM_VECTOR_LEN;
         getInt32Memory0()[arg0 / 4 + 1] = len0;
         getInt32Memory0()[arg0 / 4 + 0] = ptr0;
     };
-    imports.wbg.__wbg_error_4bb6c2a97407129a = function (arg0, arg1) {
+    imports.wbg.__wbg_error_4bb6c2a97407129a = function(arg0, arg1) {
         try {
             console.error(getStringFromWasm0(arg0, arg1));
         } finally {
             wasm.__wbindgen_free(arg0, arg1);
         }
     };
-    imports.wbg.__wbindgen_object_drop_ref = function (arg0) {
+    imports.wbg.__wbindgen_object_drop_ref = function(arg0) {
         takeObject(arg0);
     };
-    imports.wbg.__wbindgen_throw = function (arg0, arg1) {
+    imports.wbg.__wbindgen_throw = function(arg0, arg1) {
         throw new Error(getStringFromWasm0(arg0, arg1));
     };
 
@@ -204,35 +223,35 @@ function init(module) {
         const response = fetch(module);
         if (typeof WebAssembly.instantiateStreaming === 'function') {
             result = WebAssembly.instantiateStreaming(response, imports)
-                .catch(e => {
-                    return response
-                        .then(r => {
-                            if (r.headers.get('Content-Type') != 'application/wasm') {
-                                console.warn("`WebAssembly.instantiateStreaming` failed because your server does not serve wasm with `application/wasm` MIME type. Falling back to `WebAssembly.instantiate` which is slower. Original error:\n", e);
-                                return r.arrayBuffer();
-                            } else {
-                                throw e;
-                            }
-                        })
-                        .then(bytes => WebAssembly.instantiate(bytes, imports));
-                });
+            .catch(e => {
+                return response
+                .then(r => {
+                    if (r.headers.get('Content-Type') != 'application/wasm') {
+                        console.warn("`WebAssembly.instantiateStreaming` failed because your server does not serve wasm with `application/wasm` MIME type. Falling back to `WebAssembly.instantiate` which is slower. Original error:\n", e);
+                        return r.arrayBuffer();
+                    } else {
+                        throw e;
+                    }
+                })
+                .then(bytes => WebAssembly.instantiate(bytes, imports));
+            });
         } else {
             result = response
-                .then(r => r.arrayBuffer())
-                .then(bytes => WebAssembly.instantiate(bytes, imports));
+            .then(r => r.arrayBuffer())
+            .then(bytes => WebAssembly.instantiate(bytes, imports));
         }
     } else {
 
         result = WebAssembly.instantiate(module, imports)
-            .then(result => {
-                if (result instanceof WebAssembly.Instance) {
-                    return { instance: result, module };
-                } else {
-                    return result;
-                }
-            });
+        .then(result => {
+            if (result instanceof WebAssembly.Instance) {
+                return { instance: result, module };
+            } else {
+                return result;
+            }
+        });
     }
-    return result.then(({ instance, module }) => {
+    return result.then(({instance, module}) => {
         wasm = instance.exports;
         init.__wbindgen_wasm_module = module;
 

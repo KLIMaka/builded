@@ -7,9 +7,10 @@ export class ImgLib {
 /**
 * @param {Uint8Array} pal 
 * @param {number} palsize 
+* @param {number} trans_idx 
 * @returns {ImgLib} 
 */
-  static init(pal: Uint8Array, palsize: number): ImgLib;
+  static init(pal: Uint8Array, palsize: number, trans_idx: number): ImgLib;
 /**
 * @param {number} dstw 
 * @param {number} dsth 
@@ -19,6 +20,13 @@ export class ImgLib {
 * @param {Uint8Array} src 
 */
   resize(dstw: number, dsth: number, dst: Uint8Array, srcw: number, srch: number, src: Uint8Array): void;
+/**
+* @param {number} w 
+* @param {number} h 
+* @param {Uint8Array} img 
+* @param {Uint8Array} dst 
+*/
+  palettize(w: number, h: number, img: Uint8Array, dst: Uint8Array): void;
 }
 
 /**

@@ -33,7 +33,7 @@ import { SwappableViewConstructor } from './view/view';
 import { FS } from './fs/fs';
 import { Lexer, LexerRule } from '../../utils/lexer';
 import { convertPal, rgb2xyz, xyz2lab, findLab, dither, ditherMatrix } from '../../utils/color';
-import init, { ImgLib } from '../../libs_js/wasm_lib';
+import initImgLib, { ImgLib } from '../../libs_js/wasm_lib';
 
 class StateImpl implements State {
   private state: { [index: string]: any } = {};
@@ -224,7 +224,7 @@ async function AdditionalTextures(injector: Injector) {
   const lexer = createLexer(list);
   const xyzPal = convertPal(pal, rgb2xyz);
   const labPal = convertPal(xyzPal, xyz2lab);
-  await init();
+  await initImgLib();
   const lib = ImgLib.init(rawpal, 256);
 
   try {

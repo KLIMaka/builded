@@ -1,6 +1,6 @@
 import { ArtFiles, ArtInfo, Attributes } from "../../build/formats/art";
+import loadImgLib, { ImgLib } from "../../libs_js/wasm_lib";
 import { rect } from "../../utils/collections";
-import { convertPal, resizeIndexed, rgb2xyz, xyz2lab } from "../../utils/color";
 import { Texture } from "../../utils/gl/drawstruct";
 import { createTexture, TextureImpl } from "../../utils/gl/textures";
 import { Dependency, Injector } from "../../utils/injector";
@@ -8,7 +8,6 @@ import { warning } from "../../utils/logger";
 import { int } from "../../utils/mathutils";
 import { ArtProvider } from "../apis/app";
 import { RAW_PAL } from "./artselector";
-import init, { ImgLib } from "../../libs_js/wasm_lib";
 
 export const GL = new Dependency<WebGLRenderingContext>('GL');
 export const ArtFiles_ = new Dependency<ArtFiles>('ArtFiles');
@@ -31,7 +30,6 @@ function addMipMaps(gl: WebGLRenderingContext, w: number, h: number, arr: Uint8A
     const dh = Math.max(1, int(h / div));
     const mip = new Uint8Array(dw * dh);
     lib.resize(dw, dh, mip, w, h, arr);
-    // const mip = resizeIndexed(dw, dh, w, h, arr, pal, labpal);
     tex.mip(gl, level, dw, dh, mip);
     div *= 2;
     level++;
@@ -45,9 +43,9 @@ export async function BuildArtProviderConstructor(injector: Injector) {
     injector.getInstance(GL),
     injector.getInstance(ParallaxTextures_),
     injector.getInstance(RAW_PAL),
-    init()]);
+    loadImgLib()]);
   const lib = ImgLib.init(pal, 256);
-  return new BuildArtProvider(art, util, gl, parallax, pal, lib);
+  return new BuildArtProvider(art, util, gl, parallax, lib);
 }
 
 export class BuildArtProvider implements ArtProvider {
@@ -62,11 +60,7 @@ export class BuildArtProvider implements ArtProvider {
     private addTextures: { [index: number]: Texture },
     private gl: WebGLRenderingContext,
     private parallaxPics: number,
-    pal: Uint8Array,
     private lib: ImgLib) {
-    this.pal = [...pal];
-    const xyzPal = convertPal(this.pal, rgb2xyz);
-    this.labpal = convertPal(xyzPal, xyz2lab);
   }
 
   public get(picnum: number): Texture {

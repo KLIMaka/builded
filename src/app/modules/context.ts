@@ -222,10 +222,8 @@ async function AdditionalTextures(injector: Injector) {
   const decoder = new TextDecoder('utf-8');
   const list = decoder.decode(file);
   const lexer = createLexer(list);
-  const xyzPal = convertPal(pal, rgb2xyz);
-  const labPal = convertPal(xyzPal, xyz2lab);
   await initImgLib();
-  const lib = ImgLib.init(rawpal, 256);
+  const lib = ImgLib.init(rawpal, 256, 255);
 
   try {
     for (; ;) {
@@ -240,18 +238,12 @@ async function AdditionalTextures(injector: Injector) {
       } else if (options == 'palletize') {
         const texture = await fs.get(path);
         const img = await loadImageFromBuffer(texture);
-        const size = img[0] * img[1];
+        const w = img[0];
+        const h = img[1];
         const buff = img[2];
-        const indexed = new Uint8Array(size);
-        for (let i = 0; i < size; i++) {
-          const off = i * 4;
-          const xyz = rgb2xyz(buff[off + 0], buff[off + 1], buff[off + 2]);
-          const lab = xyz2lab(xyz[0], xyz[1], xyz[2]);
-          const [i1, i2, t] = findLab(labPal, lab[0], lab[1], lab[2]);
-          // const idx = dither(i % img[0], int(i / img[0]), t, ditherMatrix) ? i1 : i2;
-          indexed[i] = i1;
-        }
-        textures[id] = createIndexedTexture(gl, img[0], img[1], indexed, pal, labPal, true, lib);
+        const indexed = new Uint8Array(w * h);
+        lib.palettize(w, h, buff, indexed);
+        textures[id] = createIndexedTexture(gl, img[0], img[1], indexed, true, lib);
       }
     }
   } finally {

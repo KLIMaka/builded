@@ -14,15 +14,15 @@ export const ArtFiles_ = new Dependency<ArtFiles>('ArtFiles');
 export const UtilityTextures_ = new Dependency<{ [index: number]: Texture }>('UtilityTextures');
 export const ParallaxTextures_ = new Dependency<number>('Number of parallax textures');
 
-export function createIndexedTexture(gl: WebGLRenderingContext, w: number, h: number, arr: Uint8Array, pal: number[], labpal: number[], mipmaps = true, lib: ImgLib): Texture {
+export function createIndexedTexture(gl: WebGLRenderingContext, w: number, h: number, arr: Uint8Array, mipmaps = true, lib: ImgLib): Texture {
   const repeat = WebGLRenderingContext.CLAMP_TO_EDGE;
   const filter = mipmaps ? WebGLRenderingContext.NEAREST_MIPMAP_NEAREST : WebGLRenderingContext.NEAREST;
   const tex = createTexture(w, h, gl, { filter: filter, repeat: repeat }, arr, gl.LUMINANCE);
-  if (mipmaps) addMipMaps(gl, w, h, arr, tex, pal, labpal, lib);
+  if (mipmaps) addMipMaps(gl, w, h, arr, tex, lib);
   return tex;
 }
 
-function addMipMaps(gl: WebGLRenderingContext, w: number, h: number, arr: Uint8Array, tex: TextureImpl, pal: number[], labpal: number[], lib: ImgLib) {
+function addMipMaps(gl: WebGLRenderingContext, w: number, h: number, arr: Uint8Array, tex: TextureImpl, lib: ImgLib) {
   let div = 2;
   let level = 1;
   while (int(w / div) >= 1 || int(h / div) >= 1) {
@@ -44,7 +44,7 @@ export async function BuildArtProviderConstructor(injector: Injector) {
     injector.getInstance(ParallaxTextures_),
     injector.getInstance(RAW_PAL),
     loadImgLib()]);
-  const lib = ImgLib.init(pal, 256);
+  const lib = ImgLib.init(pal, 256, 255);
   return new BuildArtProvider(art, util, gl, parallax, lib);
 }
 
@@ -52,8 +52,6 @@ export class BuildArtProvider implements ArtProvider {
   private textures: Texture[] = [];
   private parallaxTextures: Texture[] = [];
   private infos: ArtInfo[] = [];
-  private pal: number[];
-  private labpal: number[];
 
   constructor(
     private arts: ArtFiles,
@@ -72,7 +70,7 @@ export class BuildArtProvider implements ArtProvider {
     const info = this.arts.getInfo(picnum);
     if (info.h <= 0 || info.w <= 0) return this.get(0);
     const arr = this.axisSwap(info.img, info.h, info.w);
-    tex = createIndexedTexture(this.gl, info.w, info.h, arr, this.pal, this.labpal, true, this.lib);
+    tex = createIndexedTexture(this.gl, info.w, info.h, arr, true, this.lib);
 
     this.textures[picnum] = tex;
     return tex;
@@ -97,7 +95,7 @@ export class BuildArtProvider implements ArtProvider {
     const w = infos[0].w;
     const h = infos[0].h;
     const merged = this.mergeParallax(w, h, axisSwapped);
-    tex = createIndexedTexture(this.gl, w * this.parallaxPics, h, merged, this.pal, this.labpal, true, this.lib);
+    tex = createIndexedTexture(this.gl, w * this.parallaxPics, h, merged, true, this.lib);
 
     this.parallaxTextures[picnum] = tex;
     return tex;

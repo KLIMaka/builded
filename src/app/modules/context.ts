@@ -32,8 +32,7 @@ import { BuildGlConstructor, BUILD_GL } from './gl/buildgl';
 import { SwappableViewConstructor } from './view/view';
 import { FS } from './fs/fs';
 import { Lexer, LexerRule } from '../../utils/lexer';
-import { convertPal, rgb2xyz, xyz2lab, findLab, dither, ditherMatrix } from '../../utils/color';
-import initImgLib, { ImgLib } from '../../libs_js/wasm_lib';
+import { INDEXED_IMG_LIB, IndexedImgLibJsConstructor } from '../../utils/imglib';
 
 class StateImpl implements State {
   private state: { [index: string]: any } = {};
@@ -216,14 +215,11 @@ async function AdditionalTextures(injector: Injector) {
   const textures: { [index: number]: Texture } = {};
   const gl = await injector.getInstance(GL);
   const fs = await injector.getInstance(FS);
-  const rawpal = await injector.getInstance(RAW_PAL);
-  const pal = [...rawpal];
+  const lib = await injector.getInstance(INDEXED_IMG_LIB);
   const file = await fs.get('texlist.lst');
   const decoder = new TextDecoder('utf-8');
   const list = decoder.decode(file);
   const lexer = createLexer(list);
-  await initImgLib();
-  const lib = ImgLib.init(rawpal, 256, 255);
 
   try {
     for (; ;) {
@@ -237,13 +233,9 @@ async function AdditionalTextures(injector: Injector) {
         textures[id] = await loadTexture(gl, path, opts);
       } else if (options == 'palletize') {
         const texture = await fs.get(path);
-        const img = await loadImageFromBuffer(texture);
-        const w = img[0];
-        const h = img[1];
-        const buff = img[2];
-        const indexed = new Uint8Array(w * h);
-        lib.palettize(w, h, buff, indexed);
-        textures[id] = createIndexedTexture(gl, img[0], img[1], indexed, true, lib);
+        const [w, h, buff] = await loadImageFromBuffer(texture);
+        const indexed = lib.palettize(w, h, buff);
+        textures[id] = createIndexedTexture(gl, w, h, indexed, true, lib);
       }
     }
   } finally {
@@ -266,6 +258,7 @@ export function DefaultSetupModule(injector: Injector) {
   injector.bind(BUS, DefaultMessageBus);
   injector.bind(BOARD, BoardProviderConstructor);
   injector.bind(ENTITY_FACTORY, EntityFactoryConstructor);
+  injector.bind(INDEXED_IMG_LIB, IndexedImgLibJsConstructor);
 
   injector.install(JoinSectorsModule);
   injector.install(DrawSectorModule);

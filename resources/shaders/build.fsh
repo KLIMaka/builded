@@ -8,7 +8,7 @@ uniform vec3 curpos;
 uniform vec3 eyepos;
 uniform vec4 clipPlane;
 uniform vec4 sys;
-uniform vec4 sys1;
+uniform vec4 grid;
 
 uniform vec4 color;
 uniform vec4 modulation;
@@ -186,11 +186,11 @@ void writeColor(vec3 c, vec4 m) {
 }
 
 vec4 renderGrid() {
-  vec2 coord = gridtc.xy / sys1.x;
-  vec2 grid = abs(fract(coord - 0.5) - 0.5) / fwidth(coord);
-  float line = min(grid.x, grid.y);
+  vec2 coord = gridtc.xy / grid.x;
+  vec2 gridDet = abs(fract(coord - 0.5) - 0.5) / fwidth(coord);
+  float line = min(gridDet.x, gridDet.y);
   float a = 1.0 - min(line, 1.0);
-  float dist = 1.0 - pow(smoothstep(0.0, sys1.x * 4.0, length(curpos - wpos)), 32.0);
+  float dist = 1.0 - pow(smoothstep(0.0, grid.x * grid.y, length(curpos - wpos)), 32.0);
   return vec4(0.4, 0.4, 0.4, a * dist);
 }
 

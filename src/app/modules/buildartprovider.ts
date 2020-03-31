@@ -1,5 +1,4 @@
 import { ArtFiles, ArtInfo, Attributes } from "../../build/formats/art";
-import loadImgLib, { ImgLib } from "../../libs_js/wasm_lib";
 import { rect } from "../../utils/collections";
 import { Texture } from "../../utils/gl/drawstruct";
 import { createTexture, TextureImpl } from "../../utils/gl/textures";
@@ -7,14 +6,14 @@ import { Dependency, Injector } from "../../utils/injector";
 import { warning } from "../../utils/logger";
 import { int } from "../../utils/mathutils";
 import { ArtProvider } from "../apis/app";
-import { RAW_PAL } from "./artselector";
+import { INDEXED_IMG_LIB, IndexedImgLib } from "../../utils/imglib";
 
 export const GL = new Dependency<WebGLRenderingContext>('GL');
 export const ArtFiles_ = new Dependency<ArtFiles>('ArtFiles');
 export const UtilityTextures_ = new Dependency<{ [index: number]: Texture }>('UtilityTextures');
 export const ParallaxTextures_ = new Dependency<number>('Number of parallax textures');
 
-export function createIndexedTexture(gl: WebGLRenderingContext, w: number, h: number, arr: Uint8Array, mipmaps = true, lib: ImgLib): Texture {
+export function createIndexedTexture(gl: WebGLRenderingContext, w: number, h: number, arr: Uint8Array, mipmaps = true, lib: IndexedImgLib): Texture {
   const repeat = WebGLRenderingContext.CLAMP_TO_EDGE;
   const filter = mipmaps ? WebGLRenderingContext.NEAREST_MIPMAP_NEAREST : WebGLRenderingContext.NEAREST;
   const tex = createTexture(w, h, gl, { filter: filter, repeat: repeat }, arr, gl.LUMINANCE);
@@ -22,14 +21,13 @@ export function createIndexedTexture(gl: WebGLRenderingContext, w: number, h: nu
   return tex;
 }
 
-function addMipMaps(gl: WebGLRenderingContext, w: number, h: number, arr: Uint8Array, tex: TextureImpl, lib: ImgLib) {
+function addMipMaps(gl: WebGLRenderingContext, w: number, h: number, arr: Uint8Array, tex: TextureImpl, lib: IndexedImgLib) {
   let div = 2;
   let level = 1;
   while (int(w / div) >= 1 || int(h / div) >= 1) {
     const dw = Math.max(1, int(w / div));
     const dh = Math.max(1, int(h / div));
-    const mip = new Uint8Array(dw * dh);
-    lib.resize(dw, dh, mip, w, h, arr);
+    const mip = lib.resize(dw, dh, w, h, arr);
     tex.mip(gl, level, dw, dh, mip);
     div *= 2;
     level++;
@@ -37,14 +35,12 @@ function addMipMaps(gl: WebGLRenderingContext, w: number, h: number, arr: Uint8A
 }
 
 export async function BuildArtProviderConstructor(injector: Injector) {
-  const [art, util, gl, parallax, pal] = await Promise.all([
+  const [art, util, gl, parallax, lib] = await Promise.all([
     injector.getInstance(ArtFiles_),
     injector.getInstance(UtilityTextures_),
     injector.getInstance(GL),
     injector.getInstance(ParallaxTextures_),
-    injector.getInstance(RAW_PAL),
-    loadImgLib()]);
-  const lib = ImgLib.init(pal, 256, 255);
+    injector.getInstance(INDEXED_IMG_LIB)]);
   return new BuildArtProvider(art, util, gl, parallax, lib);
 }
 
@@ -58,7 +54,7 @@ export class BuildArtProvider implements ArtProvider {
     private addTextures: { [index: number]: Texture },
     private gl: WebGLRenderingContext,
     private parallaxPics: number,
-    private lib: ImgLib) {
+    private lib: IndexedImgLib) {
   }
 
   public get(picnum: number): Texture {

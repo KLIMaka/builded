@@ -77,9 +77,11 @@ export class GridSetup extends BufferSetup {
   constructor(state: State) {
     super(state);
     this.register('GT', state);
+    this.register('grid', state);
   }
 
   public grid(grid: Mat4Array) { this.values.set(11, grid); return this }
+  public gridSettings(settings: Vec4Array) { this.values.set(13, settings); return this }
 }
 
 export class WireframeSetup extends BufferSetup {

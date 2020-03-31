@@ -4,6 +4,7 @@ import { State } from "../../../utils/gl/stategl";
 import { Dependency, Injector } from "../../../utils/injector";
 import { BUFFER_FACTORY, BuildBuffer } from "../gl/buffers";
 import { BufferRenderable, GridSetup, GRID_SETUP, PointSpriteSetup, POINT_SPRITE_SETUP, SolidSetup, SOLID_SETUP, WireframeSetup, WIREFRAME_SETUP, BufferSetup, FLAT_SETUP } from "./builders/setups";
+import { GridController, GRID } from "../context";
 
 export interface BuildersFactory {
   solid(hint: string): SolidBuilder;
@@ -16,9 +17,10 @@ export const BUILDERS_FACTORY = new Dependency<BuildersFactory>('Builder Factory
 
 export async function DefaultBuildersFactory(injector: Injector) {
   const bufferFactory = await injector.getInstance(BUFFER_FACTORY);
+  const grid = await injector.getInstance(GRID);
   return {
     solid: (hint: string) => new SolidBuilder(bufferFactory.get('solid-' + hint)),
-    grid: (hint: string) => new GridBuilder(),
+    grid: (hint: string) => new GridBuilder(grid),
     flat: (hint: string) => new FlatBuilder(),
     pointSprite: (hint: string) => new PointSpriteBuilder(bufferFactory.get('pointsprite-' + hint)),
     wireframe: (hint: string) => new WireframeBuilder(bufferFactory.get('wireframe-' + hint))
@@ -58,8 +60,10 @@ export class SolidBuilder extends BufferRenderable<SolidSetup> {
 export class GridBuilder extends BufferRenderable<GridSetup> {
   public solid: SolidBuilder;
   public gridTexMat = mat4.create();
+  public range = 4.0;
+  private gridSettings = vec4.create();
 
-  constructor() { super(GRID_SETUP) }
+  constructor(private grid: GridController) { super(GRID_SETUP) }
 
   public get buff() { return this.solid.buff }
   public reset() { mat4.identity(this.gridTexMat) }
@@ -67,7 +71,8 @@ export class GridBuilder extends BufferRenderable<GridSetup> {
 
   public setup(setup: GridSetup) {
     setup.shader('grid')
-      .grid(this.gridTexMat);
+      .grid(this.gridTexMat)
+      .gridSettings(vec4.set(this.gridSettings, this.grid.getGridSize(), this.range, 0, 0));
   }
 
   public draw(gl: WebGLRenderingContext, state: State): void {

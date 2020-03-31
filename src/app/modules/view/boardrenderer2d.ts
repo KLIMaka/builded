@@ -12,17 +12,19 @@ import { RENDRABLES_CACHE } from '../geometry/cache';
 import { BuildersFactory, BUILDERS_FACTORY, GridBuilder } from '../geometry/common';
 import { BuildGl, BUILD_GL } from '../gl/buildgl';
 import { View2d } from './view2d';
+import { GRID, GridController } from '../context';
 
 const visible = new AllBoardVisitorResult();
 
 export async function Renderer2D(injector: Injector) {
-  const [bgl, builders, renderables, board] = await Promise.all([
+  const [bgl, builders, renderables, board, grid] = await Promise.all([
     injector.getInstance(BUILD_GL),
     injector.getInstance(BUILDERS_FACTORY),
     injector.getInstance(RENDRABLES_CACHE),
     injector.getInstance(BOARD),
+    injector.getInstance(GRID),
   ]);
-  return new BoardRenderer2D(bgl, builders, renderables.topdown, board);
+  return new BoardRenderer2D(bgl, builders, renderables.topdown, board, grid);
 }
 
 export class BoardRenderer2D {
@@ -39,7 +41,8 @@ export class BoardRenderer2D {
     private bgl: BuildGl,
     private builders: BuildersFactory,
     private renderables: BuildRenderableProvider,
-    private board: BoardProvider
+    private board: BoardProvider,
+    private gridController: GridController
   ) { }
 
   private getGrid() {
@@ -58,7 +61,8 @@ export class BoardRenderer2D {
     buff.writeTcLighting(2, 1, -1);
     buff.writeTcLighting(3, -1, 1);
     buff.writeQuad(0, 3, 2, 1, 0);
-    this.grid = new GridBuilder();
+    this.grid = new GridBuilder(this.gridController);
+    this.grid.range = size;
     mat4.copy(this.grid.gridTexMat, GRID_SECTOR_MATRIX);
     this.grid.solid = gridSolid;
     return this.grid;

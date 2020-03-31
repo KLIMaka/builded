@@ -570,6 +570,7 @@ export function connectedWalls(board: Board, wallId: number, result: Deck<number
   connectedSet.clear();
   let walls = board.walls;
   let w = wallId;
+  let counter = 0;
   connectedSet.add(w);
   do {
     let wall = walls[w];
@@ -587,6 +588,8 @@ export function connectedWalls(board: Board, wallId: number, result: Deck<number
         } else break;
       } while (w != wallId)
     }
+    counter++;
+    if (counter > board.numwalls) throw new Error('Cycled connected walls');
   } while (w != wallId)
   return result.pushAll(connectedSet);
 }
@@ -863,7 +866,7 @@ function searchMatchWall(board: Board, p1: [number, number], p2: [number, number
 }
 
 function matchWalls(board: Board, points: Collection<[number, number]>) {
-  const walls = Array<[number, number]>(points.length());
+  const walls = [];
   for (const [w1, w2] of cyclicPairs(points.length())) {
     walls.push(searchMatchWall(board, points.get(w1), points.get(w2)));
   }

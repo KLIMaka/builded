@@ -89,7 +89,6 @@ export class BuildGl {
     gl.clearDepth(1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
     this.state.setUniform('sys', [performance.now(), gl.drawingBufferWidth, gl.drawingBufferHeight, 0]);
-    this.state.setUniform('sys1', [this.gridController.getGridSize(), 0, 0, 0]);
     this.modulation(1, 1, 1, 1);
   }
 

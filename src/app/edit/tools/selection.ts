@@ -215,7 +215,7 @@ export class Selection extends MessageHandlerReflective {
 
     if (Math.abs(MOVE.dx - handle.dx) >= this.ctx.gridController.getGridSize() / 2
       || Math.abs(MOVE.dy - handle.dy) >= this.ctx.gridController.getGridSize() / 2
-      || Math.abs(MOVE.dz - handle.dx) >= this.ctx.gridController.getGridSize() / 2) {
+      || Math.abs(MOVE.dz - handle.dz) >= this.ctx.gridController.getGridSize() / 2) {
       MOVE.dx = handle.dx;
       MOVE.dy = handle.dy;
       MOVE.dz = handle.dz;

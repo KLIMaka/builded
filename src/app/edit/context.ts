@@ -1,8 +1,7 @@
 import { Entity } from "../../build/hitscan";
 import { Dependency, Injector } from "../../utils/injector";
-import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, REFERENCE_TRACKER, State, STATE, View, VIEW } from "../apis/app";
+import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, REFERENCE_TRACKER, State, STATE, View, VIEW, GridController, GRID } from "../apis/app";
 import { BUS, MessageBus } from "../apis/handler";
-import { GRID, GridController } from "../modules/context";
 import { SectorEnt } from "./sector";
 import { SpriteEnt } from "./sprite";
 import { WallEnt } from "./wall";

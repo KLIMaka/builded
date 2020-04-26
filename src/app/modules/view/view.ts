@@ -3,11 +3,10 @@ import { Entity, Target } from "../../../build/hitscan";
 import { Board } from "../../../build/board/structs";
 import { create, Dependency, Injector } from "../../../utils/injector";
 import { int, len2d, tuple2 } from "../../../utils/mathutils";
-import { STATE, State, View } from "../../apis/app";
+import { STATE, State, View, GridController, GRID } from "../../apis/app";
 import { BUS, Message, MessageHandler } from "../../apis/handler";
 import { HintRenderable, RenderableProvider } from "../../apis/renderable";
 import { LoadBoard, NamedMessage } from "../../edit/messages";
-import { GRID, GridController } from "../context";
 import { View2d, View2dConstructor } from "./view2d";
 import { View3d, View3dConstructor } from "./view3d";
 

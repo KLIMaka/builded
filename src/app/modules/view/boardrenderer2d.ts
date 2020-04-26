@@ -5,14 +5,13 @@ import { Controller2D } from '../../../utils/camera/controller2d';
 import { Deck } from '../../../utils/collections';
 import { Injector } from '../../../utils/injector';
 import * as PROFILE from '../../../utils/profiler';
-import { BOARD, BoardProvider } from '../../apis/app';
+import { BOARD, BoardProvider, GridController, GRID } from '../../apis/app';
 import { BuildRenderableProvider, HELPER_GRID, HintRenderable, LayeredRenderables, RenderableProvider, SortingRenderable, SPRITE_LABEL } from '../../apis/renderable';
 import { GRID_SECTOR_MATRIX } from '../geometry/builders/common';
 import { RENDRABLES_CACHE } from '../geometry/cache';
 import { BuildersFactory, BUILDERS_FACTORY, GridBuilder } from '../geometry/common';
 import { BuildGl, BUILD_GL } from '../gl/buildgl';
 import { View2d } from './view2d';
-import { GRID, GridController } from '../context';
 
 const visible = new AllBoardVisitorResult();
 

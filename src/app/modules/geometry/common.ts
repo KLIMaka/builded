@@ -4,7 +4,7 @@ import { State } from "../../../utils/gl/stategl";
 import { Dependency, Injector } from "../../../utils/injector";
 import { BUFFER_FACTORY, BuildBuffer } from "../gl/buffers";
 import { BufferRenderable, GridSetup, GRID_SETUP, PointSpriteSetup, POINT_SPRITE_SETUP, SolidSetup, SOLID_SETUP, WireframeSetup, WIREFRAME_SETUP, BufferSetup, FLAT_SETUP } from "./builders/setups";
-import { GridController, GRID } from "../context";
+import { GRID, GridController } from "../../apis/app";
 
 export interface BuildersFactory {
   solid(hint: string): SolidBuilder;

@@ -7,7 +7,7 @@ import { info } from '../../../utils/logger';
 import * as PROFILER from '../../../utils/profiler';
 import { Renderable } from '../../apis/renderable';
 import { GL } from '../buildartprovider';
-import { GRID, GridController } from '../context';
+import { GRID, GridController } from '../../apis/app';
 
 export const PAL_TEXTURE = new Dependency<Texture>('PAL Texture');
 export const PLU_TEXTURE = new Dependency<Texture>('PLU Texture');

@@ -59,3 +59,13 @@ export interface BuildResources {
   list(): Promise<string[]>;
 }
 export const RESOURCES = new Dependency<BuildResources>('Build Resources');
+
+
+export interface GridController {
+  setGridSize(size: number): void;
+  getGridSize(): number;
+  incGridSize(): void;
+  decGridSize(): void;
+  snap(x: number): number;
+}
+export const GRID = new Dependency<GridController>('GridController');

@@ -2,11 +2,11 @@ import { ArtFiles, ArtInfo, Attributes } from "../../build/formats/art";
 import { rect } from "../../utils/collections";
 import { Texture } from "../../utils/gl/drawstruct";
 import { createTexture, TextureImpl } from "../../utils/gl/textures";
+import { IndexedImgLib, INDEXED_IMG_LIB } from "../../utils/imglib";
 import { Dependency, Injector } from "../../utils/injector";
 import { warning } from "../../utils/logger";
 import { int } from "../../utils/mathutils";
 import { ArtProvider } from "../apis/app";
-import { INDEXED_IMG_LIB, IndexedImgLib } from "../../utils/imglib";
 
 export const GL = new Dependency<WebGLRenderingContext>('GL');
 export const ArtFiles_ = new Dependency<ArtFiles>('ArtFiles');
@@ -14,6 +14,7 @@ export const UtilityTextures_ = new Dependency<{ [index: number]: Texture }>('Ut
 export const ParallaxTextures_ = new Dependency<number>('Number of parallax textures');
 
 export function createIndexedTexture(gl: WebGLRenderingContext, w: number, h: number, arr: Uint8Array, mipmaps = true, lib: IndexedImgLib): Texture {
+  mipmaps = false;
   const repeat = WebGLRenderingContext.CLAMP_TO_EDGE;
   const filter = mipmaps ? WebGLRenderingContext.NEAREST_MIPMAP_NEAREST : WebGLRenderingContext.NEAREST;
   const tex = createTexture(w, h, gl, { filter: filter, repeat: repeat }, arr, gl.LUMINANCE);
@@ -21,15 +22,31 @@ export function createIndexedTexture(gl: WebGLRenderingContext, w: number, h: nu
   return tex;
 }
 
+// function addMipMaps(gl: WebGLRenderingContext, w: number, h: number, arr: Uint8Array, tex: TextureImpl, lib: IndexedImgLib) {
+//   let div = 2;
+//   let level = 1;
+//   while (int(w / div) >= 1 || int(h / div) >= 1) {
+//     const dw = Math.max(1, int(w / div));
+//     const dh = Math.max(1, int(h / div));
+//     const mip = lib.resize(dw, dh, w, h, arr);
+//     tex.mip(gl, level, dw, dh, mip);
+//     div *= 2;
+//     level++;
+//   }
+// }
+
 function addMipMaps(gl: WebGLRenderingContext, w: number, h: number, arr: Uint8Array, tex: TextureImpl, lib: IndexedImgLib) {
-  let div = 2;
   let level = 1;
-  while (int(w / div) >= 1 || int(h / div) >= 1) {
-    const dw = Math.max(1, int(w / div));
-    const dh = Math.max(1, int(h / div));
+  while (w >= 1 || h >= 1) {
+    const nw = int(w / 2);
+    const dw = Math.max(1, nw);
+    const nh = int(h / 2);
+    const dh = Math.max(1, nh);
     const mip = lib.resize(dw, dh, w, h, arr);
     tex.mip(gl, level, dw, dh, mip);
-    div *= 2;
+    arr = mip;
+    w = nw;
+    h = nh;
     level++;
   }
 }

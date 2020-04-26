@@ -6,6 +6,14 @@ export interface Collection<T> extends Iterable<T> {
   isEmpty(): boolean;
 }
 
+export function last<T>(c: Collection<T>): T {
+  return c.get(c.length() - 1);
+}
+
+export function first<T>(c: Collection<T>): T {
+  return c.get(0);
+}
+
 export interface MutableCollection<T> extends Collection<T> {
   set(idx: number, value: T): void;
 }

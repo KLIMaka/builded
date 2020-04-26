@@ -90,6 +90,14 @@ export function convertPal(srcPal: number[], conv: (a: number, b: number, c: num
   return dst;
 }
 
+export function labDist(pal: number[], color: number, l: number, a: number, b: number) {
+  const off = color * 3;
+  const dh = l - pal[off + 0];
+  const ds = a - pal[off + 1];
+  const dl = b - pal[off + 2];
+  return Math.sqrt(dh * dh + ds * ds + dl * dl);
+}
+
 export function findLab(pal: number[], l: number, a: number, b: number): [number, number, number] {
   let mindist = Number.MAX_VALUE;
   let mindist1 = Number.MAX_VALUE;
@@ -124,26 +132,53 @@ export function convoluteIndexed(x: number, y: number, w: number, h: number, img
   if (w == int(w) && h == int(h) && x == int(x) && y == int(y)) {
     const sum = [0, 0, 0];
     let trans = 0;
+    const colors = new Set<number>();
     for (const [xx, yy] of rect(w, h)) {
       const off = (yy + y) * imgw + xx + x;
-      const idx = img[off] * 3;
-      if (idx == 255 * 3) {
+      const color = img[off] * 3;
+      if (color == 255 * 3) {
         trans++;
         if (trans > (w * h) / 2) return 255;
       } else {
-        sum[0] += pal[idx + 0];
-        sum[1] += pal[idx + 1];
-        sum[2] += pal[idx + 2];
+        sum[0] += pal[color + 0];
+        sum[1] += pal[color + 1];
+        sum[2] += pal[color + 2];
+        colors.add(color / 3);
       }
     }
     const weight = 1 / (w * h - trans);
     const xyz = rgb2xyz(sum[0] * weight, sum[1] * weight, sum[2] * weight);
     const lab = xyz2lab(xyz[0], xyz[1], xyz[2]);
-    const [i] = findLab(labpal, lab[0], lab[1], lab[2]);
-    return i;
+    let mindist = Number.MAX_VALUE;
+    let mindist1 = Number.MAX_VALUE;
+    let idx = 0;
+    let idx1 = 0;
+    for (const color of colors) {
+      const dist = labDist(labpal, color, lab[0], lab[1], lab[2]);
+      if (mindist > dist) {
+        idx1 = idx;
+        mindist1 = mindist;
+        idx = color;
+        mindist = dist;
+      }
+    }
+
+    const [i, i1, t] = findLab(labpal, lab[0], lab[1], lab[2]);
+    const d = labDist(labpal, i, lab[0], lab[1], lab[2]);
+    // return dither(x, y, t, ditherMatrix) ? i : i1;
+    return d / mindist < 0.2 ? i : dither(x, y, mindist / mindist1, ditherMatrix) ? idx : idx1;
   } else {
-    return img[int(y) * imgw + int(x)];
+    return img[int(y + h / 2) * imgw + int(x + w / 2)];
   }
+}
+
+function scale3resample(x: number, y: number, w: number, h: number, src: Uint8Array): number {
+  const px = Math.min(x + 1, w - 1);
+  const mx = Math.max(x - 1, 0);
+  const py = Math.min(y + 1, h - 1);
+  const my = Math.max(y - 1, 0);
+
+  return 0;
 }
 
 export const ditherMatrix = [
@@ -169,4 +204,31 @@ export function dither(x: number, y: number, t: number, matrix: number[]): boole
 
 export function rgb2lum(r: number, g: number, b: number): number {
   return r * 0.2126 + g * 0.7152 + b * 0.0722;
+}
+
+export function scale2x(w: number, h: number, src: Uint8Array): Uint8Array {
+  const dst = new Uint8Array(4 * w * h);
+  for (const [x, y] of rect(w, h)) {
+    const px = Math.min(x + 1, w - 1);
+    const mx = Math.max(x - 1, 0);
+    const py = Math.min(y + 1, h - 1);
+    const my = Math.max(y - 1, 0);
+    const b = src[my * w + x];
+    const d = src[y * w + mx];
+    const e = src[y * w + x];
+    const f = src[y * w + px];
+    const h1 = src[py * w + x];
+    if (b != h1 && d != f) {
+      dst[y * w * 4 + x * 2] = d == b ? d : e;
+      dst[y * w * 4 + x * 2 + 1] = b == f ? f : e;
+      dst[(y * 2 + 1) * w * 2 + x * 2] = d == h1 ? d : e;
+      dst[(y * 2 + 1) * w * 2 + x * 2 + 1] = h1 == f ? f : e;
+    } else {
+      dst[y * w * 4 + x * 2] =
+        dst[y * w * 4 + x * 2 + 1] =
+        dst[(y * 2 + 1) * w * 2 + x * 2] =
+        dst[(y * 2 + 1) * w * 2 + x * 2 + 1] = e;
+    }
+  }
+  return dst;
 }

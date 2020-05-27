@@ -179,7 +179,7 @@ export function* reversed<T>(c: Collection<T>): Generator<T> {
   for (let i = c.length() - 1; i >= 0; i--) yield c.get(i);
 }
 
-export function* indexed<T>(c: Collection<T>): Generator<[T, number]> {
+export function* enumerate<T>(c: Collection<T>): Generator<[T, number]> {
   for (let i = 0; i < c.length(); i++) yield [c.get(i), i];
 }
 

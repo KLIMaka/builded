@@ -7,6 +7,12 @@ import { normal2d } from '../utils/vecmath';
 
 export const ZSCALE = -16;
 
+
+export function* sectorWalls(sector: Sector): Generator<number> {
+  const end = sector.wallnum + sector.wallptr;
+  for (let w = sector.wallptr; w < end; w++) yield w;
+}
+
 export function build2gl(out: Vec3Array, vec: Vec3Array): Vec3Array {
   return vec3.set(out, vec[0], vec[2] / ZSCALE, vec[1]);
 }
@@ -43,13 +49,11 @@ export interface MoveStruct {
   readonly sec: number;
 }
 
-export function inPolygon(x: number, y: number, xs: Collection<number>, ys: Collection<number>) {
+export function inPolygon(x: number, y: number, points: Collection<[number, number]>) {
   let inter = 0;
-  for (const [i1, i2] of cyclicPairs(xs.length())) {
-    const dy1 = ys.get(i1) - y;
-    const dy2 = ys.get(i2) - y;
-    const dx1 = xs.get(i1) - x;
-    const dx2 = xs.get(i2) - x;
+  for (const [i1, i2] of cyclicPairs(points.length())) {
+    const [dx1, dy1] = points.get(i1);
+    const [dx2, dy2] = points.get(i2);
     if (dx1 == 0 && dx2 == 0 && (dy1 == 0 || dy2 == 0 || (dy1 ^ dy2) < 0)) return true;
     if (dy1 == 0 && dy2 == 0 && (dx1 == 0 || dx2 == 0 || (dx1 ^ dx2) < 0)) return true;
 

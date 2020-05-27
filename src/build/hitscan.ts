@@ -1,5 +1,5 @@
 import { cross2d, dot2d, int, len2d, sign, sqrLen2d } from "../utils/mathutils";
-import { Deck, IndexedDeck, range } from "../utils/collections";
+import { Deck, IndexedDeck, range, wrap } from "../utils/collections";
 import { ArtInfo, ArtInfoProvider } from "./formats/art";
 import { Board, FACE_SPRITE, FLOOR_SPRITE, Sector, WALL_SPRITE } from "./board/structs";
 import { ANGSCALE, groupSprites, inPolygon, inSector, rayIntersect, slope, spriteAngle, ZSCALE } from "./utils";
@@ -226,8 +226,19 @@ function intersectWallSprite(board: Board, info: ArtInfo, sprId: number, hit: Hi
   hit.hit(it - SPRITE_OFF, sprId, EntityType.SPRITE);
 }
 
-let xss = new Deck<number>();
-let yss = new Deck<number>();
+let points_ = wrap(<[number, number][]>[[0, 0], [0, 0], [0, 0], [0, 0]]);
+function points(x1: number, y1: number, x2: number, y2: number, x3: number, y3: number, x4: number, y4: number) {
+  points_.get(0)[0] = x1;
+  points_.get(0)[1] = y1;
+  points_.get(1)[0] = x2;
+  points_.get(1)[1] = y2;
+  points_.get(2)[0] = x3;
+  points_.get(2)[1] = y3;
+  points_.get(3)[0] = x4;
+  points_.get(3)[1] = y4;
+  return points_;
+}
+
 function intersectFloorSprite(board: Board, info: ArtInfo, sprId: number, hit: Hitscan) {
   let [xs, ys, zs] = hit.ray.start;
   let [vx, vy, vz] = hit.ray.dir;
@@ -256,13 +267,11 @@ function intersectFloorSprite(board: Board, info: ArtInfo, sprId: number, hit: H
   let y3 = int(y2 - sinang * dh);
   let x4 = int(x1 - cosang * dh);
   let y4 = int(y1 - sinang * dh);
-  xss.clear().push(x1).push(x2).push(x3).push(x4);
-  yss.clear().push(y1).push(y2).push(y3).push(y4);
 
   let t = dz / vz;
   let ix = xs + int(vx * t);
   let iy = ys + int(vy * t);
-  if (!inPolygon(ix, iy, xss, yss)) return;
+  if (!inPolygon(ix, iy, points(x1, y1, x2, y2, x3, y3, x4, y4))) return;
   hit.hit(t - SPRITE_OFF, sprId, EntityType.SPRITE);
 }
 

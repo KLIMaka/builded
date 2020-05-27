@@ -1,5 +1,5 @@
-import { Dependency, Injector, create } from "../../../utils/injector";
-import { span, stopPropagation, Table, addDragAndDrop } from "../../../utils/ui/ui";
+import { create, Dependency, Injector } from "../../../utils/injector";
+import { addDragAndDrop, span, Table } from "../../../utils/ui/ui";
 import { BUS } from "../../apis/handler";
 import { UI, Ui, Window } from "../../apis/ui";
 import { namedMessageHandler } from "../../edit/messages";

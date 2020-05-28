@@ -4,7 +4,7 @@
   "description": "Map editor for Build Engine",
   "main": "builded.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest"
   },
   "repository": {
     "type": "git",
@@ -16,6 +16,12 @@
     "url": "https://github.com/KLIMaka/builded/issues"
   },
   "devDependencies": {
-    "typescript": "~3.7"
+    "@babel/core": "^7.10.1",
+    "@babel/preset-env": "^7.10.1",
+    "@babel/preset-typescript": "^7.10.1",
+    "@types/jest": "^25.2.3",
+    "babel-jest": "^26.0.1",
+    "jest": "^26.0.1",
+    "typescript": "~3.8"
   }
 }

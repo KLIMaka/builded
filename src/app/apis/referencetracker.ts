@@ -32,7 +32,9 @@ export class ReferenceTrackerImpl<T> implements ReferenceTracker<T, number>{
   }
 
   val(ref: number): T {
-    return this.stopped ? this.nil : this.refs.get(ref) || this.nil;
+    if (this.stopped) return this.nil;
+    const val = this.refs.get(ref);
+    return val == undefined ? this.nil : val;
   }
 
   update(updater: ReferenceUpdater<T>): void {

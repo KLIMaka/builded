@@ -43,15 +43,13 @@ export class ArrayWrapper<T> implements MutableCollection<T> {
 export function wrap<T>(array: T[], len: number = array.length) { return new ArrayWrapper(array, len) }
 
 export class Deck<T> implements MutableCollection<T>{
-  public array: T[];
+  public array: T[] = [];
   public size = 0;
-
-  constructor(size: number = 10) { this.array = new Array<T>(size) }
 
   public get(i: number) { return this.array[i] }
 
   public set(i: number, value: T) {
-    if (i >= this.size) throw new Error(`Invalid set position: ${i} >= ${this.size}`);
+    if (i < 0 || i >= this.size) throw new Error(`Invalid set position: ${i}, size:${this.size}`);
     this.array[i] = value;
   }
 
@@ -108,8 +106,15 @@ export class IndexedDeck<T> extends Deck<T>{
   public push(value: T): IndexedDeck<T> {
     if (this.index.has(value)) return this;
     super.push(value);
-    this.index.set(value, this.size);
+    this.index.set(value, this.size - 1);
     return this;
+  }
+
+  public set(i: number, value: T) {
+    const last = this.get(0);
+    super.set(i, value);
+    this.index.delete(last);
+    this.index.set(value, i);
   }
 
   public clear(): IndexedDeck<T> {
@@ -175,6 +180,11 @@ export function* sub<T>(c: Collection<T>, start: number, length: number): Genera
   for (let i = 0; i < length; i++) yield c.get(start + i);
 }
 
+export function all<T>(i: Iterable<T>, f: (t: T) => boolean): boolean {
+  for (const t of i) if (!f(t)) return false;
+  return true;
+}
+
 export function* reversed<T>(c: Collection<T>): Generator<T> {
   for (let i = c.length() - 1; i >= 0; i--) yield c.get(i);
 }
@@ -185,18 +195,23 @@ export function* enumerate<T>(c: Iterable<T>): Generator<[T, number]> {
 }
 
 export function* range(start: number, end: number) {
+  if (start > end) throw new Error(`${start} > ${end}`);
   for (let i = start; i <= end; i++) yield i;
 }
 
 export function* cyclicRange(start: number, length: number) {
+  if (start >= length) throw new Error(`${start} >= ${length}`);
   for (let i = 0; i < length; i++) yield cyclic(start + i, length);
 }
 
 export function* cyclicPairs(length: number): Generator<[number, number]> {
+  if (length < 0) throw new Error(`${length} < 0`)
   for (let i = 0; i < length; i++) yield [i, cyclic(i + 1, length)];
 }
 
 export function* rect(w: number, h: number): Generator<[number, number]> {
+  if (w < 0) throw new Error(`${w} < 0`)
+  if (h < 0) throw new Error(`${h} < 0`)
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++)
       yield [x, y]

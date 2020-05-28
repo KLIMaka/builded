@@ -179,8 +179,9 @@ export function* reversed<T>(c: Collection<T>): Generator<T> {
   for (let i = c.length() - 1; i >= 0; i--) yield c.get(i);
 }
 
-export function* enumerate<T>(c: Collection<T>): Generator<[T, number]> {
-  for (let i = 0; i < c.length(); i++) yield [c.get(i), i];
+export function* enumerate<T>(c: Iterable<T>): Generator<[T, number]> {
+  let i = 0;
+  for (const t of c) yield [t, i++];
 }
 
 export function* range(start: number, end: number) {

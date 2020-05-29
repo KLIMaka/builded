@@ -87,7 +87,7 @@ export class Deck<T> implements MutableCollection<T>{
 
   public clone() {
     let copy = new Deck<T>();
-    copy.array = [...this.array];
+    copy.array = [...take(this.array, this.size)];
     copy.size = this.size;
     return copy;
   }
@@ -152,16 +152,6 @@ export function reverse<T>(c: Collection<T>): Collection<T> {
     }
 }
 
-export function subCollection<T>(c: Collection<T>, start: number, length: number): Collection<T> {
-  return length == 0
-    ? EMPTY_COLLECTION
-    : {
-      get: (i: number) => c.get(start + i),
-      length: () => length,
-      isEmpty: () => false,
-      [Symbol.iterator]: () => sub(c, start, length)
-    }
-}
 
 export function* filter<T>(i: Iterable<T>, f: (t: T) => boolean): Generator<T> {
   for (const v of i) if (f(v)) yield v;
@@ -207,6 +197,17 @@ export function* cyclicRange(start: number, length: number) {
 export function* cyclicPairs(length: number): Generator<[number, number]> {
   if (length < 0) throw new Error(`${length} < 0`)
   for (let i = 0; i < length; i++) yield [i, cyclic(i + 1, length)];
+}
+
+export function* take<T>(c: Iterable<T>, count: number): Generator<T> {
+  if (count < 0) return;
+  const iter = c[Symbol.iterator]();
+  while (count > 0) {
+    const next = iter.next();
+    if (next.done) return;
+    yield next.value;
+    count--;
+  }
 }
 
 export function* rect(w: number, h: number): Generator<[number, number]> {

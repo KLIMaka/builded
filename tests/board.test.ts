@@ -1,9 +1,9 @@
 import { BuildReferenceTrackerImpl } from '../src/app/modules/default/reftracker';
 import { Board } from '../src/build/board/structs';
-import { createNewSector, deleteWall, isOuterLoop, splitWall, walllen, wallInSector, mergePoints, deleteSector, wallLoop, looppoints, loopWalls, createInnerLoop, loopWallsFull, fillInnerLoop, loopInnerSectors, innerSectors, deleteLoop, loopPoint, loopStart } from '../src/build/boardutils';
+import { createInnerLoop, createNewSector, deleteLoop, deleteSector, deleteWall, fillInnerLoop, innerSectors, isOuterLoop, loopInnerSectors, looppoints, loopStart, loopWalls, loopWallsFull, mergePoints, splitWall, wallInSector, walllen, wallLoop } from '../src/build/boardutils';
 import { ArtInfo, ArtInfoProvider, Attributes } from '../src/build/formats/art';
 import { inSector } from '../src/build/utils';
-import { wrap, map } from '../src/utils/collections';
+import { map, wrap } from '../src/utils/collections';
 
 const REFS = new BuildReferenceTrackerImpl();
 const ART_PROVIDER: ArtInfoProvider = {

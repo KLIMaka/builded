@@ -5,7 +5,6 @@ import { BuildReferenceTracker } from '../app/apis/app';
 import { ArtInfoProvider } from './formats/art';
 import { Board, FACE_SPRITE, Sector, SectorStats, Sprite, SpriteStats, Wall, WallStats } from './board/structs';
 import { findSector, sectorOfWall, wallNormal, ZSCALE, sectorWalls, inPolygon } from './utils';
-import { cloneSector } from './maploader';
 
 export const DEFAULT_REPEAT_RATE = 128;
 const NULL_WALL = new Wall();

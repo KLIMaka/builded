@@ -1,4 +1,4 @@
-import { Deck, IndexedDeck, first, last, map, reduce, sub, wrap, reversed, enumerate, range, cyclicRange, cyclicPairs, rect } from "../src/utils/collections";
+import { Deck, IndexedDeck, first, last, map, reduce, sub, wrap, reversed, enumerate, range, cyclicRange, cyclicPairs, rect, all, take } from "../src/utils/collections";
 
 
 test('Deck', () => {
@@ -68,11 +68,22 @@ test('IndexedDeck', () => {
   expect(deck.hasAny([])).toBe(false);
   expect(first(deck)).toBe(7);
   expect(last(deck)).toBe(101);
+
+  deck.pushAll([42, 42, 42]);
+  expect(deck.length()).toBe(3);
+  expect(deck.indexOf(42)).toBe(1);
+  expect([...deck]).toStrictEqual([7, 42, 101]);
+
+  deck.set(0, 42);
+  expect(deck.indexOf(42)).toBe(0);
 });
 
 test('Utils', () => {
   expect([...map([1, 2, 3, 4], x => x * x)]).toStrictEqual([1, 4, 9, 16]);
   expect([...map([], x => x * x)]).toStrictEqual([]);
+  expect(all([0, 0, 0], x => x == 0)).toBe(true);
+  expect(all([0, 0, 1], x => x == 0)).toBe(false);
+  expect(all([], x => x == 0)).toBe(true);
   expect(reduce([1, 2, 3], (r, h) => r * h, 1)).toBe(6);
   expect(reduce([], (r: number, h: number) => r * h, 1)).toBe(1);
   expect([...sub(wrap([1, 2, 3]), 1, 1)]).toStrictEqual([2]);
@@ -82,6 +93,7 @@ test('Utils', () => {
   expect([...enumerate([])]).toStrictEqual([]);
   expect([...range(1, 3)]).toStrictEqual([1, 2, 3]);
   expect([...range(1, 1)]).toStrictEqual([1]);
+  expect([...take([1, 2, 3, 4], 1)]).toStrictEqual([1]);
   expect(() => [...range(3, 1)]).toThrow();
   expect([...cyclicRange(1, 3)]).toStrictEqual([1, 2, 0]);
   expect(() => [...cyclicRange(3, 1)]).toThrow();

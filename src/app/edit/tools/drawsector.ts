@@ -286,10 +286,9 @@ export class DrawSector extends MessageHandlerReflective {
   }
 
   private splitSector(sectorId: number) {
-    if (splitSector(this.board(), sectorId, this.points, this.refs) != -1) {
-      this.bus.handle(COMMIT);
-      this.bus.handle(new BoardInvalidate(null));
-    }
+    splitSector(this.board(), sectorId, this.points, this.refs);
+    this.bus.handle(COMMIT);
+    this.bus.handle(new BoardInvalidate(null));
     this.points.clear();
     this.contour.clear();
     this.contour.pushPoint(0, 0);

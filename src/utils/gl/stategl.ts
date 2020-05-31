@@ -1,5 +1,5 @@
 import * as GLM from '../../libs_js/glmatrix';
-import { Deck } from '../collections';
+import { Deck, isEmpty } from '../collections';
 import { Buffer } from './buffergl';
 import { Definition, IndexBuffer, Shader, Texture, VertexBuffer } from './drawstruct';
 import * as SHADER from './shaders';
@@ -140,9 +140,9 @@ export class State {
     } else if (this.batchMode == mode
       && !this.changeShader
       && !this.changeIndexBuffer
-      && this.changedUniformIdxs.isEmpty()
-      && this.changedTextures.isEmpty()
-      && this.changedVertexBuffersIds.isEmpty()) {
+      && isEmpty(this.changedUniformIdxs)
+      && isEmpty(this.changedTextures)
+      && isEmpty(this.changedVertexBuffersIds)) {
       if (this.batchOffset == offset + size) {
         this.batchOffset = offset;
         this.batchSize += size;
@@ -285,7 +285,7 @@ export class State {
   }
 
   private rebindVertexBuffers(gl: WebGLRenderingContext) {
-    if (this.changedVertexBuffersIds.isEmpty()) return;
+    if (isEmpty(this.changedVertexBuffersIds)) return;
     const vertexBufferIdxs = this.changedVertexBuffersIds;
     const len = vertexBufferIdxs.length();
     const shader = this.selectedShader;
@@ -311,7 +311,7 @@ export class State {
   }
 
   private rebindTextures(gl: WebGLRenderingContext) {
-    if (this.changedTextures.isEmpty()) return;
+    if (isEmpty(this.changedTextures)) return;
     const textures = this.changedTextures;
     const len = textures.length();
     this.profile.textureChanges += len;
@@ -328,7 +328,7 @@ export class State {
   }
 
   private updateUniforms(gl: WebGLRenderingContext) {
-    if (this.changedUniformIdxs.isEmpty()) return;
+    if (isEmpty(this.changedUniformIdxs)) return;
     const uniformsIdxs = this.changedUniformIdxs;
     const len = uniformsIdxs.length();
     this.profile.uniformChanges += len;

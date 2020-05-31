@@ -1,27 +1,27 @@
-import { Deck, IndexedDeck, first, last, map, reduce, sub, wrap, reversed, enumerate, range, cyclicRange, cyclicPairs, rect, all, take } from "../src/utils/collections";
+import { Deck, IndexedDeck, first, last, map, reduce, sub, wrap, reversed, enumerate, range, cyclicRange, cyclicPairs, rect, all, take, isEmpty } from "../src/utils/collections";
 
 
 test('Deck', () => {
   const deck = new Deck<number>();
   expect(deck.length()).toBe(0);
-  expect(deck.isEmpty()).toBe(true);
+  expect(isEmpty(deck)).toBe(true);
 
   deck.push(1);
   expect(deck.get(0)).toBe(1);
   expect(deck.length()).toBe(1);
-  expect(deck.isEmpty()).toBe(false);
+  expect(isEmpty(deck)).toBe(false);
   expect(deck.get(1)).toBe(undefined);
   expect(deck.top()).toBe(1);
 
   deck.pop();
   expect(deck.length()).toBe(0);
-  expect(deck.isEmpty()).toBe(true);
+  expect(isEmpty(deck)).toBe(true);
   expect(deck.get(0)).toBe(1);
   expect(deck.top()).toBe(undefined);
 
   deck.pushAll([1, 2, 3]);
   expect(deck.length()).toBe(3);
-  expect(deck.isEmpty()).toBe(false);
+  expect(isEmpty(deck)).toBe(false);
   expect(deck.get(0)).toBe(1);
   expect(deck.get(1)).toBe(2);
   expect(deck.get(2)).toBe(3);
@@ -29,7 +29,7 @@ test('Deck', () => {
 
   deck.clear();
   expect(deck.length()).toBe(0);
-  expect(deck.isEmpty()).toBe(true);
+  expect(isEmpty(deck)).toBe(true);
   expect(deck.get(0)).toBe(1);
   expect(deck.top()).toBe(undefined);
 
@@ -91,8 +91,8 @@ test('Utils', () => {
   expect([...reversed(wrap([]))]).toStrictEqual([]);
   expect([...enumerate(['foo', 'bar', 'baz'])]).toStrictEqual([['foo', 0], ['bar', 1], ['baz', 2]]);
   expect([...enumerate([])]).toStrictEqual([]);
-  expect([...range(1, 3)]).toStrictEqual([1, 2, 3]);
-  expect([...range(1, 1)]).toStrictEqual([1]);
+  expect([...range(1, 3)]).toStrictEqual([1, 2]);
+  expect([...range(1, 1)]).toStrictEqual([]);
   expect([...take([1, 2, 3, 4], 1)]).toStrictEqual([1]);
   expect(() => [...range(3, 1)]).toThrow();
   expect([...cyclicRange(1, 3)]).toStrictEqual([1, 2, 0]);

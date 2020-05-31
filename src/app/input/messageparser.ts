@@ -1,4 +1,4 @@
-import { Collection, Deck } from "../../utils/collections";
+import { Collection, Deck, isEmpty } from "../../utils/collections";
 import { Lexer, LexerRule } from "../../utils/lexer";
 import { error } from "../../utils/logger";
 import { EndMove, Flip, Move, NamedMessage, Palette, PanRepeat, ResetPanRepeat, SetPicnum, SetSectorCstat, SetWallCstat, Shade, SpriteMode, StartMove, SetSpriteCstat, Rotate } from "../edit/messages";
@@ -93,7 +93,7 @@ function tryParse(src: string, messages: Deck<Message>): Collection<Message> {
     parser.setSource(src);
     parser.get('ID', 'msg');
     let parsedMessages = tryParseMessage();
-    while (!parsedMessages.isEmpty()) {
+    while (!isEmpty(parsedMessages)) {
       messages.pushAll(parsedMessages);
       try { parser.get('COMA') } catch (e) { break }
       parsedMessages = tryParseMessage();

@@ -291,7 +291,7 @@ function intersectSprite(board: Board, artInfo: ArtInfoProvider, sprId: number, 
 
 function resetStack(board: Board, sectorId: number, stack: IndexedDeck<number>): void {
   stack.clear();
-  if (sectorId == -1 || !board.sectors[sectorId]) for (let i of range(0, board.numsectors - 1)) stack.push(i);
+  if (sectorId == -1 || !board.sectors[sectorId]) for (let i of range(0, board.numsectors)) stack.push(i);
   else stack.push(sectorId);
 }
 

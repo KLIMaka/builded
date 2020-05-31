@@ -3,16 +3,11 @@ import { cyclic } from "./mathutils";
 export interface Collection<T> extends Iterable<T> {
   get(i: number): T;
   length(): number;
-  isEmpty(): boolean;
 }
 
-export function last<T>(c: Collection<T>): T {
-  return c.get(c.length() - 1);
-}
-
-export function first<T>(c: Collection<T>): T {
-  return c.get(0);
-}
+export function last<T>(c: Collection<T>): T { return c.get(c.length() - 1) }
+export function first<T>(c: Collection<T>): T { return c.get(0) }
+export function isEmpty<T>(c: Collection<T>): boolean { return c.length() == 0 }
 
 export interface MutableCollection<T> extends Collection<T> {
   set(idx: number, value: T): void;
@@ -24,7 +19,6 @@ export const EMPTY_COLLECTION: MutableCollection<any> = {
   get: (i: number) => undefined,
   length: () => 0,
   [Symbol.iterator]: () => EMPTY_ITERATOR,
-  isEmpty: () => true,
   set: (i: number, v: any) => { }
 }
 
@@ -37,7 +31,6 @@ export class ArrayWrapper<T> implements MutableCollection<T> {
   get(i: number) { return this.array[i] }
   length() { return this.size }
   [Symbol.iterator]() { return this.array.values(); }
-  isEmpty() { return this.size == 0 }
   set(i: number, value: T) { this.array[i] = value }
 }
 export function wrap<T>(array: T[], len: number = array.length) { return new ArrayWrapper(array, len) }
@@ -81,10 +74,6 @@ export class Deck<T> implements MutableCollection<T>{
     return this.size;
   }
 
-  public isEmpty() {
-    return this.size == 0;
-  }
-
   public clone() {
     let copy = new Deck<T>();
     copy.array = [...take(this.array, this.size)];
@@ -111,7 +100,7 @@ export class IndexedDeck<T> extends Deck<T>{
   }
 
   public set(i: number, value: T) {
-    const last = this.get(0);
+    const last = this.get(i);
     super.set(i, value);
     this.index.delete(last);
     this.index.set(value, i);
@@ -142,12 +131,11 @@ export function findFirst<T>(collection: Collection<T>, value: T, start = 0) {
 }
 
 export function reverse<T>(c: Collection<T>): Collection<T> {
-  return c.isEmpty()
+  return isEmpty(c)
     ? EMPTY_COLLECTION
     : {
       get: (i: number) => c.get(c.length() - 1 - i),
       length: () => c.length(),
-      isEmpty: () => false,
       [Symbol.iterator]: () => reversed(c)
     }
 }
@@ -159,6 +147,10 @@ export function* filter<T>(i: Iterable<T>, f: (t: T) => boolean): Generator<T> {
 
 export function* map<T, V>(i: Iterable<T>, f: (t: T) => V): Generator<V> {
   for (const v of i) yield f(v);
+}
+
+export function forEach<T>(i: Iterable<T>, f: (t: T) => void): void {
+  for (const v of i) f(v);
 }
 
 export function reduce<T>(i: Iterable<T>, f: (lh: T, rh: T) => T, start: T): T {
@@ -186,7 +178,7 @@ export function* enumerate<T>(c: Iterable<T>): Generator<[T, number]> {
 
 export function* range(start: number, end: number) {
   if (start > end) throw new Error(`${start} > ${end}`);
-  for (let i = start; i <= end; i++) yield i;
+  for (let i = start; i < end; i++) yield i;
 }
 
 export function* cyclicRange(start: number, length: number) {

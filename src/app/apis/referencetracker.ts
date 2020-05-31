@@ -11,6 +11,12 @@ export interface ReferenceTracker<T, R> {
   stop(): void;
 }
 
+export function track<T, R>(refs: ReferenceTracker<T, R>, f: (refs: ReferenceTracker<T, R>) => void): void {
+  const crefs = refs.start();
+  f(crefs);
+  crefs.stop();
+}
+
 export class ReferenceTrackerImpl<T> implements ReferenceTracker<T, number>{
   constructor(
     private readonly nil: T,

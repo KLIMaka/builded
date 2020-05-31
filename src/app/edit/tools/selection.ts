@@ -3,7 +3,7 @@ import { Entity, EntityType, Target } from "../../../build/hitscan";
 import { Board } from "../../../build/board/structs";
 import { build2gl } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
-import { Collection, Deck } from "../../../utils/collections";
+import { Collection, Deck, isEmpty } from "../../../utils/collections";
 import { create, Dependency, Injector } from "../../../utils/injector";
 import { error } from "../../../utils/logger";
 import { detuple0, detuple1 } from "../../../utils/mathutils";
@@ -63,7 +63,7 @@ export function getFromHitscan(factory: EntityFactory): Deck<MessageHandler> {
   return list;
 }
 
-function sector(fullLoop: (board: Board, wallId: number) => Collection<number>, target: Target, factory: EntityFactory) {
+function sector(fullLoop: (board: Board, wallId: number) => Iterable<number>, target: Target, factory: EntityFactory) {
   const board = factory.ctx.board();
   if (fullLoop) {
     const firstWall = board.sectors[target.entity.id].wallptr;
@@ -74,7 +74,7 @@ function sector(fullLoop: (board: Board, wallId: number) => Collection<number>, 
   list.push(factory.sector(target.entity.clone()));
 }
 
-function wallSegment(fullLoop: (board: Board, wallId: number) => Collection<number>, factory: EntityFactory, w: number, bottom: boolean) {
+function wallSegment(fullLoop: (board: Board, wallId: number) => Iterable<number>, factory: EntityFactory, w: number, bottom: boolean) {
   const board = factory.ctx.board();
   if (fullLoop) {
     const loop = fullLoop(board, w);
@@ -115,7 +115,7 @@ export class Selection extends MessageHandlerReflective {
 
   public Frame(msg: Frame) {
     if (!handle.isActive()) this.updateSelection();
-    if (this.selection.list().isEmpty() && this.highlighted.list().isEmpty()) return;
+    if (isEmpty(this.selection.list()) && isEmpty(this.highlighted.list())) return;
     if (this.activeMove()) {
       this.updateHandle();
       try {

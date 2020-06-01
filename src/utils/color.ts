@@ -2,8 +2,7 @@ import { rect } from "./collections";
 import { int } from "./mathutils";
 
 export function rgb2hsl(r: number, g: number, b: number): [number, number, number] {
-  // convert RGB to HSV
-  const rd = r / 255.0;            // rd,gd,bd range 0-1 instead of 0-255
+  const rd = r / 255.0;
   const gd = g / 255.0;
   const bd = b / 255.0;
 
@@ -20,13 +19,12 @@ export function rgb2hsl(r: number, g: number, b: number): [number, number, numbe
     else h = 42.5 * ((rd - gd) / (delta) + 4);
     if (h < 0) h += 255;
   }
-  return [h | 0, (s * 255) | 0, (l * 255) | 0];
+  return [int(h), int(s * 255), int(l * 255)];
 }
 
 export function hsl2rgb(h: number, s: number, l: number): [number, number, number] {
   if (s == 0) return [l, l, l];
 
-  // const hf = h / 255.0;
   const lf = l / 255.0;
   const sf = s / 255.0;
 
@@ -42,7 +40,7 @@ export function hsl2rgb(h: number, s: number, l: number): [number, number, numbe
   else if (h >= 42.5 * 4 && h <= 42.5 * 5) { r = x; g = 0; b = c; }
   else if (h >= 42.5 * 5 && h <= 42.5 * 6) { r = c; g = 0; b = x; }
 
-  return [((r + m) * 255) | 0, ((g + m) * 255) | 0, ((b + m) * 255) | 0];
+  return [int((r + m) * 255), int((g + m) * 255), int((b + m) * 255)];
 }
 
 export function rgb2xyz(r: number, g: number, b: number): [number, number, number] {
@@ -206,28 +204,28 @@ export function rgb2lum(r: number, g: number, b: number): number {
   return r * 0.2126 + g * 0.7152 + b * 0.0722;
 }
 
-export function scale2x(w: number, h: number, src: Uint8Array): Uint8Array {
-  const dst = new Uint8Array(4 * w * h);
-  for (const [x, y] of rect(w, h)) {
-    const px = Math.min(x + 1, w - 1);
+export function scale2x(width: number, height: number, src: Uint8Array): Uint8Array {
+  const dst = new Uint8Array(4 * width * height);
+  for (const [x, y] of rect(width, height)) {
+    const px = Math.min(x + 1, width - 1);
     const mx = Math.max(x - 1, 0);
-    const py = Math.min(y + 1, h - 1);
+    const py = Math.min(y + 1, height - 1);
     const my = Math.max(y - 1, 0);
-    const b = src[my * w + x];
-    const d = src[y * w + mx];
-    const e = src[y * w + x];
-    const f = src[y * w + px];
-    const h1 = src[py * w + x];
-    if (b != h1 && d != f) {
-      dst[y * w * 4 + x * 2] = d == b ? d : e;
-      dst[y * w * 4 + x * 2 + 1] = b == f ? f : e;
-      dst[(y * 2 + 1) * w * 2 + x * 2] = d == h1 ? d : e;
-      dst[(y * 2 + 1) * w * 2 + x * 2 + 1] = h1 == f ? f : e;
+    const b = src[my * width + x];
+    const d = src[y * width + mx];
+    const e = src[y * width + x];
+    const f = src[y * width + px];
+    const h = src[py * width + x];
+    if (b != h && d != f) {
+      dst[y * width * 4 + x * 2] = d == b ? d : e;
+      dst[y * width * 4 + x * 2 + 1] = b == f ? f : e;
+      dst[(y * 2 + 1) * width * 2 + x * 2] = d == h ? d : e;
+      dst[(y * 2 + 1) * width * 2 + x * 2 + 1] = h == f ? f : e;
     } else {
-      dst[y * w * 4 + x * 2] =
-        dst[y * w * 4 + x * 2 + 1] =
-        dst[(y * 2 + 1) * w * 2 + x * 2] =
-        dst[(y * 2 + 1) * w * 2 + x * 2 + 1] = e;
+      dst[y * width * 4 + x * 2] =
+        dst[y * width * 4 + x * 2 + 1] =
+        dst[(y * 2 + 1) * width * 2 + x * 2] =
+        dst[(y * 2 + 1) * width * 2 + x * 2 + 1] = e;
     }
   }
   return dst;

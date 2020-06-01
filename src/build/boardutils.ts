@@ -1024,8 +1024,9 @@ function checkSplitSector(board: Board, sectorId: number, points: Collection<[nu
   return [firstWall, lastWall, start];
 }
 
-function splitInnerLoop(board: Board, sectorId: number, firstWall: number, lastWall: number, start: number, points: Collection<[number, number]>, refs: BuildReferenceTracker) {
+function splitSectorImpl(board: Board, sectorId: number, firstWall: number, lastWall: number, start: number, points: Collection<[number, number]>, refs: BuildReferenceTracker) {
   const wallMapper = (w: number) => board.walls[w];
+  const sector = board.sectors[sectorId];
   const refWall = board.walls[firstWall];
   const lengthWoLast = points.length() - 1;
   const [newWalls, existedWalls, loopPoly] = getSplitLoop(board, firstWall, lastWall, points);
@@ -1038,8 +1039,7 @@ function splitInnerLoop(board: Board, sectorId: number, firstWall: number, lastW
 
   for (const lid of looppoints(board, sectorId)) {
     if (loopStart(board, lid) == start) continue;
-    if (isOuterLoop(board, lid)) oldSectorBuilder.addLoop(map(loopWalls(board, lid), wallMapper))
-    else (loopInPolygon(board, lid, wrap(loopPoly)) ? newSectorBuilder : oldSectorBuilder).addLoop(map(loopWalls(board, lid), wallMapper));
+    else (loopInPolygon(board, lid, loopPoly) ? newSectorBuilder : oldSectorBuilder).addLoop(map(loopWalls(board, lid), wallMapper));
   }
   const newSectorId = addSector(board, copySector(board.sectors[sectorId]));
   newSectorBuilder.build(board, newSectorId, refs);
@@ -1051,63 +1051,28 @@ function splitInnerLoop(board: Board, sectorId: number, firstWall: number, lastW
     .addWalls(createNewWalls(reversedWoLast, mwalls, refWall, board))
     .addWalls(wallsBetween(board, firstWall, lastWall))
     .loop();
-  board.walls[lastWall] = null;
+  for (const w of range(sector.wallptr, sector.wallnum + sector.wallptr)) if (existedWalls.includes(board.walls[w])) board.walls[w] = null;
   oldSectorBuilder.build(board, sectorId, refs);
 }
 
-function getSplitLoop(board: Board, firstWall: number, lastWall: number, points: Collection<[number, number]>): [[number, number][], Wall[], [number, number][]] {
+function getSplitLoop(board: Board, firstWall: number, lastWall: number, points: Collection<[number, number]>): [[number, number][], Wall[], Collection<[number, number]>] {
   const newWalls = [...take(points, points.length() - 1)];
   const existedWalls = [...wallsBetween(board, lastWall, firstWall)];
   const loopPoly = [...map(existedWalls, POINT_MAPPER), ...newWalls];
-  return [newWalls, existedWalls, loopPoly];
+  return [newWalls, existedWalls, wrap(loopPoly)];
 }
 
 function checkPointsOrder(board: Board, firstWall: number, lastWall: number, points: Collection<[number, number]>): boolean {
   const [, , loop] = getSplitLoop(board, firstWall, lastWall, points);
-  return clockwise(wrap(loop));
+  return clockwise(loop);
 }
 
 export function splitSector(board: Board, sectorId: number, points: Collection<[number, number]>, refs: BuildReferenceTracker) {
   const [firstWall, lastWall, loop] = checkSplitSector(board, sectorId, points);
-
-  if (isOuterLoop(board, loop)) {
-    if (firstWall < lastWall) {
-      const oldSectorBuilder = new SectorBuilder();
-      const newSectorBuilder = new SectorBuilder();
-      const [newWalls, existedWalls, loopPoly] = getSplitLoop(board, firstWall, lastWall, points);
-      const refWall = board.walls[firstWall];
-      const wallMapper = (w: number) => board.walls[w];
-      const lengthWoLast = points.length() - 1;
-
-      newSectorBuilder
-        .addWalls(existedWalls)
-        .addWalls(createNewWalls(newWalls, [], refWall, board))
-        .loop();
-
-      for (const lid of looppoints(board, sectorId)) {
-        if (loopStart(board, lid) == loop) continue;
-        else (loopInPolygon(board, lid, wrap(loopPoly)) ? newSectorBuilder : oldSectorBuilder).addLoop(map(loopWalls(board, lid), wallMapper));
-      }
-
-      const newSectorId = addSector(board, copySector(board.sectors[sectorId]));
-      newSectorBuilder.build(board, newSectorId, refs);
-      const newSector = board.sectors[newSectorId];
-      const wallEnd = newSector.wallptr + newSector.wallnum - 1;
-      const mwalls = [...map(range(0, lengthWoLast), w => <[number, number]>[newSectorId, wallEnd - w])];
-      const reversedWoLast = take(reversed(points), lengthWoLast);
-      oldSectorBuilder
-        .addWalls(createNewWalls(reversedWoLast, mwalls, refWall, board))
-        .addWalls(wallsBetween(board, firstWall, lastWall))
-        .loop();
-      board.walls[lastWall] = null;
-      oldSectorBuilder.build(board, sectorId, refs);
-    }
+  if (checkPointsOrder(board, firstWall, lastWall, points)) {
+    splitSectorImpl(board, sectorId, firstWall, lastWall, loop, points, refs);
   } else {
-    if (checkPointsOrder(board, firstWall, lastWall, points)) {
-      splitInnerLoop(board, sectorId, firstWall, lastWall, loop, points, refs);
-    } else {
-      splitInnerLoop(board, sectorId, lastWall, firstWall, loop, wrap([...reversed(points)]), refs);
-    }
+    splitSectorImpl(board, sectorId, lastWall, firstWall, loop, wrap([...reversed(points)]), refs);
   }
 }
 

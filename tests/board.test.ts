@@ -223,4 +223,69 @@ test('splitSector', () => {
   splitSector(board, 1, wrap([E, B]), REFS);
   expect(board.numsectors).toBe(4);
   expect(board.numwalls).toBe(18);
+  expect([...loopWalls(board, 4)]).toStrictEqual([4, 5, 6, 7, 8]);
+  expect([...map(loopWalls(board, 0), COORDS)]).toStrictEqual([F, G, J, H]);
+  expect([...map(loopWalls(board, 4), COORDS)]).toStrictEqual([C, A, B, D, E]);
+  expect([...map(loopWalls(board, 9), COORDS)]).toStrictEqual([B, E, D]);
+  expect([...map(loopWalls(board, 13), COORDS)]).toStrictEqual([C, B, A]);
+  expect([...map(loopWalls(board, 16), COORDS)]).toStrictEqual([B, C, E]);
+  expect([...map(loopWalls(board, 0), NEXT_SECTOR)]).toStrictEqual([-1, -1, -1, -1]);
+  expect([...map(loopWalls(board, 4), NEXT_SECTOR)]).toStrictEqual([2, 2, 1, 1, 3]);
+  expect([...map(loopWalls(board, 9), NEXT_SECTOR)]).toStrictEqual([3, 0, 0]);
+  expect([...map(loopWalls(board, 13), NEXT_SECTOR)]).toStrictEqual([3, 0, 0]);
+  expect([...map(loopWalls(board, 16), NEXT_SECTOR)]).toStrictEqual([2, 0, 1]);
+  expect([...map(loopWalls(board, 0), NEXT_WALL)]).toStrictEqual([-1, -1, -1, -1]);
+  expect([...map(loopWalls(board, 4), NEXT_WALL)]).toStrictEqual([14, 13, 11, 10, 16]);
+  expect([...map(loopWalls(board, 9), NEXT_WALL)]).toStrictEqual([17, 7, 6]);
+  expect([...map(loopWalls(board, 13), NEXT_WALL)]).toStrictEqual([15, 5, 4]);
+  expect([...map(loopWalls(board, 16), NEXT_WALL)]).toStrictEqual([12, 8, 9]);
+});
+
+test('splitSector1', () => {
+  const board = createBoardWSector();
+  const NEXT_SECTOR = (w: number): number => board.walls[w].nextsector;
+  const NEXT_WALL = (w: number): number => board.walls[w].nextwall;
+  const COORDS = (w: number): number[] => [board.walls[w].x, board.walls[w].y];
+
+  splitSector(board, 0, wrap([[0, 0], [1024, 1024]]), REFS);
+  expect(board.numsectors).toBe(2);
+  expect(board.numwalls).toBe(6);
+  expect([...loopWalls(board, 0)]).toStrictEqual([0, 1, 2]);
+  expect([...loopWalls(board, 3)]).toStrictEqual([3, 4, 5]);
+  expect([...map(loopWalls(board, 0), COORDS)]).toStrictEqual([[1024, 1024], [0, 0], [1024, 0]]);
+  expect([...map(loopWalls(board, 3), COORDS)]).toStrictEqual([[1024, 1024], [0, 1024], [0, 0]]);
+  expect([...map(loopWalls(board, 0), NEXT_SECTOR)]).toStrictEqual([1, -1, -1]);
+  expect([...map(loopWalls(board, 3), NEXT_SECTOR)]).toStrictEqual([-1, -1, 0]);
+  expect([...map(loopWalls(board, 0), NEXT_WALL)]).toStrictEqual([5, -1, -1]);
+  expect([...map(loopWalls(board, 3), NEXT_WALL)]).toStrictEqual([-1, -1, 0]);
+});
+
+test('splitSector2', () => {
+  const board = createBoardWSector();
+  const NEXT_SECTOR = (w: number): number => board.walls[w].nextsector;
+  const NEXT_WALL = (w: number): number => board.walls[w].nextwall;
+  const COORDS = (w: number): number[] => [board.walls[w].x, board.walls[w].y];
+
+  createInnerLoop(board, 0, wrap([[100, 100], [100, 900], [900, 900], [900, 100]]), REFS);
+  fillInnerLoop(board, 4, REFS);
+  splitSector(board, 1, wrap([[900, 900], [100, 100]]), REFS);
+
+  expect(board.numsectors).toBe(3);
+  expect(board.numwalls).toBe(14);
+  expect([...loopWalls(board, 0)]).toStrictEqual([0, 1, 2, 3]);
+  expect([...loopWalls(board, 4)]).toStrictEqual([4, 5, 6, 7]);
+  expect([...loopWalls(board, 8)]).toStrictEqual([8, 9, 10]);
+  expect([...loopWalls(board, 11)]).toStrictEqual([11, 12, 13]);
+  expect([...map(loopWalls(board, 0), COORDS)]).toStrictEqual([[0, 0], [1024, 0], [1024, 1024], [0, 1024]]);
+  expect([...map(loopWalls(board, 4), COORDS)]).toStrictEqual([[100, 100], [100, 900], [900, 900], [900, 100]]);
+  expect([...map(loopWalls(board, 8), COORDS)]).toStrictEqual([[100, 100], [900, 900], [100, 900]]);
+  expect([...map(loopWalls(board, 11), COORDS)]).toStrictEqual([[100, 100], [900, 100], [900, 900]]);
+  expect([...map(loopWalls(board, 0), NEXT_SECTOR)]).toStrictEqual([-1, -1, -1, -1]);
+  expect([...map(loopWalls(board, 4), NEXT_SECTOR)]).toStrictEqual([1, 1, 2, 2]);
+  expect([...map(loopWalls(board, 8), NEXT_SECTOR)]).toStrictEqual([2, 0, 0]);
+  expect([...map(loopWalls(board, 11), NEXT_SECTOR)]).toStrictEqual([0, 0, 1]);
+  expect([...map(loopWalls(board, 0), NEXT_WALL)]).toStrictEqual([-1, -1, -1, -1]);
+  expect([...map(loopWalls(board, 4), NEXT_WALL)]).toStrictEqual([10, 9, 12, 11]);
+  expect([...map(loopWalls(board, 8), NEXT_WALL)]).toStrictEqual([13, 5, 4]);
+  expect([...map(loopWalls(board, 11), NEXT_WALL)]).toStrictEqual([7, 6, 8]);
 });

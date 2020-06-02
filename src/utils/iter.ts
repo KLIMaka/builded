@@ -9,11 +9,11 @@ export class Iter<T> implements Iterable<T>{
 
   filter(f: (t: T) => boolean): Iter<T> { return new Iter(filter(this.iter, f)) }
   map<U>(f: (t: T) => U): Iter<U> { return new Iter(map(this.iter, f)) }
-  reduce(f: (lh: T, rh: T) => T, start: T): T { return reduce(this.iter, f, start) }
-  forEach(f: (t: T) => void): void { forEach(this.iter, f) }
-  all(f: (t: T) => boolean): boolean { return all(this.iter, f) }
+  forEach(f: (t: T) => void): Iter<T> { forEach(this.iter, f); return this }
   enumerate(): Iter<[T, number]> { return new Iter(enumerate(this.iter)) }
   take(count: number): Iter<T> { return new Iter(take(this.iter, count)) }
+  reduce(f: (lh: T, rh: T) => T, start: T): T { return reduce(this.iter, f, start) }
+  all(f: (t: T) => boolean): boolean { return all(this.iter, f) }
   collect(): T[] { return [...this.iter] }
 }
 

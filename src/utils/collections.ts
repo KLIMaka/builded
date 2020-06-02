@@ -214,14 +214,14 @@ export function intersect<T>(lh: Set<T>, rh: Set<T>): Set<T> {
   return new Set([...lh].filter(t => rh.has(t)));
 }
 
-export function* interpolate<T>(ii: Iterable<T>, f: (lh: T, rh: T, t: number) => T) {
+export function* interpolate<T>(ii: Iterable<T>, f: (lh: T, rh: T, t: number) => T, points = [0.5]) {
   const i = ii[Symbol.iterator]();
   let lh = i.next();
   if (lh.done) return;
   yield lh.value;
   let rh = i.next();
   while (!rh.done) {
-    yield f(lh.value, rh.value, 0.5);
+    for (const p of points) yield f(lh.value, rh.value, p);
     yield rh.value;
     lh = rh;
     rh = i.next();

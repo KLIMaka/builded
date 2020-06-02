@@ -7,6 +7,7 @@ import { ArtInfoProvider } from './formats/art';
 import { findSector, inPolygon, sectorOfWall, sectorWalls, wallNormal, ZSCALE } from './utils';
 import { track } from '../app/apis/referencetracker';
 import { Iter } from '../utils/iter';
+import { NumberInterpolator } from '../utils/interpolator';
 
 export const DEFAULT_REPEAT_RATE = 128;
 const NULL_WALL = new Wall();
@@ -1139,7 +1140,7 @@ function deletedWallUpdater(wallId: number) {
 export function deleteWall(board: Board, wallId: number, refs: BuildReferenceTracker) {
   if (isSectorTJunction(board, wallId)) throw new Error(`Wall ${wallId} is sector T junction`);
   const loop = [...loopWalls(board, wallId)];
-  if (loop.length < 4) throw new Error(`Loop of Wall ${wallId} need to have 3 walls minimum`);
+  if (loop.length < 4) throw new Error(`Loop of Wall ${wallId} need to have 3 walls at minimum`);
   const wall = board.walls[wallId];
   if (wall.nextsector != -1) {
     const loop = [...loopWalls(board, wall.nextwall)];
@@ -1184,7 +1185,7 @@ export function findContainingSector(board: Board, points: Iterable<[number, num
 }
 
 function pointInterpolator(lh: [number, number], rh: [number, number], t: number) {
-  return <[number, number]>[lh[0] + (rh[0] - lh[0]) * t, lh[1] + (rh[1] - lh[1]) * t]
+  return <[number, number]>[NumberInterpolator(lh[0], rh[0], t), NumberInterpolator(lh[1], rh[1], t)]
 }
 
 export function findContainingSectorMidPoints(board: Board, points: Iterable<[number, number]>) {

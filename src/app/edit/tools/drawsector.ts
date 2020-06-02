@@ -1,4 +1,4 @@
-import { createInnerLoop, createNewSector, splitSector, wallInSector, closestWallPoint, closestWallPointDist } from "../../../build/boardutils";
+import { createInnerLoop, createNewSector, splitSector, wallInSector, closestWallPoint, closestWallPointDist, findContainingSectorMidPoints } from "../../../build/boardutils";
 import { Target } from "../../../build/hitscan";
 import { Board } from "../../../build/board/structs";
 import { findSector, sectorOfWall, ZSCALE } from "../../../build/utils";
@@ -264,12 +264,8 @@ export class DrawSector extends MessageHandlerReflective {
   }
 
   private findContainingSector() {
-    let sectorId = this.hintSector;
-    for (let p of this.points) {
-      let s = findSector(this.board(), p[0], p[1], sectorId);
-      if (s != sectorId) return -1;
-    }
-    return sectorId;
+    const sectors = findContainingSectorMidPoints(this.board(), this.points);
+    return sectors.size == 1 ? sectors.values().next().value : -1;
   }
 
   private createSector() {

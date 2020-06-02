@@ -1,6 +1,6 @@
 import { BuildReferenceTrackerImpl } from '../src/app/modules/default/reftracker';
 import { Board, Wall } from '../src/build/board/structs';
-import { createInnerLoop, createNewSector, deleteLoop, deleteSector, deleteWall, fillInnerLoop, innerSectors, isOuterLoop, loopInnerSectors, looppoints, loopStart, loopWalls, loopWallsFull, mergePoints, splitSector, splitWall, wallInSector, walllen, wallsBetween } from '../src/build/boardutils';
+import { createInnerLoop, createNewSector, deleteLoop, deleteSector, deleteWall, fillInnerLoop, innerSectors, isOuterLoop, loopInnerSectors, looppoints, loopStart, loopWalls, loopWallsFull, mergePoints, splitSector, splitWall, wallInSector, walllen, wallsBetween, findSectorsAtPoint, findContainingSector, findContainingSectorMidPoints } from '../src/build/boardutils';
 import { ArtInfo, ArtInfoProvider, Attributes } from '../src/build/formats/art';
 import { inSector } from '../src/build/utils';
 import { map, wrap } from '../src/utils/collections';
@@ -219,6 +219,8 @@ test('splitSector', () => {
   expect([...map(loopWalls(board, 4), NEXT_WALL)]).toStrictEqual([15, 14, 12, 11, 10]);
   expect([...map(loopWalls(board, 9), NEXT_WALL)]).toStrictEqual([13, 8, 7, 6]);
   expect([...map(loopWalls(board, 13), NEXT_WALL)]).toStrictEqual([9, 5, 4]);
+  expect([...findContainingSector(board, wrap([B, E]))]).toStrictEqual([1, 0]);
+  expect([...findContainingSectorMidPoints(board, wrap([B, E]))]).toStrictEqual([1]);
 
   splitSector(board, 1, wrap([E, B]), REFS);
   expect(board.numsectors).toBe(4);
@@ -239,6 +241,9 @@ test('splitSector', () => {
   expect([...map(loopWalls(board, 9), NEXT_WALL)]).toStrictEqual([17, 7, 6]);
   expect([...map(loopWalls(board, 13), NEXT_WALL)]).toStrictEqual([15, 5, 4]);
   expect([...map(loopWalls(board, 16), NEXT_WALL)]).toStrictEqual([12, 8, 9]);
+
+  expect([...findSectorsAtPoint(board, B[0], B[1])]).toStrictEqual([2, 1, 0]);
+  expect([...findContainingSector(board, wrap([B, [50, 500], D]))]).toStrictEqual([0]);
 });
 
 test('splitSector1', () => {

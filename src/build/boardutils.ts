@@ -1,11 +1,12 @@
 import { BuildReferenceTracker } from '../app/apis/app';
 import { vec3 } from '../libs_js/glmatrix';
-import { all, Collection, cyclicPairs, cyclicRange, Deck, enumerate, first, forEach, IndexedDeck, last, map, range, reverse, reversed, take, wrap } from '../utils/collections';
+import { all, Collection, cyclicPairs, cyclicRange, Deck, enumerate, first, forEach, IndexedDeck, last, map, range, reverse, reversed, take, wrap, filter, intersect, interpolate } from '../utils/collections';
 import { cross2d, cyclic, int, len2d, lenPointToLine, tuple2 } from '../utils/mathutils';
 import { Board, FACE_SPRITE, Sector, SectorStats, Sprite, SpriteStats, Wall, WallStats } from './board/structs';
 import { ArtInfoProvider } from './formats/art';
 import { findSector, inPolygon, sectorOfWall, sectorWalls, wallNormal, ZSCALE } from './utils';
 import { track } from '../app/apis/referencetracker';
+import { Iter } from '../utils/iter';
 
 export const DEFAULT_REPEAT_RATE = 128;
 const NULL_WALL = new Wall();
@@ -1045,13 +1046,15 @@ function splitSectorImpl(board: Board, sectorId: number, firstWall: number, last
   newSectorBuilder.build(board, newSectorId, refs);
   const newSector = board.sectors[newSectorId];
   const wallEnd = newSector.wallptr + newSector.wallnum - 1;
-  const mwalls = [...map(range(0, lengthWoLast), w => <[number, number]>[newSectorId, wallEnd - w])];
-  const reversedWoLast = take(reversed(points), lengthWoLast);
+  const mwalls = Iter.of(range(0, lengthWoLast)).map(w => <[number, number]>[newSectorId, wallEnd - w]).collect();
+  const reversedWoLast = Iter.of(reversed(points)).take(lengthWoLast);
   oldSectorBuilder
     .addWalls(createNewWalls(reversedWoLast, mwalls, refWall, board))
     .addWalls(wallsBetween(board, firstWall, lastWall))
     .loop();
-  for (const w of range(sector.wallptr, sector.wallnum + sector.wallptr)) if (existedWalls.includes(board.walls[w])) board.walls[w] = null;
+  Iter.of(sectorWalls(sector))
+    .filter(w => existedWalls.includes(board.walls[w]))
+    .forEach(w => board.walls[w] = null);
   oldSectorBuilder.build(board, sectorId, refs);
 }
 
@@ -1159,4 +1162,32 @@ export function mergePoints(board: Board, wallId: number, refs: BuildReferenceTr
   let wall = board.walls[wallId];
   let wall2 = board.walls[wall.point2];
   if (wall.x == wall2.x && wall.y == wall2.y) deleteWall(board, wallId, refs);
+}
+
+const NULL_SECTOR_SET = new Set([-1]);
+export function findSectorsAtPoint(board: Board, x: number, y: number): Set<number> {
+  const sectorId = findSector(board, x, y);
+  if (sectorId == -1) return NULL_SECTOR_SET;
+  const result = new Set(Iter.of(sectorWalls(board.sectors[sectorId]))
+    .filter(w => distanceToWallSegment(board, w, x, y) == 0)
+    .map(w => board.walls[w])
+    .filter(w => w.nextsector != -1)
+    .map(w => w.nextsector));
+  result.add(sectorId);
+  return result;
+}
+
+export function findContainingSector(board: Board, points: Iterable<[number, number]>) {
+  return Iter.of(points)
+    .map(p => findSectorsAtPoint(board, p[0], p[1]))
+    .reduce((lh, rh) => { return lh == null ? rh : intersect(lh, rh) }, null)
+}
+
+function pointInterpolator(lh: [number, number], rh: [number, number], t: number) {
+  return <[number, number]>[lh[0] + (rh[0] - lh[0]) * t, lh[1] + (rh[1] - lh[1]) * t]
+}
+
+export function findContainingSectorMidPoints(board: Board, points: Iterable<[number, number]>) {
+  const interpolated = interpolate(points, pointInterpolator);
+  return findContainingSector(board, interpolated);
 }

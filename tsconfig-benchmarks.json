@@ -20,6 +20,6 @@
     }
   },
   "files": [
-    "src/builded.ts"
+    "src/benchmarks/benchmark.ts"
   ]
 }

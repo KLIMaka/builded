@@ -15,6 +15,9 @@
   "bugs": {
     "url": "https://github.com/KLIMaka/builded/issues"
   },
+  "dependencies": {
+    "buildlib-wasm": "file://../rust-wasm/pkg"
+  },
   "devDependencies": {
     "@babel/core": "^7.10.1",
     "@babel/preset-env": "^7.10.1",

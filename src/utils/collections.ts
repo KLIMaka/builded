@@ -1,4 +1,5 @@
 import { cyclic } from "./mathutils";
+import { Iter } from "./iter";
 
 export interface Collection<T> extends Iterable<T> {
   get(i: number): T;
@@ -176,9 +177,12 @@ export function* enumerate<T>(c: Iterable<T>): Generator<[T, number]> {
   for (const t of c) yield [t, i++];
 }
 
-export function* range(start: number, end: number) {
-  if (start > end) throw new Error(`${start} > ${end}`);
-  for (let i = start; i < end; i++) yield i;
+export function* range(start: number, end: number): Generator<number> {
+  const di = start > end ? -1 : 1;
+  for (let i = start; i != end; i += di) yield i;
+}
+export function rangeIter(start: number, end: number): Iter<number> {
+  return Iter.of(range(start, end));
 }
 
 export function* cyclicRange(start: number, length: number) {
@@ -189,6 +193,20 @@ export function* cyclicRange(start: number, length: number) {
 export function* cyclicPairs(length: number): Generator<[number, number]> {
   if (length < 0) throw new Error(`${length} < 0`)
   for (let i = 0; i < length; i++) yield [i, cyclic(i + 1, length)];
+}
+
+export function* loopPairs<T>(i: Iterable<T>): Generator<[T, T]> {
+  const iter = i[Symbol.iterator]();
+  const first = iter.next();
+  if (first.done) return;
+  let lh = first;
+  let rh = iter.next();
+  while (!rh.done) {
+    yield [lh.value, rh.value];
+    lh = rh;
+    rh = iter.next();
+  }
+  yield [lh.value, first.value];
 }
 
 export function* take<T>(c: Iterable<T>, count: number): Generator<T> {

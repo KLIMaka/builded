@@ -1,8 +1,8 @@
 import { BuildReferenceTrackerImpl } from '../src/app/modules/default/reftracker';
 import { Board, Wall } from '../src/build/board/structs';
-import { createInnerLoop, createNewSector, deleteLoop, deleteSector, deleteWall, fillInnerLoop, innerSectors, isOuterLoop, loopInnerSectors, looppoints, loopStart, loopWalls, loopWallsFull, mergePoints, splitSector, splitWall, wallInSector, walllen, wallsBetween, findSectorsAtPoint, findContainingSector, findContainingSectorMidPoints, clockwise } from '../src/build/boardutils';
+import { clockwise, createInnerLoop, createNewSector, deleteLoop, deleteSector, deleteWall, fillInnerLoop, findContainingSector, findContainingSectorMidPoints, findSectorsAtPoint, innerSectors, isOuterLoop, loopInnerSectors, loopPoints, loopStart, loopWalls, loopWallsFull, mergePoints, splitSector, splitWall, wallInSector, walllen, wallsBetween } from '../src/build/boardutils';
 import { ArtInfo, ArtInfoProvider, Attributes } from '../src/build/formats/art';
-import { inSector, inPolygon } from '../src/build/utils';
+import { inPolygon, inSector } from '../src/build/utils';
 import { map, wrap } from '../src/utils/collections';
 
 const REFS = new BuildReferenceTrackerImpl();
@@ -110,7 +110,7 @@ test('loops', () => {
   expect([...map(wallsBetween(board, 3, 0), WALL_MAPPER)]).toStrictEqual([[0, 1024]]);
   expect([...map(wallsBetween(board, 0, 0), WALL_MAPPER)]).toStrictEqual([]);
 
-  expect([...looppoints(board, 0)]).toStrictEqual([3]);
+  expect([...loopPoints(board, 0)]).toStrictEqual([3]);
   expect([...loopWalls(board, 0)]).toStrictEqual([0, 1, 2, 3]);
   expect([...loopWalls(board, 1)]).toStrictEqual([0, 1, 2, 3]);
   expect([...loopWalls(board, 2)]).toStrictEqual([0, 1, 2, 3]);
@@ -121,7 +121,7 @@ test('loops', () => {
   createNewSector(board, wrap([[100, 100], [900, 100], [900, 900], [100, 900]]), REFS);
   expect(board.numsectors).toBe(2);
   expect(board.numwalls).toBe(12);
-  expect([...looppoints(board, 0)]).toStrictEqual([3, 7]);
+  expect([...loopPoints(board, 0)]).toStrictEqual([3, 7]);
   expect([...loopWalls(board, 3)]).toStrictEqual([0, 1, 2, 3]);
   expect([...loopWalls(board, 5)]).toStrictEqual([4, 5, 6, 7]);
   expect([...loopWalls(board, 9)]).toStrictEqual([8, 9, 10, 11]);
@@ -159,7 +159,7 @@ test('loops', () => {
   deleteLoop(board, 15, REFS);
   expect(board.numsectors).toBe(2);
   expect(board.numwalls).toBe(12);
-  expect([...looppoints(board, 0)]).toStrictEqual([3, 7]);
+  expect([...loopPoints(board, 0)]).toStrictEqual([3, 7]);
   expect([...loopWalls(board, 3)]).toStrictEqual([0, 1, 2, 3]);
   expect([...loopWalls(board, 5)]).toStrictEqual([4, 5, 6, 7]);
   expect([...loopWalls(board, 9)]).toStrictEqual([8, 9, 10, 11]);

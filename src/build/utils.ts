@@ -1,9 +1,9 @@
-import { Collection, cyclicPairs } from '../utils/collections';
-import { Board, Sector, Sprite, Wall } from './board/structs';
-import { EntityType, Entity } from './hitscan';
-import { cross2d, len2d, PI2, monoatan2, int } from '../utils/mathutils';
-import { Vec3Array, vec3, vec2 } from '../libs_js/glmatrix';
+import { vec2, vec3, Vec3Array } from '../libs_js/glmatrix';
+import { Collection, loopPairs } from '../utils/collections';
+import { cross2d, int, len2d, monoatan2, PI2 } from '../utils/mathutils';
 import { normal2d } from '../utils/vecmath';
+import { Board, Sector, Sprite, Wall } from './board/structs';
+import { Entity, EntityType } from './hitscan';
 
 export const ZSCALE = -16;
 
@@ -51,9 +51,9 @@ export interface MoveStruct {
 
 export function inPolygon(x: number, y: number, points: Collection<[number, number]>) {
   let inter = 0;
-  for (const [i1, i2] of cyclicPairs(points.length())) {
-    const [x1, y1] = points.get(i1);
-    const [x2, y2] = points.get(i2);
+  for (const [p1, p2] of loopPairs(points)) {
+    const [x1, y1] = p1;
+    const [x2, y2] = p2;
     const dx1 = x1 - x;
     const dx2 = x2 - x;
     const dy1 = y1 - y;

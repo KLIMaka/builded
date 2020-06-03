@@ -17,4 +17,7 @@ export class Iter<T> implements Iterable<T>{
   collect(): T[] { return [...this.iter] }
 }
 
+export function iter<T>(iter: Iterable<T>) {
+  return Iter.of(iter);
+}
 

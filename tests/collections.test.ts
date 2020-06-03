@@ -94,7 +94,7 @@ test('Utils', () => {
   expect([...range(1, 3)]).toStrictEqual([1, 2]);
   expect([...range(1, 1)]).toStrictEqual([]);
   expect([...take([1, 2, 3, 4], 1)]).toStrictEqual([1]);
-  expect(() => [...range(3, 1)]).toThrow();
+  expect([...range(3, 1)]).toStrictEqual([3, 2]);
   expect([...cyclicRange(1, 3)]).toStrictEqual([1, 2, 0]);
   expect(() => [...cyclicRange(3, 1)]).toThrow();
   expect([...cyclicPairs(3)]).toStrictEqual([[0, 1], [1, 2], [2, 0]]);

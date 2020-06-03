@@ -1046,15 +1046,16 @@ function splitSectorImpl(board: Board, sectorId: number, firstWall: number, last
   const newSectorId = addSector(board, copySector(board.sectors[sectorId]));
   newSectorBuilder.build(board, newSectorId, refs);
   const newSector = board.sectors[newSectorId];
-  const wallEnd = newSector.wallptr + newSector.wallnum - 1;
+  const wallEnd = newSector.wallptr + existedWalls.length + newWalls.length - 1;
   const mwalls = Iter.of(range(0, lengthWoLast)).map(w => <[number, number]>[newSectorId, wallEnd - w]).collect();
   const reversedWoLast = Iter.of(reversed(points)).take(lengthWoLast);
   oldSectorBuilder
     .addWalls(createNewWalls(reversedWoLast, mwalls, refWall, board))
     .addWalls(wallsBetween(board, firstWall, lastWall))
     .loop();
+  const usedWalls = Iter.of(sectorWalls(newSector)).map(wallMapper).collect();
   Iter.of(sectorWalls(sector))
-    .filter(w => existedWalls.includes(board.walls[w]))
+    .filter(w => usedWalls.includes(board.walls[w]))
     .forEach(w => board.walls[w] = null);
   oldSectorBuilder.build(board, sectorId, refs);
 }

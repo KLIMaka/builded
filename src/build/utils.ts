@@ -56,8 +56,8 @@ export function inPolygon(x: number, y: number, points: Collection<[number, numb
     const [x2, y2] = points.get(i2);
     const dx1 = x1 - x;
     const dx2 = x2 - x;
-    const dy1 = y1 - x;
-    const dy2 = y2 - x;
+    const dy1 = y1 - y;
+    const dy2 = y2 - y;
     if (dx1 == 0 && dx2 == 0 && (dy1 == 0 || dy2 == 0 || (dy1 ^ dy2) < 0)) return true;
     if (dy1 == 0 && dy2 == 0 && (dx1 == 0 || dx2 == 0 || (dx1 ^ dx2) < 0)) return true;
 

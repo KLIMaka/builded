@@ -31,8 +31,6 @@ import { BUFFER_FACTORY, DefaultBufferFactory } from './gl/buffers';
 import { BuildGlConstructor, BUILD_GL } from './gl/buildgl';
 import { SwappableViewConstructor } from './view/view';
 
-
-
 export const KeymapConfig_ = new Dependency<string>('KeymapConfig');
 
 async function mapBackupService(injector: Injector) {
@@ -46,17 +44,23 @@ async function mapBackupService(injector: Injector) {
     bus.handle(new LoadBoard(defaultBoard));
     store.set('map_bak', defaultBoard);
   }));
-}
 
-async function loadBakMap(injector: Injector) {
-  const storages = await injector.getInstance(STORAGES);
-  const store = await storages('session');
   const map = <Board>await store.get('map_bak');
   if (map) {
     const bus = await injector.getInstance(BUS);
     bus.handle(new LoadBoard(map));
   }
 }
+
+async function newMap(injector: Injector) {
+  const bus = await injector.getInstance(BUS);
+  const board = await injector.getInstance(BOARD);
+  const defaultBoard = await injector.getInstance(DEFAULT_BOARD);
+  bus.connect(namedMessageHandler('new_board', () => {
+    bus.handle(new LoadBoard(defaultBoard));
+  }));
+}
+
 
 export function DefaultSetupModule(injector: Injector) {
   injector.bindInstance(REFERENCE_TRACKER, new BuildReferenceTrackerImpl());
@@ -84,8 +88,8 @@ export function DefaultSetupModule(injector: Injector) {
   injector.install(StatusBarModule);
   injector.install(UtilsModule);
 
-  injector.install(mapBackupService);
-  injector.install(loadBakMap);
+  injector.install(newMap);
+  // injector.install(mapBackupService);
 }
 
 export function MainLoopConstructor(injector: Injector) {

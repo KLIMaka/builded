@@ -833,7 +833,7 @@ export function setFirstWall(board: Board, sectorId: number, newFirstWall: numbe
   builder.build(board, sectorId, refs);
 }
 
-function clockwise(walls: Collection<[number, number]>): boolean {
+export function clockwise(walls: Collection<[number, number]>): boolean {
   let minx = Number.MAX_VALUE;
   let minwall = -1;
   for (const [w1, w2] of cyclicPairs(walls.length())) {
@@ -1169,13 +1169,10 @@ const NULL_SECTOR_SET = new Set([-1]);
 export function findSectorsAtPoint(board: Board, x: number, y: number): Set<number> {
   const sectorId = findSector(board, x, y);
   if (sectorId == -1) return NULL_SECTOR_SET;
-  const result = new Set(Iter.of(sectorWalls(board.sectors[sectorId]))
-    .filter(w => distanceToWallSegment(board, w, x, y) == 0)
-    .map(w => board.walls[w])
-    .filter(w => w.nextsector != -1)
-    .map(w => w.nextsector));
-  result.add(sectorId);
-  return result;
+  const wallId = wallInSector(board, sectorId, x, y);
+  if (wallId == -1) return new Set([sectorId]);
+  return new Set(Iter.of(connectedWalls(board, wallId, new Deck()))
+    .map(w => sectorOfWall(board, w)));
 }
 
 export function findContainingSector(board: Board, points: Iterable<[number, number]>) {

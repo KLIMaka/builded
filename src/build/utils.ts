@@ -52,8 +52,12 @@ export interface MoveStruct {
 export function inPolygon(x: number, y: number, points: Collection<[number, number]>) {
   let inter = 0;
   for (const [i1, i2] of cyclicPairs(points.length())) {
-    const [dx1, dy1] = points.get(i1);
-    const [dx2, dy2] = points.get(i2);
+    const [x1, y1] = points.get(i1);
+    const [x2, y2] = points.get(i2);
+    const dx1 = x1 - x;
+    const dx2 = x2 - x;
+    const dy1 = y1 - x;
+    const dy2 = y2 - x;
     if (dx1 == 0 && dx2 == 0 && (dy1 == 0 || dy2 == 0 || (dy1 ^ dy2) < 0)) return true;
     if (dy1 == 0 && dy2 == 0 && (dx1 == 0 || dx2 == 0 || (dx1 ^ dx2) < 0)) return true;
 

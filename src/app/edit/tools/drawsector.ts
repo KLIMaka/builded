@@ -3,7 +3,7 @@ import { Target } from "../../../build/hitscan";
 import { Board } from "../../../build/board/structs";
 import { findSector, sectorOfWall, ZSCALE } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
-import { Deck } from "../../../utils/collections";
+import { Deck, wrap } from "../../../utils/collections";
 import { Injector, create } from "../../../utils/injector";
 import { int, len2d } from "../../../utils/mathutils";
 import { MessageHandlerReflective, MessageBus, BUS } from "../../apis/handler";
@@ -13,6 +13,7 @@ import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common
 import { getClosestSectorZ } from "../editutils";
 import { BoardInvalidate, Frame, NamedMessage, Render, COMMIT } from "../messages";
 import { ArtProvider, View, BuildReferenceTracker, ART, VIEW, BOARD, REFERENCE_TRACKER, BoardProvider } from "../../apis/app";
+import { error } from "../../../utils/logger";
 
 class Contour {
   private points: Array<[number, number]> = [];
@@ -229,12 +230,13 @@ export class DrawSector extends MessageHandlerReflective {
 
     let splitSector = this.isSplitSector(this.pointer[0], this.pointer[1]);
     if (splitSector != -1) {
-      this.points.push([this.pointer[0], this.pointer[1]]);
-      this.splitSector(splitSector);
-      return true;
+      try {
+        this.splitSector(splitSector);
+        return true;
+      } catch (e) { }
     }
     let latsPoint = this.points.get(this.points.length() - 1);
-    if (latsPoint[0] == this.pointer[0] && latsPoint[1] == this.pointer[1]) return;
+    if (latsPoint[0] == this.pointer[0] && latsPoint[1] == this.pointer[1]) return false;
     let firstPoint = this.points.get(0);
     if (firstPoint[0] == this.pointer[0] && firstPoint[1] == this.pointer[1] || this.isRect) {
       this.createSector();
@@ -264,7 +266,7 @@ export class DrawSector extends MessageHandlerReflective {
   }
 
   private findContainingSector() {
-    const sectors = findContainingSectorMidPoints(this.board(), this.points);
+    const sectors = findContainingSectorMidPoints(this.board(), [...this.points, <[number, number]>this.pointer]);
     return sectors.size == 1 ? sectors.values().next().value : -1;
   }
 
@@ -281,8 +283,8 @@ export class DrawSector extends MessageHandlerReflective {
     this.contour.pushPoint(0, 0);
   }
 
-  private splitSector(sectorId: number) {
-    splitSector(this.board(), sectorId, this.points, this.refs);
+  private splitSector(sectorId: number): void {
+    splitSector(this.board(), sectorId, wrap([...this.points, <[number, number]>this.pointer]), this.refs);
     this.bus.handle(COMMIT);
     this.bus.handle(new BoardInvalidate(null));
     this.points.clear();

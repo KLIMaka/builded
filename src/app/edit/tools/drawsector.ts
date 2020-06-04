@@ -1,19 +1,19 @@
-import { createInnerLoop, createNewSector, splitSector, wallInSector, closestWallPoint, closestWallPointDist, findContainingSectorMidPoints } from "../../../build/boardutils";
-import { Target } from "../../../build/hitscan";
 import { Board } from "../../../build/board/structs";
-import { findSector, sectorOfWall, ZSCALE } from "../../../build/utils";
+import { closestWallPointDist, createInnerLoop, createNewSector, findContainingSectorMidPoints, wallInSector } from "../../../build/boardutils";
+import { splitSector } from "../../../build/board/splitsector";
+import { Target } from "../../../build/hitscan";
+import { sectorOfWall, ZSCALE } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 import { Deck, wrap } from "../../../utils/collections";
-import { Injector, create } from "../../../utils/injector";
+import { create, Injector } from "../../../utils/injector";
 import { int, len2d } from "../../../utils/mathutils";
-import { MessageHandlerReflective, MessageBus, BUS } from "../../apis/handler";
+import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
+import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
 import { LayeredRenderables } from "../../apis/renderable";
 import { writeText } from "../../modules/geometry/builders/common";
 import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
 import { getClosestSectorZ } from "../editutils";
-import { BoardInvalidate, Frame, NamedMessage, Render, COMMIT } from "../messages";
-import { ArtProvider, View, BuildReferenceTracker, ART, VIEW, BOARD, REFERENCE_TRACKER, BoardProvider } from "../../apis/app";
-import { error } from "../../../utils/logger";
+import { BoardInvalidate, COMMIT, Frame, NamedMessage, Render } from "../messages";
 
 class Contour {
   private points: Array<[number, number]> = [];

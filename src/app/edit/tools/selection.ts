@@ -1,4 +1,4 @@
-import { loopWalls, loopWallsFull, nextwall } from "../../../build/boardutils";
+import { loopWallsFull, nextwall } from "../../../build/boardutils";
 import { Entity, EntityType, Target } from "../../../build/hitscan";
 import { Board } from "../../../build/board/structs";
 import { build2gl } from "../../../build/utils";
@@ -16,6 +16,7 @@ import { SectorEnt } from "../sector";
 import { SpriteEnt } from "../sprite";
 import { WallEnt } from "../wall";
 import { WallSegmentsEnt } from "../wallsegment";
+import { loopWalls } from "../../../build/board/internal";
 
 export type PicNumCallback = (picnum: number) => void;
 export type PicNumSelector = (cb: PicNumCallback) => void;

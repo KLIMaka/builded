@@ -12,14 +12,5 @@
     "rootDir": "src",
     "sourceMap": true,
     "moduleResolution": "node",
-    "baseUrl": ".",
-    "paths": {
-      "buildlib-wasm": [
-        "node_modules/buildlib-wasm/pkg"
-      ]
-    }
   },
-  "files": [
-    "src/benchmarks/benchmark.ts"
-  ]
 }

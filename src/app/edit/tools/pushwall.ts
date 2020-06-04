@@ -23,6 +23,7 @@ export async function PushWallModule(injector: Injector) {
 
 export class PushWall extends MessageHandlerReflective {
   private wallId = -1;
+  private copy = false;
   private movingHandle = new MovingHandle();
 
   constructor(
@@ -36,7 +37,8 @@ export class PushWall extends MessageHandlerReflective {
     private wireframe = builders.wireframe('utils')
   ) { super(); }
 
-  private start() {
+  private start(copy: boolean) {
+    this.copy = copy;
     const target = this.view.snapTarget();
     if (target.entity == null || !target.entity.isWall()) return;
     this.wallId = target.entity.id;
@@ -48,8 +50,8 @@ export class PushWall extends MessageHandlerReflective {
     this.movingHandle.stop();
   }
 
-  private stop(copy: boolean) {
-    pushWall(this.board(), this.wallId, this.getDistance(), this.art, copy, this.refs);
+  private stop() {
+    pushWall(this.board(), this.wallId, this.getDistance(), this.art, this.copy, this.refs);
     this.bus.handle(COMMIT);
     this.bus.handle(INVALIDATE_ALL);
     this.wallId = -1;
@@ -65,8 +67,8 @@ export class PushWall extends MessageHandlerReflective {
 
   public NamedMessage(msg: NamedMessage, ) {
     switch (msg.name) {
-      case 'push_wall': this.movingHandle.isActive() ? this.stop(false) : this.start(); return;
-      case 'push_wall_copy': this.movingHandle.isActive() ? this.stop(true) : this.start(); return;
+      case 'push_wall': this.movingHandle.isActive() ? this.stop() : this.start(false); return;
+      case 'push_wall_copy': this.movingHandle.isActive() ? this.stop() : this.start(true); return;
       case 'push_wall_stop': this.abort(); return;
     }
   }

@@ -49,7 +49,7 @@ export interface MoveStruct {
   readonly sec: number;
 }
 
-export function inPolygon(x: number, y: number, points: Collection<[number, number]>) {
+export function inPolygon(x: number, y: number, points: Iterable<[number, number]>) {
   let inter = 0;
   for (const [p1, p2] of loopPairs(points)) {
     const [x1, y1] = p1;

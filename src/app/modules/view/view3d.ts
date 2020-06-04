@@ -41,8 +41,8 @@ export class View3d extends MessageHandlerReflective implements View {
   private snapTargetValue = new CachedValue((t: TargetImpl) => this.updateSnapTarget(t), new TargetImpl());
   private direction = new CachedValue((r: Ray) => this.updateDir(r), new Ray());
   private cursor = vec3.create();
-  private forwardDamper = new DelayedValue(200, 0, NumberInterpolator);
-  private sideDamper = new DelayedValue(200, 0, NumberInterpolator);
+  private forwardDamper = new DelayedValue(100, 0, NumberInterpolator);
+  private sideDamper = new DelayedValue(100, 0, NumberInterpolator);
 
   constructor(
     readonly gl: WebGLRenderingContext,

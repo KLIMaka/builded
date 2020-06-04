@@ -1,84 +1,16 @@
 import { BuildReferenceTracker } from '../app/apis/app';
 import { track } from '../app/apis/referencetracker';
 import { vec3 } from '../libs_js/glmatrix';
-import { all, Collection, cyclicPairs, cyclicRange, Deck, enumerate, first, forEach, IndexedDeck, interpolate, intersect, last, map, range, reverse, reversed, take, wrap, loopPairs } from '../utils/collections';
+import { all, Collection, cyclicPairs, cyclicRange, Deck, enumerate, forEach, IndexedDeck, interpolate, intersect, loopPairs, map, range, reverse, wrap } from '../utils/collections';
 import { NumberInterpolator } from '../utils/interpolator';
 import { iter } from '../utils/iter';
 import { cross2d, cyclic, int, len2d, lenPointToLine, tuple2 } from '../utils/mathutils';
 import { Board, FACE_SPRITE, Sector, SectorStats, Sprite, SpriteStats, Wall, WallStats } from './board/structs';
 import { ArtInfoProvider } from './formats/art';
-import { findSector, inPolygon, sectorOfWall, sectorWalls, wallNormal, ZSCALE } from './utils';
+import { findSector, sectorOfWall, sectorWalls, wallNormal, ZSCALE } from './utils';
+import { SectorBuilder, loopWalls, loopPoints, copyWall, newSector, newWall, copySector, newSprite, copySprite, moveWalls, resizeWalls } from './board/internal';
 
 export const DEFAULT_REPEAT_RATE = 128;
-const NULL_WALL = new Wall();
-const POINT_MAPPER = (w: Wall) => <[number, number]>[w.x, w.y];
-
-class SectorBuilder {
-  private walls = new Deck<Wall>();
-  private looppoints = new Deck<number>();
-
-  addWall(wall: Wall): SectorBuilder { this.walls.push(wall); return this }
-  addWalls(walls: Iterable<Wall>): SectorBuilder { this.walls.pushAll(walls); return this }
-  addLoop(walls: Iterable<Wall>): SectorBuilder { return this.addWalls(walls).loop() }
-
-  loop(): SectorBuilder {
-    if (this.walls.length() == 0 || this.looppoints.top() == this.walls.length()) return this;
-    this.looppoints.push(this.walls.length());
-    return this;
-  }
-
-  build(board: Board, sectorId: number, refs: BuildReferenceTracker) {
-    track(refs.walls, wallRefs => {
-      const nextWallPtrs = [...map(this.walls, w => wallRefs.ref(w.nextwall))];
-      resizeWalls(board, sectorId, this.walls.length(), refs);
-      forEach(enumerate(this.walls), ([w, i]) => w.nextwall = wallRefs.val(nextWallPtrs[i]));
-    });
-    const sec = board.sectors[sectorId];
-    const loopIter = this.looppoints[Symbol.iterator]();
-    let loopStart = sec.wallptr;
-    let loopEnd = loopIter.next().value;
-    for (let [wall, i] of enumerate(this.walls)) {
-      let w = i + sec.wallptr;
-      board.walls[w] = wall;
-      if (loopEnd == i + 1) {
-        wall.point2 = loopStart;
-        loopStart = w + 1;
-        loopEnd = loopIter.next().value;
-      } else {
-        wall.point2 = w + 1;
-      }
-      if (wall.nextwall != -1) {
-        let nextwall = board.walls[wall.nextwall];
-        nextwall.nextsector = sectorId;
-        nextwall.nextwall = w;
-      }
-    }
-  }
-}
-
-export function* loopPoints(board: Board, sectorId: number): Generator<number> {
-  const sec = board.sectors[sectorId];
-  for (const w of sectorWalls(sec)) {
-    const wall = board.walls[w];
-    if (w > wall.point2) yield w;
-  }
-}
-
-export function* loopWalls(board: Board, wallId: number): Generator<number> {
-  const start = loopStart(board, wallId);
-  yield start;
-  for (let w = board.walls[start].point2; w != start; w = board.walls[w].point2) yield w;
-}
-
-export function loopStart(board: Board, wallId: number): number {
-  if (wallId < 0 || wallId >= board.numwalls) throw new Error(`Invalid wall ${wallId}`);
-  if (wallId > board.walls[wallId].point2) return board.walls[wallId].point2;
-  for (let w = board.walls[wallId].point2; w != wallId; w = board.walls[w].point2) {
-    const wall = board.walls[w];
-    if (w > wall.point2) return wall.point2;
-  }
-  return -1;
-}
 
 export function loopWallsFull(board: Board, wallId: number): Collection<number> {
   const loop = new IndexedDeck<number>();
@@ -260,51 +192,6 @@ function addSector(board: Board, sector: Sector) {
   return idx;
 }
 
-function moveWalls(board: Board, secId: number, afterWallId: number, size: number, refs: BuildReferenceTracker) {
-  if (size == 0) return;
-  if (size < 0) {
-    for (let w = afterWallId; w < afterWallId - size; w++)
-      board.walls[w] = NULL_WALL;
-  }
-
-  for (let w = 0; w < board.numwalls; w++) {
-    let wall = board.walls[w];
-    if (wall == null) continue;
-    if (wall.point2 > afterWallId) wall.point2 += size;
-    if (wall.nextwall > afterWallId) wall.nextwall += size;
-  }
-  refs.walls.update((w) => {
-    if (size < 0 && w >= afterWallId && w < afterWallId - size) return -1;
-    else if (w > afterWallId) return w + size;
-    return w;
-  });
-
-  if (size > 0) {
-    let end = board.numwalls - 1;
-    for (let i = end; i > afterWallId; i--) {
-      board.walls[i + size] = board.walls[i];
-    }
-    for (let i = 0; i < size; i++) {
-      board.walls[i + afterWallId + 1] = null;
-    }
-  } else {
-    let end = board.numwalls + size;
-    for (let i = afterWallId; i < end; i++) {
-      board.walls[i] = board.walls[i - size];
-    }
-    for (let i = 0; i < -size; i++) {
-      board.walls[end + i] = null;
-    }
-  }
-  board.numwalls += size;
-  board.sectors[secId].wallnum += size;
-  for (let i = 0; i < board.numsectors; i++) {
-    let sec = board.sectors[i];
-    if (sec.wallptr >= afterWallId + 1 && i != secId)
-      sec.wallptr += size;
-  }
-}
-
 export function walllen(board: Board, wallId: number) {
   let wall = board.walls[wallId];
   let wall2 = board.walls[wall.point2];
@@ -336,242 +223,6 @@ export function insertWall(board: Board, wallId: number, x: number, y: number, a
   fixpoint2xpan(board, wallId, art);
   fixxrepeat(board, wallId + 1, lenperrep);
   return wallId + 1;
-}
-
-function copyWallStats(stat: WallStats): WallStats {
-  let nstat = new WallStats();
-  nstat.alignBottom = stat.alignBottom;
-  nstat.blocking = stat.blocking;
-  nstat.blocking2 = stat.blocking2;
-  nstat.masking = stat.masking;
-  nstat.oneWay = stat.oneWay;
-  nstat.swapBottoms = stat.swapBottoms;
-  nstat.translucent = stat.translucent;
-  nstat.translucentReversed = stat.translucentReversed;
-  nstat.xflip = stat.xflip;
-  nstat.yflip = stat.yflip;
-  return nstat;
-}
-
-function copyWall(wall: Wall, x: number, y: number): Wall {
-  let nwall = new Wall();
-  nwall.x = x;
-  nwall.y = y;
-  nwall.point2 = wall.point2;
-  nwall.nextwall = wall.nextwall;
-  nwall.nextsector = wall.nextsector;
-  nwall.cstat = copyWallStats(wall.cstat);
-  nwall.picnum = wall.picnum;
-  nwall.overpicnum = wall.overpicnum;
-  nwall.shade = wall.shade;
-  nwall.pal = wall.pal;
-  nwall.xrepeat = wall.xrepeat;
-  nwall.yrepeat = wall.yrepeat;
-  nwall.xpanning = wall.xpanning;
-  nwall.ypanning = wall.ypanning;
-  nwall.lotag = wall.lotag;
-  nwall.hitag = wall.hitag;
-  nwall.extra = wall.extra;
-  return nwall;
-}
-
-function newWallStats() {
-  let stat = new WallStats();
-  stat.alignBottom = 0;
-  stat.blocking = 0;
-  stat.blocking2 = 0;
-  stat.masking = 0;
-  stat.oneWay = 0;
-  stat.swapBottoms = 0;
-  stat.translucent = 0;
-  stat.translucentReversed = 0;
-  stat.xflip = 0;
-  stat.yflip = 0;
-  return stat;
-}
-
-function newWall(x: number, y: number): Wall {
-  let wall = new Wall();
-  wall.x = x;
-  wall.y = y;
-  wall.point2 = -1;
-  wall.nextwall = -1;
-  wall.nextsector = -1;
-  wall.cstat = newWallStats();
-  wall.picnum = 0;
-  wall.overpicnum = 0;
-  wall.shade = 0;
-  wall.pal = 0;
-  wall.xrepeat = 8;
-  wall.yrepeat = 8;
-  wall.xpanning = 0;
-  wall.ypanning = 0;
-  wall.lotag = 0;
-  wall.hitag = 0
-  wall.extra = 65535;
-  return wall;
-}
-
-function copySectorStats(stat: SectorStats): SectorStats {
-  let nstat = new SectorStats();
-  nstat.alignToFirstWall = stat.alignToFirstWall;
-  nstat.doubleSmooshiness = stat.doubleSmooshiness;
-  nstat.parallaxing = stat.parallaxing;
-  nstat.slopped = stat.slopped;
-  nstat.swapXY = stat.swapXY;
-  nstat.xflip = stat.xflip;
-  nstat.yflip = stat.yflip;
-  return nstat;
-}
-
-function copySector(sector: Sector): Sector {
-  let nsector = new Sector();
-  nsector.ceilingheinum = sector.ceilingheinum;
-  nsector.ceilingpal = sector.ceilingpal;
-  nsector.ceilingpicnum = sector.ceilingpicnum;
-  nsector.ceilingshade = sector.ceilingshade;
-  nsector.ceilingstat = copySectorStats(sector.ceilingstat);
-  nsector.ceilingxpanning = sector.ceilingxpanning;
-  nsector.ceilingypanning = sector.ceilingypanning;
-  nsector.ceilingz = sector.ceilingz;
-  nsector.extra = sector.extra;
-  nsector.floorheinum = sector.floorheinum;
-  nsector.floorpal = sector.floorpal;
-  nsector.floorpicnum = sector.floorpicnum;
-  nsector.floorshade = sector.floorshade;
-  nsector.floorstat = copySectorStats(sector.floorstat);
-  nsector.floorxpanning = sector.floorxpanning;
-  nsector.floorypanning = sector.floorypanning;
-  nsector.floorz = sector.floorz;
-  nsector.hitag = sector.hitag;
-  nsector.lotag = sector.lotag;
-  nsector.visibility = sector.visibility;
-  nsector.wallnum = 0;
-  nsector.wallptr = 0;
-  return nsector;
-}
-
-function newSectorStats() {
-  let stat = new SectorStats();
-  stat.alignToFirstWall = 0;
-  stat.doubleSmooshiness = 0;
-  stat.parallaxing = 0;
-  stat.slopped = 0;
-  stat.swapXY = 0;
-  stat.xflip = 0;
-  stat.yflip = 0;
-  return stat;
-}
-
-function newSector(): Sector {
-  let sector = new Sector();
-  sector.ceilingheinum = 0;
-  sector.ceilingpal = 0;
-  sector.ceilingpicnum = 0;
-  sector.ceilingshade = 0;
-  sector.ceilingstat = newSectorStats();
-  sector.ceilingxpanning = 0;
-  sector.ceilingypanning = 0;
-  sector.ceilingz = 2048 * ZSCALE;
-  sector.extra = 65535;
-  sector.floorheinum = 0;
-  sector.floorpal = 0;
-  sector.floorpicnum = 0;
-  sector.floorshade = 0;
-  sector.floorstat = newSectorStats();
-  sector.floorxpanning = 0;
-  sector.floorypanning = 0;
-  sector.floorz = 0;
-  sector.hitag = 0;
-  sector.lotag = 0;
-  sector.visibility = 0;
-  sector.wallnum = 0;
-  sector.wallptr = 0;
-  return sector;
-}
-
-function newSpriteStats() {
-  let stats = new SpriteStats();
-  stats.blocking = 0;
-  stats.blocking2 = 0;
-  stats.invisible = 0;
-  stats.noautoshading = 0;
-  stats.onesided = 0;
-  stats.realCenter = 0;
-  stats.tranclucentReversed = 0;
-  stats.translucent = 0;
-  stats.type = FACE_SPRITE;
-  stats.xflip = 0;
-  stats.yflip = 0;
-  return stats;
-}
-
-function newSprite(x: number, y: number, z: number): Sprite {
-  let sprite = new Sprite();
-  sprite.ang = 0;
-  sprite.clipdist = 0;
-  sprite.cstat = newSpriteStats();
-  sprite.extra = 65535;
-  sprite.hitag = 0;
-  sprite.lotag = 0;
-  sprite.owner = -1;
-  sprite.pal = 0;
-  sprite.picnum = 1;
-  sprite.sectnum = -1;
-  sprite.shade = 0;
-  sprite.statnum = 0;
-  sprite.x = x;
-  sprite.y = y;
-  sprite.z = z;
-  sprite.xoffset = 0;
-  sprite.yoffset = 0;
-  sprite.xvel = 0;
-  sprite.yvel = 0;
-  sprite.xrepeat = 64;
-  sprite.yrepeat = 64;
-  return sprite;
-}
-
-function copySpriteStats(stats: SpriteStats) {
-  let nstats = new SpriteStats();
-  nstats.blocking = stats.blocking;
-  nstats.blocking2 = stats.blocking2;
-  nstats.invisible = stats.invisible;
-  nstats.noautoshading = stats.noautoshading;
-  nstats.onesided = stats.onesided;
-  nstats.realCenter = stats.realCenter;
-  nstats.tranclucentReversed = stats.tranclucentReversed;
-  nstats.translucent = stats.translucent;
-  nstats.type = stats.type;
-  nstats.xflip = stats.xflip;
-  nstats.yflip = stats.yflip;
-  return nstats;
-}
-
-function copySprite(sprite: Sprite, x: number, y: number, z: number): Sprite {
-  let nsprite = new Sprite();
-  nsprite.ang = sprite.ang;
-  nsprite.clipdist = sprite.clipdist;
-  nsprite.extra = sprite.extra;
-  nsprite.hitag = sprite.hitag;
-  nsprite.lotag = sprite.lotag;
-  nsprite.owner = sprite.owner;
-  nsprite.pal = sprite.pal;
-  nsprite.picnum = sprite.picnum;
-  nsprite.sectnum = sprite.sectnum;
-  nsprite.shade = sprite.shade;
-  nsprite.statnum = sprite.statnum;
-  nsprite.x = x;
-  nsprite.y = y;
-  nsprite.z = z;
-  nsprite.xoffset = sprite.xoffset;
-  nsprite.yoffset = sprite.yoffset;
-  nsprite.xvel = sprite.xvel;
-  nsprite.yvel = sprite.yvel;
-  nsprite.xrepeat = sprite.xrepeat;
-  nsprite.yrepeat = sprite.yrepeat;
-  nsprite.cstat = copySpriteStats(sprite.cstat);
-  return nsprite;
 }
 
 export function splitWall(board: Board, wallId: number, x: number, y: number, art: ArtInfoProvider, refs: BuildReferenceTracker): number {
@@ -613,20 +264,20 @@ function doMoveWall(board: Board, w: number, x: number, y: number) {
 let connectedSet = new Set<number>();
 export function connectedWalls(board: Board, wallId: number, result: Deck<number>): Deck<number> {
   connectedSet.clear();
-  let walls = board.walls;
-  let w = wallId;
+  const walls = board.walls;
   let counter = 0;
+  let w = wallId;
   connectedSet.add(w);
   do {
-    let wall = walls[w];
+    const wall = walls[w];
     if (wall.nextwall != -1) {
       w = nextwall(board, wall.nextwall);
       connectedSet.add(w);
     } else {
       w = wallId;
       do {
-        let p = lastwall(board, w);
-        let wall = walls[p];
+        const last = lastwall(board, w);
+        const wall = walls[last];
         if (wall.nextwall != -1) {
           w = wall.nextwall;
           connectedSet.add(w);
@@ -739,17 +390,6 @@ function updateSpriteSector(board: Board, fromSector: number) {
     let spr = board.sprites[s];
     if (spr.sectnum == fromSector)
       spr.sectnum = findSector(board, spr.x, spr.y, spr.sectnum);
-  }
-}
-
-function resizeWalls(board: Board, sectorId: number, newSize: number, refs: BuildReferenceTracker) {
-  let sec = board.sectors[sectorId];
-  let dw = newSize - sec.wallnum;
-  if (dw == 0) return;
-  if (dw > 0) {
-    moveWalls(board, sectorId, sec.wallptr + sec.wallnum - 1, dw, refs);
-  } else {
-    moveWalls(board, sectorId, sec.wallptr + newSize, dw, refs)
   }
 }
 
@@ -999,81 +639,6 @@ export function deleteLoopFull(board: Board, wallId: number, refs: BuildReferenc
     deleteSectors(board, sectors, refs);
     deleteLoop(board, wallRefs.val(wallref), refs);
   });
-}
-
-function loopInPolygon(board: Board, loopId: number, polygon: Collection<[number, number]>) {
-  for (const w of loopWalls(board, loopId)) {
-    const wall = board.walls[w];
-    if (!inPolygon(wall.x, wall.y, polygon)) return false;
-  }
-  return true;
-}
-
-function checkSplitSector(board: Board, sectorId: number, points: Collection<[number, number]>): [number, number, number] {
-  const [fx, fy] = first(points);
-  const [lx, ly] = last(points);
-  const firstWall = wallInSector(board, sectorId, fx, fy);
-  const lastWall = wallInSector(board, sectorId, lx, ly);
-  if (firstWall == -1 || lastWall == -1)
-    throw new Error(`Terminal points [${fx}, ${fy}], [${lx}, ${ly}] dont touch sector ${sectorId} walls`);
-  const start = loopStart(board, firstWall);
-  if (start != loopStart(board, lastWall))
-    throw new Error(`Start ${firstWall} and end ${lastWall} walls in different loops`);
-  return [firstWall, lastWall, start];
-}
-
-function splitSectorImpl(board: Board, sectorId: number, firstWall: number, lastWall: number, start: number, points: Collection<[number, number]>, refs: BuildReferenceTracker) {
-  const wallMapper = (w: number) => board.walls[w];
-  const sector = board.sectors[sectorId];
-  const refWall = board.walls[firstWall];
-  const lengthWoLast = points.length() - 1;
-  const [newWalls, existedWalls, loopPoly] = getSplitLoop(board, firstWall, lastWall, points);
-  const oldSectorBuilder = new SectorBuilder();
-  const newSectorBuilder = new SectorBuilder()
-    .addWalls(existedWalls)
-    .addWalls(createNewWalls(newWalls, [], refWall, board))
-    .loop();
-
-  for (const lid of loopPoints(board, sectorId)) {
-    if (loopStart(board, lid) == start) continue;
-    else (loopInPolygon(board, lid, loopPoly) ? newSectorBuilder : oldSectorBuilder).addLoop(map(loopWalls(board, lid), wallMapper));
-  }
-  const newSectorId = addSector(board, copySector(board.sectors[sectorId]));
-  newSectorBuilder.build(board, newSectorId, refs);
-  const newSector = board.sectors[newSectorId];
-  const wallEnd = newSector.wallptr + existedWalls.length + newWalls.length - 1;
-  const mwalls = iter(range(wallEnd, wallEnd - lengthWoLast)).map(w => <[number, number]>[newSectorId, w]).collect();
-  const reversedWoLast = iter(reversed(points)).take(lengthWoLast);
-  oldSectorBuilder
-    .addWalls(createNewWalls(reversedWoLast, mwalls, refWall, board))
-    .addWalls(wallsBetween(board, firstWall, lastWall))
-    .loop();
-  const usedWalls = iter(sectorWalls(newSector)).map(wallMapper).collect();
-  iter(sectorWalls(sector))
-    .filter(w => usedWalls.includes(board.walls[w]))
-    .forEach(w => board.walls[w] = null);
-  oldSectorBuilder.build(board, sectorId, refs);
-}
-
-function getSplitLoop(board: Board, firstWall: number, lastWall: number, points: Collection<[number, number]>): [[number, number][], Wall[], Collection<[number, number]>] {
-  const newWalls = [...take(points, points.length() - 1)];
-  const existedWalls = [...wallsBetween(board, lastWall, firstWall)];
-  const loopPoly = [...map(existedWalls, POINT_MAPPER), ...newWalls];
-  return [newWalls, existedWalls, wrap(loopPoly)];
-}
-
-function checkPointsOrder(board: Board, firstWall: number, lastWall: number, points: Collection<[number, number]>): boolean {
-  const [, , loop] = getSplitLoop(board, firstWall, lastWall, points);
-  return clockwise(loop);
-}
-
-export function splitSector(board: Board, sectorId: number, points: Collection<[number, number]>, refs: BuildReferenceTracker) {
-  const [firstWall, lastWall, loop] = checkSplitSector(board, sectorId, points);
-  if (checkPointsOrder(board, firstWall, lastWall, points)) {
-    splitSectorImpl(board, sectorId, firstWall, lastWall, loop, points, refs);
-  } else {
-    splitSectorImpl(board, sectorId, lastWall, firstWall, loop, wrap([...reversed(points)]), refs);
-  }
 }
 
 export function* wallsBetween(board: Board, from: number, to: number): Generator<Wall> {

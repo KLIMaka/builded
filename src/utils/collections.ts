@@ -124,13 +124,6 @@ export class IndexedDeck<T> extends Deck<T>{
   }
 }
 
-export function findFirst<T>(collection: Collection<T>, value: T, start = 0) {
-  for (let i = start; i < collection.length(); i++) {
-    if (collection.get(i) == value) return i;
-  }
-  return -1;
-}
-
 export function reverse<T>(c: Collection<T>): Collection<T> {
   return isEmpty(c)
     ? EMPTY_COLLECTION
@@ -166,6 +159,38 @@ export function* sub<T>(c: Collection<T>, start: number, length: number): Genera
 export function all<T>(i: Iterable<T>, f: (t: T) => boolean): boolean {
   for (const t of i) if (!f(t)) return false;
   return true;
+}
+
+export function findFirst<T>(i: Iterable<T>, f: (t: T) => boolean, def: T): T {
+  for (const t of i) if (f(t)) return t;
+  return def;
+}
+
+export function* chain<T>(i1: Iterable<T>, i2: Iterable<T>): Generator<T> {
+  const iter1 = i1[Symbol.iterator]();
+  let v = iter1.next();
+  while (!v.done) {
+    yield v.value;
+    v = iter1.next();
+  }
+  const iter2 = i2[Symbol.iterator]();
+  v = iter2.next();
+  while (!v.done) {
+    yield v.value;
+    v = iter2.next();
+  }
+}
+
+export function* butLast<T>(i: Iterable<T>): Generator<T> {
+  const iter = i[Symbol.iterator]();
+  let v1 = iter.next();
+  if (v1.done) return;
+  let v2 = iter.next();
+  while (!v2.done) {
+    yield v1.value;
+    v1 = v2;
+    v2 = iter.next();
+  }
 }
 
 export function* reversed<T>(c: Collection<T>): Generator<T> {

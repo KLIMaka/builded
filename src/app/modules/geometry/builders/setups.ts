@@ -105,7 +105,7 @@ export class PointSpriteSetup extends BufferSetup {
 }
 
 export abstract class BufferRenderable<T extends BufferSetup> implements Builder, HintRenderable {
-  abstract readonly buff: BuildBuffer;
+  declare abstract readonly buff: BuildBuffer;
   public mode: number = WebGLRenderingContext.TRIANGLES;
   protected drawCall: DrawCall;
   public hint: number;

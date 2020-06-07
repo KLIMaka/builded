@@ -245,7 +245,7 @@ export class View3d extends MessageHandlerReflective implements View {
     const target = this.target();
     if (target.entity == null) return this.copyTarget(target, t);
     // this.updateGridSize();
-    const d = this.gridController.getGridSize() / 2;
+    const d = 32;//this.gridController.getGridSize() / 2;
     const w = this.getClosestWall(target, d);
     if (w != -1) {
       return this.snapWallPoint(target, w, t);

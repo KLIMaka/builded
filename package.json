@@ -4,7 +4,12 @@
   "description": "Map editor for Build Engine",
   "main": "builded.js",
   "scripts": {
-    "test": "jest"
+    "test": "jest",
+    "type-check": "tsc --noEmit",
+    "type-check:watch": "npm run type-check -- --watch",
+    "build": "npm run build:types && npm run build:js",
+    "build:types": "tsc --noEmit",
+    "build:js": "babel src --out-dir distr --extensions \".ts,.tsx,.js\" --source-maps true"
   },
   "repository": {
     "type": "git",
@@ -16,6 +21,7 @@
     "url": "https://github.com/KLIMaka/builded/issues"
   },
   "devDependencies": {
+    "@babel/cli": "^7.8.3",
     "@babel/core": "^7.10.1",
     "@babel/preset-env": "^7.10.1",
     "@babel/preset-typescript": "^7.10.1",

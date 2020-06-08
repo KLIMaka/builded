@@ -1,14 +1,15 @@
-import { BuildReferenceTracker } from '../app/apis/app';
+import { BuildReferenceTracker, GridController } from '../app/apis/app';
 import { track } from '../app/apis/referencetracker';
 import { vec3 } from '../libs_js/glmatrix';
-import { all, Collection, cyclicPairs, cyclicRange, Deck, enumerate, forEach, IndexedDeck, interpolate, intersect, loopPairs, map, range, reverse, wrap } from '../utils/collections';
+import { all, Collection, cyclicPairs, cyclicRange, Deck, enumerate, IndexedDeck, interpolate, intersect, loopPairs, map, reverse, wrap } from '../utils/collections';
 import { NumberInterpolator } from '../utils/interpolator';
 import { iter } from '../utils/iter';
 import { cross2d, cyclic, int, len2d, lenPointToLine, tuple2 } from '../utils/mathutils';
-import { Board, FACE_SPRITE, Sector, SectorStats, Sprite, SpriteStats, Wall, WallStats } from './board/structs';
+import { copySector, copySprite, copyWall, loopPoints, loopWalls, moveWalls, newSector, newSprite, newWall, resizeWalls, SectorBuilder } from './board/internal';
+import { Board, Sector, Sprite, Wall } from './board/structs';
 import { ArtInfoProvider } from './formats/art';
-import { findSector, sectorOfWall, sectorWalls, wallNormal, ZSCALE } from './utils';
-import { SectorBuilder, loopWalls, loopPoints, copyWall, newSector, newWall, copySector, newSprite, copySprite, moveWalls, resizeWalls } from './board/internal';
+import { Hitscan, hitscan } from './hitscan';
+import { findSector, sectorOfWall, sectorWalls, wallNormal } from './utils';
 
 export const DEFAULT_REPEAT_RATE = 128;
 
@@ -303,6 +304,45 @@ export function moveWall(board: Board, wallId: number, x: number, y: number): bo
 export function moveSprite(board: Board, sprId: number, x: number, y: number, z: number): boolean {
   var spr = board.sprites[sprId];
   if (spr.x == x && spr.y == y && spr.z == z) return false;
+  spr.x = x; spr.y = y; spr.z = z;
+  spr.sectnum = findSector(board, x, y, spr.sectnum);
+  return true;
+}
+
+const snapResult: [number, number] = [0, 0];
+export function snapWall(board: Board, w: number, x: number, y: number, grid: GridController) {
+  const wall = board.walls[w];
+  const w1 = nextwall(board, w);
+  const wall1 = board.walls[w1];
+  const dx = wall1.x - wall.x;
+  const dy = wall1.y - wall.y;
+  const repeat = DEFAULT_REPEAT_RATE * wall.xrepeat;
+  const dxt = x - wall.x;
+  const dyt = y - wall.y;
+  const dt = len2d(dxt, dyt) / len2d(dx, dy);
+  const t = grid.snap(dt * repeat) / repeat;
+  const xs = int(wall.x + (t * dx));
+  const ys = int(wall.y + (t * dy));
+  return tuple2(snapResult, xs, ys);
+}
+
+const hit = new Hitscan();
+export function moveSpriteHitscan(board: Board, sprId: number, x: number, y: number, z: number, grid: GridController): boolean {
+  const spr = board.sprites[sprId];
+  if (spr.x == x && spr.y == y && spr.z == z) return false;
+  const vx = x - spr.x;
+  const vy = y - spr.y;
+  const vz = z - spr.z;
+  hitscan(board, null, spr.x, spr.y, spr.z, spr.sectnum, vx, vy, vz, hit, 1);
+  const ent = hit.ent;
+  if (hit.t != -1 && hit.t <= 1 && ent.isWall()) {
+    const normal = wallNormal(vec3.create(), board, ent.id);
+    const offx = normal[0] * 4;
+    const offy = normal[2] * 4;
+    [x, y] = snapWall(board, ent.id, hit.coords[0], hit.coords[1], grid);
+    x = int(x + offx);
+    y = int(y + offy);
+  }
   spr.x = x; spr.y = y; spr.z = z;
   spr.sectnum = findSector(board, x, y, spr.sectnum);
   return true;

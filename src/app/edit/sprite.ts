@@ -1,4 +1,4 @@
-import { deleteSprite, insertSprite, moveSprite } from "../../build/boardutils";
+import { deleteSprite, insertSprite, moveSprite, moveSpriteHitscan } from "../../build/boardutils";
 import { Entity, EntityType } from "../../build/hitscan";
 import { ZSCALE } from "../../build/utils";
 import * as GLM from "../../libs_js/glmatrix";
@@ -30,7 +30,7 @@ export class SpriteEnt extends MessageHandlerReflective {
     let x = this.ctx.gridController.snap(this.origin[0] + msg.dx);
     let y = this.ctx.gridController.snap(this.origin[2] + msg.dy);
     let z = this.ctx.gridController.snap(this.origin[1] + msg.dz) * ZSCALE;
-    if (moveSprite(board, this.spriteId, x, y, z)) {
+    if (moveSpriteHitscan(board, this.spriteId, x, y, z, this.ctx.gridController)) {
       this.ctx.bus.handle(new BoardInvalidate(new Entity(this.spriteId, EntityType.SPRITE)));
     }
   }

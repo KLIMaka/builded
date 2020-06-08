@@ -314,6 +314,7 @@ export function hitscan(board: Board, artInfo: ArtInfoProvider, xs: number, ys: 
       }
     }
 
+    if (cliptype == 1) continue;
     let sprs = sprites[s];
     if (sprs == undefined) continue;
     for (let j = 0; j < sprs.length; j++) {

@@ -247,8 +247,8 @@ export function fit(w: number, h: number, provider: PixelProvider, paddColor: Ui
   if (provider.getHeight() == h && provider.getWidth() == w)
     return provider;
   if (provider.getWidth() <= w && provider.getHeight() <= h) {
-    var sx = (provider.getWidth() - w) / 2;
-    var sy = (provider.getHeight() - h) / 2;
+    var sx = MU.int((provider.getWidth() - w) / 2);
+    var sy = MU.int((provider.getHeight() - h) / 2);
     return rect(provider, sx, sy, w + sx, h + sy, paddColor);
   } else {
     var aspect = provider.getWidth() / provider.getHeight();
@@ -257,17 +257,17 @@ export function fit(w: number, h: number, provider: PixelProvider, paddColor: Ui
     var r = false;
     if (nw > w) {
       nw = w;
-      nh = nw / aspect;
+      nh = MU.int(nw / aspect);
       r = true;
     }
     if (nh > h) {
       nh = h;
-      nw = nw * aspect;
+      nw = MU.int(nw * aspect);
       r = true;
     }
     if (r) {
-      var sx = (nw - w) / 2;
-      var sy = (nh - h) / 2;
+      var sx = MU.int((nw - w) / 2);
+      var sy = MU.int((nh - h) / 2);
       return rect(resize(provider, nw, nh), sx, sy, w + sx, h + sy, paddColor);
     } else {
       return resize(provider, w, h);

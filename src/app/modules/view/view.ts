@@ -65,7 +65,7 @@ export class SwappableView implements View, MessageHandler {
     this.lastGridScale = gridController.getGridSize();
     this.view2d = view2d;
     this.view3d = view3d;
-    this.view = view3d;
+    this.view = view2d;
     state.register('lookaim', false);
   }
 

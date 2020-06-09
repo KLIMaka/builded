@@ -1,9 +1,9 @@
+import { ArtInfoProvider } from "../../build/formats/art";
+import { create, Dependency, Injector } from "../../utils/injector";
 import { axisSwap, RGBPalPixelProvider } from "../../utils/pixelprovider";
 import { DrawPanel, PixelDataProvider } from "../../utils/ui/drawpanel";
-import { dragElement } from "../../utils/ui/ui";
-import { ArtInfoProvider } from "../../build/formats/art";
-import { Injector, Dependency } from "../../utils/injector";
 import { ART } from "../apis/app";
+import { Ui, UI, Window } from "../apis/ui";
 import { PicNumCallback } from "../edit/tools/selection";
 
 function createDrawPanel(arts: ArtInfoProvider, pal: Uint8Array, canvas: HTMLCanvasElement, cb: PicNumCallback) {
@@ -18,41 +18,44 @@ function createDrawPanel(arts: ArtInfoProvider, pal: Uint8Array, canvas: HTMLCan
 export const RAW_PAL = new Dependency<Uint8Array>('RawPal');
 
 export async function SelectorConstructor(injector: Injector) {
-  return Promise.all([
-    injector.getInstance(ART),
-    injector.getInstance(RAW_PAL)])
-    .then(([art, pal]) => {
-      const selector = new Selector(art, pal)
-      return (cb: PicNumCallback) => selector.modal(cb);
-    });
+  const selector = await create(injector, Selector, UI, ART, RAW_PAL);
+  return (cb: PicNumCallback) => selector.modal(cb);
 }
 
 export class Selector {
-  private panel: HTMLElement;
+  private window: Window;
   private drawPanel: DrawPanel;
   private cb: PicNumCallback;
 
-  constructor(arts: ArtInfoProvider, pal: Uint8Array) {
-    this.panel = document.getElementById('select_tile');
+  constructor(ui: Ui, arts: ArtInfoProvider, pal: Uint8Array) {
+    this.window = ui.builder.windowBuilder()
+      .id('select_tile')
+      .title('Tiles')
+      .draggable(true)
+      .closeable(true)
+      .centered(true)
+      .size(640, 640)
+      .toolbar('icon-left-dir', () => { this.drawPanel.prevPage(); this.drawPanel.draw() })
+      .toolbar('icon-right-dir', () => { this.drawPanel.nextPage(); this.drawPanel.draw() })
+      .onclose(() => this.select(-1))
+      .build();
 
-    document.getElementById('select_tile_left').onclick = () => { this.drawPanel.prevPage(); this.drawPanel.draw(); };
-    document.getElementById('select_tile_right').onclick = () => { this.drawPanel.nextPage(); this.drawPanel.draw(); };
-    document.getElementById('select_tile_close').onclick = () => this.select(-1);
-
-    const canvas = <HTMLCanvasElement>document.getElementById('select_tile_canvas');
+    const canvas = document.createElement('canvas');
+    canvas.width = 640;
+    canvas.height = 640;
     this.drawPanel = createDrawPanel(arts, pal, canvas, (id: number) => this.select(id));
     this.drawPanel.setCellSize(64, 64);
-    this.hide();
-    dragElement(document.getElementById('select_tile_title'), this.panel);
+    this.window.contentElement.append(canvas);
+    this.window.hide();
   }
 
   public show() {
-    this.panel.style.setProperty('display', 'block');
+    this.window.show();
     this.drawPanel.draw();
   }
 
   public hide() {
-    this.panel.style.setProperty('display', 'none');
+    this.window.hide();
   }
 
   public modal(cb: PicNumCallback) {

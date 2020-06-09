@@ -1,6 +1,6 @@
-import { PixelProvider, fromPal, fit } from "../pixelprovider";
-import { int } from "../mathutils";
 import { drawToCanvas } from "../imgutils";
+import { int } from "../mathutils";
+import { fit, fromPal, PixelProvider } from "../pixelprovider";
 
 export class PixelDataProvider {
 
@@ -18,7 +18,7 @@ export class PixelDataProvider {
   }
 }
 
-let noneImg = new Uint8Array([
+const noneImg = new Uint8Array([
   1, 1, 1, 1, 1, 1, 1, 1,
   1, 1, 0, 0, 0, 0, 1, 1,
   1, 0, 1, 0, 0, 1, 0, 1,
@@ -29,8 +29,8 @@ let noneImg = new Uint8Array([
   1, 1, 1, 1, 1, 1, 1, 1,
 ]);
 
-let nonePal = new Uint8Array([255, 255, 255, 255, 0, 0]);
-let noneProvider = fromPal(noneImg, nonePal, 8, 8);
+const nonePal = new Uint8Array([255, 255, 255, 255, 0, 0]);
+const noneProvider = fromPal(noneImg, nonePal, 8, 8);
 
 export class DrawPanel {
 
@@ -44,14 +44,21 @@ export class DrawPanel {
     private selectCallback: (id: number) => void
   ) {
     canvas.onclick = (e: MouseEvent) => {
-      let x = e.offsetX;
-      let y = e.offsetY;
-      let maxcx = int(this.canvas.width / this.cellW);
-      let maxcy = int(this.canvas.height / this.cellH);
-      let cx = int(x / this.cellW);
-      let cy = int(y / this.cellH);
+      const x = e.offsetX;
+      const y = e.offsetY;
+      const maxcx = int(this.canvas.clientWidth / this.cellW);
+      const maxcy = int(this.canvas.clientHeight / this.cellH);
+      const cx = int(x / this.cellW);
+      const cy = int(y / this.cellH);
       if (cx >= maxcx || cy >= maxcy) return;
       this.selectCallback(this.firstId + maxcx * cy + cx);
+    }
+    canvas.onwheel = (e: WheelEvent) => {
+      if (e.deltaY > 0) {
+        this.nextRow();
+      } else if (e.deltaY < 0) {
+        this.lastRow();
+      }
     }
   }
 
@@ -64,43 +71,66 @@ export class DrawPanel {
     this.firstId = id;
   }
 
+  private cellsOnPage() {
+    return int(this.canvas.clientWidth / this.cellW) * int(this.canvas.clientHeight / this.cellH);
+  }
+
+  private cellsOnRow() {
+    return int(this.canvas.clientWidth / this.cellW);
+  }
+
+  public nextRow(): void {
+    const off = this.cellsOnRow();
+    if (this.firstId + off >= this.provider.size()) return;
+    this.firstId += off;
+    this.draw();
+  }
+
+  public lastRow(): void {
+    const off = this.cellsOnRow();
+    if (this.firstId - off < 0) return;
+    this.firstId -= off;
+    this.draw();
+  }
+
   public nextPage(): void {
-    let cells = int(this.canvas.width / this.cellW) * int(this.canvas.height / this.cellH);
-    if (this.firstId + cells >= this.provider.size())
-      return;
+    const cells = this.cellsOnPage()
+    if (this.firstId + cells >= this.provider.size()) return;
     this.firstId += cells;
   }
 
   public prevPage(): void {
-    let cells = int(this.canvas.width / this.cellW) * int(this.canvas.height / this.cellH);
-    if (this.firstId - cells < 0)
-      return;
+    const cells = this.cellsOnPage();
+    if (this.firstId - cells < 0) return;
     this.firstId -= cells;
   }
 
   public draw(): void {
-    let provider = this.provider;
-    let canvas = this.canvas;
-    let w = canvas.width;
-    let h = canvas.height;
-    let ctx = canvas.getContext('2d');
-    let wcells = int(w / this.cellW);
-    let hcells = int(h / this.cellH);
-    let cells = wcells * hcells;
-    let firstId = this.firstId;
-    let lastId = Math.min(firstId + cells, provider.size());
+    const provider = this.provider;
+    const canvas = this.canvas;
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    const ctx = canvas.getContext('2d');
+    const wcells = int(w / this.cellW);
+    const hcells = int(h / this.cellH);
+    const cells = wcells * hcells;
+    const firstId = this.firstId;
+    const lastId = Math.min(firstId + cells, provider.size());
 
     ctx.fillStyle = 'black';
     ctx.fillRect(0, 0, w, h);
+    ctx.font = "8px Arial";
+    ctx.fillStyle = 'white';
+    ctx.textAlign = "center";
 
     for (let i = firstId; i < lastId; i++) {
-      let x = ((i - firstId) % wcells) * this.cellW;
-      let y = int((i - firstId) / wcells) * this.cellH;
+      const x = ((i - firstId) % wcells) * this.cellW;
+      const y = int((i - firstId) / wcells) * this.cellH;
       let img = provider.get(i);
-      if (img == null)
-        img = noneProvider;
-      let pixels = fit(this.cellW, this.cellH, img, new Uint8Array([0, 0, 0, 255]));
+      if (img == null) img = noneProvider;
+      const pixels = fit(this.cellW, this.cellH, img, new Uint8Array([0, 0, 0, 255]));
       drawToCanvas(pixels, canvas, x, y);
+      ctx.fillText(i + "", x + this.cellW / 2, y + this.cellH - 4);
     }
   }
 

@@ -10,7 +10,7 @@ import { BoardManipulator_, BuildResources, DEFAULT_BOARD, RESOURCES } from '../
 import { BUS } from '../../apis/handler';
 import { LoadBoard, namedMessageHandler } from '../../edit/messages';
 import { RAW_PAL } from '../artselector';
-import { ArtFiles_, GL, ParallaxTextures_ } from '../buildartprovider';
+import { ART_FILES, GL, PARALLAX_TEXTURES } from '../buildartprovider';
 import { FileSystem, FS } from '../fs/fs';
 import { PALSWAPS, PAL_TEXTURE, PLU_TEXTURE, SHADOWSTEPS } from '../gl/buildgl';
 import { MAP_NAMES, showMapSelection } from '../selectmap';
@@ -149,11 +149,11 @@ async function BloodResources(injector: Injector): Promise<BuildResources> {
 }
 
 export function BloodModule(injector: Injector) {
-  injector.bindInstance(ParallaxTextures_, 16);
+  injector.bindInstance(PARALLAX_TEXTURES, 16);
   injector.bindInstance(BoardManipulator_, { cloneBoard });
   injector.bindInstance(SHADOWSTEPS, 64);
   injector.bind(RESOURCES, BloodResources);
-  injector.bind(ArtFiles_, loadArtFiles);
+  injector.bind(ART_FILES, loadArtFiles);
   injector.bind(RAW_PAL, loadPal);
   injector.bind(RAW_PLUs, loarRawPlus);
   injector.bind(PALSWAPS, loadPLUs);

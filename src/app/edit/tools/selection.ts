@@ -1,9 +1,10 @@
+import { loopWalls } from "../../../build/board/internal";
+import { Board } from "../../../build/board/structs";
 import { loopWallsFull, nextwall } from "../../../build/boardutils";
 import { Entity, EntityType, Target } from "../../../build/hitscan";
-import { Board } from "../../../build/board/structs";
 import { build2gl } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
-import { Collection, Deck, isEmpty } from "../../../utils/collections";
+import { Deck, isEmpty } from "../../../utils/collections";
 import { create, Dependency, Injector } from "../../../utils/injector";
 import { error } from "../../../utils/logger";
 import { detuple0, detuple1 } from "../../../utils/mathutils";
@@ -16,11 +17,10 @@ import { SectorEnt } from "../sector";
 import { SpriteEnt } from "../sprite";
 import { WallEnt } from "../wall";
 import { WallSegmentsEnt } from "../wallsegment";
-import { loopWalls } from "../../../build/board/internal";
 
 export type PicNumCallback = (picnum: number) => void;
 export type PicNumSelector = (cb: PicNumCallback) => void;
-export const PicNumSelector_ = new Dependency<PicNumSelector>('PicNumSelector');
+export const PICNUM_SELECTOR = new Dependency<PicNumSelector>('PicNumSelector');
 
 const handle = new MovingHandle();
 const MOVE = new Move(0, 0, 0);
@@ -92,7 +92,7 @@ const dir_ = vec3.create();
 
 export async function SelectionModule(injector: Injector) {
   const bus = await injector.getInstance(BUS);
-  bus.connect(await create(injector, Selection, PicNumSelector_, RENDRABLES_CACHE, ENTITY_FACTORY));
+  bus.connect(await create(injector, Selection, PICNUM_SELECTOR, RENDRABLES_CACHE, ENTITY_FACTORY));
 }
 
 export class Selection extends MessageHandlerReflective {

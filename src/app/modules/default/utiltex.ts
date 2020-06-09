@@ -34,9 +34,7 @@ async function loadTexture(gl: WebGLRenderingContext, name: string, options: any
 
 export async function DefaultAdditionalTextures(injector: Injector) {
   const textures: { [index: number]: Texture } = {};
-  const gl = await injector.getInstance(GL);
-  const fs = await injector.getInstance(FS);
-  const lib = await injector.getInstance(INDEXED_IMG_LIB);
+  const [gl, fs, lib] = await Promise.all([injector.getInstance(GL), injector.getInstance(FS), injector.getInstance(INDEXED_IMG_LIB)]);
   const file = await fs.get('texlist.lst');
   const decoder = new TextDecoder('utf-8');
   const list = decoder.decode(file);

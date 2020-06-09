@@ -9,12 +9,12 @@ import { int } from "../../../utils/mathutils";
 import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, REFERENCE_TRACKER, View, VIEW, GRID, GridController } from "../../apis/app";
 import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
 import { COMMIT, INVALIDATE_ALL, NamedMessage } from "../messages";
-import { PicNumSelector, PicNumSelector_ } from "./selection";
+import { PicNumSelector, PICNUM_SELECTOR } from "./selection";
 import { invalidateSectorAndWalls } from "../editutils";
 
 export async function UtilsModule(injector: Injector) {
   const bus = await injector.getInstance(BUS);
-  bus.connect(await create(injector, Utils, BOARD, ART, VIEW, BUS, REFERENCE_TRACKER, GRID, PicNumSelector_));
+  bus.connect(await create(injector, Utils, BOARD, ART, VIEW, BUS, REFERENCE_TRACKER, GRID, PICNUM_SELECTOR));
 }
 
 class Utils extends MessageHandlerReflective {

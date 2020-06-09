@@ -9,9 +9,9 @@ import { int } from "../../utils/mathutils";
 import { ArtProvider } from "../apis/app";
 
 export const GL = new Dependency<WebGLRenderingContext>('GL');
-export const ArtFiles_ = new Dependency<ArtFiles>('ArtFiles');
-export const UtilityTextures_ = new Dependency<{ [index: number]: Texture }>('UtilityTextures');
-export const ParallaxTextures_ = new Dependency<number>('Number of parallax textures');
+export const ART_FILES = new Dependency<ArtFiles>('ArtFiles');
+export const TEXTURES_OVERRIDE = new Dependency<{ [index: number]: Texture }>('Textures Override');
+export const PARALLAX_TEXTURES = new Dependency<number>('Number of parallax textures');
 
 export function createIndexedTexture(gl: WebGLRenderingContext, w: number, h: number, arr: Uint8Array, mipmaps = true, lib: IndexedImgLib): Texture {
   mipmaps = false;
@@ -53,10 +53,10 @@ function addMipMaps(gl: WebGLRenderingContext, w: number, h: number, arr: Uint8A
 
 export async function BuildArtProviderConstructor(injector: Injector) {
   const [art, util, gl, parallax, lib] = await Promise.all([
-    injector.getInstance(ArtFiles_),
-    injector.getInstance(UtilityTextures_),
+    injector.getInstance(ART_FILES),
+    injector.getInstance(TEXTURES_OVERRIDE),
     injector.getInstance(GL),
-    injector.getInstance(ParallaxTextures_),
+    injector.getInstance(PARALLAX_TEXTURES),
     injector.getInstance(INDEXED_IMG_LIB)]);
   return new BuildArtProvider(art, util, gl, parallax, lib);
 }

@@ -46,10 +46,6 @@ export class Injector {
     }
   }
 
-  public bindPromise<T>(dependency: Dependency<T>, promise: Promise<T>) {
-    this.promises.set(dependency, promise);
-  }
-
   public bindInstance<T>(dependency: Dependency<T>, instance: T) {
     this.promises.set(dependency, Promise.resolve(instance));
   }

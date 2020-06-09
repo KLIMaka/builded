@@ -13,13 +13,13 @@ import { Frame, LoadBoard, Mouse, namedMessageHandler, PostFrame, Render } from 
 import { DrawSectorModule } from '../edit/tools/drawsector';
 import { JoinSectorsModule } from '../edit/tools/joinsectors';
 import { PushWallModule } from '../edit/tools/pushwall';
-import { PicNumSelector_, SelectionModule } from '../edit/tools/selection';
+import { PICNUM_SELECTOR, SelectionModule } from '../edit/tools/selection';
 import { UtilsModule } from '../edit/tools/utils';
 import { Binder, loadBinds } from '../input/keymap';
 import { messageParser } from '../input/messageparser';
 import { InfoModule } from '../modules/info';
 import { StatusBarModule } from '../modules/statusbar';
-import { BuildArtProviderConstructor, UtilityTextures_ } from './buildartprovider';
+import { BuildArtProviderConstructor, TEXTURES_OVERRIDE } from './buildartprovider';
 import { DefaultGridController } from './default/grid';
 import { DefaultBoardProviderConstructor } from './default/history';
 import { BuildReferenceTrackerImpl } from './default/reftracker';
@@ -31,14 +31,14 @@ import { BUFFER_FACTORY, DefaultBufferFactory } from './gl/buffers';
 import { BuildGlConstructor, BUILD_GL } from './gl/buildgl';
 import { SwappableViewConstructor } from './view/view';
 
-export const KeymapConfig_ = new Dependency<string>('KeymapConfig');
+export const KEYBINDS = new Dependency<string>('KeymapConfig');
 
 async function mapBackupService(injector: Injector) {
   const storages = await injector.getInstance(STORAGES);
-  const store = await storages('session');
   const bus = await injector.getInstance(BUS);
   const board = await injector.getInstance(BOARD);
   const defaultBoard = await injector.getInstance(DEFAULT_BOARD);
+  const store = await storages('session');
   bus.connect(namedMessageHandler('commit', () => store.set('map_bak', board())));
   bus.connect(namedMessageHandler('new_board', () => {
     bus.handle(new LoadBoard(defaultBoard));
@@ -65,11 +65,11 @@ async function newMap(injector: Injector) {
 export function DefaultSetupModule(injector: Injector) {
   injector.bindInstance(REFERENCE_TRACKER, new BuildReferenceTrackerImpl());
   injector.bindInstance(STATE, new StateImpl());
-  injector.bindPromise(KeymapConfig_, loadString('builded_binds.txt'));
-  injector.bind(UtilityTextures_, DefaultAdditionalTextures);
+  injector.bind(KEYBINDS, _ => loadString('builded_binds.txt'));
+  injector.bind(TEXTURES_OVERRIDE, DefaultAdditionalTextures);
   injector.bind(GRID, DefaultGridController);
   injector.bind(ART, BuildArtProviderConstructor);
-  injector.bind(PicNumSelector_, SelectorConstructor);
+  injector.bind(PICNUM_SELECTOR, SelectorConstructor);
   injector.bind(VIEW, SwappableViewConstructor);
   injector.bind(BUILD_GL, BuildGlConstructor);
   injector.bind(BUFFER_FACTORY, DefaultBufferFactory);
@@ -93,7 +93,7 @@ export function DefaultSetupModule(injector: Injector) {
 }
 
 export function MainLoopConstructor(injector: Injector) {
-  return create(injector, MainLoop, VIEW, BUS, STATE, KeymapConfig_);
+  return create(injector, MainLoop, VIEW, BUS, STATE, KEYBINDS);
 }
 
 const FRAME = new Frame(0);

@@ -11,12 +11,11 @@ export function createCanvas(provider: PixelProvider, blend: BlendFunc = BlendNo
   const canvas: HTMLCanvasElement = document.createElement('canvas');
   canvas.width = provider.getWidth();
   canvas.height = provider.getHeight();
-  drawToCanvas(provider, canvas, 0, 0, blend);
+  drawToCanvas(provider, canvas.getContext('2d'), 0, 0, blend);
   return canvas;
 }
 
-export function drawToCanvas(provider: PixelProvider, canvas: HTMLCanvasElement, x: number = 0, y: number = 0, blend: BlendFunc = BlendNormal) {
-  const ctx = canvas.getContext('2d');
+export function drawToCanvas(provider: PixelProvider, ctx: CanvasRenderingContext2D, x: number = 0, y: number = 0, blend: BlendFunc = BlendNormal) {
   let data: Uint8ClampedArray;
   let id: ImageData;
   if (blend === BlendNormal) {

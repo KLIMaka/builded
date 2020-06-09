@@ -245,6 +245,22 @@ export function* take<T>(c: Iterable<T>, count: number): Generator<T> {
   }
 }
 
+export function skip<T>(i: Iterable<T>, count: number): Iterable<T> {
+  const iter = i[Symbol.iterator]();
+  while (count > 0) {
+    const v = iter.next();
+    if (v.done) break;
+    count--;
+  }
+  return {
+    [Symbol.iterator]: () => {
+      return {
+        next: () => { return iter.next() }
+      }
+    }
+  }
+}
+
 export function* rect(w: number, h: number): Generator<[number, number]> {
   if (w < 0) throw new Error(`${w} < 0`)
   if (h < 0) throw new Error(`${h} < 0`)

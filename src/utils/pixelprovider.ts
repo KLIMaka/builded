@@ -3,6 +3,7 @@ import * as  MU from './mathutils';
 export type BlendFunc = (dst: Uint8Array, dstoff: number, src: Uint8Array, srcoff: number) => void;
 
 export var BlendNormal = (dst: Uint8Array, dstoff: number, src: Uint8Array, srcoff: number) => {
+  // dst.set(src.slice(srcoff, srcoff+4), dstoff);
   dst[dstoff] = src[srcoff];
   dst[dstoff + 1] = src[srcoff + 1];
   dst[dstoff + 2] = src[srcoff + 2];
@@ -110,6 +111,7 @@ export class RGBPalPixelProvider extends AbstractPixelProvider {
       return;
     }
     var paloff = idx * 3;
+    // this.palTmp.set(this.pal.slice(paloff, paloff + 3));
     this.palTmp[0] = this.pal[paloff];
     this.palTmp[1] = this.pal[paloff + 1];
     this.palTmp[2] = this.pal[paloff + 2];
@@ -262,7 +264,7 @@ export function fit(w: number, h: number, provider: PixelProvider, paddColor: Ui
     }
     if (nh > h) {
       nh = h;
-      nw = MU.int(nw * aspect);
+      nw = MU.int(nh * aspect);
       r = true;
     }
     if (r) {

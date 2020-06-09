@@ -5,14 +5,16 @@ import { DrawPanel, PixelDataProvider } from "../../utils/ui/drawpanel";
 import { ART } from "../apis/app";
 import { Ui, UI, Window } from "../apis/ui";
 import { PicNumCallback } from "../edit/tools/selection";
+import { drawToCanvas } from "../../utils/imgutils";
+import { CanvasGrid } from "../../utils/ui/canvasgrid";
 
 function createDrawPanel(arts: ArtInfoProvider, pal: Uint8Array, canvas: HTMLCanvasElement, cb: PicNumCallback) {
   let provider = new PixelDataProvider(1024 * 10, (i: number) => {
     let info = arts.getInfo(i);
     if (info == null) return null;
-    return axisSwap(new RGBPalPixelProvider(info.img, pal, info.h, info.w));
+    return axisSwap(new RGBPalPixelProvider(info.img, pal, info.h, info.w, 255, 255));
   });
-  return new DrawPanel(canvas, provider, cb);
+  return new DrawPanel(new CanvasGrid(canvas, 64, 64), provider, cb);
 }
 
 export const RAW_PAL = new Dependency<Uint8Array>('RawPal');
@@ -27,7 +29,7 @@ export class Selector {
   private drawPanel: DrawPanel;
   private cb: PicNumCallback;
 
-  constructor(ui: Ui, arts: ArtInfoProvider, pal: Uint8Array) {
+  constructor(ui: Ui, private arts: ArtInfoProvider, private pal: Uint8Array) {
     this.window = ui.builder.windowBuilder()
       .id('select_tile')
       .title('Tiles')
@@ -44,9 +46,8 @@ export class Selector {
     canvas.width = 640;
     canvas.height = 640;
     this.drawPanel = createDrawPanel(arts, pal, canvas, (id: number) => this.select(id));
-    this.drawPanel.setCellSize(64, 64);
     this.window.contentElement.append(canvas);
-    this.window.hide();
+    this.hide();
   }
 
   public show() {
@@ -57,6 +58,7 @@ export class Selector {
   public hide() {
     this.window.hide();
   }
+
 
   public modal(cb: PicNumCallback) {
     this.cb = cb;

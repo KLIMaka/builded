@@ -1,4 +1,4 @@
-import { filter, map, reduce, forEach, all, enumerate, take, findFirst, chain, butLast } from "./collections";
+import { filter, map, reduce, forEach, all, enumerate, take, findFirst, chain, butLast, skip } from "./collections";
 
 
 export class Iter<T> implements Iterable<T>{
@@ -12,6 +12,7 @@ export class Iter<T> implements Iterable<T>{
   forEach(f: (t: T) => void): Iter<T> { forEach(this.iter, f); return this }
   enumerate(): Iter<[T, number]> { return new Iter(enumerate(this.iter)) }
   take(count: number): Iter<T> { return new Iter(take(this.iter, count)) }
+  skip(count: number): Iter<T> { return new Iter(skip(this.iter, count)) }
   reduce(f: (lh: T, rh: T) => T, start: T): T { return reduce(this.iter, f, start) }
   all(f: (t: T) => boolean): boolean { return all(this.iter, f) }
   first(f: (t: T) => boolean, def: T): T { return findFirst(this.iter, f, def) }

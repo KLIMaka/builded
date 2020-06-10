@@ -583,6 +583,16 @@ input[type="checkbox"] {
   line-height: normal;
 }
 
+.toolbar-control {
+  display: inline-block;
+  font-size: 13px;
+  line-height: 1.6;
+  background-color: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  outline: none;
+}
+
 .form-control {
   display: inline-block;
   width: 100%;

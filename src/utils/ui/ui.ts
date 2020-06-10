@@ -63,6 +63,13 @@ export class Element {
     this.element.onclick = e;
     return this;
   }
+
+  public change(cb: (s: string) => void): Element {
+    this.element.oninput = (e) => {
+      cb((<HTMLInputElement>e.target).value);
+    };
+    return this;
+  }
 }
 
 function create(tag: string) {

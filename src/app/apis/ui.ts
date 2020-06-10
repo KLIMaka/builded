@@ -17,12 +17,21 @@ export interface WindowBuilder {
   closeable(closeable: boolean): WindowBuilder;
   size(width: number, height: number): WindowBuilder;
   onclose(h: () => void): WindowBuilder;
-  toolbar(icon: string, click: () => void): WindowBuilder;
+  toolbar(builder: ToolbarBuilder): WindowBuilder;
   build(): Window;
+}
+
+export interface ToolbarBuilder {
+  startGroup(): ToolbarBuilder;
+  endGroup(): ToolbarBuilder;
+  button(icon: string, click: () => void): ToolbarBuilder;
+  text(hint: string, change: (s: string) => void): ToolbarBuilder;
+  build(window: Window);
 }
 
 export interface UiBuilder {
   windowBuilder(): WindowBuilder;
+  toolbarBuilder(): ToolbarBuilder;
 }
 
 export interface Ui {

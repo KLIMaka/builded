@@ -24,8 +24,11 @@ class FileBrowser {
       .closeable(true)
       .centered(true)
       .size(600, 600)
-      .toolbar('icon-arrows-ccw', () => this.refreshContent())
-      .toolbar('icon-trash', () => this.deleteSelected())
+      .toolbar(ui.builder.toolbarBuilder()
+        .startGroup()
+        .button('icon-arrows-ccw', () => this.refreshContent())
+        .button('icon-trash', () => this.deleteSelected())
+        .endGroup())
       .build();
 
     const win = this.window.winElement;

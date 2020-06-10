@@ -66,6 +66,7 @@ function updateState(keys: { [index: string]: boolean }, e: KeyboardEvent, state
 }
 
 function keydown(e: KeyboardEvent) {
+  if (e.target != document.body) return true;
   updateState(state.keys, e, true);
   updateState(state.keysPress, e, true);
   e.preventDefault();
@@ -73,6 +74,8 @@ function keydown(e: KeyboardEvent) {
 }
 
 function keyup(e: KeyboardEvent) {
+  if (e.target != document.body) return true;
+  console.log(e.target);
   updateState(state.keys, e, false);
   e.preventDefault();
   return false;

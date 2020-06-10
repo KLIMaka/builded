@@ -1,4 +1,4 @@
-import { range } from "../collections";
+import { Deck, map } from "../collections";
 import { drawToCanvas } from "../imgutils";
 import { iter } from "../iter";
 import { int } from "../mathutils";
@@ -21,12 +21,19 @@ export class PixelDataProvider {
   }
 }
 
+export enum ScrollType {
+  ITEM,
+  ROW,
+  PAGE
+}
+
 export class DrawPanel {
   private offset = 0;
+  private pageIds: Deck<number> = new Deck();
 
   constructor(
     private canvas: HTMLCanvasElement,
-    private idsProvider: Iterable<number>,
+    private idsProvider: () => Iterable<number>,
     private provider: PixelDataProvider,
     private selectCallback: (id: number) => void,
     private cellW = 64,
@@ -37,52 +44,54 @@ export class DrawPanel {
       if (idx != -1) this.selectCallback(idx);
     }
     canvas.onwheel = (e: WheelEvent) => {
-      if (e.deltaY > 0) {
-        this.nextRow();
-      } else if (e.deltaY < 0) {
-        this.lastRow();
-      }
+      if (e.deltaY > 0) this.scroll(1, e.shiftKey ? ScrollType.PAGE : ScrollType.ROW);
+      else if (e.deltaY < 0) this.scroll(-1, e.shiftKey ? ScrollType.PAGE : ScrollType.ROW);
     }
   }
 
+  private prepareIds() {
+    this.pageIds.clear().pushAll(
+      iter(this.idsProvider())
+        .skip(this.offset)
+        .take(this.cellsOnPage()));
+  }
+
   private calcIdx(x: number, y: number) {
-    const maxcx = this.horizontalCells();
-    const maxcy = this.verticalCells();
     const cx = int(x / this.cellW);
     const cy = int(y / this.cellH);
-    if (cx >= maxcx || cy >= maxcy) return -1;
-    return this.offset + maxcx * cy + cx
+    const idx = cy * this.horizontalCells() + cx;
+    return idx < this.pageIds.length() ? this.pageIds.get(idx) : -1;
   }
 
   private horizontalCells() { return int(this.canvas.clientWidth / this.cellW) }
   private verticalCells() { return int(this.canvas.clientHeight / this.cellH) }
-  public setFirstId(id: number): void { this.offset = id }
   private cellsOnPage() { return this.horizontalCells() * this.verticalCells() }
 
-  public nextRow(): void {
-    const off = this.horizontalCells();
-    if (this.offset + off >= this.provider.size()) return;
-    this.offset += off;
-    this.draw();
+  private getDelta(type: ScrollType): number {
+    switch (type) {
+      case ScrollType.ITEM: return 1;
+      case ScrollType.ROW: return this.horizontalCells();
+      case ScrollType.PAGE: return this.cellsOnPage();
+    }
   }
 
-  public lastRow(): void {
-    const off = this.horizontalCells();
-    if (this.offset - off < 0) return;
-    this.offset -= off;
-    this.draw();
-  }
+  public seOffset(offset: number): void { this.offset = offset }
 
-  public nextPage(): void {
-    const cells = this.cellsOnPage()
-    if (this.offset + cells >= this.provider.size()) return;
-    this.offset += cells;
-  }
-
-  public prevPage(): void {
-    const cells = this.cellsOnPage();
-    if (this.offset - cells < 0) return;
-    this.offset -= cells;
+  public scroll(off: number, type: ScrollType) {
+    const d = off * this.getDelta(type);
+    let newOffset = this.offset;
+    if (d > 0) {
+      iter(this.idsProvider())
+        .skip(this.offset + this.cellsOnPage())
+        .take(d)
+        .forEach(_ => newOffset++);
+    } else {
+      newOffset = Math.max(0, newOffset + d);
+    }
+    if (this.offset != newOffset) {
+      this.offset = newOffset;
+      this.draw();
+    }
   }
 
   private render(id: number) {
@@ -103,10 +112,7 @@ export class DrawPanel {
   }
 
   public draw(): void {
-    const widgets = iter(this.idsProvider)
-      .skip(this.offset)
-      .take(this.cellsOnPage())
-      .map(id => this.render(id));
-    drawGrid(this.canvas, widgets, this.cellW, this.cellH);
+    this.prepareIds();
+    drawGrid(this.canvas, map(this.pageIds, i => this.render(i)), this.cellW, this.cellH);
   }
 }

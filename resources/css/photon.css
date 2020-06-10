@@ -585,11 +585,9 @@ input[type="checkbox"] {
 
 .toolbar-control {
   display: inline-block;
-  font-size: 13px;
-  line-height: 1.6;
-  background-color: #fff;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  font-size: 12px;
+  background-color: rgba(0, 0, 0, 0);
+  border: none;
   outline: none;
 }
 

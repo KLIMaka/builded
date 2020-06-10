@@ -46,15 +46,17 @@ class PhotonWindow implements Window {
     this.toolbar.elem().classList.remove('hidden');
   }
 
-  public addToolText(hint: string, change: (s: string) => void) {
+  public addToolSearch(hint: string, change: (s: string) => void) {
     const container = this.currentButtonGroup == null
       ? this.toolbar
       : this.currentButtonGroup;
     container.append(
-      tag('input').className('toolbar-control')
-        .attr('type', 'text')
-        .attr('placeholder', hint)
-        .change(change));
+      tag('button').className('btn btn-default btn-mini pull-right')
+        .append(span().className('icon icon-search'))
+        .append(tag('input').className('toolbar-control')
+          .attr('type', 'text')
+          .attr('placeholder', hint)
+          .change(change)));
     this.toolbar.elem().classList.remove('hidden');
   }
 
@@ -147,8 +149,8 @@ class PhotonToolbarBuilder implements ToolbarBuilder {
     return this;
   }
 
-  text(hint: string, change: (s: string) => void): ToolbarBuilder {
-    const item = { build(window: PhotonWindow) { window.addToolText(hint, change) } };
+  search(hint: string, change: (s: string) => void): ToolbarBuilder {
+    const item = { build(window: PhotonWindow) { window.addToolSearch(hint, change) } };
     this.addItem(item);
     return this;
   }

@@ -8,7 +8,7 @@ import { PicNumCallback } from "../edit/tools/selection";
 import { iter } from "../../utils/iter";
 import { range } from "../../utils/collections";
 
-function createDrawPanel(arts: ArtInfoProvider, pal: Uint8Array, canvas: HTMLCanvasElement, cb: PicNumCallback, iter: Iterable<number>) {
+function createDrawPanel(arts: ArtInfoProvider, pal: Uint8Array, canvas: HTMLCanvasElement, cb: PicNumCallback, iter: () => Iterable<number>) {
   let provider = new PixelDataProvider(1024 * 10, (i: number) => {
     let info = arts.getInfo(i);
     if (info == null) return null;
@@ -30,7 +30,7 @@ export class Selector {
   private cb: PicNumCallback;
   private filter = "";
 
-  constructor(ui: Ui, private arts: ArtInfoProvider, private pal: Uint8Array) {
+  constructor(ui: Ui, arts: ArtInfoProvider, pal: Uint8Array) {
     this.window = ui.builder.windowBuilder()
       .id('select_tile')
       .title('Tiles')
@@ -39,11 +39,11 @@ export class Selector {
       .centered(true)
       .size(640, 640)
       .toolbar(ui.builder.toolbarBuilder()
-        .startGroup()
-        .button('icon-left-dir', () => { this.drawPanel.prevPage(); this.drawPanel.draw() })
-        .button('icon-right-dir', () => { this.drawPanel.nextPage(); this.drawPanel.draw() })
-        .endGroup()
-        .text('Search', s => { this.filter = s; this.drawPanel.draw() })
+        // .startGroup()
+        // .button('icon-left-dir', () => { this.drawPanel.prevPage(); this.drawPanel.draw() })
+        // .button('icon-right-dir', () => { this.drawPanel.nextPage(); this.drawPanel.draw() })
+        // .endGroup()
+        .search('Search', s => this.updateFilter(s))
       )
       .onclose(() => this.select(-1))
       .build();
@@ -51,17 +51,24 @@ export class Selector {
     const canvas = document.createElement('canvas');
     canvas.width = 640;
     canvas.height = 640;
-    this.drawPanel = createDrawPanel(arts, pal, canvas, (id: number) => this.select(id), this.pics());
+    this.drawPanel = createDrawPanel(arts, pal, canvas, (id: number) => this.select(id), () => this.pics());
     this.window.contentElement.append(canvas);
     this.hide();
   }
 
+  private updateFilter(s: string) {
+    this.filter = s;
+    this.drawPanel.seOffset(0);
+    this.drawPanel.draw()
+  }
+
+  private searchFilter(id: number): boolean {
+    if (this.filter.startsWith('*')) return (id + '').includes(this.filter.substr(1))
+    return (id + '').startsWith(this.filter);
+  }
+
   private pics(): Iterable<number> {
-    return {
-      [Symbol.iterator]: () => {
-        return iter(range(0, 10 * 1024)).filter(i => (i + "").includes(this.filter))[Symbol.iterator]();
-      }
-    }
+    return iter(range(0, 10 * 1024)).filter(i => this.searchFilter(i));
   }
 
   public show() {

@@ -25,7 +25,7 @@ export interface ToolbarBuilder {
   startGroup(): ToolbarBuilder;
   endGroup(): ToolbarBuilder;
   button(icon: string, click: () => void): ToolbarBuilder;
-  text(hint: string, change: (s: string) => void): ToolbarBuilder;
+  search(hint: string, change: (s: string) => void): ToolbarBuilder;
   build(window: Window);
 }
 

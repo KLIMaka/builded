@@ -75,7 +75,6 @@ function keydown(e: KeyboardEvent) {
 
 function keyup(e: KeyboardEvent) {
   if (e.target != document.body) return true;
-  console.log(e.target);
   updateState(state.keys, e, false);
   e.preventDefault();
   return false;

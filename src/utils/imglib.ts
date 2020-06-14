@@ -1,6 +1,6 @@
 import { Dependency, Injector } from "./injector";
 import { RAW_PAL } from "../app/modules/artselector";
-import init, { ImgLib } from "../libs_js/wasm_lib";
+// import init, { ImgLib } from "../libs_js/wasm_lib";
 import { convertPal, rgb2xyz, xyz2lab, resizeIndexed, findLab } from "./color";
 import { rect } from "./collections";
 
@@ -11,23 +11,23 @@ export interface IndexedImgLib {
 
 export const INDEXED_IMG_LIB = new Dependency<IndexedImgLib>('IndexedImgLib');
 
-export async function IndexedImgLibWasmConstructor(injector: Injector): Promise<IndexedImgLib> {
-  const pal = await injector.getInstance(RAW_PAL);
-  await init();
-  let lib = ImgLib.init(pal, 256, 255);
-  return {
-    palettize: (w: number, h: number, img: Uint8Array) => {
-      const dst = new Uint8Array(w * h);
-      lib.palettize(w, h, img, dst);
-      return dst;
-    },
-    resize: (dstw: number, dsth: number, srcw: number, srch: number, src: Uint8Array) => {
-      const dst = new Uint8Array(dstw * dsth);
-      lib.resize(dstw, dsth, dst, srcw, srch, src);
-      return dst;
-    }
-  }
-}
+// export async function IndexedImgLibWasmConstructor(injector: Injector): Promise<IndexedImgLib> {
+//   const pal = await injector.getInstance(RAW_PAL);
+//   await init();
+//   let lib = ImgLib.init(pal, 256, 255);
+//   return {
+//     palettize: (w: number, h: number, img: Uint8Array) => {
+//       const dst = new Uint8Array(w * h);
+//       lib.palettize(w, h, img, dst);
+//       return dst;
+//     },
+//     resize: (dstw: number, dsth: number, srcw: number, srch: number, src: Uint8Array) => {
+//       const dst = new Uint8Array(dstw * dsth);
+//       lib.resize(dstw, dsth, dst, srcw, srch, src);
+//       return dst;
+//     }
+//   }
+// }
 
 export async function IndexedImgLibJsConstructor(injector: Injector): Promise<IndexedImgLib> {
   const pal = [...await injector.getInstance(RAW_PAL)];

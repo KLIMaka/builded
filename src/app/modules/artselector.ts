@@ -7,6 +7,7 @@ import { Ui, UI, Window } from "../apis/ui";
 import { PicNumCallback } from "../edit/tools/selection";
 import { iter } from "../../utils/iter";
 import { range } from "../../utils/collections";
+import tippy from "tippy.js";
 
 function createDrawPanel(arts: ArtInfoProvider, pal: Uint8Array, canvas: HTMLCanvasElement, cb: PicNumCallback, iter: () => Iterable<number>) {
   let provider = new PixelDataProvider(1024 * 10, (i: number) => {
@@ -47,6 +48,7 @@ export class Selector {
       )
       .onclose(() => this.select(-1))
       .build();
+
 
     const canvas = document.createElement('canvas');
     canvas.width = 640;

@@ -33,3 +33,7 @@ class Generator1 {
 function pow(x: number) {
   return x * x + 1;
 }
+
+test('', () => {
+
+})

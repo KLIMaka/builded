@@ -101,7 +101,7 @@ class PhotonWindowBuilder implements WindowBuilder {
   public build() {
     const win = new PhotonWindow(this._id, this._title, this._w, this._h, this._draggable, this._centered, this._closeable);
     win.onclose = this._onclose;
-    this._toolbar.build(win);
+    if (this._toolbar) this._toolbar.build(win);
     return win;
   }
 }

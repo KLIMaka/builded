@@ -8,6 +8,7 @@ import { PicNumCallback } from "../edit/tools/selection";
 import { iter } from "../../utils/iter";
 import { range } from "../../utils/collections";
 import tippy from "tippy.js";
+import { div } from "../../utils/ui/ui";
 
 function createDrawPanel(arts: ArtInfoProvider, pal: Uint8Array, canvas: HTMLCanvasElement, cb: PicNumCallback, iter: () => Iterable<number>) {
   let provider = new PixelDataProvider(1024 * 10, (i: number) => {
@@ -48,6 +49,19 @@ export class Selector {
       )
       .onclose(() => this.select(-1))
       .build();
+
+    const menu = div('menu')
+      .append(div('menu-item').text('Menu1'))
+      .append(div('menu-item').text('Menu2'))
+      .append(div('menu-item').text('Menu3'))
+    document.body.appendChild(menu.elem());
+
+    tippy(this.window.winElement, {
+      content: menu.elem(),
+      allowHTML: true,
+      placement: 'bottom',
+      trigger: 'click'
+    });
 
 
     const canvas = document.createElement('canvas');

@@ -87,7 +87,7 @@ class PhotonWindowBuilder implements WindowBuilder {
   private _onclose: () => void;
   private _w = 250;
   private _h = 250;
-  private _toolbar: ToolbarBuilder;
+  private _toolbar: PhotonToolbarBuilder;
 
   public id(id: string) { this._id = id; return this }
   public title(title: string) { this._title = title; return this }
@@ -96,7 +96,7 @@ class PhotonWindowBuilder implements WindowBuilder {
   public closeable(closeable: boolean) { this._closeable = closeable; return this }
   public onclose(h: () => void) { this._onclose = h; return this }
   public size(w: number, h: number) { this._w = w; this._h = h; return this }
-  public toolbar(toolbar: ToolbarBuilder) { this._toolbar = toolbar; return this }
+  public toolbar(toolbar: PhotonToolbarBuilder) { this._toolbar = toolbar; return this }
 
   public build() {
     const win = new PhotonWindow(this._id, this._title, this._w, this._h, this._draggable, this._centered, this._closeable);

@@ -139,7 +139,7 @@ export class View2d extends MessageHandlerReflective implements View {
 
   private updateSnapTarget(target: TargetImpl) {
     const board = this.board();
-    const d = 32;//this.gridController.getGridSize() / 2;
+    const d = this.gridController.getGridSize() / 2;
     const s = closestSpriteInSector(board, this.sec, this.x, this.y, d);
     if (s != -1) {
       const sprite = board.sprites[s];

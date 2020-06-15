@@ -110,10 +110,10 @@ export class DrawPanel {
       ctx.textAlign = "center";
       const img = this.provider.get(id);
       if (img != null) {
-        const pixels = fit(cw, ch - 8, img, new Uint8Array([0, 0, 0, 255]));
+        const pixels = fit(cw, ch - 10, img, new Uint8Array([0, 0, 0, 255]));
         drawToCanvas(pixels, ctx, x, y, BlendAlpha);
       }
-      ctx.fillText(id + "", x + cw / 2, y + ch);
+      ctx.fillText(id + "", x + cw / 2, y + ch - 2);
     }
   }
 

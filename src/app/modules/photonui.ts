@@ -61,13 +61,15 @@ class PhotonWindow implements Window {
     const container = this.currentButtonGroup == null
       ? this.toolbar
       : this.currentButtonGroup;
+    const textBox = tag('input').className('toolbar-control')
+      .attr('type', 'text')
+      .attr('placeholder', hint)
+      .change(change);
     container.append(
       tag('button').className('btn btn-default btn-mini pull-right')
         .append(span().className('icon icon-search'))
-        .append(tag('input').className('toolbar-control')
-          .attr('type', 'text')
-          .attr('placeholder', hint)
-          .change(change)));
+        .append(textBox)
+        .click(() => { (<HTMLInputElement>textBox.elem()).value = ''; change('') }));
     this.toolbar.elem().classList.remove('hidden');
   }
 
@@ -186,7 +188,7 @@ class PhotonMenuBuilder implements MenuBuilder {
   }
 
   build(elem: HTMLElement) {
-    const menu = div('menu');
+    const menu = div('menu menu-default');
     let instance = null;
     for (const [label, click] of this.items) menu.append(div('menu-item').text(label).click(() => { click(), instance.hide(); }));
     instance = tippy(elem, {
@@ -197,6 +199,7 @@ class PhotonMenuBuilder implements MenuBuilder {
       interactive: true,
       arrow: false,
       offset: [0, 0],
+      duration: 100,
     });
   }
 }

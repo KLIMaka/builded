@@ -77,6 +77,12 @@ export class DrawPanel {
 
   public seOffset(offset: number): void { this.offset = offset }
 
+  public setSize(w: number, h: number) {
+    this.cellW = w;
+    this.cellH = h;
+    this.draw();
+  }
+
   public scroll(off: number, type: ScrollType) {
     const d = off * this.getDelta(type);
     let newOffset = this.offset;

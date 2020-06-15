@@ -26,11 +26,18 @@ export interface ToolbarBuilder {
   endGroup(): ToolbarBuilder;
   button(icon: string, click: () => void): ToolbarBuilder;
   search(hint: string, change: (s: string) => void): ToolbarBuilder;
+  menuButton(icon: string, menu: MenuBuilder): ToolbarBuilder;
+}
+
+export interface MenuBuilder {
+  item(text: string, click: () => void): MenuBuilder
+  build(elem: HTMLElement): void;
 }
 
 export interface UiBuilder {
   windowBuilder(): WindowBuilder;
   toolbarBuilder(): ToolbarBuilder;
+  menuBuilder(): MenuBuilder;
 }
 
 export interface Ui {

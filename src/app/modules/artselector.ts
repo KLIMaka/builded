@@ -7,8 +7,6 @@ import { Ui, UI, Window } from "../apis/ui";
 import { PicNumCallback } from "../edit/tools/selection";
 import { iter } from "../../utils/iter";
 import { range } from "../../utils/collections";
-import tippy from "tippy.js";
-import { div } from "../../utils/ui/ui";
 
 function createDrawPanel(arts: ArtInfoProvider, pal: Uint8Array, canvas: HTMLCanvasElement, cb: PicNumCallback, iter: () => Iterable<number>) {
   let provider = new PixelDataProvider(1024 * 10, (i: number) => {
@@ -41,28 +39,14 @@ export class Selector {
       .centered(true)
       .size(640, 640)
       .toolbar(ui.builder.toolbarBuilder()
-        // .startGroup()
-        // .button('icon-left-dir', () => { this.drawPanel.prevPage(); this.drawPanel.draw() })
-        // .button('icon-right-dir', () => { this.drawPanel.nextPage(); this.drawPanel.draw() })
-        // .endGroup()
+        .menuButton('icon-popup', ui.builder.menuBuilder()
+          .item('32', () => { this.drawPanel.setSize(32, 32) })
+          .item('64', () => { this.drawPanel.setSize(64, 64) })
+          .item('128', () => { this.drawPanel.setSize(128, 128) }))
         .search('Search', s => this.updateFilter(s))
       )
       .onclose(() => this.select(-1))
       .build();
-
-    const menu = div('menu')
-      .append(div('menu-item').text('Menu1'))
-      .append(div('menu-item').text('Menu2'))
-      .append(div('menu-item').text('Menu3'))
-    document.body.appendChild(menu.elem());
-
-    tippy(this.window.winElement, {
-      content: menu.elem(),
-      allowHTML: true,
-      placement: 'bottom',
-      trigger: 'click'
-    });
-
 
     const canvas = document.createElement('canvas');
     canvas.width = 640;
@@ -78,13 +62,13 @@ export class Selector {
     this.drawPanel.draw()
   }
 
-  private searchFilter(id: number): boolean {
+  private applyFilter(id: number): boolean {
     if (this.filter.startsWith('*')) return (id + '').includes(this.filter.substr(1))
     return (id + '').startsWith(this.filter);
   }
 
   private pics(): Iterable<number> {
-    return iter(range(0, 10 * 1024)).filter(i => this.searchFilter(i));
+    return iter(range(0, 10 * 1024)).filter(i => this.applyFilter(i));
   }
 
   public show() {
@@ -95,7 +79,6 @@ export class Selector {
   public hide() {
     this.window.hide();
   }
-
 
   public modal(cb: PicNumCallback) {
     this.cb = cb;

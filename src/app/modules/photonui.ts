@@ -1,6 +1,7 @@
 import { Injector } from "../../utils/injector";
-import { UI, UiBuilder, Window, WindowBuilder, ToolbarBuilder } from "../apis/ui";
+import { UI, UiBuilder, Window, WindowBuilder, ToolbarBuilder, MenuBuilder } from "../apis/ui";
 import { div, tag, dragElement, span, Element } from "../../utils/ui/ui";
+import tippy from "tippy.js";
 
 class PhotonWindow implements Window {
   public onclose: () => void;
@@ -33,6 +34,16 @@ class PhotonWindow implements Window {
     if (centered) this.winElement.classList.add('fixed-center');
     if (draggable) dragElement(titleElem.elem(), this.winElement);
     document.body.appendChild(this.winElement);
+  }
+
+  public addToolMenuButton(icon: string, menu: MenuBuilder) {
+    const container = this.currentButtonGroup == null
+      ? this.toolbar
+      : this.currentButtonGroup;
+    const btn = tag('button').className('btn btn-default btn-dropdown').append(span().className('icon ' + icon));
+    container.append(btn);
+    menu.build(btn.elem());
+    this.toolbar.elem().classList.remove('hidden');
   }
 
   public addToolIconButton(icon: string, click: () => void) {
@@ -149,6 +160,12 @@ class PhotonToolbarBuilder implements ToolbarBuilder {
     return this;
   }
 
+  menuButton(icon: string, menu: MenuBuilder): ToolbarBuilder {
+    const item = { build(window: PhotonWindow) { window.addToolMenuButton(icon, menu) } };
+    this.addItem(item);
+    return this;
+  }
+
   search(hint: string, change: (s: string) => void): ToolbarBuilder {
     const item = { build(window: PhotonWindow) { window.addToolSearch(hint, change) } };
     this.addItem(item);
@@ -160,9 +177,34 @@ class PhotonToolbarBuilder implements ToolbarBuilder {
   }
 }
 
+class PhotonMenuBuilder implements MenuBuilder {
+  private items: [string, () => void][] = [];
+
+  item(text: string, click: () => void): MenuBuilder {
+    this.items.push([text, click]);
+    return this;
+  }
+
+  build(elem: HTMLElement) {
+    const menu = div('menu');
+    let instance = null;
+    for (const [label, click] of this.items) menu.append(div('menu-item').text(label).click(() => { click(), instance.hide(); }));
+    instance = tippy(elem, {
+      content: menu.elem(),
+      allowHTML: true,
+      placement: 'bottom-start',
+      trigger: 'click',
+      interactive: true,
+      arrow: false,
+      offset: [0, 0],
+    });
+  }
+}
+
 class Builder implements UiBuilder {
   windowBuilder() { return new PhotonWindowBuilder() }
   toolbarBuilder() { return new PhotonToolbarBuilder() }
+  menuBuilder() { return new PhotonMenuBuilder() }
 }
 
 export function PhotonUiModule(injector: Injector) {

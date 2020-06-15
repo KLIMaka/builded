@@ -77,7 +77,7 @@ export class DrawPanel {
 
   public seOffset(offset: number): void { this.offset = offset }
 
-  public setSize(w: number, h: number) {
+  public setCellSize(w: number, h: number) {
     this.cellW = w;
     this.cellH = h;
     this.draw();

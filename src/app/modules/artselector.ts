@@ -7,6 +7,8 @@ import { Ui, UI, Window } from "../apis/ui";
 import { PicNumCallback } from "../edit/tools/selection";
 import { iter } from "../../utils/iter";
 import { range } from "../../utils/collections";
+import { GridModel, IconTextRenderer, renderGrid } from "../../utils/ui/grid";
+import { Element } from "../../utils/ui/ui";
 
 function createDrawPanel(arts: ArtInfoProvider, pal: Uint8Array, canvas: HTMLCanvasElement, cb: PicNumCallback, iter: () => Iterable<number>) {
   let provider = new PixelDataProvider(1024 * 10, (i: number) => {
@@ -22,6 +24,25 @@ export const RAW_PAL = new Dependency<Uint8Array>('RawPal');
 export async function SelectorConstructor(injector: Injector) {
   const selector = await create(injector, Selector, UI, ART, RAW_PAL);
   return (cb: PicNumCallback) => selector.modal(cb);
+}
+
+function createTagsGridModel(tagsProvider: () => Promise<string[]>) {
+  const selected = new Set<String>();
+  const columns = [IconTextRenderer];
+  const grid = {
+    async rows() { return iter(await tagsProvider()).map(s => [[s, selected.has(s)]]) },
+    columns() { return columns },
+    onClick(row: any[], rowElement: Element) {
+      const value = row[0][0];
+      if (selected.has(value)) selected.delete(value);
+      else selected.add(value);
+      rowElement.elem().classList.toggle('selected');
+    }
+  }
+  return {
+    renderGrid() { return renderGrid(grid) },
+    selected() { return selected }
+  }
 }
 
 export class Selector {

@@ -200,6 +200,7 @@ class PhotonMenuBuilder implements MenuBuilder {
       arrow: false,
       offset: [0, 0],
       duration: 100,
+      appendTo: document.body
     });
   }
 }

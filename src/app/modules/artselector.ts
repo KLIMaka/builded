@@ -72,6 +72,7 @@ export class Selector {
   }
 
   public show() {
+    this.window.setPosition('50%', '50%');
     this.window.show();
     this.drawPanel.draw();
   }

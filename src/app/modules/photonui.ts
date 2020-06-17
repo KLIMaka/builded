@@ -89,6 +89,13 @@ class PhotonWindow implements Window {
 
   show() { this.winElement.classList.remove('hidden') }
   hide() { this.winElement.classList.add('hidden') }
+
+  setPosition(x: string | number, y: string | number): void {
+    const actualX = typeof x == 'number' ? x + 'px' : x;
+    const actualY = typeof y == 'number' ? y + 'px' : y;
+    this.winElement.style.left = actualX;
+    this.winElement.style.top = actualY;
+  }
 }
 
 class PhotonWindowBuilder implements WindowBuilder {
@@ -200,6 +207,7 @@ class PhotonMenuBuilder implements MenuBuilder {
       arrow: false,
       offset: [0, 0],
       duration: 100,
+      appendTo: document.body
     });
   }
 }

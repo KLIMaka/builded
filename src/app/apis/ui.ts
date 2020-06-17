@@ -7,6 +7,7 @@ export interface Window {
   onclose: () => void;
   show(): void;
   hide(): void;
+  setPosition(x: number | string, y: string | number): void;
 }
 
 export interface WindowBuilder {

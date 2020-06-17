@@ -9,7 +9,7 @@ import { Stream } from '../../../utils/stream';
 import { BoardManipulator_, BuildResources, DEFAULT_BOARD, RESOURCES } from '../../apis/app';
 import { BUS } from '../../apis/handler';
 import { LoadBoard, namedMessageHandler } from '../../edit/messages';
-import { RAW_PAL } from '../artselector';
+import { RAW_PAL, PIC_TAGS } from '../artselector';
 import { ART_FILES, GL, PARALLAX_TEXTURES } from '../buildartprovider';
 import { FileSystem, FS } from '../fs/fs';
 import { PALSWAPS, PAL_TEXTURE, PLU_TEXTURE, SHADOWSTEPS } from '../gl/buildgl';
@@ -148,6 +148,19 @@ async function BloodResources(injector: Injector): Promise<BuildResources> {
   }
 }
 
+async function PicTags(injector: Injector) {
+  const fs = await injector.getInstance(FS);
+  const surface = new Uint8Array(await fs.get('SURFACE.DAT'));
+  const tags = ['None', 'Stone', 'Metal', 'Wood', 'Flesh', 'Water', 'Dirt', 'Clay', 'Snow', 'Ice', 'Leaves', 'Cloth', 'Plant', 'Goo', 'Lava'];
+  return {
+    allTags() { return tags },
+    tags(id: number) {
+      if (surface.length <= id) return []
+      return [tags[surface[id]]];
+    }
+  }
+}
+
 export function BloodModule(injector: Injector) {
   injector.bindInstance(PARALLAX_TEXTURES, 16);
   injector.bindInstance(BoardManipulator_, { cloneBoard });
@@ -161,6 +174,7 @@ export function BloodModule(injector: Injector) {
   injector.bind(PLU_TEXTURE, loadPluTexture);
   injector.bind(Implementation_, BloodImplementationConstructor);
   injector.bind(MAP_NAMES, getMapNames);
+  injector.bind(PIC_TAGS, PicTags);
   injector.bindInstance(DEFAULT_BOARD, createBoard());
 
   injector.install(mapLoader);

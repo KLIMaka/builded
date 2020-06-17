@@ -161,6 +161,17 @@ export function all<T>(i: Iterable<T>, f: (t: T) => boolean): boolean {
   return true;
 }
 
+export function any<T>(i: Iterable<T>, f: (t: T) => boolean): boolean {
+  for (const t of i) if (f(t)) return true;
+  return false;
+}
+
+export function iterIsEmpty<T>(i: Iterable<T>): boolean {
+  const ii = i[Symbol.iterator]();
+  return ii.next().done;
+}
+
+
 export function findFirst<T>(i: Iterable<T>, f: (t: T) => boolean, def: T): T {
   for (const t of i) if (f(t)) return t;
   return def;

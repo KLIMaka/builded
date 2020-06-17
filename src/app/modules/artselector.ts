@@ -1,14 +1,14 @@
 import { ArtInfoProvider } from "../../build/formats/art";
+import { range } from "../../utils/collections";
 import { create, Dependency, Injector } from "../../utils/injector";
+import { iter } from "../../utils/iter";
 import { axisSwap, RGBPalPixelProvider } from "../../utils/pixelprovider";
 import { DrawPanel, PixelDataProvider } from "../../utils/ui/drawpanel";
+import { IconTextRenderer, renderGrid } from "../../utils/ui/grid";
+import { div, Element } from "../../utils/ui/ui";
 import { ART } from "../apis/app";
 import { Ui, UI, Window } from "../apis/ui";
 import { PicNumCallback } from "../edit/tools/selection";
-import { iter } from "../../utils/iter";
-import { range } from "../../utils/collections";
-import { GridModel, IconTextRenderer, renderGrid } from "../../utils/ui/grid";
-import { Element } from "../../utils/ui/ui";
 
 function createDrawPanel(arts: ArtInfoProvider, pal: Uint8Array, canvas: HTMLCanvasElement, cb: PicNumCallback, iter: () => Iterable<number>) {
   let provider = new PixelDataProvider(1024 * 10, (i: number) => {
@@ -19,29 +19,38 @@ function createDrawPanel(arts: ArtInfoProvider, pal: Uint8Array, canvas: HTMLCan
   return new DrawPanel(canvas, iter, provider, cb);
 }
 
+export interface PicTags {
+  allTags(): Iterable<string>;
+  tags(picnum: number): Iterable<string>;
+}
+
 export const RAW_PAL = new Dependency<Uint8Array>('RawPal');
+export const PIC_TAGS = new Dependency<PicTags>('Tags');
 
 export async function SelectorConstructor(injector: Injector) {
-  const selector = await create(injector, Selector, UI, ART, RAW_PAL);
+  const selector = await create(injector, Selector, UI, ART, RAW_PAL, PIC_TAGS);
   return (cb: PicNumCallback) => selector.modal(cb);
 }
 
-function createTagsGridModel(tagsProvider: () => Promise<string[]>) {
-  const selected = new Set<String>();
+function createTagsGridModel(tags: PicTags) {
+  const selected = new Set<string>();
   const columns = [IconTextRenderer];
+  let callback: (selected: Iterable<string>) => void;
   const grid = {
-    async rows() { return iter(await tagsProvider()).map(s => [[s, selected.has(s)]]) },
+    async rows() { return iter(tags.allTags()).map(s => [[s, selected.has(s)]]) },
     columns() { return columns },
     onClick(row: any[], rowElement: Element) {
       const value = row[0][0];
       if (selected.has(value)) selected.delete(value);
       else selected.add(value);
       rowElement.elem().classList.toggle('selected');
+      if (callback) callback(selected.values());
     }
   }
   return {
     renderGrid() { return renderGrid(grid) },
-    selected() { return selected }
+    selected() { return selected },
+    connect(cb: (selected: Iterable<string>) => void) { callback = cb }
   }
 }
 
@@ -50,8 +59,19 @@ export class Selector {
   private drawPanel: DrawPanel;
   private cb: PicNumCallback;
   private filter = "";
+  // private selectedTags: string[] = [];
 
-  constructor(ui: Ui, arts: ArtInfoProvider, pal: Uint8Array) {
+  constructor(ui: Ui, arts: ArtInfoProvider, pal: Uint8Array, private tags: PicTags) {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 640;
+    // const grid = createTagsGridModel(tags);
+    // const gridPanel = div('pane-sm sidebar').css('width', '170px');
+    // grid.renderGrid().then(g => gridPanel.append(g));
+    // grid.connect(tags => { this.selectedTags = [...tags], this.drawPanel.draw() });
+    // const paneGroup = div('pane-group')
+    //   .append(gridPanel)
+    //   .append(div('pane').css('overflow', 'hidden').appendHtml(canvas));
+
     this.window = ui.builder.windowBuilder()
       .id('select_tile')
       .title('Tiles')
@@ -67,13 +87,10 @@ export class Selector {
         .search('Search', s => this.updateFilter(s))
       )
       .onclose(() => this.select(-1))
+      .content(canvas)
       .build();
 
-    const canvas = document.createElement('canvas');
-    canvas.width = 640;
-    canvas.height = 640;
     this.drawPanel = createDrawPanel(arts, pal, canvas, (id: number) => this.select(id), () => this.pics());
-    this.window.contentElement.append(canvas);
     this.hide();
   }
 
@@ -84,8 +101,10 @@ export class Selector {
   }
 
   private applyFilter(id: number): boolean {
+    const tags = iter(this.tags.tags(id));
+    // if (!tags.isEmpty() && !tags.any(t => this.selectedTags.includes(t))) return false;
     if (this.filter.startsWith('*')) return (id + '').includes(this.filter.substr(1))
-    return (id + '').startsWith(this.filter);
+    return (id + '').startsWith(this.filter) || tags.any(t => t.toLowerCase() == this.filter.toLowerCase());
   }
 
   private pics(): Iterable<number> {

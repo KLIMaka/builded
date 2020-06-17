@@ -1,4 +1,4 @@
-import { Deck, map } from "../collections";
+import { Deck, map, isEmpty } from "../collections";
 import { drawToCanvas } from "../imgutils";
 import { iter } from "../iter";
 import { int } from "../mathutils";
@@ -59,6 +59,10 @@ export class DrawPanel {
       iter(this.idsProvider())
         .skip(this.offset)
         .take(this.cellsOnPage()));
+    if (this.offset != 0 && isEmpty(this.pageIds)) {
+      this.offset = 0;
+      this.prepareIds();
+    }
   }
 
   private calcIdx(x: number, y: number) {

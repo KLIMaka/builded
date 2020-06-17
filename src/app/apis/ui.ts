@@ -19,6 +19,7 @@ export interface WindowBuilder {
   size(width: number, height: number): WindowBuilder;
   onclose(h: () => void): WindowBuilder;
   toolbar(builder: ToolbarBuilder): WindowBuilder;
+  content(content: HTMLElement): WindowBuilder;
   build(): Window;
 }
 

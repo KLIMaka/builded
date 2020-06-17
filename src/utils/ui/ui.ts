@@ -18,6 +18,11 @@ export class Element {
     return this;
   }
 
+  public appendHtml(html: HTMLElement): Element {
+    this.element.appendChild(html);
+    return this;
+  }
+
   public append(element: Element): Element {
     this.element.appendChild(element.element);
     return this;

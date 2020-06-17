@@ -1,6 +1,5 @@
 import { Dependency } from "../../utils/injector";
 
-
 export interface Window {
   readonly contentElement: HTMLElement;
   readonly winElement: HTMLElement;
@@ -27,8 +26,9 @@ export interface ToolbarBuilder {
   startGroup(): ToolbarBuilder;
   endGroup(): ToolbarBuilder;
   button(icon: string, click: () => void): ToolbarBuilder;
-  search(hint: string, change: (s: string) => void): ToolbarBuilder;
+  search(hint: string, change: (s: string, sugg: HTMLElement) => void): ToolbarBuilder;
   menuButton(icon: string, menu: MenuBuilder): ToolbarBuilder;
+  widget(widget: HTMLElement): ToolbarBuilder;
 }
 
 export interface MenuBuilder {

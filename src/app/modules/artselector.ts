@@ -4,7 +4,7 @@ import { create, Dependency, Injector } from "../../utils/injector";
 import { iter } from "../../utils/iter";
 import { axisSwap, RGBPalPixelProvider } from "../../utils/pixelprovider";
 import { DrawPanel, PixelDataProvider } from "../../utils/ui/drawpanel";
-import { IconTextRenderer, renderGrid } from "../../utils/ui/grid";
+import { IconTextRenderer, renderGrid, renderMenu, menuButton, search, SerachBar, sugggestionsMenu } from "../../utils/ui/renderers";
 import { div, Element } from "../../utils/ui/ui";
 import { ART } from "../apis/app";
 import { Ui, UI, Window } from "../apis/ui";
@@ -59,9 +59,10 @@ export class Selector {
   private drawPanel: DrawPanel;
   private cb: PicNumCallback;
   private filter = "";
+  private searchWidget: SerachBar;
   // private selectedTags: string[] = [];
 
-  constructor(ui: Ui, arts: ArtInfoProvider, pal: Uint8Array, private tags: PicTags) {
+  constructor(private ui: Ui, arts: ArtInfoProvider, pal: Uint8Array, private tags: PicTags) {
     const canvas = document.createElement('canvas');
     canvas.width = canvas.height = 640;
     // const grid = createTagsGridModel(tags);
@@ -71,7 +72,7 @@ export class Selector {
     // const paneGroup = div('pane-group')
     //   .append(gridPanel)
     //   .append(div('pane').css('overflow', 'hidden').appendHtml(canvas));
-
+    this.searchWidget = search('Search', s => { this.updateFilter(s); this.updateSuggestions(s) });
     this.window = ui.builder.windowBuilder()
       .id('select_tile')
       .title('Tiles')
@@ -80,11 +81,11 @@ export class Selector {
       .centered(true)
       .size(640, 640)
       .toolbar(ui.builder.toolbarBuilder()
-        .menuButton('icon-popup', ui.builder.menuBuilder()
+        .widget(menuButton('icon-popup', ui.builder.menuBuilder()
           .item('32', () => { this.drawPanel.setCellSize(32, 32) })
           .item('64', () => { this.drawPanel.setCellSize(64, 64) })
-          .item('128', () => { this.drawPanel.setCellSize(128, 128) }))
-        .search('Search', s => this.updateFilter(s))
+          .item('128', () => { this.drawPanel.setCellSize(128, 128) })))
+        .widget(this.searchWidget.widget)
       )
       .onclose(() => this.select(-1))
       .content(canvas)
@@ -97,7 +98,14 @@ export class Selector {
   private updateFilter(s: string) {
     this.filter = s;
     this.drawPanel.seOffset(0);
-    this.drawPanel.draw()
+    this.drawPanel.draw();
+  }
+
+  private updateSuggestions(s: string) {
+    const menu = iter(this.tags.allTags())
+      .filter(t => t.toLowerCase().startsWith(s.toLowerCase()))
+      .map(t => <[string, () => void]>[t, () => { this.searchWidget.setValue(t); this.updateFilter(t) }]);
+    this.searchWidget.updateSuggestions(sugggestionsMenu(menu));
   }
 
   private applyFilter(id: number): boolean {

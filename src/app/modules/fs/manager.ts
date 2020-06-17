@@ -2,7 +2,7 @@ import { create, Dependency, Injector } from "../../../utils/injector";
 import { addDragAndDrop, span, Table } from "../../../utils/ui/ui";
 import { BUS } from "../../apis/handler";
 import { UI, Ui, Window } from "../../apis/ui";
-import { GridModel, IconTextRenderer, renderGrid } from "../../../utils/ui/grid";
+import { GridModel, IconTextRenderer, renderGrid } from "../../../utils/ui/renderers";
 import { namedMessageHandler } from "../../edit/messages";
 import { iter } from "../../../utils/iter";
 import { Element } from "../../../utils/ui/ui";

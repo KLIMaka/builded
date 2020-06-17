@@ -2408,10 +2408,12 @@ td:last-child {
   min-width: 100px;
 }
 
-.menu-item:hover {
+.menu-item:hover, .menu-item.selected {
   color: #fff;
   background-image: linear-gradient(to bottom, #116cd6 0%, #1068cc 100%);
 }
+
+
 
 
 .tippy-box[data-animation=fade][data-state=hidden] {

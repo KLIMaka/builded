@@ -3,13 +3,6 @@ var fs = require('fs');
 var path = require('path');
 var url = require('url');
 
-function replaceUrl(url) {
-  var m = url.match(/.*\/distr\/.*\.(map|js|wasm)/);
-  if (m) return url;
-  var m = url.match(/.*\/distr\/.*/);
-  if (m) return url + '.js';
-  return url;
-}
 
 function contentType(url) {
   var extname = path.extname(url);
@@ -26,7 +19,7 @@ function contentType(url) {
 }
 
 http.createServer(function (req, res) {
-  let name = replaceUrl(new url.URL(req.url, 'https://example.org/').pathname);
+  let name = new url.URL(req.url, 'https://example.org/').pathname;
   fs.readFile(__dirname + name, function (err, data) {
     if (err) {
       res.writeHead(404);

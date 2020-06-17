@@ -2,6 +2,7 @@ import { Injector } from "../../utils/injector";
 import { UI, UiBuilder, Window, WindowBuilder, ToolbarBuilder, MenuBuilder } from "../apis/ui";
 import { div, tag, dragElement, span, Element } from "../../utils/ui/ui";
 import tippy from "tippy.js";
+import { Widget } from "../../utils/ui/canvasgrid";
 
 class PhotonWindow implements Window {
   public onclose: () => void;
@@ -36,6 +37,14 @@ class PhotonWindow implements Window {
     document.body.appendChild(this.winElement);
   }
 
+  public addToolbarWidget(widget: HTMLElement) {
+    const container = this.currentButtonGroup == null
+      ? this.toolbar
+      : this.currentButtonGroup;
+    container.appendHtml(widget);
+    this.toolbar.elem().classList.remove('hidden');
+  }
+
   public addToolMenuButton(icon: string, menu: MenuBuilder) {
     const container = this.currentButtonGroup == null
       ? this.toolbar
@@ -57,19 +66,30 @@ class PhotonWindow implements Window {
     this.toolbar.elem().classList.remove('hidden');
   }
 
-  public addToolSearch(hint: string, change: (s: string) => void) {
+  public addToolSearch(hint: string, change: (s: string, sugg: HTMLElement) => void) {
+    const suggestContainer = div('suggest');
     const container = this.currentButtonGroup == null
       ? this.toolbar
       : this.currentButtonGroup;
     const textBox = tag('input').className('toolbar-control')
       .attr('type', 'text')
       .attr('placeholder', hint)
-      .change(change);
+      .change(s => change(s, suggestContainer.elem()));
     container.append(
       tag('button').className('btn btn-default btn-mini pull-right')
         .append(span().className('icon icon-search'))
         .append(textBox)
-        .click(() => { (<HTMLInputElement>textBox.elem()).value = ''; change('') }));
+        .click(() => { (<HTMLInputElement>textBox.elem()).value = ''; change('', suggestContainer.elem()) }));
+
+    tippy(textBox.elem(), {
+      allowHTML: true,
+      placement: 'bottom-start',
+      interactive: true,
+      content: suggestContainer.elem(),
+      trigger: 'focus',
+      arrow: false,
+      offset: [0, 0]
+    });
     this.toolbar.elem().classList.remove('hidden');
   }
 
@@ -178,8 +198,14 @@ class PhotonToolbarBuilder implements ToolbarBuilder {
     return this;
   }
 
-  search(hint: string, change: (s: string) => void): ToolbarBuilder {
+  search(hint: string, change: (s: string, sugg: HTMLElement) => void): ToolbarBuilder {
     const item = { build(window: PhotonWindow) { window.addToolSearch(hint, change) } };
+    this.addItem(item);
+    return this;
+  }
+
+  widget(widget: HTMLElement): ToolbarBuilder {
+    const item = { build(window: PhotonWindow) { window.addToolbarWidget(widget) } };
     this.addItem(item);
     return this;
   }

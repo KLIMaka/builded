@@ -2,7 +2,10 @@ import { create, Dependency, Injector } from "../../../utils/injector";
 import { addDragAndDrop, span, Table } from "../../../utils/ui/ui";
 import { BUS } from "../../apis/handler";
 import { UI, Ui, Window } from "../../apis/ui";
+import { GridModel, IconTextRenderer, renderGrid } from "../../../utils/ui/grid";
 import { namedMessageHandler } from "../../edit/messages";
+import { iter } from "../../../utils/iter";
+import { Element } from "../../../utils/ui/ui";
 
 export interface FsManager {
   read(name: string): Promise<ArrayBuffer>;
@@ -46,16 +49,19 @@ class FileBrowser {
     })
   }
 
+  private gridModel = this.createGridModel();
+  private createGridModel(): GridModel {
+    const columns = [IconTextRenderer];
+    const self = this;
+    return {
+      async rows() { return iter(await self.manager.list()).map(f => [[f, self.getIcon(f)]]) },
+      columns() { return columns },
+      onClick(row: any[], rowElement: Element) { self.toggleItem(rowElement.elem(), row[0][0]) }
+    }
+  }
+
   private async refreshContent() {
-    const list = await this.manager.list();
-    const table = new Table();
-    table.className("table-striped");
-    list.forEach(f => {
-      const file = span().className('icon-text').text(f)
-        .append(span().className('icon pull-left ' + this.getIcon(f)));
-      const row = table.row([file]);
-      row.click(() => this.toggleItem(row.elem(), f));
-    });
+    const table = await renderGrid(this.gridModel);
     this.replaceContent(table.elem());
   }
 

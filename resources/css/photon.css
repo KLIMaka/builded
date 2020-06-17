@@ -2424,7 +2424,7 @@ td:last-child {
 
 .tippy-box {
 	position: relative;
-	background-color: #333;
+	/* background-color: #333; */
 	color: #fff;
 	border-radius: 4px;
 	font-size: 14px;

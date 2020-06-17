@@ -44,7 +44,12 @@ export class DrawPanel {
       if (idx != -1) this.selectCallback(idx);
     }
     canvas.onwheel = (e: WheelEvent) => {
-      if (e.deltaY > 0) this.scroll(1, e.shiftKey ? ScrollType.PAGE : ScrollType.ROW);
+      if (e.altKey) {
+        const d = e.deltaY > 0 ? -4 : 4;
+        this.cellH += d;
+        this.cellW += d;
+        this.draw();
+      } else if (e.deltaY > 0) this.scroll(1, e.shiftKey ? ScrollType.PAGE : ScrollType.ROW);
       else if (e.deltaY < 0) this.scroll(-1, e.shiftKey ? ScrollType.PAGE : ScrollType.ROW);
     }
   }

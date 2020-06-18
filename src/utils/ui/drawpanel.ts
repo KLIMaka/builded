@@ -1,4 +1,4 @@
-import { Deck, map, isEmpty } from "../collections";
+import { Deck, map, isEmpty, IndexedDeck } from "../collections";
 import { drawToCanvas } from "../imgutils";
 import { iter } from "../iter";
 import { int } from "../mathutils";
@@ -30,6 +30,7 @@ export enum ScrollType {
 export class DrawPanel {
   private offset = 0;
   private pageIds: Deck<number> = new Deck();
+  private selected = new Set<number>();
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -79,7 +80,7 @@ export class DrawPanel {
   private getDelta(type: ScrollType): number {
     switch (type) {
       case ScrollType.ITEM: return 1;
-      case ScrollType.ROW: return this.horizontalCells();
+      case ScrollType.ROW: return this.verticalCells() == 1 ? 1 : this.horizontalCells();
       case ScrollType.PAGE: return this.cellsOnPage();
     }
   }
@@ -91,6 +92,10 @@ export class DrawPanel {
     this.cellH = h;
     this.draw();
   }
+
+  public select(id: number) { this.selected.add(id) }
+  public deselect(id: number) { this.selected.delete(id) }
+  public deselectAll() { this.selected.clear() }
 
   public scroll(off: number, type: ScrollType) {
     const d = off * this.getDelta(type);
@@ -112,10 +117,10 @@ export class DrawPanel {
   private render(id: number) {
     const cw = this.cellW;
     const ch = this.cellH;
-    return (ctx: CanvasRenderingContext2D, t: Translator) => {
-      const [x, y] = t(0, 0);
+    return (ctx: CanvasRenderingContext2D, x: number, y: number) => {
       ctx.font = "8px Arial";
       ctx.fillStyle = 'white';
+      ctx.strokeStyle = 'white';
       ctx.textAlign = "center";
       const img = this.provider.get(id);
       if (img != null) {
@@ -123,6 +128,7 @@ export class DrawPanel {
         drawToCanvas(pixels, ctx, x, y, BlendAlpha);
       }
       ctx.fillText(id + "", x + cw / 2, y + ch - 2);
+      if (this.selected.has(id)) ctx.strokeRect(x + 0.5, y + 0.5, cw - 1, ch - 1);
     }
   }
 

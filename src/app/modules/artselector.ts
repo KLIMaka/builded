@@ -4,8 +4,8 @@ import { create, Dependency, Injector } from "../../utils/injector";
 import { iter } from "../../utils/iter";
 import { axisSwap, RGBPalPixelProvider } from "../../utils/pixelprovider";
 import { DrawPanel, PixelDataProvider } from "../../utils/ui/drawpanel";
-import { IconTextRenderer, renderGrid, renderMenu, menuButton, search, SerachBar, sugggestionsMenu } from "../../utils/ui/renderers";
-import { div, Element } from "../../utils/ui/ui";
+import { IconTextRenderer, menuButton, renderGrid, search, SerachBar, sugggestionsMenu } from "../../utils/ui/renderers";
+import { Element } from "../../utils/ui/ui";
 import { ART } from "../apis/app";
 import { Ui, UI, Window } from "../apis/ui";
 import { PicNumCallback } from "../edit/tools/selection";
@@ -92,6 +92,8 @@ export class Selector {
       .build();
 
     this.drawPanel = createDrawPanel(arts, pal, canvas, (id: number) => this.select(id), () => this.pics());
+    this.drawPanel.select(110);
+    this.drawPanel.select(111);
     this.hide();
   }
 

@@ -2,7 +2,7 @@ import { int } from "../mathutils";
 import { take, enumerate } from "../collections";
 
 export type Translator = (x: number, y: number) => [number, number];
-export type Widget = (ctx: CanvasRenderingContext2D, trans: Translator) => void;
+export type Widget = (ctx: CanvasRenderingContext2D, x: number, y: number) => void;
 
 export function drawGrid(canvas: HTMLCanvasElement, widgets: Iterable<Widget>, cw: number, ch: number, bg = 'black') {
   const w = canvas.clientWidth;
@@ -24,7 +24,7 @@ export function drawGrid(canvas: HTMLCanvasElement, widgets: Iterable<Widget>, c
     ctx.rect(x, y, w, h);
     ctx.clip();
 
-    widget(ctx, (x_, y_) => [x - x_, y - y_]);
+    widget(ctx, x, y);
     ctx.restore();
   }
 }

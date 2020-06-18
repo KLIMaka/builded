@@ -61,6 +61,7 @@ F4              print_usage
 SHIFT+mouse0    add_selection
 CTRL+D          clear_selection
 ALT+N           new_board
+CTRL+SHIFT+A    show_artedit
 
 +W              forward
 +S              backward

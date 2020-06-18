@@ -3,6 +3,7 @@ import { GL } from './app/modules/buildartprovider';
 import { DefaultSetupModule, MainLoopConstructor } from './app/modules/context';
 import { DbFsModule } from './app/modules/fs/db';
 import { FileBrowserModule } from './app/modules/fs/manager';
+import { ArtEditorModule } from './app/modules/arteditor';
 import { PhotonUiModule } from './app/modules/photonui';
 import { animate, createContextFromCanvas } from './utils/gl/gl';
 import { Injector } from './utils/injector';
@@ -20,6 +21,7 @@ injector.install(DefaultSetupModule);
 injector.install(BloodModule);
 injector.install(PhotonUiModule);
 injector.install(FileBrowserModule);
+injector.install(ArtEditorModule);
 
 MainLoopConstructor(injector).then(mainLoop => {
   animate(gl, (gl: WebGLRenderingContext, time: number) => {

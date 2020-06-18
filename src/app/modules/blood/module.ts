@@ -16,7 +16,7 @@ import { PALSWAPS, PAL_TEXTURE, PLU_TEXTURE, SHADOWSTEPS } from '../gl/buildgl';
 import { MAP_NAMES, showMapSelection } from '../selectmap';
 import { Implementation_ } from '../view/boardrenderer3d';
 
-const RAW_PLUs = new Dependency<Uint8Array[]>('Raw PLUs');
+export const RAW_PLUs = new Dependency<Uint8Array[]>('Raw PLUs');
 
 async function loadArtFiles(injector: Injector): Promise<ArtFiles> {
   const res = await injector.getInstance(RESOURCES);

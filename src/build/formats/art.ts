@@ -5,8 +5,8 @@ export class ArtInfo {
 }
 
 export const NO_ANIMATION = 0;
-export const ANIMATE_FORWARD = 1;
-export const OSCILLATING_ANIMATION = 2;
+export const ANIMATE_FORWARD = 2;
+export const OSCILLATING_ANIMATION = 1;
 export const ANIMATE_BACKWARD = 3;
 
 export class Attributes {

@@ -1,8 +1,7 @@
-import { iter } from "../iter";
-import { Element, Table, span, div, tag } from "./ui";
-import { MenuBuilder } from "../../app/apis/ui";
 import tippy from "tippy.js";
-import { text } from "../../app/modules/geometry/builders/common";
+import { MenuBuilder } from "../../app/apis/ui";
+import { iter } from "../iter";
+import { div, Element, span, Table, tag } from "./ui";
 
 export type ColumnRenderer<T> = (value: T) => Element;
 

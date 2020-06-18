@@ -1,20 +1,20 @@
-import { ArtInfoProvider, ArtInfo, NO_ANIMATION, OSCILLATING_ANIMATION, ANIMATE_FORWARD, ANIMATE_BACKWARD } from "../../build/formats/art";
+import { ANIMATE_BACKWARD, ANIMATE_FORWARD, ArtInfo, ArtInfoProvider, NO_ANIMATION, OSCILLATING_ANIMATION } from "../../build/formats/art";
 import { range } from "../../utils/collections";
-import { create, Dependency, Injector } from "../../utils/injector";
-import { iter } from "../../utils/iter";
-import { axisSwap, RGBPalPixelProvider, BlendAlpha } from "../../utils/pixelprovider";
-import { DrawPanel, PixelDataProvider } from "../../utils/ui/drawpanel";
-import { IconTextRenderer, menuButton, renderGrid, search, SerachBar, sugggestionsMenu } from "../../utils/ui/renderers";
-import { Element, div } from "../../utils/ui/ui";
-import { ART } from "../apis/app";
-import { Ui, UI, Window } from "../apis/ui";
-import { PicNumCallback } from "../edit/tools/selection";
-import { PicTags, RAW_PAL, PIC_TAGS } from "./artselector";
-import { RAW_PLUs } from "./blood/module";
-import { BUS } from "../apis/handler";
-import { namedMessageHandler } from "../edit/messages";
 import { drawToCanvas } from "../../utils/imgutils";
-import { int, cyclic } from "../../utils/mathutils";
+import { create, Injector } from "../../utils/injector";
+import { iter } from "../../utils/iter";
+import { int } from "../../utils/mathutils";
+import { axisSwap, RGBPalPixelProvider, resize } from "../../utils/pixelprovider";
+import { DrawPanel, PixelDataProvider } from "../../utils/ui/drawpanel";
+import { search, SerachBar, sugggestionsMenu } from "../../utils/ui/renderers";
+import { div } from "../../utils/ui/ui";
+import { ART } from "../apis/app";
+import { BUS } from "../apis/handler";
+import { Ui, UI, Window } from "../apis/ui";
+import { namedMessageHandler } from "../edit/messages";
+import { PicNumCallback } from "../edit/tools/selection";
+import { PicTags, PIC_TAGS, RAW_PAL } from "./artselector";
+import { RAW_PLUs } from "./blood/module";
 
 function createDrawPanel(arts: ArtInfoProvider, pal: Uint8Array, canvas: HTMLCanvasElement, cb: PicNumCallback, iter: () => Iterable<number>) {
   const provider = new PixelDataProvider(1024 * 10, (i: number) => {
@@ -42,6 +42,7 @@ export class ArtEditor {
   private centerY = 320;
   private frame = 0;
   private animation = -1;
+  private scale = 2.0;
 
   constructor(
     private ui: Ui,
@@ -53,7 +54,7 @@ export class ArtEditor {
     this.searchWidget = search('Search', s => { this.updateFilter(s); this.updateSuggestions(s) });
     const browserCanvas = document.createElement('canvas');
     browserCanvas.width = 640;
-    browserCanvas.height = 64;
+    browserCanvas.height = 192;
     browserCanvas.style.display = 'block';
     this.view = this.createView();
     this.window = ui.builder.windowBuilder()
@@ -100,13 +101,39 @@ export class ArtEditor {
   private createView(): HTMLCanvasElement {
     const canvas = document.createElement('canvas');
     canvas.width = 640;
-    canvas.height = 640 - 64;
+    canvas.height = 640 - 192;
+    canvas.addEventListener('wheel', e => {
+      if (e.deltaY > 0) this.scale *= 0.9;
+      if (e.deltaY < 0) this.scale *= 1.1;
+      this.updateView(false);
+    });
+    let isDrag = false;
+    let oldx = 0;
+    let oldy = 0;
+    canvas.addEventListener('mousemove', e => {
+      if (isDrag) {
+        const dx = e.x - oldx;
+        const dy = e.y - oldy;
+        if (dx != 0 || dy != 0) {
+          this.centerX += dx;
+          this.centerY += dy;
+          this.updateView(false);
+        }
+      }
+      oldx = e.x;
+      oldy = e.y;
+    });
+    canvas.addEventListener('mousedown', e => isDrag = true);
+    canvas.addEventListener('mouseup', e => isDrag = false);
     return canvas;
   }
 
   private select(id: number) {
     this.drawPanel.deselectAll();
     this.drawPanel.select(id);
+    const info = this.arts.getInfo(id);
+    if (info != null && info.attrs.frames) iter(range(0, info.attrs.frames + 1)).forEach(i => this.drawPanel.select(id + i));
+
     this.drawPanel.draw();
     window.clearTimeout(this.animation);
     this.animation = -1;
@@ -125,7 +152,7 @@ export class ArtEditor {
     // ctx.stroke();
   }
 
-  private updateView() {
+  private updateView(anim = true) {
     const ctx = this.view.getContext('2d');
     ctx.fillStyle = 'black';
     ctx.strokeStyle = 'white';
@@ -134,21 +161,26 @@ export class ArtEditor {
     const mainInfo = this.arts.getInfo(this.currentId);
     const frameInfo = this.arts.getInfo(this.currentId + this.getFrame(mainInfo));
     if (mainInfo == null || frameInfo == null) return;
-    const img = axisSwap(new RGBPalPixelProvider(frameInfo.img, this.pal, frameInfo.h, frameInfo.w, 255, 255, 255, new Uint8Array([0, 0, 0, 255])));
-    const x = this.centerX - (frameInfo.attrs.xoff | 0) - int(frameInfo.w / 2);
-    const y = this.centerY - (frameInfo.attrs.yoff | 0) - int(frameInfo.h / 2);
+    const scaledW = int(frameInfo.w * this.scale);
+    const scaledH = int(frameInfo.h * this.scale);
+    const img =
+      resize(
+        axisSwap(new RGBPalPixelProvider(frameInfo.img, this.pal, frameInfo.h, frameInfo.w, 255, 255, 255, new Uint8Array([0, 0, 0, 255]))),
+        scaledW, scaledH);
+    const x = this.centerX - int(((frameInfo.attrs.xoff | 0) + frameInfo.w / 2) * this.scale);
+    const y = this.centerY - int(((frameInfo.attrs.yoff | 0) + frameInfo.h / 2) * this.scale);
     drawToCanvas(img, ctx, x, y);
 
-    if ((mainInfo.attrs.frames | 0) != 0) {
+    if (anim && (mainInfo.attrs.frames | 0) != 0) {
       this.frame++;
-      this.animation = window.setTimeout(() => this.updateView(), mainInfo.attrs.speed * 100);
+      this.animation = window.setTimeout(() => this.updateView(), mainInfo.attrs.speed * 50);
     }
   }
 
   private getFrame(info: ArtInfo): number {
     const max = info.attrs.frames + 1;
     if (info.attrs.type == NO_ANIMATION) return 0;
-    else if (info.attrs.type = OSCILLATING_ANIMATION) {
+    else if (info.attrs.type == OSCILLATING_ANIMATION) {
       const x = this.frame % (max * 2 - 2);
       return x >= max ? max * 2 - 2 - x : x;
     } else if (info.attrs.type == ANIMATE_FORWARD) return this.frame % max;

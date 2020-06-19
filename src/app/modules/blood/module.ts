@@ -136,9 +136,9 @@ async function BloodResources(injector: Injector): Promise<BuildResources> {
   const rfffs = await loadRffFs(injector);
   return {
     get: async name => {
-      const file = await rfffs.get(name);
-      if (file) return file;
-      return fs.get(name);
+      const file = await fs.get(name);
+      if (file != null) return file;
+      return rfffs.get(name);
     },
     list: async () => {
       const files = new Set<string>(await rfffs.list());

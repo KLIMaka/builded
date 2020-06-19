@@ -32,11 +32,11 @@ export async function BloodImplementationConstructor(injector: Injector) {
 }
 
 export function loadRorLinks(board: BloodBoard): RorLinks {
-  let linkRegistry = {};
+  const linkRegistry = {};
   for (let s = 0; s < board.numsprites; s++) {
-    let spr = board.sprites[s];
+    const spr = board.sprites[s];
     if (isUpperLink(spr) || isLowerLink(spr)) {
-      let id = spr.extraData.data1;
+      const id = spr.extraData.data1;
       let links = linkRegistry[id];
       if (links == undefined) {
         links = [];
@@ -46,9 +46,9 @@ export function loadRorLinks(board: BloodBoard): RorLinks {
     }
   }
 
-  let links = new RorLinks();
-  for (let linkId in linkRegistry) {
-    let spriteIds = linkRegistry[linkId];
+  const links = new RorLinks();
+  for (const linkId in linkRegistry) {
+    const spriteIds = linkRegistry[linkId];
     if (spriteIds.length != 2)
       throw new Error('Invalid link in sprites: ' + spriteIds);
     let [s1, s2] = spriteIds;

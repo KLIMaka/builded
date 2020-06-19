@@ -54,7 +54,7 @@ export class Binder {
   private stateHandlers: InputHandler[] = [];
   private stateValues: [string, any, any][][] = [];
 
-  public poolEvents(state: InputState): Collection<Message> {
+  public poolEvents(state: InputState): Iterable<Message> {
     for (let i = this.handlers.length - 1; i >= 0; i--) {
       if (this.handlers[i](state))
         return this.messages[i];

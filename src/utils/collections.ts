@@ -272,6 +272,22 @@ export function skip<T>(i: Iterable<T>, count: number): Iterable<T> {
   }
 }
 
+export function skipWhile<T>(i: Iterable<T>, f: (t: T) => boolean): Iterable<T> {
+  const iter = i[Symbol.iterator]();
+  for (; ;) {
+    const v = iter.next();
+    if (v.done || !f(v.value)) break;
+
+  }
+  return {
+    [Symbol.iterator]: () => {
+      return {
+        next: () => { return iter.next() }
+      }
+    }
+  }
+}
+
 export function* rect(w: number, h: number): Generator<[number, number]> {
   if (w < 0) throw new Error(`${w} < 0`)
   if (h < 0) throw new Error(`${h} < 0`)

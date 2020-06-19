@@ -1,9 +1,9 @@
-import { Deck, map, isEmpty, IndexedDeck } from "../collections";
+import { Deck, isEmpty, map } from "../collections";
 import { drawToCanvas } from "../imgutils";
 import { iter } from "../iter";
 import { int } from "../mathutils";
 import { BlendAlpha, fit, PixelProvider } from "../pixelprovider";
-import { drawGrid, Translator } from "./canvasgrid";
+import { drawGrid } from "./canvasgrid";
 
 export class PixelDataProvider {
 
@@ -86,6 +86,14 @@ export class DrawPanel {
   }
 
   public seOffset(offset: number): void { this.offset = offset }
+
+  public scrollToId(id: number): void {
+    this.offset = 0;
+    const found = !iter(this.idsProvider())
+      .skipWhile(i => { this.offset++; return i != id })
+      .isEmpty();
+    this.offset = found ? this.offset - 1 : 0;
+  }
 
   public setCellSize(w: number, h: number) {
     this.cellW = w;

@@ -22,7 +22,7 @@ export function animate(frame: number, info: ArtInfo) {
   const max = info.attrs.frames + 1;
   if (info.attrs.type == NO_ANIMATION) return 0;
   else if (info.attrs.type == OSCILLATING_ANIMATION) {
-    const x = this.frame % (max * 2 - 2);
+    const x = frame % (max * 2 - 2);
     return x >= max ? max * 2 - 2 - x : x;
   } else if (info.attrs.type == ANIMATE_FORWARD) return frame % max;
   else if (info.attrs.type == ANIMATE_BACKWARD) return max - frame % max;

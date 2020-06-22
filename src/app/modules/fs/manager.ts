@@ -1,11 +1,10 @@
 import { create, Dependency, Injector } from "../../../utils/injector";
-import { addDragAndDrop, span, Table } from "../../../utils/ui/ui";
+import { iter } from "../../../utils/iter";
+import { GridModel, IconTextRenderer, renderGrid } from "../../../utils/ui/renderers";
+import { addDragAndDrop, Element } from "../../../utils/ui/ui";
 import { BUS } from "../../apis/handler";
 import { UI, Ui, Window } from "../../apis/ui";
-import { GridModel, IconTextRenderer, renderGrid } from "../../../utils/ui/renderers";
 import { namedMessageHandler } from "../../edit/messages";
-import { iter } from "../../../utils/iter";
-import { Element } from "../../../utils/ui/ui";
 
 export interface FsManager {
   read(name: string): Promise<ArrayBuffer>;

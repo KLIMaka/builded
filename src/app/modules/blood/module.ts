@@ -1,4 +1,4 @@
-import { cloneBoard, loadBloodMap } from '../../../build/blood/maploader';
+import { cloneBoard, loadBloodMap, saveBloodMap } from '../../../build/blood/maploader';
 import { BloodBoard } from '../../../build/blood/structs';
 import { BloodImplementationConstructor } from '../../../build/blood/utils';
 import { ArtFile, ArtFiles } from '../../../build/formats/art';
@@ -6,7 +6,7 @@ import { RffFile } from '../../../build/formats/rff';
 import { createTexture } from '../../../utils/gl/textures';
 import { Dependency, Injector } from '../../../utils/injector';
 import { Stream } from '../../../utils/stream';
-import { BoardManipulator_, BuildResources, DEFAULT_BOARD, RESOURCES } from '../../apis/app';
+import { BoardManipulator_, BuildResources, DEFAULT_BOARD, RESOURCES, BOARD } from '../../apis/app';
 import { BUS } from '../../apis/handler';
 import { LoadBoard, namedMessageHandler } from '../../edit/messages';
 import { RAW_PAL, PIC_TAGS } from '../artselector';
@@ -15,6 +15,7 @@ import { FileSystem, FS } from '../fs/fs';
 import { PALSWAPS, PAL_TEXTURE, PLU_TEXTURE, SHADOWSTEPS } from '../gl/buildgl';
 import { MAP_NAMES, showMapSelection } from '../selectmap';
 import { Implementation_ } from '../view/boardrenderer3d';
+import { FS_MANAGER } from '../fs/manager';
 
 export const RAW_PLUs = new Dependency<Uint8Array[]>('Raw PLUs');
 
@@ -101,6 +102,15 @@ async function mapLoader(injector: Injector) {
   }));
 }
 
+async function mapSaver(injector: Injector) {
+  const bus = await injector.getInstance(BUS);
+  const fsmgr = await injector.getInstance(FS_MANAGER);
+  const board = await injector.getInstance(BOARD);
+  bus.connect(namedMessageHandler('save_map', async () => {
+    fsmgr.write('newboard.map', saveBloodMap(<BloodBoard>board()))
+  }));
+}
+
 async function getMapNames(injector: Injector) {
   const res = await injector.getInstance(RESOURCES);
   return () => res.list().then(list => list.filter(f => f.toLowerCase().endsWith('.map')));
@@ -178,4 +188,5 @@ export function BloodModule(injector: Injector) {
   injector.bindInstance(DEFAULT_BOARD, createBoard());
 
   injector.install(mapLoader);
+  injector.install(mapSaver);
 }

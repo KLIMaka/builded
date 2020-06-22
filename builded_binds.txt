@@ -57,6 +57,7 @@ ALT+SHIFT+DELETE delete_full
 CTRL+SHIFT+F    show_files
 0               print_info
 F3              load_map
+F2              save_map
 F4              print_usage
 SHIFT+mouse0    add_selection
 CTRL+D          clear_selection

@@ -2,7 +2,8 @@ export class Stream {
   private view: DataView;
   private offset: number;
   private littleEndian: boolean;
-  private currentBit = 7;
+  private aligned = true;
+  private currentBit = 0;
   private currentByte = 0;
 
   constructor(buf: ArrayBuffer, isLE: boolean) {
@@ -12,8 +13,8 @@ export class Stream {
   }
 
   private checkBitAlignment() {
-    if (this.currentBit != 7)
-      throw new Error('Unaligned read');
+    if (!this.aligned)
+      throw new Error(`Unaligned offset: ${this.offset}:${this.currentBit}`);
   }
 
   public buffer(): ArrayBuffer {
@@ -113,7 +114,7 @@ export class Stream {
 
   public readFloat(): number {
     this.checkBitAlignment();
-    const ret = this.view.getFloat32(this.offset += 4, this.littleEndian);
+    const ret = this.view.getFloat32(this.offset, this.littleEndian);
     this.offset += 4;
     return ret;
   }
@@ -140,6 +141,7 @@ export class Stream {
 
   public writeByteString(len: number, str: string): void {
     this.checkBitAlignment();
+    str = str.length > len ? str.substr(0, len) : str;
     for (const c of str) this.writeByte(c.charCodeAt(0));
     for (let i = 0; i < len - str.length; i++) this.writeByte(0);
   }
@@ -158,34 +160,27 @@ export class Stream {
     return slice;
   }
 
-  public writeArrayBuffer(buffer: ArrayBuffer): void {
+  public writeArrayBuffer(buffer: ArrayBuffer, len: number): void {
     const dst = new Uint8Array(this.view.buffer, this.offset);
-    dst.set(new Uint8Array(buffer));
-    this.offset += buffer.byteLength;
+    dst.set(new Uint8Array(buffer, 0, len));
+    this.offset += len;
   }
 
   public readBit(): number {
-    if (this.currentBit > 6) {
-      this.currentByte = this.readUByte();
-      this.currentBit = 0;
-    } else {
-      this.currentBit++;
-    }
-
-    return ((this.currentByte >> (this.currentBit)) & 1);
+    if (this.aligned) this.currentByte = this.readUByte();
+    const bit = ((this.currentByte >> (this.currentBit)) & 1);
+    this.currentBit = (this.currentBit + 1) % 8;
+    this.aligned = this.currentBit == 0;
+    return bit;
   }
 
   public writeBit(bit: boolean): void {
-    if (this.currentBit == 0) {
-      this.writeUByte(this.currentByte);
-      this.currentByte = 0;
-      this.currentBit = 7;
-    } else {
-      this.currentBit--;
-    }
-
-    if (bit) this.currentByte |= (1 << this.currentByte)
-    else this.currentByte &= (~(1 << this.currentByte) & 0xff);
+    if (this.aligned) this.currentByte = 0;
+    if (bit) this.currentByte |= (1 << this.currentBit)
+    else this.currentByte &= (~(1 << this.currentBit) & 0xff);
+    this.currentBit = (this.currentBit + 1) % 8;
+    this.aligned = this.currentBit == 0;
+    if (this.aligned) this.writeUByte(this.currentByte);
   }
 
   public readBits(bits: number): number {
@@ -199,8 +194,11 @@ export class Stream {
     return signed ? toSigned(value, bits) : value;
   }
 
-  public writeBits(count: number, value: number): void {
-
+  public writeBits(bits: number, value: number): void {
+    const signed = bits < 0;
+    bits = signed ? -bits : bits;
+    value = signed ? fromSigned(value, bits) : value;
+    for (let i = 0; i < bits; i++)  this.writeBit(((value >> i) & 1) == 1);
   }
 }
 
@@ -210,45 +208,58 @@ function toSigned(value: number, bits: number) {
     : value
 }
 
-type ScalarReader<T> = (s: Stream) => T;
+function fromSigned(value: number, bits: number) {
+  const mask = ((1 << bits) - 1);
+  return value > 0
+    ? value & mask
+    : (~(-value) & mask) + 1;
+}
 
-export interface Reader<T> {
+type ScalarReader<T> = (s: Stream) => T;
+type ScalarWriter<T> = (s: Stream, value: T) => void;
+
+export interface Accessor<T> {
   readonly read: ScalarReader<T>;
+  readonly write: ScalarWriter<T>;
   readonly size: number;
 }
 
 type AtomicArrayConstructor<T> = { new(buffer: ArrayBuffer, byteOffset: number, length: number): T };
 
-export interface AtomicReader<T, AT> extends Reader<T> {
+export interface AtomicReader<T, AT> extends Accessor<T> {
   readonly atomicArrayConstructor: AtomicArrayConstructor<AT>;
 }
 
-function reader<T>(read: ScalarReader<T>, size: number): Reader<T> {
-  return { read, size };
+function accessor<T>(read: ScalarReader<T>, write: ScalarWriter<T>, size: number): Accessor<T> {
+  return { read, write, size };
 }
 
-function atomicReader<T, AT>(read: ScalarReader<T>, size: number, atomicArrayConstructor: AtomicArrayConstructor<AT>): AtomicReader<T, AT> {
-  return { read, size, atomicArrayConstructor };
+function atomicReader<T, AT>(read: ScalarReader<T>, write: ScalarWriter<T>, size: number, atomicArrayConstructor: AtomicArrayConstructor<AT>): AtomicReader<T, AT> {
+  return { read, write, size, atomicArrayConstructor };
 }
 
-export const byte = atomicReader(s => s.readByte(), 1, Int8Array);
-export const ubyte = atomicReader(s => s.readUByte(), 1, Uint8Array);
-export const short = atomicReader(s => s.readShort(), 2, Int16Array);
-export const ushort = atomicReader(s => s.readUShort(), 2, Uint16Array);
-export const int = atomicReader(s => s.readInt(), 4, Int32Array);
-export const uint = atomicReader(s => s.readUInt(), 4, Uint32Array);
-export const float = atomicReader(s => s.readFloat(), 4, Float32Array);
-export const string = (len: number) => reader(s => s.readByteString(len), len);
-export const bits = (len: number) => reader(s => s.readBits(len), Math.abs(len) / 8);
-export const array = <T>(type: Reader<T>, len: number) => reader(s => readArray(s, type, len), type.size * len);
-export const atomic_array = <T>(type: AtomicReader<any, T>, len: number) => reader(s => readAtomicArray(s, type, len), type.size * len);
+export const byte = atomicReader(s => s.readByte(), (s, v) => s.writeByte(v), 1, Int8Array);
+export const ubyte = atomicReader(s => s.readUByte(), (s, v) => s.writeUByte(v), 1, Uint8Array);
+export const short = atomicReader(s => s.readShort(), (s, v) => s.writeShort(v), 2, Int16Array);
+export const ushort = atomicReader(s => s.readUShort(), (s, v) => s.writeUShort(v), 2, Uint16Array);
+export const int = atomicReader(s => s.readInt(), (s, v) => s.writeInt(v), 4, Int32Array);
+export const uint = atomicReader(s => s.readUInt(), (s, v) => s.writeUInt(v), 4, Uint32Array);
+export const float = atomicReader(s => s.readFloat(), (s, v) => s.writeFloat(v), 4, Float32Array);
+export const string = (len: number) => accessor(s => s.readByteString(len), (s, v) => s.writeByteString(len, v), len);
+export const bits = (len: number) => accessor(s => s.readBits(len), (s, v) => s.writeBits(len, v), Math.abs(len) / 8);
+export const array = <T>(type: Accessor<T>, len: number) => accessor(s => readArray(s, type, len), (s, v) => writeArray(s, type, len, v), type.size * len);
+export const atomic_array = <T>(type: AtomicReader<any, T>, len: number) => accessor(s => readAtomicArray(s, type, len), (s, v) => writeAtomicArray(s, type, len, v), type.size * len);
 export const struct = <T>(type: Constructor<T>) => new StructBuilder(type);
 
-const readArray = <T>(s: Stream, type: Reader<T>, len: number): Array<T> => {
+const readArray = <T>(s: Stream, type: Accessor<T>, len: number): Array<T> => {
   const arr = new Array<T>();
   for (let i = 0; i < len; i++)
     arr[i] = type.read(s);
   return arr;
+}
+
+const writeArray = <T>(s: Stream, type: Accessor<T>, len: number, value: Array<T>): void => {
+  for (let i = 0; i < len; i++) type.write(s, value[i]);
 }
 
 const readAtomicArray = <T>(s: Stream, type: AtomicReader<any, T>, len: number) => {
@@ -257,15 +268,19 @@ const readAtomicArray = <T>(s: Stream, type: AtomicReader<any, T>, len: number) 
   return new ctr(buffer, 0, len * type.size);
 }
 
-type Constructor<T> = { new(): T };
-type Field<T> = [T, Reader<any>];
+const writeAtomicArray = <T>(s: Stream, type: AtomicReader<any, T>, len: number, value: T) => {
+  s.writeArrayBuffer((<any>value).buffer, len);
+}
 
-class StructBuilder<T, K extends keyof T> implements Reader<T> {
+type Constructor<T> = { new(): T };
+type Field<T> = [T, Accessor<any>];
+
+class StructBuilder<T, K extends keyof T> implements Accessor<T> {
   private fields: Field<K>[] = [];
   public size = 0;
   constructor(private ctr: Constructor<T>) { }
 
-  field(f: K, r: Reader<any>) {
+  field(f: K, r: Accessor<any>) {
     this.fields.push([f, r]);
     this.size += r.size;
     return this;
@@ -278,6 +293,13 @@ class StructBuilder<T, K extends keyof T> implements Reader<T> {
       struct[name] = reader.read(s);
     }
     return struct;
+  }
+
+  write(s: Stream, value: T) {
+    for (let i = 0; i < this.fields.length; i++) {
+      const [name, accessor] = this.fields[i];
+      accessor.write(s, value[name]);
+    }
   }
 }
 

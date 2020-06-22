@@ -163,6 +163,7 @@ export function copyWallStats(stat: WallStats): WallStats {
   nstat.translucentReversed = stat.translucentReversed;
   nstat.xflip = stat.xflip;
   nstat.yflip = stat.yflip;
+  nstat.unk = stat.unk;
   return nstat;
 }
 
@@ -200,6 +201,7 @@ export function newWallStats() {
   stat.translucentReversed = 0;
   stat.xflip = 0;
   stat.yflip = 0;
+  stat.unk = 0;
   return stat;
 }
 
@@ -234,6 +236,7 @@ export function copySectorStats(stat: SectorStats): SectorStats {
   nstat.swapXY = stat.swapXY;
   nstat.xflip = stat.xflip;
   nstat.yflip = stat.yflip;
+  nstat.unk = stat.unk;
   return nstat;
 }
 
@@ -261,6 +264,7 @@ export function copySector(sector: Sector): Sector {
   nsector.visibility = sector.visibility;
   nsector.wallnum = 0;
   nsector.wallptr = 0;
+  nsector.filler = 0;
   return nsector;
 }
 
@@ -273,6 +277,7 @@ export function newSectorStats() {
   stat.swapXY = 0;
   stat.xflip = 0;
   stat.yflip = 0;
+  stat.unk = 0;
   return stat;
 }
 
@@ -300,6 +305,7 @@ export function newSector(): Sector {
   sector.visibility = 0;
   sector.wallnum = 0;
   sector.wallptr = 0;
+  sector.filler = 0;
   return sector;
 }
 
@@ -316,6 +322,7 @@ export function newSpriteStats() {
   stats.type = FACE_SPRITE;
   stats.xflip = 0;
   stats.yflip = 0;
+  stats.unk = 0;
   return stats;
 }
 
@@ -342,6 +349,7 @@ export function newSprite(x: number, y: number, z: number): Sprite {
   sprite.yvel = 0;
   sprite.xrepeat = 64;
   sprite.yrepeat = 64;
+  sprite.filler = 0;
   return sprite;
 }
 
@@ -358,6 +366,7 @@ export function copySpriteStats(stats: SpriteStats) {
   nstats.type = stats.type;
   nstats.xflip = stats.xflip;
   nstats.yflip = stats.yflip;
+  stats.unk = stats.unk;
   return nstats;
 }
 

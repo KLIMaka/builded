@@ -1,10 +1,16 @@
-import { array, atomic_array, bits, int, short, Stream, struct, ubyte } from '../../utils/stream';
-import { BloodBoard, BloodSector, BloodSprite, BloodWall, SectorExtra, SpriteExtra, WallExtra } from './structs';
+import { range } from '../../utils/collections';
+import { iter } from '../../utils/iter';
+import { array, atomic_array, bits, byte, int, short, Stream, struct, ubyte } from '../../utils/stream';
 import { Header1 } from '../board/structs';
-import { sectorStruct, wallStruct, spriteStruct } from '../maploader';
+import { sectorStruct, spriteStruct, wallStruct } from '../maploader';
+import { BloodBoard, BloodSector, BloodSprite, BloodWall, SectorExtra, SpriteExtra, WallExtra } from './structs';
 
 
 function decryptBuffer(buffer: Uint8Array, size: number, key: number) {
+  for (let i = 0; i < size; i++) buffer[i] = buffer[i] ^ (key + i);
+}
+
+function encryptBuffer(buffer: Uint8Array, size: number, key: number) {
   for (let i = 0; i < size; i++) buffer[i] = buffer[i] ^ (key + i);
 }
 
@@ -216,7 +222,7 @@ function readSectors(header3: Header3, stream: Stream): BloodSector[] {
   for (let i = 0; i < header3.numSectors; i++) {
     const buf = sectorReader.read(stream);
     decryptBuffer(buf, sectorStruct.size, dec);
-    const sector = <BloodSector>sectorStruct.read(createStream(buf));
+    const sector = cloneSector(<BloodSector>sectorStruct.read(createStream(buf)));
     sectors.push(sector);
     if (sector.extra != 0 && sector.extra != 65535)
       sector.extraData = sectorExtraStruct.read(stream);
@@ -231,7 +237,7 @@ function readWalls(header3: any, stream: Stream): BloodWall[] {
   for (let i = 0; i < header3.numWalls; i++) {
     const buf = wallReader.read(stream);
     decryptBuffer(buf, wallStruct.size, dec);
-    const wall = <BloodWall>wallStruct.read(createStream(buf));
+    const wall = cloneWall(<BloodWall>wallStruct.read(createStream(buf)));
     walls.push(wall);
     if (wall.extra != 0 && wall.extra != 65535)
       wall.extraData = wallExtraStruct.read(stream);
@@ -246,7 +252,7 @@ function readSprites(header3: any, stream: Stream): BloodSprite[] {
   for (let i = 0; i < header3.numSprites; i++) {
     const buf = spriteReader.read(stream);
     decryptBuffer(buf, spriteStruct.size, dec);
-    const sprite = <BloodSprite>spriteStruct.read(createStream(buf));
+    const sprite = cloneSprite(<BloodSprite>spriteStruct.read(createStream(buf)));
     sprites.push(sprite);
     if (sprite.extra != 0 && sprite.extra != 65535)
       sprite.extraData = spriteExtraStruct.read(stream);
@@ -288,6 +294,114 @@ export function loadBloodMap(stream: Stream): BloodBoard {
   const sprites = readSprites(header3, stream);
 
   return createBoard(version, header1, header3, sectors, walls, sprites);
+}
+
+function hasExtra(extra: number) { return extra != 0 && extra != 65535 }
+
+function getSize(board: BloodBoard): number {
+  const extraSectors = iter(range(0, board.numsectors)).filter(s => hasExtra(board.sectors[s].extra)).collect().length;
+  const extraWalls = iter(range(0, board.numwalls)).filter(w => hasExtra(board.walls[w].extra)).collect().length;
+  const extraSprites = iter(range(0, board.numsprites)).filter(s => hasExtra(board.sprites[s].extra)).collect().length;
+  return 128 + 2 + 6 +
+    header1Struct.size +
+    header2Struct.size +
+    header3Struct.size +
+    board.numsectors * sectorStruct.size +
+    extraSectors * sectorExtraStruct.size +
+    board.numwalls * wallStruct.size +
+    extraWalls * wallExtraStruct.size +
+    board.numsprites * spriteStruct.size +
+    extraSprites * spriteExtraStruct.size;
+}
+
+export function saveBloodMap(board: BloodBoard): ArrayBuffer {
+  const tmpBuffer = new ArrayBuffer(1024);
+  const tmpArray = new Uint8Array(tmpBuffer);
+  const tmpStream = new Stream(tmpBuffer, true);
+  const buffer = new ArrayBuffer(getSize(board));
+  const stream = new Stream(buffer, true);
+
+  array(byte, 4).write(stream, [0x42, 0x4c, 0x4d, 0x1a]);
+  short.write(stream, board.version);
+
+  const header1 = createHeader1(board);
+  header1Struct.write(tmpStream, header1);
+  encryptBuffer(tmpArray, header1Struct.size, 0x4d);
+  atomic_array(ubyte, header1Struct.size).write(stream, tmpArray);
+
+  tmpArray.fill(0, 0, header2Struct.size);
+  atomic_array(ubyte, header2Struct.size).write(stream, tmpArray);
+
+  const header3 = createHeader3(board);
+  tmpStream.setOffset(0);
+  header3Struct.write(tmpStream, header3);
+  encryptBuffer(tmpArray, header3Struct.size, 0x68);
+  atomic_array(ubyte, header3Struct.size).write(stream, tmpArray);
+
+  tmpArray.fill(0, 0, 128 + 2);
+  atomic_array(ubyte, 128 + 2).write(stream, tmpArray);
+
+  writeSectors(board, tmpStream, tmpArray, stream);
+  writeWalls(board, tmpStream, tmpArray, stream);
+  writeSprites(board, tmpStream, tmpArray, stream);
+
+  return buffer;
+}
+
+function writeSprites(board: BloodBoard, tmpStream: Stream, tmpArray: Uint8Array, stream: Stream) {
+  for (let i = 0; i < board.numsprites; i++) {
+    const sprite = board.sprites[i];
+    tmpStream.setOffset(0);
+    spriteStruct.write(tmpStream, sprite);
+    encryptBuffer(tmpArray, spriteStruct.size, 0x4d);
+    atomic_array(ubyte, spriteStruct.size).write(stream, tmpArray);
+    if (sprite.extra != 0 && sprite.extra != 65535)
+      spriteExtraStruct.write(stream, sprite.extraData);
+  }
+}
+
+function writeWalls(board: BloodBoard, tmpStream: Stream, tmpArray: Uint8Array, stream: Stream) {
+  for (let i = 0; i < board.numwalls; i++) {
+    const wall = board.walls[i];
+    tmpStream.setOffset(0);
+    wallStruct.write(tmpStream, wall);
+    encryptBuffer(tmpArray, wallStruct.size, 0x4d);
+    atomic_array(ubyte, wallStruct.size).write(stream, tmpArray);
+    if (wall.extra != 0 && wall.extra != 65535)
+      wallExtraStruct.write(stream, wall.extraData);
+  }
+}
+
+function writeSectors(board: BloodBoard, tmpStream: Stream, tmpArray: Uint8Array, stream: Stream) {
+  for (let i = 0; i < board.numsectors; i++) {
+    const sector = board.sectors[i];
+    tmpStream.setOffset(0);
+    sectorStruct.write(tmpStream, sector);
+    encryptBuffer(tmpArray, sectorStruct.size, 0);
+    atomic_array(ubyte, sectorStruct.size).write(stream, tmpArray);
+    if (sector.extra != 0 && sector.extra != 65535)
+      sectorExtraStruct.write(stream, sector.extraData);
+  }
+}
+
+function createHeader3(board: BloodBoard) {
+  const header3 = new Header3();
+  header3.mapRevisions = 0;
+  header3.numSectors = board.numsectors;
+  header3.numWalls = board.numwalls;
+  header3.numSprites = board.numsprites;
+  return header3;
+}
+
+function createHeader1(board: BloodBoard) {
+  const header1 = new Header1();
+  header1.startAng = board.ang;
+  header1.startSec = board.cursectnum;
+  header1.startX = board.posx;
+  header1.startY = board.posy;
+  header1.startZ = board.posz;
+  header1.unk = 0;
+  return header1;
 }
 
 export function cloneSector(sector: BloodSector): BloodSector {

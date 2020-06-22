@@ -126,6 +126,23 @@ export function loadBuildMap(stream: Stream): Board {
   return brd;
 }
 
+export function saveBuildMap(board: Board): ArrayBuffer {
+  const size = boardStruct.size
+    + 2 + sectorStruct.size * board.numsectors
+    + 2 + wallStruct.size * board.numwalls +
+    + 2 + spriteStruct.size * board.numsprites;
+  const buffer = new ArrayBuffer(size);
+  const stream = new Stream(buffer, true);
+  boardStruct.write(stream, board);
+  ushort.write(stream, board.numsectors);
+  array(sectorStruct, board.numsectors).write(stream, board.sectors);
+  ushort.write(stream, board.numwalls);
+  array(wallStruct, board.numwalls).write(stream, board.walls);
+  ushort.write(stream, board.numsprites);
+  array(spriteStruct, board.numsprites).write(stream, board.sprites);
+  return buffer;
+}
+
 export function cloneSector(sector: Sector): Sector {
   let sectorCopy = new Sector();
   Object.assign(sectorCopy, sector);

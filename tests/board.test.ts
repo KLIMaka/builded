@@ -5,7 +5,11 @@ import { ArtInfo, ArtInfoProvider, Attributes } from '../src/build/formats/art';
 import { inPolygon, inSector } from '../src/build/utils';
 import { map, wrap } from '../src/utils/collections';
 import { splitSector } from '../src/build/board/splitsector';
+import { saveBuildMap, loadBuildMap } from '../src/build/maploader';
+import { saveBloodMap, loadBloodMap, cloneBoard } from '../src/build/blood/maploader';
 import { loopPoints, loopWalls, loopStart } from '../src/build/board/internal';
+import { Stream } from '../src/utils/stream';
+import { BloodBoard } from '../src/build/blood/structs';
 
 const REFS = new BuildReferenceTrackerImpl();
 const ART_PROVIDER: ArtInfoProvider = {
@@ -15,6 +19,9 @@ const ART_PROVIDER: ArtInfoProvider = {
 }
 function createEmptyBoard() {
   const board = new Board();
+  board.cursectnum = board.ang = 0;
+  board.posx = board.posy = board.posz = 0;
+  board.version = 0;
   board.walls = [];
   board.sectors = [];
   board.sprites = [];
@@ -32,6 +39,18 @@ function createBoardWSector() {
   createNewSector(board, wrap([[0, 0], [1024, 0], [1024, 1024], [0, 1024]]), refs);
   return board;
 }
+
+test('save_load', () => {
+  const board = createBoardWSector();
+  const buffer = saveBuildMap(board);
+  expect(loadBuildMap(new Stream(buffer, true))).toStrictEqual(board);
+})
+
+test('save_load Blood', () => {
+  const board = cloneBoard(<BloodBoard>createBoardWSector());
+  const buffer = saveBloodMap(board);
+  expect(loadBloodMap(new Stream(buffer, true))).toStrictEqual(board);
+})
 
 test('createNewSector', () => {
   const board = createBoardWSector();

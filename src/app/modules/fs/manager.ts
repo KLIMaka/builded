@@ -1,10 +1,11 @@
 import { create, Dependency, Injector } from "../../../utils/injector";
 import { iter } from "../../../utils/iter";
-import { GridModel, IconTextRenderer, renderGrid } from "../../../utils/ui/renderers";
+import { GridModel, IconTextRenderer, renderGrid, IconText } from "../../../utils/ui/renderers";
 import { addDragAndDrop, Element } from "../../../utils/ui/ui";
 import { BUS } from "../../apis/handler";
 import { UI, Ui, Window } from "../../apis/ui";
 import { namedMessageHandler } from "../../edit/messages";
+import { save } from "../../../utils/filesave";
 
 export interface FsManager {
   read(name: string): Promise<ArrayBuffer>;
@@ -29,6 +30,7 @@ class FileBrowser {
       .toolbar(ui.builder.toolbarBuilder()
         .startGroup()
         .button('icon-arrows-ccw', () => this.refreshContent())
+        .button('icon-download', () => this.downloadSelected())
         .button('icon-trash', () => this.deleteSelected())
         .endGroup())
       .build();
@@ -51,11 +53,12 @@ class FileBrowser {
   private gridModel = this.createGridModel();
   private createGridModel(): GridModel {
     const columns = [IconTextRenderer];
+    const item = (f: string) => { return { text: f, icon: this.getIcon(f), style: this.selected.has(f) ? "selected" : "" } };
     const self = this;
     return {
-      async rows() { return iter(await self.manager.list()).map(f => [[f, self.getIcon(f)]]) },
+      async rows() { return iter(await self.manager.list()).map(f => [item(f)]) },
       columns() { return columns },
-      onClick(row: any[], rowElement: Element) { self.toggleItem(rowElement.elem(), row[0][0]) }
+      onClick(row: [IconText], rowElement: Element) { self.toggleItem(rowElement.elem(), row[0].text) }
     }
   }
 
@@ -83,7 +86,18 @@ class FileBrowser {
   }
 
   private async deleteSelected() {
-    for (const file of this.selected) await this.manager.delete(file)
+    for (const file of this.selected) {
+      await this.manager.delete(file)
+      this.selected.delete(file);
+    }
+    this.refreshContent();
+  }
+
+  private async downloadSelected() {
+    for (const file of this.selected) {
+      save(await this.manager.read(file), file);
+      this.selected.delete(file);
+    }
     this.refreshContent();
   }
 

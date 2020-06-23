@@ -11,10 +11,12 @@ export interface GridModel {
   onClick(row: any[], rowElement: Element): void;
 }
 
-export function IconTextRenderer(value: [string, string]): Element {
-  const text = span().className('icon-text').text(value[0]);
-  if (value[1] != null)
-    text.append(span().className('icon pull-left ' + value[1]));
+export type IconText = { text: string, icon: string, style: string };
+
+export function IconTextRenderer(value: IconText): Element {
+  const text = span().className('icon-text').text(value.text);
+  if (value.style != null) text.className(value.style);
+  if (value.icon != null) text.append(span().className('icon pull-left ' + value.icon));
   return text;
 }
 

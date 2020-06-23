@@ -2,7 +2,7 @@ import { BuildReferenceTrackerImpl } from '../src/app/modules/default/reftracker
 import { Board, Wall } from '../src/build/board/structs';
 import { clockwise, createInnerLoop, createNewSector, deleteLoop, deleteSector, deleteWall, fillInnerLoop, findContainingSector, findContainingSectorMidPoints, findSectorsAtPoint, innerSectors, isOuterLoop, loopInnerSectors, loopWallsFull, mergePoints, splitWall, wallInSector, walllen, wallsBetween } from '../src/build/boardutils';
 import { ArtInfo, ArtInfoProvider, Attributes } from '../src/build/formats/art';
-import { inPolygon, inSector } from '../src/build/utils';
+import { inPolygon, inSector, findSector } from '../src/build/utils';
 import { map, wrap } from '../src/utils/collections';
 import { splitSector } from '../src/build/board/splitsector';
 import { saveBuildMap, loadBuildMap } from '../src/build/maploader';
@@ -315,6 +315,24 @@ test('splitSector2', () => {
   expect([...map(loopWalls(board, 8), NEXT_WALL)]).toStrictEqual([13, 5, 4]);
   expect([...map(loopWalls(board, 11), NEXT_WALL)]).toStrictEqual([7, 6, 8]);
 });
+
+test('splitSector3', () => {
+  const COORDS = (w: number): number[] => [board.walls[w].x, board.walls[w].y];
+  const board = createBoardWSector();
+  splitWall(board, 0, 512, 0, ART_PROVIDER, REFS);
+  splitWall(board, 3, 512, 1024, ART_PROVIDER, REFS);
+
+  expect(board.numwalls).toBe(6);
+  expect([...map(loopWalls(board, 0), COORDS)]).toStrictEqual([[0, 0], [512, 0], [1024, 0], [1024, 1024], [512, 1024], [0, 1024]]);
+
+  createInnerLoop(board, 0, wrap([[100, 100], [200, 100], [200, 200], [100, 200]]), REFS);
+  expect(findSector(board, 150, 150, 0)).toBe(-1);
+
+  splitSector(board, 0, wrap([[512, 0], [512, 1024]]), REFS);
+  expect(findSector(board, 150, 150, 0)).toBe(-1);
+  expect(findSector(board, 300, 300, 0)).toBe(1);
+  expect(findSector(board, 600, 600, 0)).toBe(0);
+})
 
 test('inPolygon', () => {
   const LOOP = wrap(<[number, number][]>[[-256, 384], [-256, -384], [768, -256], [768, 384]]);

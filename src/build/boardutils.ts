@@ -227,6 +227,7 @@ export function insertWall(board: Board, wallId: number, x: number, y: number, a
 }
 
 export function splitWall(board: Board, wallId: number, x: number, y: number, art: ArtInfoProvider, refs: BuildReferenceTracker): number {
+  if (wallId < 0 || wallId >= board.numwalls) throw new Error('Invalid wall: ' + wallId);
   let wall = board.walls[wallId];
   insertWall(board, wallId, x, y, art, refs);
   if (wall.nextwall != -1) {

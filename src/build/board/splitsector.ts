@@ -1,11 +1,13 @@
 import { BuildReferenceTracker } from '../../app/apis/app';
-import { butLast, Collection, first, last, map, range, reversed, wrap } from '../../utils/collections';
+import { Collection, first, last, map, range, reversed, wrap } from '../../utils/collections';
 import { iter } from '../../utils/iter';
 import { Board, Wall } from '../board/structs';
 import { inPolygon, sectorWalls } from '../utils';
-import { addSector, clockwise, copySector, createNewWalls, loopPoints, loopStart, loopWalls, wallInSector, wallsBetween, SectorBuilder } from './internal';
+import { addSector, clockwise, copySector, createNewWalls, loopPoints, loopStart, loopWalls, SectorBuilder, wallInSector, wallsBetween } from './internal';
 
-function loopInPolygon(board: Board, loopId: number, polygon: Iterable<[number, number]>) {
+type point2d = [number, number];
+
+function loopInPolygon(board: Board, loopId: number, polygon: Iterable<point2d>) {
   for (const w of loopWalls(board, loopId)) {
     const wall = board.walls[w];
     if (!inPolygon(wall.x, wall.y, polygon)) return false;
@@ -13,7 +15,7 @@ function loopInPolygon(board: Board, loopId: number, polygon: Iterable<[number, 
   return true;
 }
 
-function checkSplitSector(board: Board, sectorId: number, points: Collection<[number, number]>): [number, number, number] {
+function checkSplitSector(board: Board, sectorId: number, points: Collection<point2d>): [number, number, number] {
   const [fx, fy] = first(points);
   const [lx, ly] = last(points);
   const firstWall = wallInSector(board, sectorId, fx, fy);
@@ -26,7 +28,7 @@ function checkSplitSector(board: Board, sectorId: number, points: Collection<[nu
   return [firstWall, lastWall, start];
 }
 
-function splitSectorImpl(board: Board, sectorId: number, firstWall: number, lastWall: number, start: number, points: Collection<[number, number]>, refs: BuildReferenceTracker) {
+function splitSectorImpl(board: Board, sectorId: number, firstWall: number, lastWall: number, start: number, points: Collection<point2d>, refs: BuildReferenceTracker) {
   const wallMapper = (w: number) => board.walls[w];
   const sector = board.sectors[sectorId];
   const refWall = board.walls[firstWall];
@@ -47,7 +49,7 @@ function splitSectorImpl(board: Board, sectorId: number, firstWall: number, last
   newSectorBuilder.build(board, newSectorId, refs);
   const newSector = board.sectors[newSectorId];
   const wallEnd = newSector.wallptr + firstLoopLength - 1;
-  const mwalls = iter(range(wallEnd, wallEnd - lengthWoLast)).map(w => <[number, number]>[newSectorId, w]).collect();
+  const mwalls = iter(range(wallEnd, wallEnd - lengthWoLast)).map(w => <point2d>[newSectorId, w]).collect();
   const reversedWoLast = iter(reversed(points)).take(lengthWoLast);
   oldSectorBuilder
     .addWalls(createNewWalls(reversedWoLast, mwalls, refWall, board))
@@ -60,20 +62,20 @@ function splitSectorImpl(board: Board, sectorId: number, firstWall: number, last
   oldSectorBuilder.build(board, sectorId, refs);
 }
 
-const POINT_MAPPER = (w: Wall) => <[number, number]>[w.x, w.y];
-function getSplitLoop(board: Board, firstWall: number, lastWall: number, points: Iterable<[number, number]>): [Iterable<[number, number]>, Iterable<Wall>, Iterable<[number, number]>] {
-  const newWalls = butLast(points);
-  const existedWalls = wallsBetween(board, lastWall, firstWall);
-  const loopPoly = iter(map(existedWalls, POINT_MAPPER)).chain(newWalls);
+const POINT_MAPPER = (w: Wall) => <point2d>[w.x, w.y];
+function getSplitLoop(board: Board, firstWall: number, lastWall: number, points: Iterable<point2d>): [Iterable<point2d>, Iterable<Wall>, Iterable<point2d>] {
+  const newWalls = iter(points).butLast().collect();
+  const existedWalls = [...wallsBetween(board, lastWall, firstWall)];
+  const loopPoly = iter(map(existedWalls, POINT_MAPPER)).chain(newWalls).collect();
   return [newWalls, existedWalls, loopPoly];
 }
 
-function checkPointsOrder(board: Board, firstWall: number, lastWall: number, points: Collection<[number, number]>): boolean {
+function checkPointsOrder(board: Board, firstWall: number, lastWall: number, points: Collection<point2d>): boolean {
   const [, , loop] = getSplitLoop(board, firstWall, lastWall, points);
   return clockwise(loop);
 }
 
-export function splitSector(board: Board, sectorId: number, points: Collection<[number, number]>, refs: BuildReferenceTracker) {
+export function splitSector(board: Board, sectorId: number, points: Collection<point2d>, refs: BuildReferenceTracker) {
   const [firstWall, lastWall, loop] = checkSplitSector(board, sectorId, points);
   if (checkPointsOrder(board, firstWall, lastWall, points)) {
     splitSectorImpl(board, sectorId, firstWall, lastWall, loop, points, refs);

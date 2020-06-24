@@ -23,22 +23,33 @@ function normals(n: Vec3Array) {
 }
 
 function getWallCoords(x1: number, y1: number, x2: number, y2: number,
-  slope: any, nextslope: any, heinum: number, nextheinum: number, z: number, nextz: number, check: boolean, line = false): number[] {
+  slope: any, nextslope: any, heinum: number, nextheinum: number, z: number, nextz: number, check: boolean): number[] {
   const z1 = (slope(x1, y1, heinum) + z) / ZSCALE;
   const z2 = (slope(x2, y2, heinum) + z) / ZSCALE;
   const z3 = (nextslope(x2, y2, nextheinum) + nextz) / ZSCALE;
   const z4 = (nextslope(x1, y1, nextheinum) + nextz) / ZSCALE;
-  if (check) {
-    if (line && z4 > z1 && z3 > z2) return null;
-    if (!line && z4 >= z1 && z3 >= z2) return null;
+  if (check && z4 >= z1 && z3 >= z2) return null;
+
+  if (z4 > z1) {
+    const d = 1 / ((z4 - z1) / (z2 - z3));
+    const x1_ = x1 + (x2 - x1) * d;
+    const y1_ = y1 + (y2 - y1) * d;
+    const z1_ = z1 + (z2 - z1) * d;
+    return [x1_, y1_, z1_, x2, y2, z2, x2, y2, z3, x1_, y1_, z1_];
+  } else if (z3 > z2) {
+    const d = 1 / ((z1 - z4) / (z3 - z2));
+    const x2_ = x1 + (x2 - x1) * d;
+    const y2_ = y1 + (y2 - y1) * d;
+    const z2_ = z1 + (z2 - z1) * d;
+    return [x1, y1, z1, x2_, y2_, z2_, x2_, y2_, z2_, x1, y1, z4];
   }
+
   return [x1, y1, z1, x2, y2, z2, x2, y2, z3, x1, y1, z4];
 }
 
 function applyWallTextureTransform(wall: Wall, wall2: Wall, info: ArtInfo, base: number, originalWall: Wall = wall, texMat: Mat4Array) {
   let wall1 = wall;
-  if (originalWall.cstat.xflip)
-    [wall1, wall2] = [wall2, wall1];
+  if (originalWall.cstat.xflip) [wall1, wall2] = [wall2, wall1];
   const flip = wall == originalWall ? 1 : -1;
   const tw = info.w;
   const th = info.h;
@@ -82,16 +93,12 @@ function writeNormal(buff: BuildBuffer, n: number[]) {
   buff.writeNormal(3, n[9], n[10], n[11]);
 }
 
-function genQuad(c: number[], n: number[], t: Mat4Array, pal: number, shade: number, buff: BuildBuffer, onesided: number = 1) {
-  buff.allocate(4, onesided ? 6 : 12);
-
+function genQuad(c: number[], n: number[], t: Mat4Array, pal: number, shade: number, buff: BuildBuffer) {
+  buff.allocate(4, 6);
   writePos(buff, c);
   writeTransformTc(buff, t, c, pal, shade);
   writeNormal(buff, n);
-
   buff.writeQuad(0, 0, 1, 2, 3);
-  if (!onesided)
-    buff.writeQuad(6, 3, 2, 1, 0);
 }
 
 function getMaskedWallCoords(x1: number, y1: number, x2: number, y2: number, slope: any, nextslope: any,

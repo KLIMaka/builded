@@ -2,7 +2,7 @@ import { ArtInfo } from "../../../../build/formats/art";
 import { Wall } from "../../../../build/board/structs";
 import { createSlopeCalculator, sectorOfWall, wallNormal, ZSCALE } from "../../../../build/utils";
 import { mat4, Mat4Array, vec3, Vec3Array, vec4 } from "../../../../libs_js/glmatrix";
-import { len2d } from "../../../../utils/mathutils";
+import { len2d, len3d } from "../../../../utils/mathutils";
 import { Builders } from "../../../apis/builder";
 import { WallRenderable } from "../../../apis/renderable";
 import { BuildBuffer } from "../../gl/buffers";
@@ -31,13 +31,13 @@ function getWallCoords(x1: number, y1: number, x2: number, y2: number,
   if (check && z4 >= z1 && z3 >= z2) return null;
 
   if (z4 > z1) {
-    const d = 1 / ((z4 - z1) / (z2 - z3));
+    const d = 1 - 1 / ((z4 - z1) / (z2 - z3) + 1);
     const x1_ = x1 + (x2 - x1) * d;
     const y1_ = y1 + (y2 - y1) * d;
     const z1_ = z1 + (z2 - z1) * d;
     return [x1_, y1_, z1_, x2, y2, z2, x2, y2, z3, x1_, y1_, z1_];
   } else if (z3 > z2) {
-    const d = 1 / ((z1 - z4) / (z3 - z2));
+    const d = 1 - 1 / ((z1 - z4) / (z3 - z2) + 1);
     const x2_ = x1 + (x2 - x1) * d;
     const y2_ = y1 + (y2 - y1) * d;
     const z2_ = z1 + (z2 - z1) * d;

@@ -93,13 +93,11 @@ export function text(builder: PointSpriteBuilder, text: string, posx: number, po
 
 export function writeText(buff: BuildBuffer, bufferOff: number, text: string, charW: number, charH: number, posx: number, posy: number, posz: number) {
   const tiler = new Tiler();
-  for (let i = 0; i < text.length; i++) {
-    tiler.put(i + 1, 1, text.charCodeAt(i));
-    tiler.put(i + 1, 0, 3);
-  }
-  tiler.put(0, 0, 2);
-  tiler.put(0, 1, 0);
-  tiler.put(text.length + 1, 1, 1);
+  for (let i = 0; i < text.length; i++) tiler.put(i + 1, 1, text.charCodeAt(i)).put(i + 1, 0, 3);
+  tiler
+    .put(0, 0, 2)
+    .put(0, 1, 0)
+    .put(text.length + 1, 1, 1);
   let vtxoff = bufferOff * 4;
   let idxoff = bufferOff * 6;
   const charTexSize = 1 / 16;

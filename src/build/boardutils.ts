@@ -841,7 +841,7 @@ function pointInterpolator(lh: [number, number], rh: [number, number], t: number
   return <[number, number]>[NumberInterpolator(lh[0], rh[0], t), NumberInterpolator(lh[1], rh[1], t)]
 }
 
-export function findContainingSectorMidPoints(board: Board, points: Iterable<[number, number]>) {
+export function findContainingSectorMidPoints(board: Board, points: Iterable<[number, number]>): Set<number> {
   const interpolated = interpolate(points, pointInterpolator);
   return findContainingSector(board, interpolated);
 }

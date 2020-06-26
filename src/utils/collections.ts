@@ -171,7 +171,6 @@ export function iterIsEmpty<T>(i: Iterable<T>): boolean {
   return ii.next().done;
 }
 
-
 export function findFirst<T>(i: Iterable<T>, f: (t: T) => boolean, def: T): T {
   for (const t of i) if (f(t)) return t;
   return def;

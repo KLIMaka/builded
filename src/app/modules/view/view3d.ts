@@ -96,13 +96,15 @@ export class View3d extends MessageHandlerReflective implements View {
   Frame(msg: Frame) {
     this.invalidateTarget();
     build2gl(this.cursor, this.snapTarget().coords);
-    this.buildgl.setCursorPosiotion(this.cursor[0], this.cursor[1], this.cursor[2]);
     this.aspect = this.gl.drawingBufferWidth / this.gl.drawingBufferHeight;
+    this.buildgl.setCursorPosiotion(this.cursor[0], this.cursor[1], this.cursor[2]);
     this.buildgl.newFrame(this.gl);
     this.renderer.draw(this);
+    this.move(msg.dt);
+  }
 
+  private move(dt: number) {
     const state = this.state;
-    const dt = msg.dt;
     const cameraSpeed = state.get<number>('camera_speed');
 
     this.forwardDamper.set(0);

@@ -137,7 +137,6 @@ export async function DrawSectorModule(injector: Injector) {
 export class DrawSector extends MessageHandlerReflective {
   private points = new Deck<[number, number]>();
   private pointer = vec3.create();
-  private hintSector = -1;
   private isRect = true;
 
   constructor(
@@ -152,8 +151,7 @@ export class DrawSector extends MessageHandlerReflective {
 
   private update() {
     if (this.predrawUpdate()) return;
-
-    let z = this.contour.getZ();
+    const z = this.contour.getZ();
     const [x, y] = this.view.snapTarget().coords;
     vec3.set(this.pointer, x, y, z);
 
@@ -187,16 +185,12 @@ export class DrawSector extends MessageHandlerReflective {
       vec3.set(this.pointer, x, y, z);
       this.contour.setZ(z / ZSCALE);
       this.contour.updateLastPoint(x, y);
-      this.hintSector = -1;
     } else {
       let [x, y,] = target.coords;
       let z = this.getPointerZ(board, target);
       vec3.set(this.pointer, x, y, z);
       this.contour.setZ(z / ZSCALE);
       this.contour.updateLastPoint(x, y);
-      if (target.entity.isSector()) this.hintSector = target.entity.id;
-      if (target.entity.isSprite()) this.hintSector = board.sprites[target.entity.id].sectnum;
-      if (target.entity.isWall()) this.hintSector = sectorOfWall(board, target.entity.id);
     }
     return true;
   }
@@ -304,7 +298,7 @@ export class DrawSector extends MessageHandlerReflective {
     this.update();
   }
 
-  public Render(msg: Render, ) {
+  public Render(msg: Render,) {
     this.contour.getRenderable().accept(msg.consumer);
   }
 }

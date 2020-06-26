@@ -2,8 +2,9 @@
 export class Tiler {
   private tiles: Map<string, number> = new Map();
 
-  public put(x: number, y: number, tileId: number) {
+  public put(x: number, y: number, tileId: number): Tiler {
     this.tiles.set(`${x},${y}`, tileId);
+    return this;
   }
 
   public get(x: number, y: number) {

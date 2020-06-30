@@ -14,8 +14,7 @@ import { BUS } from "../apis/handler";
 import { Ui, UI, Window } from "../apis/ui";
 import { namedMessageHandler } from "../edit/messages";
 import { PicNumCallback } from "../edit/tools/selection";
-import { PicTags, PIC_TAGS, RAW_PAL } from "./artselector";
-import { RAW_PLUs } from "./blood/module";
+import { PicTags, PIC_TAGS, RAW_PAL, RAW_PLUs } from "./artselector";
 
 function createDrawPanel(arts: ArtInfoProvider, pal: Uint8Array, plu: (x: number) => number, canvas: HTMLCanvasElement, cb: PicNumCallback, iter: () => Iterable<number>) {
   const provider = new PixelDataProvider(1024 * 10, (i: number) => {

@@ -1,29 +1,28 @@
-import { ArtFile, ArtFiles, createArts } from "../../../build/art";
-import { createNewSector } from "../../../build/boardutils";
-import { createPalette, GrpFile, loadShadeTables, loadPlus } from "../../../build/grp";
-import { cloneBoard, loadBuildMap } from '../../../build/maploader';
-import { Board, Sprite, SpriteStats } from "../../../build/board/structs";
-import { Deck } from "../../../utils/collections";
+import { Board } from "../../../build/board/structs";
+import { ArtFile, ArtFiles } from "../../../build/formats/art";
+import { createPalette, GrpFile, loadPlus, loadShadeTables } from "../../../build/formats/grp";
+import { cloneBoard, loadBuildMap, saveBuildMap } from '../../../build/maploader';
 import { createTexture } from "../../../utils/gl/textures";
 import { Dependency, Injector } from "../../../utils/injector";
-import { BoardManipulator_, BOARD, BuildReferenceTracker } from "../../apis/app";
-import { ReferenceTrackerImpl } from "../../apis/referencetracker";
-import { RAW_PAL } from "../artselector";
-import { ArtFiles_, GL, ParallaxTextures_ } from "../buildartprovider";
-import { PALSWAPS, PAL_TEXTURE, PLU_TEXTURE, SHADOWSTEPS } from "../gl/buildgl";
+import { BoardManipulator_, DEFAULT_BOARD, BOARD } from "../../apis/app";
+import { BUS } from "../../apis/handler";
+import { LoadBoard, namedMessageHandler } from "../../edit/messages";
+import { PIC_TAGS, RAW_PAL, RAW_PLUs } from "../artselector";
+import { ART_FILES, GL, PARALLAX_TEXTURES } from "../buildartprovider";
 import { FS } from "../fs/fs";
-import { MAP_NAMES } from "../selectmap";
+import { PALSWAPS, PAL_TEXTURE, PLU_TEXTURE, SHADOWSTEPS } from "../gl/buildgl";
+import { MAP_NAMES, showMapSelection } from "../selectmap";
 import { Implementation_, RorLinks } from "../view/boardrenderer3d";
+import { FS_MANAGER } from "../fs/manager";
 
 const GRP = new Dependency<GrpFile>('Grp File');
 const SHADOW_TABLE = new Dependency<Uint8Array[]>('Shadow Table');
-const LOOKUPS = new Dependency<Uint8Array[]>('Lookup Table');
 
 async function loadArtFiles(injector: Injector): Promise<ArtFiles> {
   const grp = await injector.getInstance(GRP);
   const artFiles: ArtFile[] = [];
   for (let a = 0; a < 20; a++) artFiles.push(new ArtFile(grp.get('tiles0' + ("00" + a).slice(-2) + '.art')))
-  return createArts(artFiles);
+  return new ArtFiles(artFiles);
 }
 
 async function loadPal(injector: Injector) {
@@ -50,7 +49,7 @@ async function loadPluTexture(injector: Injector) {
   const [shadows, gl, lookups] = await Promise.all([
     injector.getInstance(SHADOW_TABLE),
     injector.getInstance(GL),
-    injector.getInstance(LOOKUPS)]);
+    injector.getInstance(RAW_PLUs)]);
 
   const tex = new Uint8Array(256 * shadows.length * lookups.length);
   for (let i = 0; i < lookups.length; i++) {
@@ -79,43 +78,10 @@ function createBoard() {
   board.sprites = [];
   board.numwalls = 0;
   board.numsectors = 0;
-  board.numsprites = 1;
-
-  const points = new Deck<[number, number]>();
-
-  const NULL_TRACKER: BuildReferenceTracker = {
-    walls: new ReferenceTrackerImpl<number>(-1),
-    sectors: new ReferenceTrackerImpl<number>(-1),
-    sprites: new ReferenceTrackerImpl<number>(-1),
-  }
-
-  createNewSector(board, points.clear()
-    .push([0, 0])
-    .push([4096, 0])
-    .push([4096, 4096])
-    .push([0, 4096]),
-    NULL_TRACKER
-  );
-
-  board.sectors[0].floorz = 0;
-  board.sectors[0].ceilingz = -16 * 4096;
-
-  const sprite = new Sprite();
-  sprite.x = 1024;
-  sprite.y = 1024;
-  sprite.z = 0;
-  sprite.picnum = 0;
-  sprite.lotag = 1;
-  sprite.sectnum = 0;
-  sprite.cstat = new SpriteStats();
-  sprite.extra = 65535;
-  board.sprites.push(sprite);
+  board.numsprites = 0;
+  board.version = 0x0700;
+  board.posx = board.posy = board.posz = board.cursectnum = board.ang = 0;
   return board;
-}
-
-async function loadMap(injector: Injector) {
-  const map = await injector.getInstance(MapName_);
-  return !map ? createBoard() : loadMapImpl(map)(injector);
 }
 
 function DukeImplementation() {
@@ -128,13 +94,13 @@ function DukeImplementation() {
 
 async function loadGrp(injector: Injector) {
   const fs = await injector.getInstance(FS);
-  const grp = await fs('DUKE3D.GRP');
+  const grp = await fs.get('DUKE3D.GRP');
   return new GrpFile(grp);
 }
 
 async function getMapNames(injector: Injector) {
   const grp = await injector.getInstance(GRP);
-  return Object.keys(grp.files).filter(f => f.endsWith('.map'));
+  return () => Promise.resolve(Object.keys(grp.files).filter(f => f.endsWith('.map')));
 }
 
 async function shadowsteps(injector: Injector) {
@@ -143,23 +109,53 @@ async function shadowsteps(injector: Injector) {
 }
 
 async function palswaps(injector: Injector) {
-  const lookups = await injector.getInstance(LOOKUPS);
+  const lookups = await injector.getInstance(RAW_PLUs);
   return lookups.length;
 }
 
+async function PicTags(injector: Injector) {
+  return {
+    allTags() { return [] },
+    tags(id: number) { return [] }
+  }
+}
+
+async function mapLoader(injector: Injector) {
+  const bus = await injector.getInstance(BUS);
+  bus.connect(namedMessageHandler('load_map', async () => {
+    const mapName = await showMapSelection(injector);
+    if (!mapName) return;
+    const map = await loadMapImpl(mapName)(injector);
+    bus.handle(new LoadBoard(map));
+  }));
+}
+
+async function mapSaver(injector: Injector) {
+  const bus = await injector.getInstance(BUS);
+  const fsmgr = await injector.getInstance(FS_MANAGER);
+  const board = await injector.getInstance(BOARD);
+  bus.connect(namedMessageHandler('save_map', async () => {
+    fsmgr.write('newboard.map', saveBuildMap(board()))
+  }));
+}
+
 export function DukeModule(injector: Injector) {
-  injector.bindInstance(ParallaxTextures_, 5);
+  injector.bindInstance(PARALLAX_TEXTURES, 5);
   injector.bindInstance(BoardManipulator_, { cloneBoard });
   injector.bindInstance(Implementation_, DukeImplementation());
   injector.bind(PALSWAPS, palswaps);
   injector.bind(SHADOWSTEPS, shadowsteps);
   injector.bind(GRP, loadGrp);
-  injector.bind(ArtFiles_, loadArtFiles);
+  injector.bind(ART_FILES, loadArtFiles);
   injector.bind(RAW_PAL, loadPal);
-  injector.bind(LOOKUPS, loadLookups);
+  injector.bind(RAW_PLUs, loadLookups);
   injector.bind(SHADOW_TABLE, loadShadowTable);
   injector.bind(PAL_TEXTURE, loadPalTexture);
   injector.bind(PLU_TEXTURE, loadPluTexture);
   injector.bind(MAP_NAMES, getMapNames);
-  injector.bind(BOARD, loadMap);
+  injector.bind(PIC_TAGS, PicTags);
+  injector.bindInstance(DEFAULT_BOARD, createBoard());
+
+  injector.install(mapLoader);
+  injector.install(mapSaver);
 }

@@ -1,4 +1,5 @@
 import { BloodModule } from './app/modules/blood/module';
+import { DukeModule } from './app/modules/duke/module';
 import { GL } from './app/modules/buildartprovider';
 import { DefaultSetupModule, MainLoopConstructor } from './app/modules/context';
 import { DbFsModule } from './app/modules/fs/db';
@@ -18,7 +19,8 @@ const injector = new Injector();
 injector.bindInstance(GL, gl);
 injector.install(DbFsModule('resources/engines/blood/'));
 injector.install(DefaultSetupModule);
-injector.install(BloodModule);
+// injector.install(BloodModule);
+injector.install(DukeModule);
 injector.install(PhotonUiModule);
 injector.install(FileBrowserModule);
 injector.install(ArtEditorModule);

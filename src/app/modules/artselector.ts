@@ -25,6 +25,7 @@ export interface PicTags {
 }
 
 export const RAW_PAL = new Dependency<Uint8Array>('RawPal');
+export const RAW_PLUs = new Dependency<Uint8Array[]>('Raw PLUs');
 export const PIC_TAGS = new Dependency<PicTags>('Tags');
 
 export async function SelectorConstructor(injector: Injector) {

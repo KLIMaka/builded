@@ -49,7 +49,7 @@ const wallNormal = vec2.create();
 const mirrorNormal = vec3.create();
 const mirroredTransform = mat4.create();
 const mpos = vec3.create();
-const polyOffsetOn = (gl: WebGLRenderingContext, state: State) => { gl.polygonOffset(-1, -8) };
+const polyOffsetOn = (gl: WebGLRenderingContext, state: State) => { gl.polygonOffset(0, -8) };
 const polyOffsetOff = (gl: WebGLRenderingContext, state: State) => { gl.polygonOffset(0, 0) };
 const blendOn = (gl: WebGLRenderingContext, state: State) => { gl.enable(WebGLRenderingContext.BLEND) };
 const blendOff = (gl: WebGLRenderingContext, state: State) => { gl.disable(WebGLRenderingContext.BLEND) };
@@ -112,11 +112,11 @@ export class Boardrenderer3D {
     gl.colorMask(true, true, true, true);
   }
 
-  private writeDepthOnly(gl: WebGLRenderingContext, ) {
+  private writeDepthOnly(gl: WebGLRenderingContext,) {
     gl.colorMask(false, false, false, false);
   }
 
-  private writeAll(gl: WebGLRenderingContext, ) {
+  private writeAll(gl: WebGLRenderingContext,) {
     gl.depthMask(true);
     gl.colorMask(true, true, true, true);
   }
@@ -135,7 +135,7 @@ export class Boardrenderer3D {
 
     this.bgl.setViewMatrix(view.getTransformMatrix());
     this.bgl.setPosition(view.getPosition());
-    this.drawRooms(view, result);
+    this.drawRooms(result, view);
   }
 
 
@@ -170,7 +170,7 @@ export class Boardrenderer3D {
     this.bgl.setViewMatrix(stackTransform);
     this.bgl.setPosition(npos);
     this.writeStenciledOnly(view.gl, stencilValue);
-    this.drawRooms(view, this.getLinkVis(link).visit(this.board(), mstmp, view.getForward()));
+    this.drawRooms(this.getLinkVis(link).visit(this.board(), mstmp, view.getForward()), view);
 
     this.bgl.setViewMatrix(view.getTransformMatrix());
     this.bgl.setPosition(view.getPosition());
@@ -203,8 +203,7 @@ export class Boardrenderer3D {
     view.gl.enable(WebGLRenderingContext.STENCIL_TEST);
     for (let i = 0; i < this.mirrorWallsCollector.walls.length(); i++) {
       const w = unpackWallId(this.mirrorWallsCollector.walls.get(i));
-      if (!wallVisible(board, w, view))
-        continue;
+      if (!wallVisible(board, w, view)) continue;
 
       // draw mirror surface into stencil
       const r = this.renderables.wall(w);
@@ -229,7 +228,7 @@ export class Boardrenderer3D {
       reflectPoint3d(mpos, mirrorNormal, mirrorrD, mpos);
       mstmp.sec = view.sec; mstmp.x = mpos[0]; mstmp.y = mpos[2]; mstmp.z = mpos[1];
       this.writeStenciledOnly(view.gl, i + 127);
-      this.drawRooms(view, mirrorVis.visit(board, mstmp, view.getForward()));
+      this.drawRooms(mirrorVis.visit(board, mstmp, view.getForward()), view);
       view.gl.cullFace(WebGLRenderingContext.BACK);
 
       // seal reflections by writing depth of mirror surface
@@ -257,7 +256,7 @@ export class Boardrenderer3D {
 
   private _sectorVisitor = (board: Board, sectorId: number) => this.sectorVisitor(board, sectorId);
   private sectorVisitor(board: Board, sectorId: number) {
-    let sector = this.renderables.sector(sectorId);
+    const sector = this.renderables.sector(sectorId);
     if (this.impl.rorLinks().floorLinks[sectorId] == undefined)
       this.surfaces.add(sector.floor);
     if (this.impl.rorLinks().ceilLinks[sectorId] == undefined)
@@ -268,8 +267,8 @@ export class Boardrenderer3D {
   private _wallVisitor = (board: Board, wallId: number, sectorId: number) => this.wallVisitor(board, wallId, sectorId);
   private wallVisitor(board: Board, wallId: number, sectorId: number) {
     if (this.impl.isMirrorPic(board.walls[wallId].picnum)) return;
-    let wall = board.walls[wallId];
-    let wallr = this.renderables.wall(wallId);
+    const wall = board.walls[wallId];
+    const wallr = this.renderables.wall(wallId);
     if (wall.cstat.translucent || wall.cstat.translucentReversed) {
       this.surfacesTrans.add(wallr.mid);
       this.surfaces.add(wallr.bot);
@@ -282,9 +281,9 @@ export class Boardrenderer3D {
 
   private _spriteVisitor = (board: Board, spriteId: number) => this.spriteVisitor(board, spriteId);
   private spriteVisitor(board: Board, spriteId: number) {
-    let spriter = this.renderables.sprite(spriteId);
-    let sprite = board.sprites[spriteId];
-    let trans = sprite.cstat.translucent == 1;
+    const spriter = this.renderables.sprite(spriteId);
+    const sprite = board.sprites[spriteId];
+    const trans = sprite.cstat.translucent == 1 || sprite.cstat.tranclucentReversed == 1;
     (trans ? this.spritesTrans : this.sprites).add(spriter);
     PROFILE.incCount('sprites');
   }
@@ -294,7 +293,7 @@ export class Boardrenderer3D {
   private transparent = new WrapRenderable(new Renderables([this.surfacesTrans, this.spriteTransparent]), blendOn, blendOff);
   private pass = new Renderables([this.surfaces, this.spriteSolids, this.transparent]);
 
-  private drawRooms(view: View3d, result: VisResult) {
+  private drawRooms(result: VisResult, view: View3d) {
     PROFILE.startProfile('processing');
     this.clearDrawLists();
     const board = this.board();

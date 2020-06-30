@@ -10,12 +10,12 @@ export const OSCILLATING_ANIMATION = 1;
 export const ANIMATE_BACKWARD = 3;
 
 export class Attributes {
-  public frames: number;
-  public type: number;
-  public xoff: number;
-  public yoff: number;
-  public speed: number;
-  public unk: number;
+  public frames = 0;
+  public type = NO_ANIMATION;
+  public xoff = 0;
+  public yoff = 0;
+  public speed = 0;
+  public unk = 0;
 }
 
 export function animate(frame: number, info: ArtInfo) {

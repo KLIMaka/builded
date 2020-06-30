@@ -40,7 +40,7 @@ export class Controller3D {
   }
 
   public setPosition(x: number, y: number, z: number) {
-    this.camera.setPosition([x, y, z]);
+    this.camera.setPosition(x, y, z);
   }
 
   public getForward() {
@@ -63,7 +63,7 @@ export class Controller3D {
     let campos = this.camera.getPosition();
     vec3.scale(forward, forward, dist);
     vec3.add(campos, campos, forward);
-    this.camera.setPosition(campos);
+    this.camera.setPosition(campos[0], campos[1], campos[2]);
   }
 
   public moveSideway(dist: number) {
@@ -71,7 +71,7 @@ export class Controller3D {
     let campos = this.camera.getPosition();
     vec3.scale(sideways, sideways, dist);
     vec3.add(campos, campos, sideways);
-    this.camera.setPosition(campos);
+    this.camera.setPosition(campos[0], campos[1], campos[2]);
   }
 
   public track(x: number, y: number, move: boolean) {

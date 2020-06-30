@@ -15,8 +15,10 @@ export class Camera {
     this.angleY = ay;
   }
 
-  public setPosition(pos: Vec3Array): void {
-    this.position = pos;
+  public setPosition(x: number, y: number, z: number): void {
+    this.position[0] = x;
+    this.position[1] = y;
+    this.position[2] = z;
     this.needUpdate = true;
   }
 

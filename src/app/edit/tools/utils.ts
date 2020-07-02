@@ -31,7 +31,7 @@ class Utils extends MessageHandlerReflective {
   public NamedMessage(msg: NamedMessage) {
     switch (msg.name) {
       case 'insert_sprite': this.insertSprite(); return;
-      case 'print_selected': this.print(); return;
+      // case 'print_selected': this.print(); return;
       case 'set_first_wall': this.setFirstWall(); return;
       case 'fill_inner_sector': this.fillInnerLoop(); return;
       case 'delete_loop': this.deleteLoop(); return;

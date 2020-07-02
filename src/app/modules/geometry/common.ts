@@ -32,12 +32,12 @@ export enum Type {
   FACE
 }
 
-let color = vec4.create();
 export class SolidBuilder extends BufferRenderable<SolidSetup> {
   public type: Type = Type.SURFACE;
   public tex: Texture;
   public trans: number = 1;
   public parallax: number = 0;
+  private color = vec4.create();
 
   constructor(readonly buff: BuildBuffer) { super(SOLID_SETUP) }
   protected textureHint() { return this.tex }
@@ -45,13 +45,14 @@ export class SolidBuilder extends BufferRenderable<SolidSetup> {
   public setup(setup: SolidSetup) {
     setup.shader(this.type == Type.SURFACE ? (this.parallax ? 'parallax' : 'baseShader') : 'spriteShader')
       .base(this.tex)
-      .color(vec4.set(color, 1, 1, 1, this.trans))
+      .color(vec4.set(this.color, 1, 1, 1, this.trans))
   }
 
   public reset() {
     this.buff.deallocate();
     this.type = Type.SURFACE;
     this.trans = 1;
+    vec4.set(this.color, 1, 1, 1, 1);
     this.parallax = 0;
     this.tex = null;
   }

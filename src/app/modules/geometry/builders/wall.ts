@@ -138,7 +138,7 @@ export function updateWall(ctx: RenderablesCacheContext, wallId: number, builder
   const ceilingz = sector.ceilingz;
   const floorheinum = sector.floorheinum;
   const floorz = sector.floorz;
-  const trans = (wall.cstat.translucent || wall.cstat.translucentReversed) ? 0.6 : 1;
+  const trans = wall.cstat.translucent ? wall.cstat.translucentReversed ? 0.66 : 0.33 : 1;
   const normal = normals(wallNormal(wallNormal_, board, wallId));
 
   if (wall.nextwall == -1 || wall.cstat.oneWay) {

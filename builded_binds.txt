@@ -45,6 +45,7 @@ CTRL+mouse0     split_wall
 SPACE           draw_wall
 SHIFT+SPACE     draw_rect_wall
 BACKSPACE       undo_draw_wall
+G               draw_point
 [               grid+
 ]               grid-
 J               join_sectors

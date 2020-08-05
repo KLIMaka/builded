@@ -178,7 +178,7 @@ export class View3d extends MessageHandlerReflective implements View {
     const [x, y] = snapWall(wallId, target.coords[0], target.coords[1], this.board(), this.gridController);
     t.coords_[0] = x;
     t.coords_[1] = y;
-    t.coords_[2] = target.coords[2];
+    t.coords_[2] = this.gridController.snap(target.coords[2] / ZSCALE) * ZSCALE;
     t.entity_ = new Entity(wallId, EntityType.MID_WALL);
     return t;
   }

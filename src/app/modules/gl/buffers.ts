@@ -33,6 +33,71 @@ export async function DefaultBufferFactory(injector: Injector) {
   return new BuildBufferFactoryImpl(gl);
 }
 
+export class PointSpritesBuilder {
+  private sprites: [number, number, number][] = [];
+
+  public add(x: number, y: number, z: number) {
+    this.sprites.push([x, y, z]);
+  }
+
+  public build(buff: BuildBuffer, d: number) {
+    const size = this.sprites.length;
+    buff.allocate(size * 4, size * 6);
+    for (let i = 0; i < size; i++) {
+      const off = i * 4;
+      const [x, y, z] = this.sprites[i];
+      buff.writePos(off + 0, x, y, z);
+      buff.writePos(off + 1, x, y, z);
+      buff.writePos(off + 2, x, y, z);
+      buff.writePos(off + 3, x, y, z);
+      buff.writeTcLighting(off + 0, 0, 0);
+      buff.writeTcLighting(off + 1, 1, 0);
+      buff.writeTcLighting(off + 2, 1, 1);
+      buff.writeTcLighting(off + 3, 0, 1);
+      buff.writeNormal(off + 0, -d, d, 0);
+      buff.writeNormal(off + 1, d, d, 0);
+      buff.writeNormal(off + 2, d, -d, 0);
+      buff.writeNormal(off + 3, -d, -d, 0);
+      buff.writeQuad(i * 6, off, off + 1, off + 2, off + 3);
+    }
+  }
+}
+
+export class LineBuilder {
+  private vtxIndex: string[] = [];
+  private vtxs: [number, number, number][] = [];
+  private lines: [number, number][] = [];
+
+  public segment(x1: number, y1: number, z1: number, x2: number, y2: number, z2: number) {
+    const idx1 = this.addVtx(x1, y1, z1);
+    const idx2 = this.addVtx(x2, y2, z2);
+    this.lines.push([idx1, idx2]);
+  }
+
+  public build(buff: GenericBuildBuffer) {
+    buff.allocate(this.vtxs.length, this.lines.length * 2);
+    for (let i = 0; i < this.vtxs.length; i++) {
+      const vtx = this.vtxs[i];
+      buff.writePos(i, vtx[0], vtx[1], vtx[2]);
+    }
+    for (let i = 0; i < this.lines.length; i++) {
+      const line = this.lines[i];
+      buff.writeLine(i * 2, line[0], line[1]);
+    }
+  }
+
+  private addVtx(x: number, y: number, z: number): number {
+    const key = x + ',' + y + ',' + z;
+    let idx = this.vtxIndex.indexOf(key);
+    if (idx == -1) {
+      idx = this.vtxs.length;
+      this.vtxIndex.push(key);
+      this.vtxs.push([x, y, z]);
+    }
+    return idx;
+  }
+}
+
 const POSITION = 0;
 const NORMAL = 1;
 const TEX_SHADING = 2;

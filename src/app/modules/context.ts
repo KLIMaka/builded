@@ -11,6 +11,7 @@ import { consumerProvider, HintRenderable } from '../apis/renderable';
 import { EntityFactoryConstructor, ENTITY_FACTORY } from '../edit/context';
 import { Frame, LoadBoard, Mouse, namedMessageHandler, PostFrame, Render } from '../edit/messages';
 import { DrawSectorModule } from '../edit/tools/drawsector';
+import { DrawWallModule } from '../edit/tools/drawwall';
 import { JoinSectorsModule } from '../edit/tools/joinsectors';
 import { PushWallModule } from '../edit/tools/pushwall';
 import { PICNUM_SELECTOR, SelectionModule } from '../edit/tools/selection';
@@ -81,6 +82,7 @@ export function DefaultSetupModule(injector: Injector) {
 
   injector.install(JoinSectorsModule);
   injector.install(DrawSectorModule);
+  injector.install(DrawWallModule);
   injector.install(PushWallModule);
   injector.install(RenderablesCacheModule);
   injector.install(SelectionModule);

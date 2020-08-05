@@ -1,23 +1,18 @@
 import { Board } from "../../../build/board/structs";
-import { build2gl, createSlopeCalculator, sectorOfWall, ZSCALE } from "../../../build/utils";
-import { vec3, vec2, Vec2Array } from "../../../libs_js/glmatrix";
-import { Deck } from "../../../utils/collections";
-import { View } from "../../apis/app";
-import { MessageHandlerReflective } from "../../apis/handler";
+import { createSlopeCalculator, sectorOfWall, ZSCALE } from "../../../build/utils";
+import { vec2, Vec2Array } from "../../../libs_js/glmatrix";
+import { create, Injector } from "../../../utils/injector";
+import { BOARD, BoardProvider, BuildReferenceTracker, REFERENCE_TRACKER, View, VIEW, ART, ArtProvider } from "../../apis/app";
+import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
 import { LayeredRenderables } from "../../apis/renderable";
-import { BuildersFactory } from "../../modules/geometry/common";
-import { MovingHandle } from "../handle";
+import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
 import { Frame, NamedMessage, Render } from "../messages";
-
-const target_ = vec3.create();
-const start_ = vec3.create();
-const dir_ = vec3.create();
+import { LineBuilder } from "../../modules/gl/buffers";
 
 enum PortalType { UP, DOWN, MID };
-type point_t = { off: number, zup: number, zdown: number };
+type point_t = { off: number, zup: number, zdown: number, zref: number };
 
 class PortalModel {
-  private wallId: number;
   private wallVec = vec2.create();
   private startPoint = vec2.create();
   private type: PortalType;
@@ -27,6 +22,7 @@ class PortalModel {
 
   constructor(
     factory: BuildersFactory,
+    private art: ArtProvider,
     private contour = factory.wireframe('utils'),
     private contourPoints = factory.pointSprite('utils'),
     private length = factory.pointSprite('utils'),
@@ -36,9 +32,10 @@ class PortalModel {
   public getRenderable() { this.update(); return this.renderable }
 
   public start(board: Board, wallId: number, x: number, y: number, z: number) {
-    this.wallId = wallId;
+    this.points = [];
+    this.placedPoints = [];
     const wall = board.walls[wallId];
-    const wall2 = board[wall.point2];
+    const wall2 = board.walls[wall.point2];
     vec2.set(this.wallVec, wall2.x - wall.x, wall2.y - wall.y);
     vec2.normalize(this.wallVec, this.wallVec);
     vec2.set(this.startPoint, wall.x, wall.y);
@@ -65,6 +62,7 @@ class PortalModel {
       else throw new Error(`Invalid point`);
     }
     this.move(x, y, z);
+    this.addPoint();
   }
 
   public move(x: number, y: number, z: number) {
@@ -87,8 +85,8 @@ class PortalModel {
     return points.length;
   }
 
-  private createPoint(points: point_t[], idx: number, off: number, z: number) {
-    if (idx == 0 || idx == points.length) return { off, zup: z, zdown: z };
+  private createPoint(points: point_t[], idx: number, off: number, z: number): point_t {
+    if (idx == 0 || idx == points.length) return { off, zup: z, zdown: z, zref: z };
     const p1 = points[idx - 1];
     const p2 = points[idx];
     const dzup = p2.zup - p1.zup;
@@ -96,17 +94,24 @@ class PortalModel {
     const doff = (off - p1.off) / (p2.off - p1.off);
     const zup = p1.zup + dzup * doff;
     const zdown = p1.zdown + dzdown * doff;
-    return { off, zup: zup <= z ? zup : z, zdown: zdown >= z ? zdown : z };
+    return { off, zup: zup <= z ? zup : z, zdown: zdown >= z ? zdown : z, zref: z };
+  }
+
+  private updatePoint(p: point_t, z: number) {
+    if (z > p.zref) {
+      p.zdown = z;
+      p.zup = p.zref;
+    } else {
+      p.zup = z;
+      p.zdown = p.zref;
+    }
   }
 
   private insertPoint(points: point_t[], x: number, y: number, z: number) {
     const off = this.getOffset(x, y);
     const idx = this.findIndex(points, off);
-    if (idx < points.length && points[idx].off == off) {
-      const p = points[idx];
-      if (z > p.zdown) p.zdown = z;
-      else p.zup = z;
-    } else {
+    if (idx < points.length && points[idx].off == off) this.updatePoint(points[idx], z);
+    else {
       const p = this.createPoint(points, idx, off, z);
       points.splice(idx, 0, p);
     }
@@ -114,7 +119,8 @@ class PortalModel {
 
   private update() {
     if (this.points.length == 0) return;
-
+    this.updateContour();
+    this.updateContourPoints();
   }
 
   private getCoords(out: Vec2Array, off: number): Vec2Array {
@@ -123,75 +129,104 @@ class PortalModel {
     return vec2.add(out, out, this.startPoint);
   }
 
+  private updateContourPoints() {
+    this.contourPoints.needToRebuild();
+    this.contourPoints.tex = this.art.get(-1);
+    const buff = this.contourPoints.buff;
+    const size = this.placedPoints.length;
+    buff.allocate(size * 4, size * 6);
+    const d = 2.5;
+    const p = vec2.create();
+    for (let i = 0; i < size; i++) {
+      const point = this.placedPoints[i];
+      const off = i * 4;
+      this.getCoords(p, point.off);
+      buff.writePos(off + 0, p[0], this.z, p[1]);
+      buff.writePos(off + 1, p[0], this.z, p[1]);
+      buff.writePos(off + 2, p[0], this.z, p[1]);
+      buff.writePos(off + 3, p[0], this.z, p[1]);
+      buff.writeTcLighting(off + 0, 0, 0);
+      buff.writeTcLighting(off + 1, 1, 0);
+      buff.writeTcLighting(off + 2, 1, 1);
+      buff.writeTcLighting(off + 3, 0, 1);
+      buff.writeNormal(off + 0, -d, d, 0);
+      buff.writeNormal(off + 1, d, d, 0);
+      buff.writeNormal(off + 2, d, -d, 0);
+      buff.writeNormal(off + 3, -d, -d, 0);
+      buff.writeQuad(i * 6, off, off + 1, off + 2, off + 3);
+    }
+  }
+
   private updateContour() {
     this.contour.needToRebuild();
-    const p = vec2.create();
+    const p1 = vec2.create();
+    const p2 = vec2.create();
+    const line = new LineBuilder();
     const buff = this.contour.buff;
+    const last = this.points[this.points.length - 1];
+    const first = this.points[0];
     buff.deallocate();
     if (this.type == PortalType.DOWN) {
-      const size = this.points.length - 1 + 4;
-      buff.allocate(size, size * 2 - 2);
-      this.getCoords(p, this.points[this.points.length - 1].off);
-      buff.writePos(0, p[0], this.slope(p[0], p[1]) / ZSCALE, p[1]);
-      buff.writePos(1, p[0], this.points[this.points.length - 1].zup / ZSCALE, p[1]);
-      buff.writeLine(0, 0, 1);
-      this.getCoords(p, this.points[0].off);
-      buff.writePos(2, p[0], this.slope(p[0], p[1]) / ZSCALE, p[1]);
-      buff.writePos(3, p[0], this.points[0].zup / ZSCALE, p[1]);
-      buff.writeLine(2, 2, 3);
-      buff.writeLine(4, 0, 2);
+      this.getCoords(p1, last.off);
+      this.getCoords(p2, first.off);
+      line.segment(p1[0], this.slope(p1[0], p1[1]) / ZSCALE, p1[1], p1[0], last.zup / ZSCALE, p1[1]);
+      line.segment(p2[0], this.slope(p2[0], p2[1]) / ZSCALE, p2[1], p2[0], first.zup / ZSCALE, p2[1]);
+      line.segment(p1[0], this.slope(p1[0], p1[1]) / ZSCALE, p1[1], p2[0], this.slope(p2[0], p2[1]) / ZSCALE, p2[1]);
       for (let i = 1; i < this.points.length; i++) {
-        const point = this.points[i];
-        this.getCoords(p, point.off);
-        buff.writePos(4 + i, p[0], point.zup / ZSCALE, p[1]);
-        buff.writeLine(6 + i * 2, i + 3, i + 4);
+        const point1 = this.points[i];
+        const point2 = this.points[i + 1];
+        this.getCoords(p1, point1.off);
+        this.getCoords(p2, point2.off);
+        line.segment(p1[0], point1.zup / ZSCALE, p1[1], p2[0], point2.zup / ZSCALE, p2[1]);
       }
     } else if (this.type == PortalType.UP) {
 
     } else if (this.type == PortalType.MID) {
-      const size = this.points.length - 1 + 4;
-      buff.allocate(size, size * 2 - 4);
-      this.getCoords(p, this.points[this.points.length - 1].off);
-      buff.writePos(0, p[0], this.points[this.points.length - 1].zdown / ZSCALE, p[1]);
-      buff.writePos(1, p[0], this.points[this.points.length - 1].zup / ZSCALE, p[1]);
-      buff.writeLine(0, 0, 1);
-      this.getCoords(p, this.points[0].off);
-      buff.writePos(2, p[0], this.points[0].zdown / ZSCALE, p[1]);
-      buff.writePos(3, p[0], this.points[0].zup / ZSCALE, p[1]);
-      buff.writeLine(2, 2, 3);
-      for (let i = 1; i < this.points.length; i++) {
-        const point = this.points[i];
-        this.getCoords(p, point.off);
-        buff.writePos(4 + i, p[0], point.zup / ZSCALE, p[1]);
-        buff.writeLine(6 + i * 2, i + 3, i + 4);
+      this.getCoords(p1, last.off);
+      this.getCoords(p2, first.off);
+      line.segment(p1[0], last.zdown / ZSCALE, p1[1], p1[0], last.zup / ZSCALE, p1[1]);
+      line.segment(p1[0], first.zdown / ZSCALE, p1[1], p1[0], first.zup / ZSCALE, p1[1]);
+      for (let i = 0; i < this.points.length - 1; i++) {
+        const point1 = this.points[i];
+        const point2 = this.points[i + 1];
+        this.getCoords(p1, point1.off);
+        this.getCoords(p2, point2.off);
+        line.segment(p1[0], point1.zup / ZSCALE, p1[1], p2[0], point2.zup / ZSCALE, p2[1]);
+        line.segment(p1[0], point1.zdown / ZSCALE, p1[1], p2[0], point2.zdown / ZSCALE, p2[1]);
       }
     }
+    line.build(buff);
   }
+}
+
+export async function DrawWallModule(injector: Injector) {
+  const bus = await injector.getInstance(BUS);
+  bus.connect(await create(injector, DrawWall, BUILDERS_FACTORY, VIEW, BOARD, REFERENCE_TRACKER, BUS, ART));
 }
 
 export class DrawWall extends MessageHandlerReflective {
   private wallId = -1;
-  private movingHandle = new MovingHandle();
-  private upper = new Deck<number>();
-  private lower = new Deck<number>();
-  private points = new Deck<[number, number]>();
 
   constructor(
     factory: BuildersFactory,
-    private wireframe = factory.wireframe('utils'),
     private view: View,
+    private board: BoardProvider,
+    private refs: BuildReferenceTracker,
+    private bus: MessageBus,
+    private art: ArtProvider,
+    private portal = new PortalModel(factory, art),
   ) { super() }
 
   private start() {
     const target = this.view.snapTarget();
     if (target.entity == null || !target.entity.isWall()) return;
+    this.portal.start(this.board(), target.entity.id, target.coords[0], target.coords[1], target.coords[2]);
     this.wallId = target.entity.id;
-    this.movingHandle.start(build2gl(target_, target.coords));
   }
 
   private insertPoint() {
     if (this.wallId == -1) this.start();
-
+    else this.portal.addPoint();
   }
 
   private popPoint() {
@@ -206,14 +241,14 @@ export class DrawWall extends MessageHandlerReflective {
   }
 
   public Frame(msg: Frame) {
-    if (this.movingHandle.isActive()) {
-      const { start, dir } = this.view.dir();
-      this.movingHandle.update(false, false, build2gl(start_, start), build2gl(dir_, dir));
+    if (this.wallId != -1) {
+      const target = this.view.snapTarget();
+      this.portal.move(target.coords[0], target.coords[1], target.coords[2])
     }
   }
 
   public Render(msg: Render) {
-    if (!this.movingHandle.isActive()) return;
-    this.wireframe.accept(msg.consumer);
+    if (this.wallId == -1) return;
+    this.portal.getRenderable().accept(msg.consumer);
   }
 }

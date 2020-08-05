@@ -14,6 +14,7 @@ import { writeText } from "../../modules/geometry/builders/common";
 import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
 import { getClosestSectorZ } from "../editutils";
 import { BoardInvalidate, COMMIT, Frame, NamedMessage, Render } from "../messages";
+import { PointSpritesBuilder, LineBuilder } from "../../modules/gl/buffers";
 
 class Contour {
   private points: Array<[number, number]> = [];
@@ -59,41 +60,26 @@ class Contour {
   private updateContourPoints() {
     this.contourPoints.needToRebuild();
     this.contourPoints.tex = this.art.get(-1);
-    let buff = this.contourPoints.buff;
-    buff.allocate(this.size * 4, this.size * 6);
-    let d = 2.5;
+    const builder = new PointSpritesBuilder();
     for (let i = 0; i < this.size; i++) {
-      let p = this.points[i];
-      let off = i * 4;
-      buff.writePos(off + 0, p[0], this.z, p[1]);
-      buff.writePos(off + 1, p[0], this.z, p[1]);
-      buff.writePos(off + 2, p[0], this.z, p[1]);
-      buff.writePos(off + 3, p[0], this.z, p[1]);
-      buff.writeTcLighting(off + 0, 0, 0);
-      buff.writeTcLighting(off + 1, 1, 0);
-      buff.writeTcLighting(off + 2, 1, 1);
-      buff.writeTcLighting(off + 3, 0, 1);
-      buff.writeNormal(off + 0, -d, d, 0);
-      buff.writeNormal(off + 1, d, d, 0);
-      buff.writeNormal(off + 2, d, -d, 0);
-      buff.writeNormal(off + 3, -d, -d, 0);
-      buff.writeQuad(i * 6, off, off + 1, off + 2, off + 3);
+      const p = this.points[i];
+      builder.add(p[0], this.z, p[1]);
     }
+    builder.build(this.contourPoints.buff, 2.5);
   }
 
   private updateContour() {
     this.contour.needToRebuild();
-    let buff = this.contour.buff;
+    const buff = this.contour.buff;
     buff.deallocate();
-    let size = this.size - 1;
-    buff.allocate(size + 1, size * 2);
-
+    const size = this.size - 1;
+    const builder = new LineBuilder();
     for (let i = 0; i < size; i++) {
-      let p = this.points[i];
-      buff.writePos(i, p[0], this.z, p[1]);
-      buff.writeLine(i * 2, i, i + 1);
+      const p1 = this.points[i];
+      const p2 = this.points[i + 1];
+      builder.segment(p1[0], this.z, p1[1], p2[0], this.z, p2[1]);
     }
-    buff.writePos(size, this.points[size][0], this.z, this.points[size][1]);
+    builder.build(buff);
   }
 
   private prepareLengthLabels(): [number, string[]] {

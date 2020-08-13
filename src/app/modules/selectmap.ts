@@ -8,7 +8,7 @@ let selectMapWindow: Window;
 async function getWindow(injector: Injector) {
   const ui = await injector.getInstance(UI);
   if (selectMapWindow == null) {
-    selectMapWindow = ui.builder.windowBuilder()
+    selectMapWindow = ui.builder.window()
       .id('map_select')
       .title('Select Map')
       .closeable(true)

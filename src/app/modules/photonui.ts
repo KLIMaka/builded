@@ -1,8 +1,7 @@
-import { Injector } from "../../utils/injector";
-import { UI, UiBuilder, Window, WindowBuilder, ToolbarBuilder, MenuBuilder } from "../apis/ui";
-import { div, tag, dragElement, span, Element } from "../../utils/ui/ui";
 import tippy from "tippy.js";
-import { Widget } from "../../utils/ui/canvasgrid";
+import { Injector } from "../../utils/injector";
+import { div, dragElement, Element, span, tag } from "../../utils/ui/ui";
+import { MenuBuilder, ToolbarBuilder, UI, UiBuilder, Window, WindowBuilder } from "../apis/ui";
 
 class PhotonWindow implements Window {
   public onclose: () => void;
@@ -242,9 +241,9 @@ class PhotonMenuBuilder implements MenuBuilder {
 }
 
 class Builder implements UiBuilder {
-  windowBuilder() { return new PhotonWindowBuilder() }
-  toolbarBuilder() { return new PhotonToolbarBuilder() }
-  menuBuilder() { return new PhotonMenuBuilder() }
+  window() { return new PhotonWindowBuilder() }
+  toolbar() { return new PhotonToolbarBuilder() }
+  menu() { return new PhotonMenuBuilder() }
 }
 
 export function PhotonUiModule(injector: Injector) {

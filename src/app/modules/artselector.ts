@@ -74,15 +74,15 @@ export class Selector {
     //   .append(gridPanel)
     //   .append(div('pane').css('overflow', 'hidden').appendHtml(canvas));
     this.searchWidget = search('Search', s => { this.updateFilter(s); this.updateSuggestions(s) });
-    this.window = ui.builder.windowBuilder()
+    this.window = ui.builder.window()
       .id('select_tile')
       .title('Tiles')
       .draggable(true)
       .closeable(true)
       .centered(true)
       .size(640, 640)
-      .toolbar(ui.builder.toolbarBuilder()
-        .widget(menuButton('icon-popup', ui.builder.menuBuilder()
+      .toolbar(ui.builder.toolbar()
+        .widget(menuButton('icon-popup', ui.builder.menu()
           .item('32', () => { this.drawPanel.setCellSize(32, 32) })
           .item('64', () => { this.drawPanel.setCellSize(64, 64) })
           .item('128', () => { this.drawPanel.setCellSize(128, 128) })))

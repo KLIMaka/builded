@@ -37,9 +37,9 @@ export interface MenuBuilder {
 }
 
 export interface UiBuilder {
-  windowBuilder(): WindowBuilder;
-  toolbarBuilder(): ToolbarBuilder;
-  menuBuilder(): MenuBuilder;
+  window(): WindowBuilder;
+  toolbar(): ToolbarBuilder;
+  menu(): MenuBuilder;
 }
 
 export interface Ui {

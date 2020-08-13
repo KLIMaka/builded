@@ -9,6 +9,7 @@ import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
 import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
 import { MovingHandle } from "../handle";
 import { COMMIT, Frame, INVALIDATE_ALL, NamedMessage, Render } from "../messages";
+import { LineBuilder } from "../../modules/gl/buffers";
 
 const wallNormal_ = vec3.create();
 const wallNormal1_ = vec3.create();
@@ -65,7 +66,7 @@ export class PushWall extends MessageHandlerReflective {
     return this.grid.snap(dot2d(nx, ny, dx, dy));
   }
 
-  public NamedMessage(msg: NamedMessage, ) {
+  public NamedMessage(msg: NamedMessage,) {
     switch (msg.name) {
       case 'push_wall': this.movingHandle.isActive() ? this.stop() : this.start(false); return;
       case 'push_wall_copy': this.movingHandle.isActive() ? this.stop() : this.start(true); return;
@@ -87,9 +88,7 @@ export class PushWall extends MessageHandlerReflective {
   }
 
   private updateWireframe() {
-    const buff = this.wireframe.buff;
     const board = this.board();
-    buff.allocate(8, 16);
     const normal = wallNormal(wallNormal_, board, this.wallId);
     const [nx, , ny] = vec3.scale(normal, normal, this.getDistance());
     const wall = board.walls[this.wallId];
@@ -99,23 +98,24 @@ export class PushWall extends MessageHandlerReflective {
     const x1 = int(wall.x + nx), y1 = int(wall.y + ny);
     const x2 = int(wall2.x + nx), y2 = int(wall2.y + ny);
     const slopeCalc = createSlopeCalculator(board, sectorId);
-    const z1 = slopeCalc(x1, y1, sector.floorheinum) + sector.floorz;
-    const z2 = slopeCalc(x1, y1, sector.ceilingheinum) + sector.ceilingz;
-    const z3 = slopeCalc(x2, y2, sector.ceilingheinum) + sector.ceilingz;
-    const z4 = slopeCalc(x2, y2, sector.floorheinum) + sector.floorz;
-    const z5 = slopeCalc(wall.x, wall.y, sector.floorheinum) + sector.floorz;
-    const z6 = slopeCalc(wall.x, wall.y, sector.ceilingheinum) + sector.ceilingz;
-    const z7 = slopeCalc(wall2.x, wall2.y, sector.ceilingheinum) + sector.ceilingz;
-    const z8 = slopeCalc(wall2.x, wall2.y, sector.floorheinum) + sector.floorz;
-    buff.writePos(0, x1, z1 / ZSCALE, y1);
-    buff.writePos(1, x1, z2 / ZSCALE, y1);
-    buff.writePos(2, x2, z3 / ZSCALE, y2);
-    buff.writePos(3, x2, z4 / ZSCALE, y2);
-    buff.writePos(4, wall.x, z5 / ZSCALE, wall.y);
-    buff.writePos(5, wall.x, z6 / ZSCALE, wall.y);
-    buff.writePos(6, wall2.x, z7 / ZSCALE, wall2.y);
-    buff.writePos(7, wall2.x, z8 / ZSCALE, wall2.y);
-    for (let [i1, i2] of cyclicPairs(4)) buff.writeLine(i1 * 2, i1, i2);
-    for (let i = 0; i < 4; i++) buff.writeLine(8 + i * 2, i, i + 4);
+    const z1 = (slopeCalc(x1, y1, sector.floorheinum) + sector.floorz) / ZSCALE;
+    const z2 = (slopeCalc(x1, y1, sector.ceilingheinum) + sector.ceilingz) / ZSCALE;
+    const z3 = (slopeCalc(x2, y2, sector.ceilingheinum) + sector.ceilingz) / ZSCALE;
+    const z4 = (slopeCalc(x2, y2, sector.floorheinum) + sector.floorz) / ZSCALE;
+    const z5 = (slopeCalc(wall.x, wall.y, sector.floorheinum) + sector.floorz) / ZSCALE;
+    const z6 = (slopeCalc(wall.x, wall.y, sector.ceilingheinum) + sector.ceilingz) / ZSCALE;
+    const z7 = (slopeCalc(wall2.x, wall2.y, sector.ceilingheinum) + sector.ceilingz) / ZSCALE;
+    const z8 = (slopeCalc(wall2.x, wall2.y, sector.floorheinum) + sector.floorz) / ZSCALE;
+
+    const line = new LineBuilder();
+    // line.segment(x1, z1, y1, x1, z2, y1);
+    // line.segment(x2, z3, y2, x2, z4, y2);
+    // line.segment(x1, z2, y1, x2, z3, y2);
+    // line.segment(x1, z1, y1, x2, z4, y2);
+    line.segment(x1, z1, y1, wall.x, z5, wall.y);
+    line.segment(x1, z2, y1, wall.x, z6, wall.y);
+    line.segment(x2, z3, y2, wall2.x, z7, wall2.y);
+    line.segment(x2, z4, y2, wall2.x, z8, wall2.y);
+    line.build(this.wireframe.buff);
   }
 }

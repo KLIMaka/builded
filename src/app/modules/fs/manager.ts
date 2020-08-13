@@ -20,14 +20,14 @@ class FileBrowser {
   private selected = new Set<string>();
 
   constructor(ui: Ui, private manager: FsManager) {
-    this.window = ui.builder.windowBuilder()
+    this.window = ui.builder.window()
       .id('fileBrowser')
       .title('Files')
       .draggable(true)
       .closeable(true)
       .centered(true)
       .size(600, 600)
-      .toolbar(ui.builder.toolbarBuilder()
+      .toolbar(ui.builder.toolbar()
         .startGroup()
         .button('icon-arrows-ccw', () => this.refreshContent())
         .button('icon-download', () => this.downloadSelected())

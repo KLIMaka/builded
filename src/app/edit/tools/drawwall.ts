@@ -2,25 +2,56 @@ import { Board } from "../../../build/board/structs";
 import { createSlopeCalculator, sectorOfWall, ZSCALE } from "../../../build/utils";
 import { vec2, Vec2Array } from "../../../libs_js/glmatrix";
 import { create, Injector } from "../../../utils/injector";
-import { BOARD, BoardProvider, BuildReferenceTracker, REFERENCE_TRACKER, View, VIEW, ART, ArtProvider } from "../../apis/app";
+import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
 import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
 import { LayeredRenderables } from "../../apis/renderable";
 import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
-import { Frame, NamedMessage, Render } from "../messages";
 import { LineBuilder } from "../../modules/gl/buffers";
+import { Frame, NamedMessage, Render } from "../messages";
+
+class Point {
+  constructor(
+    readonly off: number,
+    readonly x: number,
+    readonly y: number,
+    public zup: number,
+    public zdown: number = zup,
+    public zupoff = 0,
+    public zdownoff = 0,
+    private stage = -1
+  ) { }
+
+  public update(z: number) {
+    switch (this.stage) {
+      case 0:
+        this.zupoff = z - this.zup;
+        this.zdown = Math.min(this.zup, this.zup + this.zupoff);
+        break;
+      case 1:
+        this.zdown = Math.min(this.zup + this.zupoff, z);
+        break;
+      case 2:
+        this.zdownoff = z - this.zdown;
+        break;
+    }
+  }
+
+  public place() { this.stage++ }
+}
 
 enum PortalType { UP, DOWN, MID };
-type point_t = { off: number, x: number, y: number, zup: number, zdown: number, zref: number };
+type point_3d = [number, number, number];
 
 class PortalModel {
   private wallVec = vec2.create();
   private startPoint = vec2.create();
   private type: PortalType;
-  private points: point_t[] = [];
-  private placedPoints: point_t[] = [];
+  private points: Point[] = [];
+  private placedPoints: Point[] = [];
+  private lastPoint = -1;
   private slope: (x: number, y: number) => number;
   private needToUpdate = true;
-  private lastMove: [number, number, number] = [0, 0, 0];
+  private lastMove: point_3d = [0, 0, 0];
 
   constructor(
     factory: BuildersFactory,
@@ -36,6 +67,7 @@ class PortalModel {
   public start(board: Board, wallId: number, x: number, y: number, z: number) {
     this.points = [];
     this.placedPoints = [];
+    this.lastPoint = -1;
     const wall = board.walls[wallId];
     const wall2 = board.walls[wall.point2];
     vec2.set(this.wallVec, wall2.x - wall.x, wall2.y - wall.y);
@@ -85,6 +117,7 @@ class PortalModel {
 
   public addPoint() {
     this.placedPoints = [...this.points];
+    this.points[this.lastPoint].place();
   }
 
   private getOffset(x: number, y: number) {
@@ -93,43 +126,34 @@ class PortalModel {
     return vec2.dot(this.wallVec, vec);
   }
 
-  private findIndex(points: point_t[], off: number) {
+  private findIndex(points: Point[], off: number) {
     for (let i = 0; i < points.length; i++) if (points[i].off >= off) return i;
     return points.length;
   }
 
-  private createPoint(points: point_t[], idx: number, off: number, x: number, y: number, z: number): point_t {
-    if (idx == 0 || idx == points.length) return { x, y, off, zup: z, zdown: z, zref: z };
+  private createPoint(points: Point[], idx: number, off: number, x: number, y: number, z: number): Point {
+    if (idx == 0 || idx == points.length) return new Point(off, x, y, z);
     const p1 = points[idx - 1];
     const p2 = points[idx];
-    const dzup = p2.zup - p1.zup;
-    const dzdown = p2.zdown - p1.zdown;
+    const dzup = p2.zup - p1.zup - p1.zupoff;
+    const dzdown = p2.zdown - p1.zdown - p1.zdownoff;
     const doff = (off - p1.off) / (p2.off - p1.off);
-    const zup = p1.zup + dzup * doff;
-    const zdown = p1.zdown + dzdown * doff;
-    return { x, y, off, zup: zup <= z ? zup : z, zdown: zdown >= z ? zdown : z, zref: z };
+    const zup = p1.zup + p1.zupoff + dzup * doff;
+    const zdown = p1.zdown + p1.zdownoff + dzdown * doff;
+    return new Point(off, x, y, zup, z >= zup ? zup : z);
   }
 
-  private updatePoint(p: point_t, z: number) {
-    if (z > p.zref) {
-      p.zdown = z;
-      p.zup = p.zref;
-    } else {
-      p.zup = z;
-      p.zdown = p.zref;
-    }
-  }
-
-  private insertPoint(points: point_t[], x: number, y: number, z: number) {
+  private insertPoint(points: Point[], x: number, y: number, z: number) {
     const off = this.getOffset(x, y);
     [x, y] = this.getCoords(vec2.create(), off);
     const idx = this.findIndex(points, off);
     if (idx < points.length && points[idx].off == off) {
-      this.updatePoint(points[idx], z);
+      points[idx].update(z);
     } else {
       const p = this.createPoint(points, idx, off, x, y, z);
       points.splice(idx, 0, p);
     }
+    this.lastPoint = idx;
     this.needToUpdate = true;
   }
 
@@ -161,18 +185,20 @@ class PortalModel {
     line.build(this.contour.buff);
   }
 
-  private buildMid(line: LineBuilder, last: point_t, first: point_t) {
+  private buildMid(line: LineBuilder, last: Point, first: Point) {
     line.segment(last.x, last.zdown, last.y, last.x, last.zup, last.y);
     line.segment(first.x, first.zdown, first.y, first.x, first.zup, first.y);
     for (let i = 0; i < this.points.length - 1; i++) {
       const p1 = this.points[i];
       const p2 = this.points[i + 1];
-      line.segment(p1.x, p1.zup, p1.y, p2.x, p2.zup, p2.y);
-      line.segment(p1.x, p1.zdown, p1.y, p2.x, p2.zdown, p2.y);
+      line.segment(p1.x, p1.zup, p1.y, p1.x, p1.zup + p1.zupoff, p1.y);
+      line.segment(p1.x, p1.zdown, p1.y, p1.x, p1.zdown + p1.zdownoff, p1.y);
+      line.segment(p1.x, p1.zup + p1.zupoff, p1.y, p2.x, p2.zup, p2.y);
+      line.segment(p1.x, p1.zdown + p1.zdownoff, p1.y, p2.x, p2.zdown, p2.y);
     }
   }
 
-  private buildNonMid(line: LineBuilder, last: point_t, first: point_t, down: boolean) {
+  private buildNonMid(line: LineBuilder, last: Point, first: Point, down: boolean) {
     const lastz = this.slope(last.x, last.y);
     const firstz = this.slope(first.x, first.y);
     line.segment(last.x, lastz, last.y, last.x, down ? last.zup : last.zdown, last.y);
@@ -181,7 +207,8 @@ class PortalModel {
     for (let i = 0; i < this.points.length - 1; i++) {
       const p1 = this.points[i];
       const p2 = this.points[i + 1];
-      line.segment(p1.x, down ? p1.zup : p1.zdown, p1.y, p2.x, down ? p2.zup : p2.zdown, p2.y);
+      line.segment(p1.x, down ? p1.zup : p1.zdown, p1.y, p1.x, down ? p1.zup + p1.zupoff : p1.zdown + p1.zdownoff, p1.y);
+      line.segment(p1.x, down ? p1.zup + p1.zupoff : p1.zdown + p1.zdownoff, p1.y, p2.x, down ? p2.zup : p2.zdown, p2.y);
     }
   }
 }

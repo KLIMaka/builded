@@ -87,7 +87,7 @@ export class LineBuilder {
   }
 
   private addVtx(x: number, y: number, z: number): number {
-    const key = x + ',' + y + ',' + z;
+    const key = `${x},${y},${z}`;
     let idx = this.vtxIndex.indexOf(key);
     if (idx == -1) {
       idx = this.vtxs.length;

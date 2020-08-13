@@ -59,7 +59,7 @@ export class ArtEditor {
     browserCanvas.height = 192;
     browserCanvas.style.display = 'block';
     this.view = this.createView();
-    this.window = ui.builder.windowBuilder()
+    this.window = ui.builder.window()
       .title('ART Edit')
       .draggable(true)
       .closeable(true)
@@ -69,7 +69,7 @@ export class ArtEditor {
         .appendHtml(this.view)
         .appendHtml(browserCanvas)
         .elem())
-      .toolbar(ui.builder.toolbarBuilder()
+      .toolbar(ui.builder.toolbar()
         .widget(this.createPalSelectingMenu())
         .widget(this.searchWidget.widget))
       .build();
@@ -79,7 +79,7 @@ export class ArtEditor {
   }
 
   private createPalSelectingMenu() {
-    const menu = this.ui.builder.menuBuilder();
+    const menu = this.ui.builder.menu();
     iter(range(0, this.plus.length)).forEach(i => menu.item(i + '', () => { this.currentPlu = i; this.redraw() }))
     return menuButton('icon-adjust', menu);
   }

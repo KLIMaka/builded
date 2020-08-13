@@ -93,7 +93,6 @@ type trap_t = { x0: number, x1: number, w: Wall }
 const trapCmp = (lh: trap_t, rh: trap_t) => { return lh.x0 + lh.x1 - rh.x0 - rh.x1 }
 
 export function triangulate(sector: Sector, walls: Wall[]) {
-  const triangles: point2d[] = [];
   const secy = [...new Set(iter(sectorWalls(sector))
     .map(w => walls[w].y)
     .collect()
@@ -130,6 +129,7 @@ export function triangulate(sector: Sector, walls: Wall[]) {
     }
   }
 
+  const triangles: point2d[] = [];
   for (let i = 0; i < zoids.length(); i++) {
     const pol = new Deck<point2dxy>();
     for (let j = 0; j < 4; j++) {

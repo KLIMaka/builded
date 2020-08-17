@@ -9,7 +9,7 @@ import { LayeredRenderables } from "../../apis/renderable";
 import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
 import { LineBuilder } from "../../modules/gl/buffers";
 import { Frame, NamedMessage, Render } from "../messages";
-import { loopPairs } from "../../../utils/collections";
+import { loopPairs, pairs } from "../../../utils/collections";
 
 enum PointMode { UP, UPOFF, DOWN, DOWNOFF };
 class Point {
@@ -30,9 +30,11 @@ class Point {
       this.zdownoff = this.zupoff;
       this.zup = z;
       this.zupoff = 0;
+      this.fixDown();
     } else {
       this.zdown = z;
       this.zdownoff = 0;
+      this.fixUp();
     }
   }
 
@@ -42,9 +44,11 @@ class Point {
       this.zdownoff = this.zupoff;
       this.zup = z;
       this.zupoff = dz;
+      this.fixDown();
     } else {
       this.zdown = z;
       this.zdownoff = dz;
+      this.fixUp();
     }
   }
 
@@ -113,6 +117,8 @@ class PortalModel {
   private startPoint = vec2.create();
   private type: PortalType;
   private points: Point[] = [];
+  private points1: point_3d[] = [];
+  private pointer: point_3d;
   private placedPoints: Point[] = [];
   private lastPoint = -1;
   private slope: (x: number, y: number) => number;
@@ -135,6 +141,8 @@ class PortalModel {
     this.points = [];
     this.placedPoints = [];
     this.lastPoint = -1;
+    this.pointer = [x, y, z];
+    this.points1 = [];
     const wall = board.walls[wallId];
     const wall2 = board.walls[wall.point2];
     vec2.set(this.wallVec, wall2.x - wall.x, wall2.y - wall.y);
@@ -167,13 +175,13 @@ class PortalModel {
 
   private buildHull(points: point_3d[]) {
     const hull: Point[] = [];
-    for (const [x, y, _] of points) {
+    for (const [x, y, z] of points) {
       const [xp, yp, off] = this.project(x, y);
       const idx = this.findIndex(hull, off);
-      if (idx == hull.length || hull[idx].off != off) hull.splice(idx, 0, new Point(off, xp, yp, 0));
+      if (idx == hull.length || hull[idx].off != off) hull.splice(idx, 0, new Point(off, xp, yp, z));
     }
 
-    for (const [p1, p2] of loopPairs(points)) {
+    for (const [p1, p2] of pairs(points)) {
       const vertical = p1[0] == p2[0] && p1[1] == p2[1];
       let dz = p2[2] - p1[2];
       let z = 0;
@@ -183,9 +191,10 @@ class PortalModel {
       let idx = this.findIndex(hull, pp1[2]);
       if (vertical) {
         hull[idx].updateZVertical(p1[2], dz);
+        hull[idx].updateZ(p2[2]);
       } else {
         while (hull[idx].off != pp2[2]) {
-          const doff = (hull[idx].off - p1[2]) / (p2[2] - p1[2]);
+          const doff = (hull[idx].off - pp1[2]) / (pp2[2] - pp1[2]);
           hull[idx].updateZ(z + doff * dz)
           idx++;
         }
@@ -218,8 +227,12 @@ class PortalModel {
   public move(x: number, y: number, z: number) {
     const [xp, yp, off] = this.project(x, y);
     if (this.needToMove(xp, yp, z)) return;
-    this.points = this.clonePlacedPoints();
-    this.insertPoint(this.points, xp, yp, z / ZSCALE, off);
+    // this.points = this.clonePlacedPoints();
+    // this.insertPoint(this.points, xp, yp, z / ZSCALE, off);
+    this.pointer[0] = xp;
+    this.pointer[1] = yp;
+    this.pointer[2] = z / ZSCALE;
+    this.needToUpdate = true;
     this.updateLastMove(xp, yp, z);
   }
 
@@ -234,11 +247,13 @@ class PortalModel {
   }
 
   public addPoint() {
-    this.placedPoints = [...this.points];
-    const lastPoint = this.points[this.lastPoint];
-    const lastMode = lastPoint.mode;
-    const nextMode = cyclic(this.modes.indexOf(lastMode) + 1, this.modes.length);
-    lastPoint.setMode(nextMode);
+    // this.placedPoints = [...this.points];
+    // const lastPoint = this.points[this.lastPoint];
+    // const lastMode = lastPoint.mode;
+    // const nextMode = cyclic(this.modes.indexOf(lastMode) + 1, this.modes.length);
+    // lastPoint.setMode(nextMode);
+    this.points1.push(this.pointer);
+    this.pointer = [...this.pointer];
     this.needToUpdate = true;
   }
 
@@ -277,8 +292,8 @@ class PortalModel {
   }
 
   private update() {
-    if (!this.needToUpdate) return;
-    if (this.points.length == 0) return;
+    // if (!this.needToUpdate) return;
+    // if (this.points.length == 0) return;
     this.updateContour();
     this.updateContourPoints();
     this.needToUpdate = false;
@@ -289,39 +304,25 @@ class PortalModel {
 
   private updateContour() {
     this.contour.needToRebuild();
+    const hull = this.buildHull([...this.points1, this.pointer]);
     const line = new LineBuilder();
-    const last = this.points[this.points.length - 1];
-    const first = this.points[0];
-    if (this.type == PortalType.DOWN) this.buildNonMid(line, last, first, true);
-    else if (this.type == PortalType.UP) this.buildNonMid(line, last, first, false);
-    else if (this.type == PortalType.MID) this.buildMid(line, last, first);
+    if (this.type == PortalType.DOWN) this.buildNonMid(line, hull, true);
+    else if (this.type == PortalType.UP) this.buildNonMid(line, hull, false);
+    else if (this.type == PortalType.MID) this.buildMid(line, hull);
 
-    const size = 16;
-    const lastPoint = this.points[this.lastPoint];
-    const dw = vec2.scale(vec2.create(), this.wallVec, size);
-    const x = lastPoint.x;
-    const y = lastPoint.y;
-    const z = lastPoint.getModeZ();
-    line.rect(
-      x - dw[0], z - size, y - dw[1],
-      x + dw[0], z - size, y - dw[1],
-      x + dw[0], z + size, y - dw[1],
-      x - dw[0], z + size, y - dw[1],
-    )
-    if (lastPoint.mode == PointMode.UP) line.segment(x, z, y, x, z + size, y);
-    if (lastPoint.mode == PointMode.UPOFF) line.segment(x, z, y, x + dw[0], z + size, y + dw[1]);
-    if (lastPoint.mode == PointMode.DOWN) line.segment(x, z, y, x, z - size, y);
-    if (lastPoint.mode == PointMode.DOWNOFF) line.segment(x, z, y, x + dw[0], z - size, y + dw[1]);
+    // for (const [p1, p2] of loopPairs(this.points1)) line.segment(p1[0], p1[2], p1[1], p2[0], p2[2], p2[1])
 
     line.build(this.contour.buff);
   }
 
-  private buildMid(line: LineBuilder, last: Point, first: Point) {
+  private buildMid(line: LineBuilder, hull: Point[],) {
+    const last = hull[hull.length - 1];
+    const first = hull[0];
     line.segment(last.x, last.zdown, last.y, last.x, last.zup, last.y);
     line.segment(first.x, first.zdown, first.y, first.x, first.zup, first.y);
-    for (let i = 0; i < this.points.length - 1; i++) {
-      const p1 = this.points[i];
-      const p2 = this.points[i + 1];
+    for (let i = 0; i < hull.length - 1; i++) {
+      const p1 = hull[i];
+      const p2 = hull[i + 1];
       line.segment(p1.x, p1.zup, p1.y, p1.x, p1.zup + p1.zupoff, p1.y);
       line.segment(p1.x, p1.zdown, p1.y, p1.x, p1.zdown + p1.zdownoff, p1.y);
       line.segment(p1.x, p1.zup + p1.zupoff, p1.y, p2.x, p2.zup, p2.y);
@@ -329,15 +330,17 @@ class PortalModel {
     }
   }
 
-  private buildNonMid(line: LineBuilder, last: Point, first: Point, down: boolean) {
+  private buildNonMid(line: LineBuilder, hull: Point[], down: boolean) {
+    const last = hull[hull.length - 1];
+    const first = hull[0];
     const lastz = this.slope(last.x, last.y);
     const firstz = this.slope(first.x, first.y);
     line.segment(last.x, lastz, last.y, last.x, down ? last.zup : last.zdown, last.y);
     line.segment(first.x, firstz, first.y, first.x, down ? first.zup : first.zdown, first.y);
     line.segment(last.x, lastz, last.y, first.x, firstz, first.y);
-    for (let i = 0; i < this.points.length - 1; i++) {
-      const p1 = this.points[i];
-      const p2 = this.points[i + 1];
+    for (let i = 0; i < hull.length - 1; i++) {
+      const p1 = hull[i];
+      const p2 = hull[i + 1];
       line.segment(p1.x, down ? p1.zup : p1.zdown, p1.y, p1.x, down ? p1.zup + p1.zupoff : p1.zdown + p1.zdownoff, p1.y);
       line.segment(p1.x, down ? p1.zup + p1.zupoff : p1.zdown + p1.zdownoff, p1.y, p2.x, down ? p2.zup : p2.zdown, p2.y);
     }

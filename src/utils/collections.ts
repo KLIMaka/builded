@@ -244,6 +244,19 @@ export function* loopPairs<T>(i: Iterable<T>): Generator<[T, T]> {
   yield [lh.value, first.value];
 }
 
+export function* pairs<T>(i: Iterable<T>): Generator<[T, T]> {
+  const iter = i[Symbol.iterator]();
+  const first = iter.next();
+  if (first.done) return;
+  let lh = first;
+  let rh = iter.next();
+  while (!rh.done) {
+    yield [lh.value, rh.value];
+    lh = rh;
+    rh = iter.next();
+  }
+}
+
 export function* take<T>(c: Iterable<T>, count: number): Generator<T> {
   if (count < 0) return;
   const iter = c[Symbol.iterator]();

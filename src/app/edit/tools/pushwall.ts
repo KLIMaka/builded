@@ -1,15 +1,14 @@
 import { pushWall } from "../../../build/boardutils";
 import { build2gl, createSlopeCalculator, sectorOfWall, wallNormal, ZSCALE } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
-import { cyclicPairs } from "../../../utils/collections";
 import { create, Injector } from "../../../utils/injector";
 import { dot2d, int } from "../../../utils/mathutils";
-import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, REFERENCE_TRACKER, View, VIEW, GRID, GridController } from "../../apis/app";
+import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, GRID, GridController, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
 import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
 import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
+import { LineBuilder } from "../../modules/gl/buffers";
 import { MovingHandle } from "../handle";
 import { COMMIT, Frame, INVALIDATE_ALL, NamedMessage, Render } from "../messages";
-import { LineBuilder } from "../../modules/gl/buffers";
 
 const wallNormal_ = vec3.create();
 const wallNormal1_ = vec3.create();
@@ -108,10 +107,8 @@ export class PushWall extends MessageHandlerReflective {
     const z8 = (slopeCalc(wall2.x, wall2.y, sector.floorheinum) + sector.floorz) / ZSCALE;
 
     const line = new LineBuilder();
-    // line.segment(x1, z1, y1, x1, z2, y1);
-    // line.segment(x2, z3, y2, x2, z4, y2);
-    // line.segment(x1, z2, y1, x2, z3, y2);
-    // line.segment(x1, z1, y1, x2, z4, y2);
+    this.wireframe.needToRebuild();
+    line.rect(x1, z1, y1, x1, z2, y1, x2, z3, y2, x2, z4, y2);
     line.segment(x1, z1, y1, wall.x, z5, wall.y);
     line.segment(x1, z2, y1, wall.x, z6, wall.y);
     line.segment(x2, z3, y2, wall2.x, z7, wall2.y);

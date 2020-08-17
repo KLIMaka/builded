@@ -1,14 +1,17 @@
 import { Board } from "../../../build/board/structs";
 import { createSlopeCalculator, sectorOfWall, ZSCALE } from "../../../build/utils";
-import { vec2, Vec2Array } from "../../../libs_js/glmatrix";
+import { vec2 } from "../../../libs_js/glmatrix";
 import { create, Injector } from "../../../utils/injector";
+import { cyclic } from "../../../utils/mathutils";
 import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
 import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
 import { LayeredRenderables } from "../../apis/renderable";
 import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
 import { LineBuilder } from "../../modules/gl/buffers";
 import { Frame, NamedMessage, Render } from "../messages";
+import { loopPairs } from "../../../utils/collections";
 
+enum PointMode { UP, UPOFF, DOWN, DOWNOFF };
 class Point {
   constructor(
     readonly off: number,
@@ -18,25 +21,88 @@ class Point {
     public zdown: number = zup,
     public zupoff = 0,
     public zdownoff = 0,
-    private stage = -1
+    public mode = PointMode.UPOFF
   ) { }
 
-  public update(z: number) {
-    switch (this.stage) {
-      case 0:
-        this.zupoff = z - this.zup;
-        this.zdown = Math.min(this.zup, this.zup + this.zupoff);
-        break;
-      case 1:
-        this.zdown = Math.min(this.zup + this.zupoff, z);
-        break;
-      case 2:
-        this.zdownoff = z - this.zdown;
-        break;
+  public updateZ(z: number) {
+    if (z >= this.zup) {
+      this.zdown = this.zup;
+      this.zdownoff = this.zupoff;
+      this.zup = z;
+      this.zupoff = 0;
+    } else {
+      this.zdown = z;
+      this.zdownoff = 0;
     }
   }
 
-  public place() { this.stage++ }
+  public updateZVertical(z: number, dz: number) {
+    if (z >= this.zup) {
+      this.zdown = this.zup;
+      this.zdownoff = this.zupoff;
+      this.zup = z;
+      this.zupoff = dz;
+    } else {
+      this.zdown = z;
+      this.zdownoff = dz;
+    }
+  }
+
+  public update(z: number) {
+    switch (this.mode) {
+      case PointMode.UPOFF: this.updateUpOff(z); break;
+      case PointMode.UP: this.updateUp(z); break;
+      case PointMode.DOWNOFF: this.updateDownOff(z); break;
+      case PointMode.DOWN: this.updateDown(z); break;
+    }
+  }
+
+  private fixDown() {
+    this.zdown = Math.min(this.zdown, this.zup);
+    this.zdownoff = Math.min(this.zup + this.zupoff, this.zdown + this.zdownoff) - this.zdown;
+  }
+
+  private fixUp() {
+    this.zup = Math.max(this.zdown, this.zup);
+    this.zupoff = Math.max(this.zup + this.zupoff, this.zdown + this.zdownoff) - this.zup;
+  }
+
+  private updateUp(z: number) {
+    const zupoff = this.zup + this.zupoff;
+    this.zup = z;
+    this.zupoff = zupoff - z;
+    this.fixDown();
+  }
+
+  private updateUpOff(z: number) {
+    this.zupoff = z - this.zup;
+    this.fixDown();
+  }
+
+  private updateDown(z: number) {
+    const zdownoff = this.zdown + this.zdownoff;
+    this.zdown = z;
+    this.zdownoff = zdownoff - z;
+    this.fixUp();
+  }
+
+  private updateDownOff(z: number) {
+    this.zdownoff = z - this.zdown;
+    this.fixUp();
+  }
+
+  public setMode(mode: PointMode) {
+    this.mode = mode;
+  }
+
+  public getModeZ() {
+    switch (this.mode) {
+      case PointMode.DOWN: return this.zdown;
+      case PointMode.DOWNOFF: return this.zdown + this.zdownoff;
+      case PointMode.UP: return this.zup;
+      case PointMode.UPOFF: return this.zup + this.zupoff;
+    }
+  }
 }
 
 enum PortalType { UP, DOWN, MID };
@@ -52,6 +118,7 @@ class PortalModel {
   private slope: (x: number, y: number) => number;
   private needToUpdate = true;
   private lastMove: point_3d = [0, 0, 0];
+  private modes = [PointMode.UP, PointMode.UPOFF, PointMode.DOWN, PointMode.DOWNOFF];
 
   constructor(
     factory: BuildersFactory,
@@ -98,11 +165,62 @@ class PortalModel {
     this.addPoint();
   }
 
+  private buildHull(points: point_3d[]) {
+    const hull: Point[] = [];
+    for (const [x, y, _] of points) {
+      const [xp, yp, off] = this.project(x, y);
+      const idx = this.findIndex(hull, off);
+      if (idx == hull.length || hull[idx].off != off) hull.splice(idx, 0, new Point(off, xp, yp, 0));
+    }
+
+    for (const [p1, p2] of loopPairs(points)) {
+      const vertical = p1[0] == p2[0] && p1[1] == p2[1];
+      let dz = p2[2] - p1[2];
+      let z = 0;
+      let pp1 = this.project(p1[0], p1[1]);
+      let pp2 = this.project(p2[0], p2[1]);
+      [pp1, pp2, dz, z] = pp1[2] > pp2[2] ? [pp2, pp1, -dz, p2[2]] : [pp1, pp2, dz, p1[2]];
+      let idx = this.findIndex(hull, pp1[2]);
+      if (vertical) {
+        hull[idx].updateZVertical(p1[2], dz);
+      } else {
+        while (hull[idx].off != pp2[2]) {
+          const doff = (hull[idx].off - p1[2]) / (p2[2] - p1[2]);
+          hull[idx].updateZ(z + doff * dz)
+          idx++;
+        }
+      }
+    }
+
+    return hull;
+  }
+
+  private project(x: number, y: number): point_3d {
+    const point = vec2.fromValues(x, y);
+    const vec = vec2.sub(vec2.create(), point, this.startPoint);
+    const off = vec2.dot(this.wallVec, vec);
+    const t = vec2.copy(vec2.create(), this.wallVec);
+    vec2.scale(t, t, off);
+    vec2.add(t, t, this.startPoint);
+    return [t[0], t[1], off];
+  }
+
+  private clonePlacedPoints() {
+    const pts = [];
+    for (let i = 0; i < this.placedPoints.length; i++) {
+      const p = new Point(0, 0, 0, 0);
+      Object.assign(p, this.placedPoints[i]);
+      pts.push(p)
+    }
+    return pts;
+  }
+
   public move(x: number, y: number, z: number) {
-    if (this.needToMove(x, y, z)) return;
-    this.points = [...this.placedPoints];
-    this.insertPoint(this.points, x, y, z / ZSCALE);
-    this.updateLastMove(x, y, z);
+    const [xp, yp, off] = this.project(x, y);
+    if (this.needToMove(xp, yp, z)) return;
+    this.points = this.clonePlacedPoints();
+    this.insertPoint(this.points, xp, yp, z / ZSCALE, off);
+    this.updateLastMove(xp, yp, z);
   }
 
   private needToMove(x: number, y: number, z: number) {
@@ -117,14 +235,13 @@ class PortalModel {
 
   public addPoint() {
     this.placedPoints = [...this.points];
-    this.points[this.lastPoint].place();
+    const lastPoint = this.points[this.lastPoint];
+    const lastMode = lastPoint.mode;
+    const nextMode = cyclic(this.modes.indexOf(lastMode) + 1, this.modes.length);
+    lastPoint.setMode(nextMode);
+    this.needToUpdate = true;
   }
 
-  private getOffset(x: number, y: number) {
-    const point = vec2.fromValues(x, y);
-    const vec = vec2.sub(vec2.create(), point, this.startPoint);
-    return vec2.dot(this.wallVec, vec);
-  }
 
   private findIndex(points: Point[], off: number) {
     for (let i = 0; i < points.length; i++) if (points[i].off >= off) return i;
@@ -143,13 +260,15 @@ class PortalModel {
     return new Point(off, x, y, zup, z >= zup ? zup : z);
   }
 
-  private insertPoint(points: Point[], x: number, y: number, z: number) {
-    const off = this.getOffset(x, y);
-    [x, y] = this.getCoords(vec2.create(), off);
+  private updatePoint(points: Point[], idx: number, z: number) {
+    points[idx].update(z);
+  }
+
+  private insertPoint(points: Point[], x: number, y: number, z: number, off: number) {
     const idx = this.findIndex(points, off);
     if (idx < points.length && points[idx].off == off) {
-      points[idx].update(z);
-    } else {
+      this.updatePoint(points, idx, z);
+    } else if (idx == 0 || idx == points.length) {
       const p = this.createPoint(points, idx, off, x, y, z);
       points.splice(idx, 0, p);
     }
@@ -165,12 +284,6 @@ class PortalModel {
     this.needToUpdate = false;
   }
 
-  private getCoords(out: Vec2Array, off: number): Vec2Array {
-    vec2.copy(out, this.wallVec);
-    vec2.scale(out, out, off);
-    return vec2.add(out, out, this.startPoint);
-  }
-
   private updateContourPoints() {
   }
 
@@ -182,6 +295,24 @@ class PortalModel {
     if (this.type == PortalType.DOWN) this.buildNonMid(line, last, first, true);
     else if (this.type == PortalType.UP) this.buildNonMid(line, last, first, false);
     else if (this.type == PortalType.MID) this.buildMid(line, last, first);
+
+    const size = 16;
+    const lastPoint = this.points[this.lastPoint];
+    const dw = vec2.scale(vec2.create(), this.wallVec, size);
+    const x = lastPoint.x;
+    const y = lastPoint.y;
+    const z = lastPoint.getModeZ();
+    line.rect(
+      x - dw[0], z - size, y - dw[1],
+      x + dw[0], z - size, y - dw[1],
+      x + dw[0], z + size, y - dw[1],
+      x - dw[0], z + size, y - dw[1],
+    )
+    if (lastPoint.mode == PointMode.UP) line.segment(x, z, y, x, z + size, y);
+    if (lastPoint.mode == PointMode.UPOFF) line.segment(x, z, y, x + dw[0], z + size, y + dw[1]);
+    if (lastPoint.mode == PointMode.DOWN) line.segment(x, z, y, x, z - size, y);
+    if (lastPoint.mode == PointMode.DOWNOFF) line.segment(x, z, y, x + dw[0], z - size, y + dw[1]);
+
     line.build(this.contour.buff);
   }
 

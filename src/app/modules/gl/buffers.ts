@@ -74,6 +74,18 @@ export class LineBuilder {
     this.lines.push([idx1, idx2]);
   }
 
+  public rect(
+    x1: number, y1: number, z1: number,
+    x2: number, y2: number, z2: number,
+    x3: number, y3: number, z3: number,
+    x4: number, y4: number, z4: number
+  ) {
+    this.segment(x1, y1, z1, x2, y2, z2);
+    this.segment(x2, y2, z2, x3, y3, z3);
+    this.segment(x3, y3, z3, x4, y4, z4);
+    this.segment(x4, y4, z4, x1, y1, z1);
+  }
+
   public build(buff: GenericBuildBuffer) {
     buff.allocate(this.vtxs.length, this.lines.length * 2);
     for (let i = 0; i < this.vtxs.length; i++) {

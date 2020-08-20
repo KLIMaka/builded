@@ -54,8 +54,7 @@ export class PushWall extends MessageHandlerReflective {
     pushWall(this.board(), this.wallId, this.getDistance(), this.art, this.copy, this.refs);
     this.bus.handle(COMMIT);
     this.bus.handle(INVALIDATE_ALL);
-    this.wallId = -1;
-    this.movingHandle.stop();
+    this.abort();
   }
 
   private getDistance(): number {

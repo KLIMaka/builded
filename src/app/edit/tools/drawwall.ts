@@ -1,8 +1,11 @@
+import { clockwise } from "../../../build/board/internal";
 import { Board } from "../../../build/board/structs";
 import { createSlopeCalculator, sectorOfWall, ZSCALE } from "../../../build/utils";
 import { vec2 } from "../../../libs_js/glmatrix";
-import { pairs, loopPairs } from "../../../utils/collections";
+import { reversed, wrap } from "../../../utils/collections";
 import { create, Injector } from "../../../utils/injector";
+import { iter } from "../../../utils/iter";
+import { cyclic } from "../../../utils/mathutils";
 import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
 import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
 import { LayeredRenderables } from "../../apis/renderable";
@@ -10,7 +13,59 @@ import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common
 import { LineBuilder } from "../../modules/gl/buffers";
 import { Frame, NamedMessage, Render } from "../messages";
 
-class Point {
+export type point_3d = [number, number, number];
+export type projector = (x: number, y: number) => [number, number, number];
+
+function fixOrder(points: point_3d[], proj: projector): point_3d[] {
+  const cw = clockwise(iter(points).map(p => <[number, number]>[proj(p[0], p[1])[2], p[2]]));
+  return cw ? [...reversed(wrap(points))] : points;
+}
+
+function findIndex(points: Point[], off: number) {
+  for (let i = 0; i < points.length; i++) if (points[i].off >= off) return i;
+  return points.length;
+}
+
+export function buildHull(points: point_3d[], proj: projector) {
+  points = fixOrder(points, proj);
+  const hull: Point[] = [];
+  for (const [x, y, z] of points) {
+    const [xp, yp, off] = proj(x, y);
+    const idx = findIndex(hull, off);
+    if (idx == hull.length || hull[idx].off != off) hull.splice(idx, 0, new Point(off, xp, yp, z));
+  }
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const p1 = points[i];
+    const p2 = points[cyclic(i + 1, points.length)];
+    const vertical = p1[0] == p2[0] && p1[1] == p2[1];
+    if (vertical) {
+      const dz = p2[2] - p1[2];
+      const p0 = points[cyclic(i - 1, points.length)];
+      const pp0 = proj(p0[0], p0[1]);
+      const pp1 = proj(p1[0], p1[1]);
+      const doff = pp1[2] - pp0[2];
+      const idx = findIndex(hull, pp1[2]);
+      if (doff > 0) hull[idx].updateZVertical(p1[2], dz);
+      else hull[idx].updateZVertical(p2[2], -dz);
+    } else {
+      const pp1 = proj(p1[0], p1[1]);
+      const pp2 = proj(p2[0], p2[1]);
+      const [start, end, dz, startz] = pp1[2] > pp2[2]
+        ? [pp2[2], pp1[2], p1[2] - p2[2], p2[2]]
+        : [pp1[2], pp2[2], p2[2] - p1[2], p1[2]];
+      let idx = findIndex(hull, start);
+      while (hull[idx].off != end) {
+        const doff = (hull[idx].off - start) / (end - start);
+        hull[idx].updateZ(startz + doff * dz)
+        idx++;
+      }
+    }
+  }
+  return hull;
+}
+
+export class Point {
   constructor(
     readonly off: number,
     readonly x: number,
@@ -36,9 +91,9 @@ class Point {
   }
 
   public updateZVertical(z: number, dz: number) {
-    if (z + dz > this.zup + this.zupoff) {
-      this.zdown = this.zup;
-      this.zdownoff = this.zupoff;
+    if (z >= this.zup) {
+      this.zdown = z + dz;
+      this.zdownoff = 0;
       this.zup = z;
       this.zupoff = dz;
       // this.fixDown();
@@ -61,8 +116,6 @@ class Point {
 }
 
 enum PortalType { UP, DOWN, MID };
-type point_3d = [number, number, number];
-
 class PortalModel {
   private wallVec = vec2.create();
   private startPoint = vec2.create();
@@ -117,37 +170,6 @@ class PortalModel {
     this.addPoint();
   }
 
-  private buildHull(points: point_3d[]) {
-    const hull: Point[] = [];
-    for (const [x, y, z] of points) {
-      const [xp, yp, off] = this.project(x, y);
-      const idx = this.findIndex(hull, off);
-      if (idx == hull.length || hull[idx].off != off) hull.splice(idx, 0, new Point(off, xp, yp, z));
-    }
-
-    for (const [p1, p2] of pairs(points)) {
-      const vertical = p1[0] == p2[0] && p1[1] == p2[1];
-      let dz = p2[2] - p1[2];
-      let z = 0;
-      let pp1 = this.project(p1[0], p1[1]);
-      let pp2 = this.project(p2[0], p2[1]);
-      [pp1, pp2, dz, z] = pp1[2] > pp2[2] ? [pp2, pp1, -dz, p2[2]] : [pp1, pp2, dz, p1[2]];
-      let idx = this.findIndex(hull, pp1[2]);
-      if (vertical) {
-        hull[idx].updateZVertical(p1[2], dz);
-        hull[idx].updateZ(p2[2]);
-      } else {
-        while (hull[idx].off != pp2[2]) {
-          const doff = (hull[idx].off - pp1[2]) / (pp2[2] - pp1[2]);
-          hull[idx].updateZ(z + doff * dz)
-          idx++;
-        }
-      }
-    }
-
-    return hull;
-  }
-
   private project(x: number, y: number): point_3d {
     const t = vec2.fromValues(x, y);
     vec2.sub(t, t, this.startPoint);
@@ -184,13 +206,6 @@ class PortalModel {
     this.needToUpdate = true;
   }
 
-
-  private findIndex(points: Point[], off: number) {
-    for (let i = 0; i < points.length; i++) if (points[i].off >= off) return i;
-    return points.length;
-  }
-
-
   private update() {
     if (!this.needToUpdate) return;
     this.updateContour();
@@ -203,7 +218,7 @@ class PortalModel {
 
   private updateContour() {
     this.contour.needToRebuild();
-    const hull = this.buildHull([...this.points, this.pointer]);
+    const hull = buildHull([...this.points, this.pointer], (x, y) => this.project(x, y));
     const line = new LineBuilder();
     if (this.type == PortalType.DOWN) this.buildNonMid(line, hull, true);
     else if (this.type == PortalType.UP) this.buildNonMid(line, hull, false);

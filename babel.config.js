@@ -5,6 +5,10 @@ module.exports = api => {
       presets: [
         ['@babel/preset-env', { targets: { node: 'current' } }],
         '@babel/preset-typescript',
+      ],
+      plugins: [
+        ['@babel/plugin-transform-typescript', { allowDeclareFields: true }],
+        ['@babel/plugin-proposal-class-properties', { loose: true }],
       ]
     }
     : {

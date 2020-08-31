@@ -11,3 +11,17 @@ export const save = (function () {
     window.URL.revokeObjectURL(url);
   };
 }());
+
+export async function saveAs(buffer: ArrayBuffer, fileName: string) {
+  const opts = {
+    type: 'save-file',
+    accepts: [{
+      description: 'BUILD Map',
+      extensions: ['map'],
+    }],
+  };
+  const handle = await window['chooseFileSystemEntries'](opts);
+  const writable = await handle.createWritable();
+  await writable.write(buffer);
+  await writable.close();
+}

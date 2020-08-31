@@ -135,12 +135,20 @@ export function saveBuildMap(board: Board): ArrayBuffer {
   const stream = new Stream(buffer, true);
   boardStruct.write(stream, board);
   ushort.write(stream, board.numsectors);
-  array(sectorStruct, board.numsectors).write(stream, board.sectors);
+  array(sectorStruct, board.numsectors).write(stream, fixSectorSlopes(board.sectors));
   ushort.write(stream, board.numwalls);
   array(wallStruct, board.numwalls).write(stream, board.walls);
   ushort.write(stream, board.numsprites);
   array(spriteStruct, board.numsprites).write(stream, board.sprites);
   return buffer;
+}
+
+function fixSectorSlopes(sectors: Sector[]) {
+  for (const sec of sectors) {
+    sec.ceilingstat.slopped = 1;
+    sec.floorstat.slopped = 1;
+  }
+  return sectors;
 }
 
 export function cloneSector(sector: Sector): Sector {

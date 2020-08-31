@@ -5,7 +5,7 @@ import { addDragAndDrop, Element } from "../../../utils/ui/ui";
 import { BUS } from "../../apis/handler";
 import { UI, Ui, Window } from "../../apis/ui";
 import { namedMessageHandler } from "../../edit/messages";
-import { save } from "../../../utils/filesave";
+import { save, saveAs } from "../../../utils/filesave";
 
 export interface FsManager {
   read(name: string): Promise<ArrayBuffer>;
@@ -95,7 +95,7 @@ class FileBrowser {
 
   private async downloadSelected() {
     for (const file of this.selected) {
-      save(await this.manager.read(file), file);
+      saveAs(await this.manager.read(file), file);
       this.selected.delete(file);
     }
     this.refreshContent();

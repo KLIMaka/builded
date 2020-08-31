@@ -79,7 +79,7 @@ function createBoard() {
   board.numwalls = 0;
   board.numsectors = 0;
   board.numsprites = 0;
-  board.version = 0x0700;
+  board.version = 0x0007;
   board.posx = board.posy = board.posz = board.cursectnum = board.ang = 0;
   return board;
 }

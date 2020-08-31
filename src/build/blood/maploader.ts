@@ -375,6 +375,8 @@ function writeWalls(board: BloodBoard, tmpStream: Stream, tmpArray: Uint8Array, 
 function writeSectors(board: BloodBoard, tmpStream: Stream, tmpArray: Uint8Array, stream: Stream) {
   for (let i = 0; i < board.numsectors; i++) {
     const sector = board.sectors[i];
+    sector.ceilingstat.slopped = 1;
+    sector.floorstat.slopped = 1;
     tmpStream.setOffset(0);
     sectorStruct.write(tmpStream, sector);
     encryptBuffer(tmpArray, sectorStruct.size, 0);

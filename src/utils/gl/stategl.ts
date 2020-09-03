@@ -3,34 +3,16 @@ import { Deck, isEmpty } from '../collections';
 import { Buffer } from './buffergl';
 import { Definition, IndexBuffer, Shader, Texture, VertexBuffer } from './drawstruct';
 import * as SHADER from './shaders';
-
-function eqCmp<T>(lh: T, rh: T) { return lh === rh }
-function assign<T>(dst: T, src: T) { return src }
-
-export class StateValue<T> {
-  constructor(
-    private changecb: () => void,
-    public value: T,
-    public cmp: (lh: T, rh: T) => boolean = eqCmp,
-    public setter: (dst: T, src: T) => T = assign
-  ) { }
-  get(): T { return this.value; }
-  set(v: T) {
-    if (!this.cmp(v, this.value)) {
-      this.value = this.setter(this.value, v);
-      this.changecb()
-    }
-  }
-}
+import { StateValueMatrix, StateValueGeneric, StateValue } from './statevalue';
 
 function createStateValue(type: string, changecb: () => void): StateValue<any> {
   switch (type) {
     case "mat4":
     case "vec3":
     case "vec4":
-      return new StateValue<GLM.Mat4Array>(changecb, GLM[type].create(), GLM[type].exactEquals, GLM[type].copy)
+      return new StateValueMatrix<GLM.Mat4Array>(changecb, GLM[type].create(), GLM[type].exactEquals, GLM[type].copy)
     default:
-      return new StateValue<number>(changecb, 0);
+      return new StateValueGeneric<number>(changecb, 0);
   }
 }
 
@@ -71,17 +53,25 @@ function nextBatch(batch: number) {
   return nb > 1.0 ? 0 : nb;
 }
 
+class ShaderConfig {
+  constructor(
+    readonly shader: Shader,
+    readonly uniforms: number[],
+    readonly attribs: number[],
+  ) { }
+}
+
 export class State {
   readonly profile = new Profile();
 
   private batchUniform = -1;
   private lastBuffer: Buffer;
 
-  private shader: StateValue<string> = new StateValue<string>(() => this.changeShader = true, null);
+  private shader: StateValue<string> = new StateValueGeneric<string>(() => this.changeShader = true, null);
   private lastShader: string;
   private selectedShader: Shader;
-  private indexBuffer: StateValue<IndexBuffer> = new StateValue<IndexBuffer>(() => this.changeIndexBuffer = true, null);
-  private shaders: { [index: string]: Shader } = {};
+  private indexBuffer: StateValue<IndexBuffer> = new StateValueGeneric<IndexBuffer>(() => this.changeIndexBuffer = true, null);
+  private shaders: { [index: string]: ShaderConfig } = {};
 
   private states: StateValue<any>[] = [];
   private stateIndex: { [index: string]: number } = {};
@@ -103,9 +93,9 @@ export class State {
   private changedTextures = new Deck<[number, number]>();
   private changedUniformIdxs = new Deck<number>();
 
-  private batchOffset = -1;
-  private batchSize = -1;
-  private batchMode = -1;
+  private chainOffset = -1;
+  private chainSize = -1;
+  private chainMode = -1;
 
   constructor() {
     this.registerState('shader', this.shader);
@@ -122,70 +112,86 @@ export class State {
   }
 
   public flush(gl: WebGLRenderingContext, buffer: Buffer = this.lastBuffer) {
-    if (this.batchMode == -1) return;
+    if (this.chainMode == -1) return;
     if (buffer) buffer.update(gl);
-    gl.drawElements(this.batchMode, this.batchSize, gl.UNSIGNED_SHORT, this.batchOffset * 2);
+    gl.drawElements(this.chainMode, this.chainSize, gl.UNSIGNED_SHORT, this.chainOffset * 2);
     // this.nextBatch();
-    this.batchMode = -1;
+    this.chainMode = -1;
     this.lastBuffer = null;
   }
 
-  private tryBatch(gl: WebGLRenderingContext, buffer: Buffer, offset: number, size: number, mode: number): boolean {
-    if (this.batchMode == -1) {
-      this.batchMode = mode;
-      this.batchOffset = offset;
-      this.batchSize = size;
+  private tryChain(gl: WebGLRenderingContext, buffer: Buffer, offset: number, size: number, mode: number): boolean {
+    if (this.chainMode == -1) {
+      this.chainMode = mode;
+      this.chainOffset = offset;
+      this.chainSize = size;
       this.lastBuffer = buffer;
       return false;
-    } else if (this.batchMode == mode
-      && !this.changeShader
-      && !this.changeIndexBuffer
-      && isEmpty(this.changedUniformIdxs)
-      && isEmpty(this.changedTextures)
-      && isEmpty(this.changedVertexBuffersIds)) {
-      if (this.batchOffset == offset + size) {
-        this.batchOffset = offset;
-        this.batchSize += size;
+    } else if (this.sameState(mode)) {
+      if (this.chainOffset == offset + size) {
+        this.chainOffset = offset;
+        this.chainSize += size;
         return true;
-      } else if (this.batchOffset + this.batchSize == offset) {
-        this.batchSize += size;
+      } else if (this.chainOffset + this.chainSize == offset) {
+        this.chainSize += size;
         return true;
       }
     }
     this.flush(gl);
-    return this.tryBatch(gl, buffer, offset, size, mode);
+    return this.tryChain(gl, buffer, offset, size, mode);
+  }
+
+  private sameState(mode: number) {
+    return this.chainMode == mode
+      && !this.changeShader
+      && !this.changeIndexBuffer
+      && isEmpty(this.changedUniformIdxs)
+      && isEmpty(this.changedTextures)
+      && isEmpty(this.changedVertexBuffersIds);
   }
 
   public registerShader(name: string, shader: Shader) {
-    this.shaders[name] = shader;
+    const uniforms: number[] = [];
     for (const uniform of shader.getUniforms()) {
-      if (this.uniformsIndex[uniform.name] != undefined) continue;
+      const existedId = this.uniformsIndex[uniform.name];
+      if (existedId != undefined) {
+        uniforms.push(existedId);
+        continue;
+      }
       const idx = this.uniforms.length;
       const state = createStateValue(uniform.type, () => this.changedUniformIdxs.push(idx));
       if (uniform.type != 'sampler2D') this.registerState(uniform.name, state);
       this.uniforms.push(state);
       this.uniformsDefinitions.push(uniform);
       this.uniformsIndex[uniform.name] = idx;
+      uniforms.push(idx);
     }
     const samplers = shader.getSamplers();
     for (let s = 0; s < samplers.length; s++) {
       const sampler = samplers[s];
       if (this.texturesIndex[sampler.name] != undefined) continue;
       const idx = this.textures.length;
-      const state = new StateValue<Texture>(() => this.changedTextures.push([idx, s]), null);
+      const state = new StateValueGeneric<Texture>(() => this.changedTextures.push([idx, s]), null);
       this.registerState(sampler.name, state);
       this.textures.push(state);
       this.texturesIndex[sampler.name] = idx;
     }
+    const attribs: number[] = [];
     for (const attrib of shader.getAttributes()) {
-      if (this.vertexBufferIndex[attrib.name] != undefined) continue;
+      const existedId = this.vertexBufferIndex[attrib.name];
+      if (existedId != undefined) {
+        attribs.push(existedId);
+        continue;
+      }
       const idx = this.vertexBuffers.length;
-      const state = new StateValue<VertexBuffer>(() => this.changedVertexBuffersIds.push(idx), null);
+      const state = new StateValueGeneric<VertexBuffer>(() => this.changedVertexBuffersIds.push(idx), null);
       this.registerState(attrib.name, state);
       this.vertexBufferNames[idx] = attrib.name;
       this.vertexBuffers.push(state);
       this.vertexBufferIndex[attrib.name] = idx;
+      attribs.push(idx);
     }
+    this.shaders[name] = new ShaderConfig(shader, uniforms, attribs);
   }
 
   private registerState(name: string, state: StateValue<any>) {
@@ -249,9 +255,11 @@ export class State {
   private rebindShader(gl: WebGLRenderingContext) {
     if (!this.changeShader) return;
     ++this.profile.shaderChanges;
-    this.profile.changeShader(this.lastShader, this.shader.get());
-    this.lastShader = this.shader.get();
-    const shader = this.shaders[this.shader.get()];
+    const newShader = this.shader.get();
+    this.profile.changeShader(this.lastShader, newShader);
+    this.lastShader = newShader;
+    const shaderConfig = this.shaders[newShader];
+    const shader = shaderConfig.shader;
     this.selectedShader = shader;
     gl.useProgram(shader.getProgram());
 
@@ -263,19 +271,8 @@ export class State {
       this.setUniform(sampler.name, s);
     }
 
-    this.changedUniformIdxs.clear();
-    const uniforms = shader.getUniforms();
-    for (let u = 0; u < uniforms.length; u++) {
-      const uniform = uniforms[u];
-      this.changedUniformIdxs.push(this.uniformsIndex[uniform.name]);
-    }
-
-    this.changedVertexBuffersIds.clear();
-    const attribs = shader.getAttributes();
-    for (let a = 0; a < attribs.length; a++) {
-      const attrib = attribs[a];
-      this.changedVertexBuffersIds.push(this.vertexBufferIndex[attrib.name]);
-    }
+    this.changedUniformIdxs.clear().pushAll(shaderConfig.uniforms);
+    this.changedVertexBuffersIds.clear().pushAll(shaderConfig.attribs);
     this.changeShader = false;
     this.changeIndexBuffer = true;
   }
@@ -338,7 +335,7 @@ export class State {
 
   public draw(gl: WebGLRenderingContext, buffer: Buffer, offset: number, size: number, mode: number = gl.TRIANGLES) {
     ++this.profile.drawsRequested;
-    if (this.tryBatch(gl, buffer, offset, size, mode)) {
+    if (this.tryChain(gl, buffer, offset, size, mode)) {
       ++this.profile.drawsMerged;
       return;
     }

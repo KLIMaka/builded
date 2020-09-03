@@ -33,14 +33,14 @@ export class Statusbar extends MessageHandlerReflective {
   }
 
   public PostFrame(msg: PostFrame) {
-    // const view = this.view;
-    // this.xpos.textContent = '' + view.x;
-    // this.ypos.textContent = '' + view.y;
-    // this.secpos.textContent = '' + view.sec;
-    // this.fps.textContent = (1000 / PROFILE.get(null).time).toFixed(0);
-    // const draws = PROFILE.get(null).counts['drawsRequested'] | 0;
-    // const skips = PROFILE.get(null).counts['drawsMerged'] | 0;
-    // this.draws.textContent = '' + draws + ' / ' + (draws - skips);
+    const view = this.view;
+    this.xpos.textContent = '' + view.x;
+    this.ypos.textContent = '' + view.y;
+    this.secpos.textContent = '' + view.sec;
+    this.fps.textContent = (1000 / PROFILE.get(null).time).toFixed(0);
+    const draws = PROFILE.get(null).counts['drawsRequested'] | 0;
+    const skips = PROFILE.get(null).counts['drawsMerged'] | 0;
+    this.draws.textContent = '' + draws + ' / ' + (draws - skips);
     // this.bufferPixelProvider.buffer = PROFILE.get(null).counts['buffer'];
     // drawToCanvas(this.bufferPixelProvider, this.buffer);
 

@@ -9,6 +9,7 @@ export const save = (function () {
     a.download = fileName;
     a.click();
     window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
   };
 }());
 

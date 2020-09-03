@@ -34,8 +34,9 @@ export interface HintRenderable extends Renderable {
   readonly kind: number;
 }
 
+const sorter = (l: HintRenderable, r: HintRenderable): number => l.hint - r.hint;
 export class SortingRenderable implements Renderable {
-  private drawList: [Renderable, number][] = [];
+  private drawList: HintRenderable[] = [];
 
   constructor(
     private provider: RenderableProvider<HintRenderable>,
@@ -44,15 +45,14 @@ export class SortingRenderable implements Renderable {
 
   draw(gl: WebGLRenderingContext, state: State): void {
     this.drawList = [];
-    this.provider.accept((r) => this.consume(r));
-    const sorted = this.drawList.sort((l, r) => l[1] - r[1]);
-    let size = sorted.length - 1;
-    while (size >= 0) sorted[size--][0].draw(gl, state);
+    this.provider.accept(r => this.consume(r));
+    const sorted = this.drawList.sort(sorter);
+    for (const r of sorted) r.draw(gl, state);
   }
 
   protected consume(r: HintRenderable) {
     if (!this.filter(r)) return;
-    this.drawList.push([r, r.hint]);
+    this.drawList.push(r);
   }
 }
 

@@ -158,9 +158,7 @@ export class State {
 
   public registerShader(name: string, shader: Shader) {
     this.shaders[name] = shader;
-    const uniforms = shader.getUniforms();
-    for (let u = 0; u < uniforms.length; u++) {
-      const uniform = uniforms[u];
+    for (const uniform of shader.getUniforms()) {
       if (this.uniformsIndex[uniform.name] != undefined) continue;
       const idx = this.uniforms.length;
       const state = createStateValue(uniform.type, () => this.changedUniformIdxs.push(idx));
@@ -179,16 +177,14 @@ export class State {
       this.textures.push(state);
       this.texturesIndex[sampler.name] = idx;
     }
-    const attribs = shader.getAttributes();
-    for (let a = 0; a < attribs.length; a++) {
-      const attrib = attribs[a];
+    for (const attrib of shader.getAttributes()) {
       if (this.vertexBufferIndex[attrib.name] != undefined) continue;
       const idx = this.vertexBuffers.length;
       const state = new StateValue<VertexBuffer>(() => this.changedVertexBuffersIds.push(idx), null);
       this.registerState(attrib.name, state);
-      this.vertexBufferIndex[attrib.name] = idx;
       this.vertexBufferNames[idx] = attrib.name;
       this.vertexBuffers.push(state);
+      this.vertexBufferIndex[attrib.name] = idx;
     }
   }
 

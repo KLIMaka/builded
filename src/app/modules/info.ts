@@ -30,12 +30,12 @@ export class Info extends MessageHandlerReflective {
   }
 
   public Frame(msg: Frame) {
-    this.clear();
-    const ent = this.view.snapTarget().entity;
-    if (ent == null) return;
-    if (ent.isWall()) this.renderWall(ent.id);
-    else if (ent.isSector()) this.renderSector(ent);
-    else if (ent.isSprite()) this.renderSprite(ent.id);
+    // this.clear();
+    // const ent = this.view.snapTarget().entity;
+    // if (ent == null) return;
+    // if (ent.isWall()) this.renderWall(ent.id);
+    // else if (ent.isSector()) this.renderSector(ent);
+    // else if (ent.isSprite()) this.renderSprite(ent.id);
   }
 
   private clear() {

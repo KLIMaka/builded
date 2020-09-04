@@ -17,28 +17,33 @@ export class GenericBufferSetup implements StateSetup {
   protected offset: number;
   protected size: number;
   protected mode: number;
+  protected shaderIdx: number;
+  protected aIndexIdx: number;
+  protected aPosIdx: number;
 
   constructor(state: State) {
-    this.register('shader', state);
-    this.register('aIndex', state);
-    this.register('aPos', state);
+    this.shaderIdx = this.register('shader', state);
+    this.aIndexIdx = this.register('aIndex', state);
+    this.aPosIdx = this.register('aPos', state);
   }
 
-  protected register(name: string, state: State) {
+  protected register(name: string, state: State): number {
     this.values.push(state.getState(name));
+    const valueIdx = this.values.length();
     this.values.push(null);
+    return valueIdx;
   }
 
   createDrawCall(): DrawCall {
     return new DrawCall([...this.values], this.buff, this.offset, this.size, this.mode);
   }
 
-  public shader(shader: string) { this.values.set(1, shader); return this }
+  public shader(shader: string) { this.values.set(this.shaderIdx, shader); return this }
   public drawMode(mode: number) { this.mode = mode; return this }
 
   public buffer(buffer: GenericBuildBuffer) {
-    this.values.set(3, buffer.getIdxBuffer());
-    this.values.set(5, buffer.getPosBuffer());
+    this.values.set(this.aIndexIdx, buffer.getIdxBuffer());
+    this.values.set(this.aPosIdx, buffer.getPosBuffer());
     const pointer = buffer.get();
     this.buff = pointer.buffer;
     this.offset = pointer.idx.offset;
@@ -48,60 +53,74 @@ export class GenericBufferSetup implements StateSetup {
 }
 
 export class BufferSetup extends GenericBufferSetup {
+  protected aNormIdx: number;
+  protected aTcps: number;
+
   constructor(state: State) {
     super(state);
-    this.register('aNorm', state);
-    this.register('aTcps', state);
+    this.aNormIdx = this.register('aNorm', state);
+    this.aTcps = this.register('aTcps', state);
   }
 
   public buffer(buffer: BuildBuffer) {
     super.buffer(buffer);
-    this.values.set(7, buffer.getNormBuffer())
-    this.values.set(9, buffer.getTexCoordBuffer())
+    this.values.set(this.aNormIdx, buffer.getNormBuffer())
+    this.values.set(this.aTcps, buffer.getTexCoordBuffer())
     return this;
   }
 }
 
 export class SolidSetup extends BufferSetup {
+  protected baseIdx: number;
+  protected colorIdx: number;
+
   constructor(state: State) {
     super(state);
-    this.register('base', state);
-    this.register('color', state);
+    this.baseIdx = this.register('base', state);
+    this.colorIdx = this.register('color', state);
   }
 
-  public base(tex: Texture) { this.values.set(11, tex); return this }
-  public color(color: Vec4Array) { this.values.set(13, color); return this }
+  public base(tex: Texture) { this.values.set(this.baseIdx, tex); return this }
+  public color(color: Vec4Array) { this.values.set(this.colorIdx, color); return this }
 }
 
 export class GridSetup extends BufferSetup {
+  protected GTIdx: number;
+  protected gridIdx: number;
+
   constructor(state: State) {
     super(state);
-    this.register('GT', state);
-    this.register('grid', state);
+    this.GTIdx = this.register('GT', state);
+    this.gridIdx = this.register('grid', state);
   }
 
-  public grid(grid: Mat4Array) { this.values.set(11, grid); return this }
-  public gridSettings(settings: Vec4Array) { this.values.set(13, settings); return this }
+  public grid(grid: Mat4Array) { this.values.set(this.GTIdx, grid); return this }
+  public gridSettings(settings: Vec4Array) { this.values.set(this.gridIdx, settings); return this }
 }
 
 export class WireframeSetup extends BufferSetup {
+  protected colorIdx: number;
+
   constructor(state: State) {
     super(state);
-    this.register('color', state);
+    this.colorIdx = this.register('color', state);
   }
 
-  public color(color: Vec4Array) { this.values.set(11, color); return this }
+  public color(color: Vec4Array) { this.values.set(this.colorIdx, color); return this }
 }
 
 export class PointSpriteSetup extends BufferSetup {
+  protected baseIdx: number;
+  protected colorIdx: number;
+
   constructor(state: State) {
     super(state);
-    this.register('base', state);
-    this.register('color', state);
+    this.baseIdx = this.register('base', state);
+    this.colorIdx = this.register('color', state);
   }
 
-  public base(tex: Texture) { this.values.set(11, tex); return this }
-  public color(color: Vec4Array) { this.values.set(13, color); return this }
+  public base(tex: Texture) { this.values.set(this.baseIdx, tex); return this }
+  public color(color: Vec4Array) { this.values.set(this.colorIdx, color); return this }
 }
 
 export abstract class BufferRenderable<T extends BufferSetup> implements Builder, HintRenderable {

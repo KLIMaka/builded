@@ -1,10 +1,11 @@
 import { mat4, vec4 } from "../../../libs_js/glmatrix";
 import { Texture } from "../../../utils/gl/drawstruct";
-import { State } from "../../../utils/gl/stategl";
 import { Dependency, Injector } from "../../../utils/injector";
-import { BUFFER_FACTORY, BuildBuffer } from "../gl/buffers";
-import { BufferRenderable, GridSetup, GRID_SETUP, PointSpriteSetup, POINT_SPRITE_SETUP, SolidSetup, SOLID_SETUP, WireframeSetup, WIREFRAME_SETUP, BufferSetup, FLAT_SETUP } from "./builders/setups";
 import { GRID, GridController } from "../../apis/app";
+import { DrawCallConsumer } from "../../apis/renderable";
+import { BUFFER_FACTORY, BuildBuffer } from "../gl/buffers";
+import { BUILD_GL } from "../gl/buildgl";
+import { BufferRenderable, BufferSetup, GridSetup, PointSpriteSetup, SolidSetup, WireframeSetup } from "./builders/setups";
 
 export interface BuildersFactory {
   solid(hint: string): SolidBuilder;
@@ -17,13 +18,21 @@ export const BUILDERS_FACTORY = new Dependency<BuildersFactory>('Builder Factory
 
 export async function DefaultBuildersFactory(injector: Injector) {
   const bufferFactory = await injector.getInstance(BUFFER_FACTORY);
+  const buildgl = await injector.getInstance(BUILD_GL);
   const grid = await injector.getInstance(GRID);
+
+  const solidSetup = () => new SolidSetup(buildgl.state);
+  const gridSetup = () => new GridSetup(buildgl.state);
+  const bufferSetup = () => new BufferSetup(buildgl.state);
+  const pointspriteSetup = () => new PointSpriteSetup(buildgl.state);
+  const wireframeSetup = () => new WireframeSetup(buildgl.state);
+
   return {
-    solid: (hint: string) => new SolidBuilder(bufferFactory.get('solid-' + hint)),
-    grid: (hint: string) => new GridBuilder(grid),
-    flat: (hint: string) => new FlatBuilder(),
-    pointSprite: (hint: string) => new PointSpriteBuilder(bufferFactory.get('pointsprite-' + hint)),
-    wireframe: (hint: string) => new WireframeBuilder(bufferFactory.get('wireframe-' + hint))
+    solid: (hint: string) => new SolidBuilder(solidSetup(), bufferFactory.get('solid-' + hint)),
+    grid: (hint: string) => new GridBuilder(gridSetup(), grid),
+    flat: (hint: string) => new FlatBuilder(bufferSetup()),
+    pointSprite: (hint: string) => new PointSpriteBuilder(pointspriteSetup(), bufferFactory.get('pointsprite-' + hint)),
+    wireframe: (hint: string) => new WireframeBuilder(wireframeSetup(), bufferFactory.get('wireframe-' + hint))
   }
 }
 
@@ -39,10 +48,10 @@ export class SolidBuilder extends BufferRenderable<SolidSetup> {
   public parallax: number = 0;
   private color = vec4.create();
 
-  constructor(readonly buff: BuildBuffer) { super(SOLID_SETUP) }
+  constructor(setup: SolidSetup, readonly buff: BuildBuffer) { super(setup) }
   protected textureHint() { return this.tex }
 
-  public setup(setup: SolidSetup) {
+  public applySetup(setup: SolidSetup) {
     setup.shader(this.type == Type.SURFACE ? (this.parallax ? 'parallax' : 'baseShader') : 'spriteShader')
       .base(this.tex)
       .color(vec4.set(this.color, 1, 1, 1, this.trans))
@@ -64,37 +73,39 @@ export class GridBuilder extends BufferRenderable<GridSetup> {
   public range = 4.0;
   private gridSettings = vec4.create();
 
-  constructor(private grid: GridController) { super(GRID_SETUP) }
+  constructor(setup: GridSetup, private grid: GridController) {
+    super(setup)
+  }
 
   public get buff() { return this.solid.buff }
   public reset() { mat4.identity(this.gridTexMat) }
   protected textureHint() { return null }
 
-  public setup(setup: GridSetup) {
+  public applySetup(setup: GridSetup) {
     setup.shader('grid')
       .grid(this.gridTexMat)
       .gridSettings(vec4.set(this.gridSettings, this.grid.getGridSize(), this.range, 0, 0));
   }
 
-  public draw(gl: WebGLRenderingContext, state: State): void {
+  public draw(consumer: DrawCallConsumer): void {
     this.needToRebuild();
-    super.draw(gl, state);
+    super.draw(consumer);
   }
 }
 
 export class FlatBuilder extends BufferRenderable<BufferSetup> {
   public solid: SolidBuilder;
 
-  constructor() { super(FLAT_SETUP) }
+  constructor(setup: BufferSetup) { super(setup) }
 
   public get buff() { return this.solid.buff }
   public reset() { }
   protected textureHint() { return null }
-  public setup(setup: BufferSetup) { setup.shader('baseFlatShader') }
+  public applySetup(setup: BufferSetup) { setup.shader('baseFlatShader') }
 
-  public draw(gl: WebGLRenderingContext, state: State): void {
+  public draw(consumer: DrawCallConsumer): void {
     this.needToRebuild();
-    super.draw(gl, state);
+    super.draw(consumer);
   }
 }
 
@@ -102,9 +113,9 @@ export class PointSpriteBuilder extends BufferRenderable<PointSpriteSetup> {
   public tex: Texture;
   public color = vec4.fromValues(1, 1, 1, 1);
 
-  constructor(readonly buff: BuildBuffer) { super(POINT_SPRITE_SETUP) }
+  constructor(setup: PointSpriteSetup, readonly buff: BuildBuffer) { super(setup) }
 
-  public setup(setup: PointSpriteSetup) {
+  public applySetup(setup: PointSpriteSetup) {
     setup.shader('spriteFaceShader')
       .base(this.tex)
       .color(this.color);
@@ -124,9 +135,9 @@ export class WireframeBuilder extends BufferRenderable<WireframeSetup> {
   public color = vec4.fromValues(1, 1, 1, 1);
   public mode = WebGLRenderingContext.LINES;
 
-  constructor(readonly buff: BuildBuffer) { super(WIREFRAME_SETUP) }
+  constructor(setup: WireframeSetup, readonly buff: BuildBuffer) { super(setup) }
 
-  public setup(setup: WireframeSetup) {
+  public applySetup(setup: WireframeSetup) {
     setup.shader(this.type == Type.SURFACE ? 'baseFlatShader' : 'spriteFlatShader')
       .color(this.color);
   }

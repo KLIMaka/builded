@@ -1,13 +1,14 @@
 import { mat4, Mat4Array, vec3, Vec3Array, vec4 } from '../../../libs_js/glmatrix';
 import { Texture } from '../../../utils/gl/drawstruct';
 import { createShader } from '../../../utils/gl/shaders';
-import { Profile, State } from '../../../utils/gl/stategl';
+import { Profile, State, DrawCall } from '../../../utils/gl/stategl';
 import { Dependency, Injector } from '../../../utils/injector';
 import { info } from '../../../utils/logger';
 import * as PROFILER from '../../../utils/profiler';
 import { Renderable } from '../../apis/renderable';
 import { GL } from '../buildartprovider';
 import { GRID, GridController } from '../../apis/app';
+import { Deck } from '../../../utils/collections';
 
 export const PAL_TEXTURE = new Dependency<Texture>('PAL Texture');
 export const PLU_TEXTURE = new Dependency<Texture>('PLU Texture');
@@ -34,7 +35,7 @@ const pos = vec3.create();
 const clipPlane = vec4.create();
 
 export class BuildGl {
-  private state = new State();
+  readonly state = new State();
 
   constructor(palswaps: number, shadowsteps: number, gl: WebGLRenderingContext, pal: Texture, plus: Texture, private gridController: GridController, cb: () => void) {
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
@@ -79,7 +80,7 @@ export class BuildGl {
 
   public draw(gl: WebGLRenderingContext, renderable: Renderable) {
     if (renderable == null) return;
-    renderable.draw(gl, this.state);
+    renderable.draw(dc => this.state.run(gl, dc));
   }
 
   public newFrame(gl: WebGLRenderingContext) {
@@ -114,4 +115,5 @@ export class BuildGl {
   public flush(gl: WebGLRenderingContext) {
     this.state.flush(gl);
   }
+
 }

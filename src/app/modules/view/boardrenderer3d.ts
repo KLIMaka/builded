@@ -8,7 +8,7 @@ import { Dependency, Injector } from '../../../utils/injector';
 import { dot2d } from '../../../utils/mathutils';
 import * as PROFILE from '../../../utils/profiler';
 import { mirrorBasis, normal2d, reflectPoint3d } from '../../../utils/vecmath';
-import { BuildRenderableProvider, HintRenderable, LayeredRenderables, Renderable, RenderableProvider, Renderables, SortingRenderable, WrapRenderable } from '../../apis/renderable';
+import { BuildRenderableProvider, HintRenderable, LayeredRenderables, Renderable, RenderableProvider, Renderables, SortingRenderable, WrapRenderable, DrawCallConsumer } from '../../apis/renderable';
 import { BuildGl, BUILD_GL } from '../gl/buildgl';
 import { vec3, mat4, vec2 } from '../../../libs_js/glmatrix';
 import { RENDRABLES_CACHE } from '../geometry/cache';
@@ -60,7 +60,7 @@ function list() {
   return {
     add: (r: RenderableProvider<HintRenderable>) => { list.push(r) },
     clear: () => list.clear(),
-    draw: (gl: WebGLRenderingContext, state: State) => { renderable.draw(gl, state) }
+    draw: (consumer: DrawCallConsumer) => { renderable.draw(consumer) }
   }
 }
 
@@ -290,8 +290,6 @@ export class Boardrenderer3D {
 
   private spriteSolids = new WrapRenderable(this.sprites, polyOffsetOn, polyOffsetOff);
   private spriteTransparent = new WrapRenderable(this.spritesTrans, polyOffsetOn, polyOffsetOff);
-  private transparent = new WrapRenderable(new Renderables([this.surfacesTrans, this.spriteTransparent]), blendOn, blendOff);
-  private pass = new Renderables([this.surfaces, this.spriteSolids, this.transparent]);
 
   private drawRooms(result: VisResult, view: View3d) {
     PROFILE.startProfile('processing');
@@ -303,7 +301,14 @@ export class Boardrenderer3D {
     PROFILE.endProfile();
 
     PROFILE.startProfile('draw');
-    this.bgl.draw(view.gl, this.pass);
+
+    this.bgl.draw(view.gl, this.surfaces);
+    this.spriteSolids.draw(view.gl, this.bgl.state);
+    blendOn(view.gl, this.bgl.state);
+    this.bgl.draw(view.gl, this.surfacesTrans);
+    this.spriteTransparent.draw(view.gl, this.bgl.state);
+    blendOff(view.gl, this.bgl.state);
+
     PROFILE.endProfile();
   }
 }

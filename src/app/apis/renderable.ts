@@ -1,8 +1,9 @@
 import { Deck } from '../../utils/collections';
-import { State } from '../../utils/gl/stategl';
+import { State, DrawCall } from '../../utils/gl/stategl';
 
+export type DrawCallConsumer = (d: DrawCall) => void;
 export interface Renderable {
-  draw(gl: WebGLRenderingContext, state: State): void;
+  draw(consumer: DrawCallConsumer): void;
 }
 
 export type RenderableConsumer<T extends Renderable> = (r: T) => void;
@@ -43,11 +44,11 @@ export class SortingRenderable implements Renderable {
     private filter: (r: HintRenderable) => boolean = () => true
   ) { }
 
-  draw(gl: WebGLRenderingContext, state: State): void {
+  draw(consumer: DrawCallConsumer): void {
     this.drawList = [];
     this.provider.accept(r => this.consume(r));
     const sorted = this.drawList.sort(sorter);
-    for (const r of sorted) r.draw(gl, state);
+    for (const r of sorted) r.draw(consumer);
   }
 
   protected consume(r: HintRenderable) {
@@ -57,12 +58,12 @@ export class SortingRenderable implements Renderable {
 }
 
 export const NULL_RENDERABLE: Renderable = {
-  draw: (gl: WebGLRenderingContext, state: State) => { },
+  draw: (consumer: DrawCallConsumer) => { },
 }
 
 export class Renderables implements Renderable {
   constructor(private renderables: Iterable<Renderable>) { }
-  public draw(gl: WebGLRenderingContext, state: State): void { for (const r of this.renderables) r.draw(gl, state) }
+  public draw(consumer: DrawCallConsumer): void { for (const r of this.renderables) r.draw(consumer) }
 }
 
 export class LayeredRenderables implements RenderableProvider<HintRenderable>, Renderable {
@@ -71,14 +72,14 @@ export class LayeredRenderables implements RenderableProvider<HintRenderable>, R
   constructor(private providers: Iterable<RenderableProvider<HintRenderable>>) { }
   accept(consumer: RenderableConsumer<HintRenderable>): void { for (const p of this.providers) p.accept(consumer) }
 
-  draw(gl: WebGLRenderingContext, state: State): void {
+  draw(consumer: DrawCallConsumer): void {
     this.list.clear();
     for (const p of this.providers) p.accept((r) => this.list.push(r));
-    for (const r of this.list) r.draw(gl, state);
+    for (const r of this.list) r.draw(consumer);
   }
 }
 
-export class WrapRenderable implements Renderable {
+export class WrapRenderable {
   constructor(
     private rend: Renderable,
     private pre: (gl: WebGLRenderingContext, state: State) => void,
@@ -87,7 +88,7 @@ export class WrapRenderable implements Renderable {
 
   draw(gl: WebGLRenderingContext, state: State): void {
     this.pre(gl, state);
-    this.rend.draw(gl, state);
+    this.rend.draw(dc => state.run(gl, dc));
     state.flush(gl);
     this.post(gl, state);
   }

@@ -60,7 +60,7 @@ export class BoardRenderer2D {
     buff.writeTcLighting(2, 1, -1);
     buff.writeTcLighting(3, -1, 1);
     buff.writeQuad(0, 3, 2, 1, 0);
-    this.grid = new GridBuilder(this.gridController);
+    this.grid = this.builders.grid('');
     this.grid.range = size;
     mat4.copy(this.grid.gridTexMat, GRID_SECTOR_MATRIX);
     this.grid.solid = gridSolid;

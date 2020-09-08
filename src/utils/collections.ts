@@ -36,45 +36,6 @@ export class ArrayWrapper<T> implements MutableCollection<T> {
 }
 export function wrap<T>(array: T[], len: number = array.length) { return new ArrayWrapper(array, len) }
 
-interface Storage<T> {
-  get(i: number): T;
-  push(v: T): void;
-  pop(): void;
-  top(): T;
-  pushAll(vs: Iterable<T>): void;
-  clear(): void;
-  length(): number;
-  clone(): Storage<T>;
-}
-
-class NumberStorage implements Storage<number>{
-  private array: number[] = [];
-  private size = 0;
-
-  get(i: number): number {
-    if (i < 0 || i >= this.size) throw new Error(`Infalid position: ${i}, size: ${this.size}`);
-    return this.array[i];
-  }
-
-  pop(): void {
-    if (this.size == 0) throw new Error(`Underflow`);
-    this.size--
-  }
-
-  clone(): Storage<number> {
-    const copy = new NumberStorage();
-    copy.array = this.array.slice(0, this.size);
-    copy.size = this.size;
-    return copy;
-  }
-
-  push(v: number): void { this.array[this.size++] = v }
-  top(): number { return this.get(this.size - 1) }
-  pushAll(vs: Iterable<number>): void { for (const v of vs) this.push(v) }
-  clear(): void { this.size = 0 }
-  length(): number { return this.size }
-}
-
 export class Deck<T> implements MutableCollection<T>{
   public array: T[] = [];
   public size = 0;

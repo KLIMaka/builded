@@ -7,7 +7,6 @@ import { info } from '../../../utils/logger';
 import * as PROFILER from '../../../utils/profiler';
 import { Renderable } from '../../apis/renderable';
 import { GL } from '../buildartprovider';
-import { GRID, GridController } from '../../apis/app';
 
 export const PAL_TEXTURE = new Dependency<Texture>('PAL Texture');
 export const PLU_TEXTURE = new Dependency<Texture>('PLU Texture');
@@ -22,9 +21,8 @@ export function BuildGlConstructor(injector: Injector): Promise<BuildGl> {
     injector.getInstance(PLU_TEXTURE),
     injector.getInstance(PALSWAPS),
     injector.getInstance(SHADOWSTEPS),
-    injector.getInstance(GRID),
-  ]).then(([gl, pal, plus, plaswaps, shadowsteps, grid]) => {
-    const buildgl = new BuildGl(plaswaps, shadowsteps, gl, pal, plus, grid, () => resolve(buildgl))
+  ]).then(([gl, pal, plus, plaswaps, shadowsteps]) => {
+    const buildgl = new BuildGl(plaswaps, shadowsteps, gl, pal, plus, () => resolve(buildgl))
   }));
 }
 
@@ -36,7 +34,7 @@ const clipPlane = vec4.create();
 export class BuildGl {
   private state = new State();
 
-  constructor(palswaps: number, shadowsteps: number, gl: WebGLRenderingContext, pal: Texture, plus: Texture, private gridController: GridController, cb: () => void) {
+  constructor(palswaps: number, shadowsteps: number, gl: WebGLRenderingContext, pal: Texture, plus: Texture, cb: () => void) {
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.enable(gl.CULL_FACE);
     gl.enable(gl.DEPTH_TEST);

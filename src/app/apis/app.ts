@@ -7,6 +7,7 @@ import { Dependency } from "../../utils/injector";
 import { MessageHandler } from "./handler";
 import { ReferenceTracker } from "./referencetracker";
 import { HintRenderable, RenderableProvider } from "./renderable";
+import { DrawCall } from "../../utils/gl/stategl";
 
 export interface Storage {
   get(key: string): Promise<any>;

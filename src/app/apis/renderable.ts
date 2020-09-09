@@ -34,21 +34,6 @@ export class Renderables implements Renderable {
   public drawCall(consumer: DrawCallConsumer): void { for (const r of this.renderables) r.drawCall(consumer) }
 }
 
-export class RenderWrapper {
-  constructor(
-    private rend: Renderable,
-    private pre: (gl: WebGLRenderingContext, state: State) => void,
-    private post: (gl: WebGLRenderingContext, state: State) => void = () => { }
-  ) { }
-
-  draw(gl: WebGLRenderingContext, state: State): void {
-    this.pre(gl, state);
-    this.rend.drawCall(dc => state.run(gl, dc));
-    state.flush(gl);
-    this.post(gl, state);
-  }
-}
-
 export interface SectorRenderable extends Renderable {
   readonly ceiling: Renderable;
   readonly floor: Renderable;

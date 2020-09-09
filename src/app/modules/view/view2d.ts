@@ -1,6 +1,6 @@
+import { Board } from "../../../build/board/structs";
 import { closestSpriteInSector, closestWallPoint, closestWallSegment } from "../../../build/boardutils";
 import { Entity, EntityType, Hitscan, hitscan, Ray, Target } from "../../../build/hitscan";
-import { Board } from "../../../build/board/structs";
 import { findSector, getPlayerStart, inSector, ZSCALE } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 import { CachedValue } from "../../../utils/cachedvalue";
@@ -9,19 +9,17 @@ import { Injector } from "../../../utils/injector";
 import { NumberInterpolator } from "../../../utils/interpolator";
 import { int, len2d } from "../../../utils/mathutils";
 import { DelayedValue } from "../../../utils/timed";
-import { ART, ArtProvider, BOARD, BoardProvider, STATE, State, View, GridController, GRID } from "../../apis/app";
+import { ART, ArtProvider, BOARD, BoardProvider, GRID, GridController, STATE, State, View } from "../../apis/app";
 import { Message, MessageHandlerReflective } from "../../apis/handler";
 import { Renderable } from "../../apis/renderable";
 import { BoardInvalidate, LoadBoard, Mouse } from "../../edit/messages";
-import { GL } from "../buildartprovider";
 import { BuildGl, BUILD_GL } from "../gl/buildgl";
 import { BoardRenderer2D, Renderer2D } from "./boardrenderer2d";
 import { snapWall, TargetImpl, ViewPosition } from "./view";
 
 
 export async function View2dConstructor(injector: Injector) {
-  const [gl, renderer, grid, bgl, board, art, state] = await Promise.all([
-    injector.getInstance(GL),
+  const [renderer, grid, bgl, board, art, state] = await Promise.all([
     Renderer2D(injector),
     injector.getInstance(GRID),
     injector.getInstance(BUILD_GL),
@@ -29,7 +27,7 @@ export async function View2dConstructor(injector: Injector) {
     injector.getInstance(ART),
     injector.getInstance(STATE),
   ]);
-  return new View2d(gl, renderer, grid, bgl, board, art, state);
+  return new View2d(renderer, grid, bgl, board, art, state);
 }
 
 export class View2d extends MessageHandlerReflective implements View {
@@ -42,7 +40,6 @@ export class View2d extends MessageHandlerReflective implements View {
   private upp = new DelayedValue(100, 1, NumberInterpolator);
 
   constructor(
-    readonly gl: WebGLRenderingContext,
     private renderer: BoardRenderer2D,
     private gridController: GridController,
     private buildgl: BuildGl,
@@ -66,7 +63,7 @@ export class View2d extends MessageHandlerReflective implements View {
   getProjectionMatrix() { return this.control.getProjectionMatrix() }
   getTransformMatrix() { return this.control.getTransformMatrix() }
   getPosition() { return this.pointer }
-  drawTools(renderables: Iterable<Renderable>) { this.renderer.drawTools(this.gl, renderables) }
+  drawTools(renderables: Iterable<Renderable>) { this.renderer.drawTools(renderables) }
   target(): Target { return this.hit.get() }
   snapTarget(): Target { return this.snapTargetValue.get() }
   dir(): Ray { return this.direction.get() }
@@ -80,8 +77,8 @@ export class View2d extends MessageHandlerReflective implements View {
 
   Mouse(msg: Mouse) {
     this.control.track(msg.x, msg.y, 1024 * ZSCALE, this.state.get('lookaim'));
-    const x = (msg.x / this.gl.drawingBufferWidth) * 2 - 1;
-    const y = (msg.y / this.gl.drawingBufferHeight) * 2 - 1;
+    const x = (msg.x / this.buildgl.gl.drawingBufferWidth) * 2 - 1;
+    const y = (msg.y / this.buildgl.gl.drawingBufferHeight) * 2 - 1;
     const p = this.control.getPointerPosition(this.pointer, x, y);
 
     this.position.x = int(p[0]);
@@ -93,11 +90,11 @@ export class View2d extends MessageHandlerReflective implements View {
 
   Frame(msg: Message) {
     this.invalidateTarget();
-    this.control.setSize(this.gl.drawingBufferWidth, this.gl.drawingBufferHeight);
+    this.control.setSize(this.buildgl.gl.drawingBufferWidth, this.buildgl.gl.drawingBufferHeight);
     const max = this.control.getPointerPosition(this.pointer, 1, 1);
     const campos = this.control.getPosition();
     const dist = len2d(max[0] - campos[0], max[2] - campos[2]);
-    this.buildgl.newFrame(this.gl);
+    this.buildgl.newFrame();
     this.renderer.draw(this, campos, dist, this.control);
 
     const state = this.state;

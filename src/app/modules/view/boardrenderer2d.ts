@@ -65,15 +65,15 @@ export class BoardRenderer2D {
     return this.grid;
   }
 
-  public drawTools(gl: WebGLRenderingContext, p: Iterable<Renderable>) {
-    gl.disable(WebGLRenderingContext.DEPTH_TEST);
-    gl.enable(WebGLRenderingContext.BLEND);
+  public drawTools(p: Iterable<Renderable>) {
+    this.bgl.gl.disable(WebGLRenderingContext.DEPTH_TEST);
+    this.bgl.gl.enable(WebGLRenderingContext.BLEND);
     this.surfaces.clear().pushAll(p);
     this.bgl.modulation(0.984, 0.78, 0.118, 1);
-    this.bgl.draw(gl, this.pass);
-    this.bgl.flush(gl);
-    gl.disable(WebGLRenderingContext.BLEND);
-    gl.enable(WebGLRenderingContext.DEPTH_TEST);
+    this.bgl.draw(this.pass);
+    this.bgl.flush();
+    this.bgl.gl.disable(WebGLRenderingContext.BLEND);
+    this.bgl.gl.enable(WebGLRenderingContext.DEPTH_TEST);
   }
 
   public draw(view: View2d, campos: Vec3Array, dist: number, controller: Controller2D) {
@@ -86,14 +86,14 @@ export class BoardRenderer2D {
     this.bgl.setViewMatrix(view.getTransformMatrix());
     this.bgl.setPosition(view.getPosition());
 
-    view.gl.disable(WebGLRenderingContext.DEPTH_TEST);
-    view.gl.enable(WebGLRenderingContext.BLEND);
-    this.bgl.draw(view.gl, this.getGrid());
-    this.bgl.flush(view.gl);
-    view.gl.disable(WebGLRenderingContext.BLEND);
+    this.bgl.gl.disable(WebGLRenderingContext.DEPTH_TEST);
+    this.bgl.gl.enable(WebGLRenderingContext.BLEND);
+    this.bgl.draw(this.getGrid());
+    this.bgl.flush();
+    this.bgl.gl.disable(WebGLRenderingContext.BLEND);
 
-    this.drawRooms(view, result);
-    view.gl.enable(WebGLRenderingContext.DEPTH_TEST);
+    this.drawRooms(result);
+    this.bgl.gl.enable(WebGLRenderingContext.DEPTH_TEST);
   }
 
   private clearDrawLists() {
@@ -118,7 +118,7 @@ export class BoardRenderer2D {
     PROFILE.incCount('sprites');
   }
 
-  private drawRooms(view: View2d, result: VisResult) {
+  private drawRooms(result: VisResult) {
     PROFILE.startProfile('processing');
     this.clearDrawLists();
     const board = this.board();
@@ -128,8 +128,8 @@ export class BoardRenderer2D {
     PROFILE.endProfile();
 
     PROFILE.startProfile('draw');
-    this.bgl.draw(view.gl, this.pass);
-    this.bgl.flush(view.gl);
+    this.bgl.draw(this.pass);
+    this.bgl.flush();
     PROFILE.endProfile();
   }
 }

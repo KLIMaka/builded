@@ -19,8 +19,7 @@ import { Boardrenderer3D, Renderer3D } from "./boardrenderer3d";
 import { snapWall, TargetImpl, ViewPosition } from "./view";
 
 export async function View3dConstructor(injector: Injector) {
-  const [gl, renderer, buildgl, board, state, grid, art] = await Promise.all([
-    injector.getInstance(GL),
+  const [renderer, buildgl, board, state, grid, art] = await Promise.all([
     Renderer3D(injector),
     injector.getInstance(BUILD_GL),
     injector.getInstance(BOARD),
@@ -28,7 +27,7 @@ export async function View3dConstructor(injector: Injector) {
     injector.getInstance(GRID),
     injector.getInstance(ART),
   ]);
-  return new View3d(gl, renderer, buildgl, board, state, grid, art);
+  return new View3d(renderer, buildgl, board, state, grid, art);
 }
 
 export class View3d extends MessageHandlerReflective implements View {
@@ -45,7 +44,6 @@ export class View3d extends MessageHandlerReflective implements View {
   private sideDamper = new DelayedValue(100, 0, NumberInterpolator);
 
   constructor(
-    readonly gl: WebGLRenderingContext,
     private renderer: Boardrenderer3D,
     private buildgl: BuildGl,
     private board: BoardProvider,
@@ -55,7 +53,7 @@ export class View3d extends MessageHandlerReflective implements View {
   ) {
     super();
 
-    this.aspect = this.gl.drawingBufferWidth / this.gl.drawingBufferHeight;
+    this.aspect = this.buildgl.gl.drawingBufferWidth / this.buildgl.gl.drawingBufferHeight;
     this.control.setFov(90);
 
     state.register('forward', false);
@@ -76,7 +74,7 @@ export class View3d extends MessageHandlerReflective implements View {
   getTransformMatrix() { return this.control.getTransformMatrix() }
   getPosition() { return this.control.getPosition() }
   getForward() { return this.control.getForward() }
-  drawTools(renderables: Iterable<Renderable>) { this.renderer.drawTools(this.gl, renderables) }
+  drawTools(renderables: Iterable<Renderable>) { this.renderer.drawTools(renderables) }
   target(): Target { return this.hit.get() }
   snapTarget(): Target { return this.snapTargetValue.get() }
   dir(): Ray { return this.direction.get() }
@@ -96,9 +94,9 @@ export class View3d extends MessageHandlerReflective implements View {
   Frame(msg: Frame) {
     this.invalidateTarget();
     build2gl(this.cursor, this.snapTarget().coords);
-    this.aspect = this.gl.drawingBufferWidth / this.gl.drawingBufferHeight;
+    this.aspect = this.buildgl.gl.drawingBufferWidth / this.buildgl.gl.drawingBufferHeight;
     this.buildgl.setCursorPosiotion(this.cursor[0], this.cursor[1], this.cursor[2]);
-    this.buildgl.newFrame(this.gl);
+    this.buildgl.newFrame();
     this.renderer.draw(this);
     this.move(msg.dt);
   }
@@ -263,8 +261,8 @@ export class View3d extends MessageHandlerReflective implements View {
 
   private updateDir(r: Ray): Ray {
     vec3.set(r.start, this.x, this.y, this.z);
-    const x = (this.mouseX / this.gl.drawingBufferWidth) * 2 - 1;
-    const y = (this.mouseY / this.gl.drawingBufferHeight) * 2 - 1;
+    const x = (this.mouseX / this.buildgl.gl.drawingBufferWidth) * 2 - 1;
+    const y = (this.mouseY / this.buildgl.gl.drawingBufferHeight) * 2 - 1;
     gl2build(r.dir, this.control.getForwardUnprojected(this.aspect, x, y));
     return r;
   }

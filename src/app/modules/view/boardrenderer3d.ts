@@ -10,7 +10,7 @@ import { dot2d } from '../../../utils/mathutils';
 import * as PROFILE from '../../../utils/profiler';
 import { mirrorBasis, normal2d, reflectPoint3d } from '../../../utils/vecmath';
 import { BOARD, BoardProvider } from '../../apis/app';
-import { BuildRenderableProvider, DrawCallConsumer, Renderable, SortingRenderable, RenderWrapper } from '../../apis/renderable';
+import { BuildRenderableProvider, DrawCallConsumer, Renderable, SortingRenderable } from '../../apis/renderable';
 import { RENDRABLES_CACHE } from '../geometry/cache';
 import { BuildGl, BUILD_GL } from '../gl/buildgl';
 import { View3d } from './view3d';
@@ -49,10 +49,10 @@ const wallNormal = vec2.create();
 const mirrorNormal = vec3.create();
 const mirroredTransform = mat4.create();
 const mpos = vec3.create();
-const polyOffsetOn = (gl: WebGLRenderingContext, state: State) => { gl.polygonOffset(0, -8) };
-const polyOffsetOff = (gl: WebGLRenderingContext, state: State) => { gl.polygonOffset(0, 0) };
-const blendOn = (gl: WebGLRenderingContext, state: State) => { gl.enable(WebGLRenderingContext.BLEND) };
-const blendOff = (gl: WebGLRenderingContext, state: State) => { gl.disable(WebGLRenderingContext.BLEND) };
+const polyOffsetOn = (bgl: BuildGl) => { bgl.gl.polygonOffset(0, -8) };
+const polyOffsetOff = (bgl: BuildGl) => { bgl.gl.polygonOffset(0, 0) };
+const blendOn = (bgl: BuildGl) => { bgl.gl.enable(WebGLRenderingContext.BLEND) };
+const blendOff = (bgl: BuildGl) => { bgl.gl.disable(WebGLRenderingContext.BLEND) };
 
 function list() {
   const list = new Deck<Renderable>();
@@ -82,43 +82,43 @@ export class Boardrenderer3D {
     private renderables: BuildRenderableProvider
   ) { }
 
-  public drawTools(gl: WebGLRenderingContext, p: Iterable<Renderable>) {
-    gl.disable(WebGLRenderingContext.DEPTH_TEST);
-    gl.enable(WebGLRenderingContext.BLEND);
+  public drawTools(p: Iterable<Renderable>) {
+    this.bgl.gl.disable(WebGLRenderingContext.DEPTH_TEST);
+    this.bgl.gl.enable(WebGLRenderingContext.BLEND);
     this.surfaces.clear().pushAll(p);
     this.bgl.modulation(0.984, 0.78, 0.118, 1);
-    this.bgl.draw(gl, this.surfaces);
-    this.bgl.flush(gl);
-    gl.disable(WebGLRenderingContext.BLEND);
-    gl.enable(WebGLRenderingContext.DEPTH_TEST);
+    this.bgl.draw(this.surfaces);
+    this.bgl.flush();
+    this.bgl.gl.disable(WebGLRenderingContext.BLEND);
+    this.bgl.gl.enable(WebGLRenderingContext.DEPTH_TEST);
   }
 
   public draw(view: View3d) {
     this.drawGeometry(view);
   }
 
-  private writeStencilOnly(gl: WebGLRenderingContext, value: number) {
-    gl.stencilFunc(WebGLRenderingContext.ALWAYS, value, 0xff);
-    gl.stencilOp(WebGLRenderingContext.KEEP, WebGLRenderingContext.KEEP, WebGLRenderingContext.REPLACE);
-    gl.stencilMask(0xff);
-    gl.depthMask(false);
-    gl.colorMask(false, false, false, false);
+  private writeStencilOnly(value: number) {
+    this.bgl.gl.stencilFunc(WebGLRenderingContext.ALWAYS, value, 0xff);
+    this.bgl.gl.stencilOp(WebGLRenderingContext.KEEP, WebGLRenderingContext.KEEP, WebGLRenderingContext.REPLACE);
+    this.bgl.gl.stencilMask(0xff);
+    this.bgl.gl.depthMask(false);
+    this.bgl.gl.colorMask(false, false, false, false);
   }
 
-  private writeStenciledOnly(gl: WebGLRenderingContext, value: number) {
-    gl.stencilFunc(WebGLRenderingContext.EQUAL, value, 0xff);
-    gl.stencilMask(0x0);
-    gl.depthMask(true);
-    gl.colorMask(true, true, true, true);
+  private writeStenciledOnly(value: number) {
+    this.bgl.gl.stencilFunc(WebGLRenderingContext.EQUAL, value, 0xff);
+    this.bgl.gl.stencilMask(0x0);
+    this.bgl.gl.depthMask(true);
+    this.bgl.gl.colorMask(true, true, true, true);
   }
 
-  private writeDepthOnly(gl: WebGLRenderingContext,) {
-    gl.colorMask(false, false, false, false);
+  private writeDepthOnly() {
+    this.bgl.gl.colorMask(false, false, false, false);
   }
 
-  private writeAll(gl: WebGLRenderingContext,) {
-    gl.depthMask(true);
-    gl.colorMask(true, true, true, true);
+  private writeAll() {
+    this.bgl.gl.depthMask(true);
+    this.bgl.gl.colorMask(true, true, true, true);
   }
 
   private drawGeometry(view: View3d) {
@@ -135,7 +135,7 @@ export class Boardrenderer3D {
 
     this.bgl.setViewMatrix(view.getTransformMatrix());
     this.bgl.setPosition(view.getPosition());
-    this.drawRooms(result, view);
+    this.drawRooms(result);
   }
 
 
@@ -152,9 +152,9 @@ export class Boardrenderer3D {
     if (!link) return;
     this.bgl.setViewMatrix(view.getTransformMatrix());
     this.bgl.setPosition(view.getPosition());
-    this.writeStencilOnly(view.gl, stencilValue);
-    this.bgl.draw(view.gl, surface);
-    this.bgl.flush(view.gl);
+    this.writeStencilOnly(stencilValue);
+    this.bgl.draw(surface);
+    this.bgl.flush();
 
     const board = this.board();
     const src = board.sprites[link.srcSpriteId];
@@ -169,14 +169,14 @@ export class Boardrenderer3D {
     mstmp.sec = dst.sectnum; mstmp.x = npos[0]; mstmp.y = npos[2]; mstmp.z = npos[1] * ZSCALE;
     this.bgl.setViewMatrix(stackTransform);
     this.bgl.setPosition(npos);
-    this.writeStenciledOnly(view.gl, stencilValue);
-    this.drawRooms(this.getLinkVis(link).visit(this.board(), mstmp, view.getForward()), view);
+    this.writeStenciledOnly(stencilValue);
+    this.drawRooms(this.getLinkVis(link).visit(this.board(), mstmp, view.getForward()));
 
     this.bgl.setViewMatrix(view.getTransformMatrix());
     this.bgl.setPosition(view.getPosition());
-    this.writeDepthOnly(view.gl);
-    this.bgl.draw(view.gl, surface);
-    this.bgl.flush(view.gl);
+    this.writeDepthOnly();
+    this.bgl.draw(surface);
+    this.bgl.flush();
   }
 
   private rorSectorCollector = createSectorCollector((board: Board, sectorId: number) => this.impl.rorLinks().hasRor(sectorId));
@@ -184,15 +184,15 @@ export class Boardrenderer3D {
     result.forSector(this.board(), this.rorSectorCollector.visit());
     PROFILE.get(null).inc('rors', this.rorSectorCollector.sectors.length());
 
-    view.gl.enable(WebGLRenderingContext.STENCIL_TEST);
+    this.bgl.gl.enable(WebGLRenderingContext.STENCIL_TEST);
     for (let i = 0; i < this.rorSectorCollector.sectors.length(); i++) {
       const s = this.rorSectorCollector.sectors.get(i);
       const r = this.renderables.sector(s);
       this.drawStack(view, this.impl.rorLinks().ceilLinks[s], r.ceiling, i + 1);
       this.drawStack(view, this.impl.rorLinks().floorLinks[s], r.floor, i + 1);
     }
-    view.gl.disable(WebGLRenderingContext.STENCIL_TEST);
-    this.writeAll(view.gl);
+    this.bgl.gl.disable(WebGLRenderingContext.STENCIL_TEST);
+    this.writeAll();
   }
 
   private mirrorWallsCollector = createWallCollector((board: Board, wallId: number, sectorId: number) => this.impl.isMirrorPic(board.walls[wallId].picnum));
@@ -200,7 +200,7 @@ export class Boardrenderer3D {
     const board = this.board();
     result.forWall(board, this.mirrorWallsCollector.visit());
     PROFILE.get(null).inc('mirrors', this.mirrorWallsCollector.walls.length());
-    view.gl.enable(WebGLRenderingContext.STENCIL_TEST);
+    this.bgl.gl.enable(WebGLRenderingContext.STENCIL_TEST);
     for (let i = 0; i < this.mirrorWallsCollector.walls.length(); i++) {
       const w = unpackWallId(this.mirrorWallsCollector.walls.get(i));
       if (!wallVisible(board, w, view)) continue;
@@ -209,9 +209,9 @@ export class Boardrenderer3D {
       const r = this.renderables.wall(w);
       this.bgl.setViewMatrix(view.getTransformMatrix());
       this.bgl.setPosition(view.getPosition());
-      this.writeStencilOnly(view.gl, i + 127);
-      this.bgl.draw(view.gl, r);
-      this.bgl.flush(view.gl);
+      this.writeStencilOnly(i + 127);
+      this.bgl.draw(r);
+      this.bgl.flush();
 
       // draw reflections in stenciled area
       const w1 = board.walls[w]; const w2 = board.walls[w1.point2];
@@ -223,23 +223,23 @@ export class Boardrenderer3D {
 
       this.bgl.setViewMatrix(mirroredTransform);
       this.bgl.setClipPlane(mirrorNormal[0], mirrorNormal[1], mirrorNormal[2], mirrorrD);
-      view.gl.cullFace(WebGLRenderingContext.FRONT);
+      this.bgl.gl.cullFace(WebGLRenderingContext.FRONT);
       vec3.copy(mpos, view.getPosition());
       reflectPoint3d(mpos, mirrorNormal, mirrorrD, mpos);
       mstmp.sec = view.sec; mstmp.x = mpos[0]; mstmp.y = mpos[2]; mstmp.z = mpos[1];
-      this.writeStenciledOnly(view.gl, i + 127);
-      this.drawRooms(mirrorVis.visit(board, mstmp, view.getForward()), view);
-      view.gl.cullFace(WebGLRenderingContext.BACK);
+      this.writeStenciledOnly(i + 127);
+      this.drawRooms(mirrorVis.visit(board, mstmp, view.getForward()));
+      this.bgl.gl.cullFace(WebGLRenderingContext.BACK);
 
       // seal reflections by writing depth of mirror surface
       this.bgl.setViewMatrix(view.getTransformMatrix());
-      this.writeDepthOnly(view.gl);
+      this.writeDepthOnly();
       this.bgl.setClipPlane(0, 0, 0, 0);
-      this.bgl.draw(view.gl, r);
-      this.bgl.flush(view.gl);
+      this.bgl.draw(r);
+      this.bgl.flush();
     }
-    view.gl.disable(WebGLRenderingContext.STENCIL_TEST);
-    this.writeAll(view.gl);
+    this.bgl.gl.disable(WebGLRenderingContext.STENCIL_TEST);
+    this.writeAll();
   }
 
   private surfaces = list();
@@ -273,6 +273,8 @@ export class Boardrenderer3D {
       this.surfacesTrans.add(wallr.mid);
       this.surfaces.add(wallr.bot);
       this.surfaces.add(wallr.top);
+    } else if (wall.nextwall == -1) {
+      this.surfaces.add(wallr.mid);
     } else {
       this.surfaces.add(wallr);
     }
@@ -288,10 +290,7 @@ export class Boardrenderer3D {
     PROFILE.incCount('sprites');
   }
 
-  private spriteSolids = new RenderWrapper(this.sprites, polyOffsetOn, polyOffsetOff);
-  private spriteTransparent = new RenderWrapper(this.spritesTrans, polyOffsetOn, polyOffsetOff);
-
-  private drawRooms(result: VisResult, view: View3d) {
+  private drawRooms(result: VisResult) {
     PROFILE.startProfile('processing');
     this.clearDrawLists();
     const board = this.board();
@@ -302,12 +301,16 @@ export class Boardrenderer3D {
 
     PROFILE.startProfile('draw');
 
-    this.bgl.draw(view.gl, this.surfaces);
-    this.spriteSolids.draw(view.gl, this.bgl.state);
-    blendOn(view.gl, this.bgl.state);
-    this.bgl.draw(view.gl, this.surfacesTrans);
-    this.spriteTransparent.draw(view.gl, this.bgl.state);
-    blendOff(view.gl, this.bgl.state);
+    this.bgl.draw(this.surfaces);
+    polyOffsetOn(this.bgl);
+    this.bgl.draw(this.sprites);
+    polyOffsetOff(this.bgl);
+    blendOn(this.bgl);
+    this.bgl.draw(this.surfacesTrans);
+    polyOffsetOn(this.bgl);
+    this.bgl.draw(this.spritesTrans);
+    polyOffsetOff(this.bgl);
+    blendOff(this.bgl);
 
     PROFILE.endProfile();
   }

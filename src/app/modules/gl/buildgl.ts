@@ -34,7 +34,7 @@ const clipPlane = vec4.create();
 export class BuildGl {
   readonly state = new State();
 
-  constructor(palswaps: number, shadowsteps: number, gl: WebGLRenderingContext, pal: Texture, plus: Texture, cb: () => void) {
+  constructor(palswaps: number, shadowsteps: number, readonly gl: WebGLRenderingContext, pal: Texture, plus: Texture, cb: () => void) {
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.enable(gl.CULL_FACE);
     gl.enable(gl.DEPTH_TEST);
@@ -75,18 +75,18 @@ export class BuildGl {
     this.state.setUniform('clipPlane', clipPlane);
   }
 
-  public draw(gl: WebGLRenderingContext, renderable: Renderable) {
+  public draw(renderable: Renderable) {
     if (renderable == null) return;
-    renderable.drawCall(dc => this.state.run(gl, dc));
+    renderable.drawCall(dc => this.state.run(this.gl, dc));
   }
 
-  public newFrame(gl: WebGLRenderingContext) {
+  public newFrame() {
     this.updateProfile(this.state.profile);
-    gl.clearColor(0.2, 0.2, 0.2, 1.0);
-    gl.clearStencil(0);
-    gl.clearDepth(1);
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
-    this.state.setUniform('sys', [performance.now(), gl.drawingBufferWidth, gl.drawingBufferHeight, 0]);
+    this.gl.clearColor(0.2, 0.2, 0.2, 1.0);
+    this.gl.clearStencil(0);
+    this.gl.clearDepth(1);
+    this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT | this.gl.STENCIL_BUFFER_BIT);
+    this.state.setUniform('sys', [performance.now(), this.gl.drawingBufferWidth, this.gl.drawingBufferHeight, 0]);
     this.modulation(1, 1, 1, 1);
   }
 
@@ -109,8 +109,8 @@ export class BuildGl {
     info(this.state.profile);
   }
 
-  public flush(gl: WebGLRenderingContext) {
-    this.state.flush(gl);
+  public flush() {
+    this.state.flush(this.gl);
   }
 
 }

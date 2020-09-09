@@ -32,7 +32,7 @@ const pos = vec3.create();
 const clipPlane = vec4.create();
 
 export class BuildGl {
-  private state = new State();
+  readonly state = new State();
 
   constructor(palswaps: number, shadowsteps: number, gl: WebGLRenderingContext, pal: Texture, plus: Texture, cb: () => void) {
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
@@ -77,7 +77,7 @@ export class BuildGl {
 
   public draw(gl: WebGLRenderingContext, renderable: Renderable) {
     if (renderable == null) return;
-    renderable.draw(gl, this.state);
+    renderable.draw(dc => this.state.run(gl, dc));
   }
 
   public newFrame(gl: WebGLRenderingContext) {
@@ -112,4 +112,5 @@ export class BuildGl {
   public flush(gl: WebGLRenderingContext) {
     this.state.flush(gl);
   }
+
 }

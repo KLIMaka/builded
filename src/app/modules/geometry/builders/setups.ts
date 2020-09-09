@@ -4,7 +4,7 @@ import { Buffer } from "../../../../utils/gl/buffergl";
 import { Texture } from "../../../../utils/gl/drawstruct";
 import { DrawCall, State } from "../../../../utils/gl/stategl";
 import { Builder } from "../../../apis/builder";
-import { HintRenderable, RenderableConsumer } from "../../../apis/renderable";
+import { HintRenderable, RenderableConsumer, DrawCallConsumer } from "../../../apis/renderable";
 import { BuildBuffer, GenericBuildBuffer } from "../../gl/buffers";
 
 export interface StateSetup {
@@ -130,44 +130,29 @@ export abstract class BufferRenderable<T extends BufferSetup> implements Builder
   public hint: number;
   public kind = 0;
 
-  constructor(private getSetup: (state: State) => T) { }
+  constructor(private setup: T) { }
 
-  draw(gl: WebGLRenderingContext, state: State): void {
+  draw(consumer: DrawCallConsumer): void {
     if (this.buff.getSize() == 0) return;
     if (this.drawCall == null) {
-      const setup = this.getSetup(state);
-      setup.buffer(this.buff).drawMode(this.mode);
-      this.setup(setup);
-      this.drawCall = setup.createDrawCall();
+      this.setup.buffer(this.buff).drawMode(this.mode);
+      this.applySetup(this.setup);
+      this.drawCall = this.setup.createDrawCall();
       this.hint = hash(this.drawCall.values[1], this.buff.get().buffer, this.textureHint(), this.buff.get().idx.offset);
     }
-    state.run(gl, this.drawCall);
+    consumer(this.drawCall);
   }
 
   public needToRebuild() { this.drawCall = null }
   public knd(kind: number) { this.kind = kind; return this }
 
-  abstract setup(setup: T): void;
+  abstract applySetup(setup: T): void;
   abstract reset(): void;
   protected abstract textureHint(): Texture;
 
   public get() { return this }
   public accept(consumer: RenderableConsumer<HintRenderable>) { if (this.buff.getSize() != 0) consumer(this) }
 }
-
-export function lazySingletonTransformer<I, O>(trans: (i: I) => O) {
-  let instance: O = null;
-  return (i: I) => {
-    if (instance == null) instance = trans(i);
-    return instance;
-  }
-}
-
-export const SOLID_SETUP = lazySingletonTransformer((state: State) => new SolidSetup(state));
-export const GRID_SETUP = lazySingletonTransformer((state: State) => new GridSetup(state));
-export const POINT_SPRITE_SETUP = lazySingletonTransformer((state: State) => new PointSpriteSetup(state));
-export const WIREFRAME_SETUP = lazySingletonTransformer((state: State) => new WireframeSetup(state));
-export const FLAT_SETUP = lazySingletonTransformer((state: State) => new BufferSetup(state));
 
 const textureMap = new Map<Texture, number>();
 const bufferMap = new Map<Buffer, number>();

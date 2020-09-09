@@ -11,7 +11,7 @@ import { int, len2d } from "../../../utils/mathutils";
 import { DelayedValue } from "../../../utils/timed";
 import { ART, ArtProvider, BOARD, BoardProvider, STATE, State, View, GridController, GRID } from "../../apis/app";
 import { Message, MessageHandlerReflective } from "../../apis/handler";
-import { HintRenderable, RenderableProvider } from "../../apis/renderable";
+import { Renderable } from "../../apis/renderable";
 import { BoardInvalidate, LoadBoard, Mouse } from "../../edit/messages";
 import { GL } from "../buildartprovider";
 import { BuildGl, BUILD_GL } from "../gl/buildgl";
@@ -66,7 +66,7 @@ export class View2d extends MessageHandlerReflective implements View {
   getProjectionMatrix() { return this.control.getProjectionMatrix() }
   getTransformMatrix() { return this.control.getTransformMatrix() }
   getPosition() { return this.pointer }
-  drawTools(renderable: RenderableProvider<HintRenderable>) { this.renderer.drawTools(this.gl, renderable) }
+  drawTools(renderables: Iterable<Renderable>) { this.renderer.drawTools(this.gl, renderables) }
   target(): Target { return this.hit.get() }
   snapTarget(): Target { return this.snapTargetValue.get() }
   dir(): Ray { return this.direction.get() }

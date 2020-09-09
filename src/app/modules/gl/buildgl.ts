@@ -77,7 +77,7 @@ export class BuildGl {
 
   public draw(gl: WebGLRenderingContext, renderable: Renderable) {
     if (renderable == null) return;
-    renderable.draw(dc => this.state.run(gl, dc));
+    renderable.drawCall(dc => this.state.run(gl, dc));
   }
 
   public newFrame(gl: WebGLRenderingContext) {

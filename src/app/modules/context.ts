@@ -1,5 +1,6 @@
 import { SelectorConstructor } from '../../app/modules/artselector';
 import { Board } from '../../build/board/structs';
+import { Deck } from '../../utils/collections';
 import { loadString } from '../../utils/getter';
 import { IndexedImgLibJsConstructor, INDEXED_IMG_LIB } from '../../utils/imglib';
 import { create, Dependency, Injector } from '../../utils/injector';
@@ -7,7 +8,7 @@ import { InputState } from '../../utils/input';
 import * as PROFILE from '../../utils/profiler';
 import { ART, BOARD, DEFAULT_BOARD, GRID, REFERENCE_TRACKER, State, STATE, STORAGES, View, VIEW } from '../apis/app';
 import { BUS, DefaultMessageBus, MessageBus, MessageHandlerReflective } from '../apis/handler';
-import { consumerProvider, HintRenderable } from '../apis/renderable';
+import { Renderable } from '../apis/renderable';
 import { EntityFactoryConstructor, ENTITY_FACTORY } from '../edit/context';
 import { Frame, LoadBoard, Mouse, namedMessageHandler, PostFrame, Render } from '../edit/messages';
 import { DrawSectorModule } from '../edit/tools/drawsector';
@@ -98,10 +99,19 @@ export function MainLoopConstructor(injector: Injector) {
   return create(injector, MainLoop, VIEW, BUS, STATE, KEYBINDS);
 }
 
+function createTools() {
+  const list = new Deck<Renderable>();
+  return {
+    consumer: (r: Renderable) => list.push(r),
+    clear: () => list.clear(),
+    provider: list,
+  }
+}
+
 const FRAME = new Frame(0);
 const POSTFRAME = new PostFrame();
 const MOUSE = new Mouse(0, 0);
-const tools = consumerProvider<HintRenderable>();
+const tools = createTools();
 const RENDER = new Render(tools.consumer);
 
 export class MainLoop extends MessageHandlerReflective {

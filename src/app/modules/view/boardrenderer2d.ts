@@ -1,12 +1,12 @@
-import { AllBoardVisitorResult, VisResult } from '../../../build/boardvisitor';
 import { Board } from '../../../build/board/structs';
+import { AllBoardVisitorResult, VisResult } from '../../../build/boardvisitor';
 import { mat4, Vec3Array } from '../../../libs_js/glmatrix';
 import { Controller2D } from '../../../utils/camera/controller2d';
 import { Deck } from '../../../utils/collections';
 import { Injector } from '../../../utils/injector';
 import * as PROFILE from '../../../utils/profiler';
-import { BOARD, BoardProvider, GridController, GRID } from '../../apis/app';
-import { BuildRenderableProvider, HELPER_GRID, HintRenderable, LayeredRenderables, RenderableProvider, SortingRenderable, SPRITE_LABEL } from '../../apis/renderable';
+import { BOARD, BoardProvider } from '../../apis/app';
+import { BuildRenderableProvider, HELPER_GRID, SPRITE_LABEL, Renderable, SortingRenderable } from '../../apis/renderable';
 import { GRID_SECTOR_MATRIX } from '../geometry/builders/common';
 import { RENDRABLES_CACHE } from '../geometry/cache';
 import { BuildersFactory, BUILDERS_FACTORY, GridBuilder } from '../geometry/common';
@@ -16,23 +16,22 @@ import { View2d } from './view2d';
 const visible = new AllBoardVisitorResult();
 
 export async function Renderer2D(injector: Injector) {
-  const [bgl, builders, renderables, board, grid] = await Promise.all([
+  const [bgl, builders, renderables, board] = await Promise.all([
     injector.getInstance(BUILD_GL),
     injector.getInstance(BUILDERS_FACTORY),
     injector.getInstance(RENDRABLES_CACHE),
     injector.getInstance(BOARD),
-    injector.getInstance(GRID),
   ]);
-  return new BoardRenderer2D(bgl, builders, renderables.topdown, board, grid);
+  return new BoardRenderer2D(bgl, builders, renderables.topdown, board);
 }
 
 export class BoardRenderer2D {
   private grid: GridBuilder;
   private upp = 1;
-  private surfaces = new Deck<RenderableProvider<HintRenderable>>();
-  private pass = new SortingRenderable(new LayeredRenderables(this.surfaces), r => {
-    const spriteLabel = r.kind & SPRITE_LABEL && this.upp > 20;
-    const gridHelper = r.kind & HELPER_GRID;
+  private surfaces = new Deck<Renderable>();
+  private pass = new SortingRenderable(this.surfaces, kind => {
+    const spriteLabel = kind & SPRITE_LABEL && this.upp > 20;
+    const gridHelper = kind & HELPER_GRID;
     return !spriteLabel && !gridHelper;
   });
 
@@ -40,8 +39,7 @@ export class BoardRenderer2D {
     private bgl: BuildGl,
     private builders: BuildersFactory,
     private renderables: BuildRenderableProvider,
-    private board: BoardProvider,
-    private gridController: GridController
+    private board: BoardProvider
   ) { }
 
   private getGrid() {
@@ -67,10 +65,10 @@ export class BoardRenderer2D {
     return this.grid;
   }
 
-  public drawTools(gl: WebGLRenderingContext, p: RenderableProvider<HintRenderable>) {
+  public drawTools(gl: WebGLRenderingContext, p: Iterable<Renderable>) {
     gl.disable(WebGLRenderingContext.DEPTH_TEST);
     gl.enable(WebGLRenderingContext.BLEND);
-    this.surfaces.clear().push(p);
+    this.surfaces.clear().pushAll(p);
     this.bgl.modulation(0.984, 0.78, 0.118, 1);
     this.bgl.draw(gl, this.pass);
     this.bgl.flush(gl);

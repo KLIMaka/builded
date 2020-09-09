@@ -4,11 +4,11 @@ import { Buffer } from "../../../../utils/gl/buffergl";
 import { Texture } from "../../../../utils/gl/drawstruct";
 import { DrawCall, State } from "../../../../utils/gl/stategl";
 import { Builder } from "../../../apis/builder";
-import { HintRenderable, RenderableConsumer, DrawCallConsumer } from "../../../apis/renderable";
+import { DrawCallConsumer } from "../../../apis/renderable";
 import { BuildBuffer, GenericBuildBuffer } from "../../gl/buffers";
 
 export interface StateSetup {
-  createDrawCall(): DrawCall;
+  createDrawCall(kind: number): DrawCall;
 }
 
 export class GenericBufferSetup implements StateSetup {
@@ -34,10 +34,13 @@ export class GenericBufferSetup implements StateSetup {
     return valueIdx;
   }
 
-  createDrawCall(): DrawCall {
-    return new DrawCall([...this.values], this.buff, this.offset, this.size, this.mode);
+  createDrawCall(kind: number): DrawCall {
+    const hint = hash(this.values[this.shaderIdx], this.buff, this.textureHint(), this.offset);
+    return new DrawCall([...this.values], this.buff, this.offset, this.size, this.mode, hint, kind);
   }
 
+
+  textureHint() { return null }
   public shader(shader: string) { this.values.set(this.shaderIdx, shader); return this }
   public drawMode(mode: number) { this.mode = mode; return this }
 
@@ -82,6 +85,7 @@ export class SolidSetup extends BufferSetup {
 
   public base(tex: Texture) { this.values.set(this.baseIdx, tex); return this }
   public color(color: Vec4Array) { this.values.set(this.colorIdx, color); return this }
+  textureHint() { return this.values.get(this.baseIdx) }
 }
 
 export class GridSetup extends BufferSetup {
@@ -121,29 +125,28 @@ export class PointSpriteSetup extends BufferSetup {
 
   public base(tex: Texture) { this.values.set(this.baseIdx, tex); return this }
   public color(color: Vec4Array) { this.values.set(this.colorIdx, color); return this }
+  textureHint() { return this.values.get(this.baseIdx) }
 }
 
-export abstract class BufferRenderable<T extends BufferSetup> implements Builder, HintRenderable {
+export abstract class BufferRenderable<T extends BufferSetup> implements Builder {
   declare abstract readonly buff: BuildBuffer;
   public mode: number = WebGLRenderingContext.TRIANGLES;
-  protected drawCall: DrawCall;
-  public hint: number;
+  private cachedDrawCall: DrawCall;
   public kind = 0;
 
   constructor(private setup: T) { }
 
-  draw(consumer: DrawCallConsumer): void {
+  drawCall(consumer: DrawCallConsumer): void {
     if (this.buff.getSize() == 0) return;
-    if (this.drawCall == null) {
+    if (this.cachedDrawCall == null) {
       this.setup.buffer(this.buff).drawMode(this.mode);
       this.applySetup(this.setup);
-      this.drawCall = this.setup.createDrawCall();
-      this.hint = hash(this.drawCall.values[1], this.buff.get().buffer, this.textureHint(), this.buff.get().idx.offset);
+      this.cachedDrawCall = this.setup.createDrawCall(this.kind);
     }
-    consumer(this.drawCall);
+    consumer(this.cachedDrawCall);
   }
 
-  public needToRebuild() { this.drawCall = null }
+  public needToRebuild() { this.cachedDrawCall = null }
   public knd(kind: number) { this.kind = kind; return this }
 
   abstract applySetup(setup: T): void;
@@ -151,7 +154,6 @@ export abstract class BufferRenderable<T extends BufferSetup> implements Builder
   protected abstract textureHint(): Texture;
 
   public get() { return this }
-  public accept(consumer: RenderableConsumer<HintRenderable>) { if (this.buff.getSize() != 0) consumer(this) }
 }
 
 const textureMap = new Map<Texture, number>();

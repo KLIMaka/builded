@@ -268,11 +268,11 @@ export class Selection extends MessageHandlerReflective {
       const id = detuple1(v);
       const rs = this.renderables.helpers;
       switch (type) {
-        case 0: rs.sector(id).ceiling.accept(msg.consumer); break;
-        case 1: rs.sector(id).floor.accept(msg.consumer); break;
-        case 2: rs.wall(id).accept(msg.consumer); break;
-        case 3: rs.wallPoint(id).accept(msg.consumer); break;
-        case 4: rs.sprite(id).accept(msg.consumer); break;
+        case 0: msg.consumer(rs.sector(id).ceiling); break;
+        case 1: msg.consumer(rs.sector(id).floor); break;
+        case 2: msg.consumer(rs.wall(id)); break;
+        case 3: msg.consumer(rs.wallPoint(id)); break;
+        case 4: msg.consumer(rs.sprite(id)); break;
       }
     }
   }

@@ -5,7 +5,7 @@ import { create, Dependency, Injector } from "../../../utils/injector";
 import { int, len2d, tuple2 } from "../../../utils/mathutils";
 import { STATE, State, View, GridController, GRID } from "../../apis/app";
 import { BUS, Message, MessageHandler } from "../../apis/handler";
-import { HintRenderable, RenderableProvider } from "../../apis/renderable";
+import { Renderable } from "../../apis/renderable";
 import { LoadBoard, NamedMessage } from "../../edit/messages";
 import { View2d, View2dConstructor } from "./view2d";
 import { View3d, View3dConstructor } from "./view3d";
@@ -77,7 +77,7 @@ export class SwappableView implements View, MessageHandler {
   target() { return this.view.target() }
   snapTarget() { return this.view.snapTarget() }
   dir() { return this.view.dir() }
-  drawTools(provider: RenderableProvider<HintRenderable>) { this.view.drawTools(provider) }
+  drawTools(renderables: Iterable<Renderable>) { this.view.drawTools(renderables) }
 
   handle(message: Message) {
     if (message instanceof NamedMessage && message.name == 'view_mode') {

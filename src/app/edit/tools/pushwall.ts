@@ -82,7 +82,7 @@ export class PushWall extends MessageHandlerReflective {
   public Render(msg: Render) {
     if (!this.movingHandle.isActive()) return;
     this.updateWireframe();
-    this.wireframe.accept(msg.consumer);
+    msg.consumer(this.wireframe);
   }
 
   private updateWireframe() {

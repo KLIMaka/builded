@@ -1,18 +1,18 @@
+import { Board } from '../../../build/board/structs';
 import { unpackWallId } from '../../../build/boardutils';
 import { AllBoardVisitorResult, createSectorCollector, createWallCollector, PvsBoardVisitorResult, VisResult } from '../../../build/boardvisitor';
-import { Board } from '../../../build/board/structs';
 import { wallVisible, ZSCALE } from '../../../build/utils';
+import { mat4, vec2, vec3 } from '../../../libs_js/glmatrix';
 import { Deck } from '../../../utils/collections';
 import { State } from '../../../utils/gl/stategl';
 import { Dependency, Injector } from '../../../utils/injector';
 import { dot2d } from '../../../utils/mathutils';
 import * as PROFILE from '../../../utils/profiler';
 import { mirrorBasis, normal2d, reflectPoint3d } from '../../../utils/vecmath';
-import { BuildRenderableProvider, HintRenderable, LayeredRenderables, Renderable, RenderableProvider, Renderables, SortingRenderable, WrapRenderable, DrawCallConsumer } from '../../apis/renderable';
-import { BuildGl, BUILD_GL } from '../gl/buildgl';
-import { vec3, mat4, vec2 } from '../../../libs_js/glmatrix';
-import { RENDRABLES_CACHE } from '../geometry/cache';
 import { BOARD, BoardProvider } from '../../apis/app';
+import { BuildRenderableProvider, DrawCallConsumer, Renderable, SortingRenderable, RenderWrapper } from '../../apis/renderable';
+import { RENDRABLES_CACHE } from '../geometry/cache';
+import { BuildGl, BUILD_GL } from '../gl/buildgl';
 import { View3d } from './view3d';
 
 export class RorLink {
@@ -55,12 +55,12 @@ const blendOn = (gl: WebGLRenderingContext, state: State) => { gl.enable(WebGLRe
 const blendOff = (gl: WebGLRenderingContext, state: State) => { gl.disable(WebGLRenderingContext.BLEND) };
 
 function list() {
-  const list = new Deck<RenderableProvider<HintRenderable>>();
-  const renderable = new SortingRenderable(new LayeredRenderables(list));
+  const list = new Deck<Renderable>();
+  const renderable = new SortingRenderable(list);
   return {
-    add: (r: RenderableProvider<HintRenderable>) => { list.push(r) },
+    add: (r: Renderable) => { list.push(r) },
     clear: () => list.clear(),
-    draw: (consumer: DrawCallConsumer) => { renderable.draw(consumer) }
+    drawCall: (consumer: DrawCallConsumer) => { renderable.drawCall(consumer) }
   }
 }
 
@@ -82,10 +82,10 @@ export class Boardrenderer3D {
     private renderables: BuildRenderableProvider
   ) { }
 
-  public drawTools(gl: WebGLRenderingContext, p: RenderableProvider<HintRenderable>) {
+  public drawTools(gl: WebGLRenderingContext, p: Iterable<Renderable>) {
     gl.disable(WebGLRenderingContext.DEPTH_TEST);
     gl.enable(WebGLRenderingContext.BLEND);
-    this.surfaces.clear().push(p);
+    this.surfaces.clear().pushAll(p);
     this.bgl.modulation(0.984, 0.78, 0.118, 1);
     this.bgl.draw(gl, this.surfaces);
     this.bgl.flush(gl);
@@ -269,7 +269,7 @@ export class Boardrenderer3D {
     if (this.impl.isMirrorPic(board.walls[wallId].picnum)) return;
     const wall = board.walls[wallId];
     const wallr = this.renderables.wall(wallId);
-    if (wall.cstat.translucent || wall.cstat.translucentReversed) {
+    if (wall.cstat.translucent == 1 || wall.cstat.translucentReversed == 1) {
       this.surfacesTrans.add(wallr.mid);
       this.surfaces.add(wallr.bot);
       this.surfaces.add(wallr.top);
@@ -288,8 +288,8 @@ export class Boardrenderer3D {
     PROFILE.incCount('sprites');
   }
 
-  private spriteSolids = new WrapRenderable(this.sprites, polyOffsetOn, polyOffsetOff);
-  private spriteTransparent = new WrapRenderable(this.spritesTrans, polyOffsetOn, polyOffsetOff);
+  private spriteSolids = new RenderWrapper(this.sprites, polyOffsetOn, polyOffsetOff);
+  private spriteTransparent = new RenderWrapper(this.spritesTrans, polyOffsetOn, polyOffsetOff);
 
   private drawRooms(result: VisResult, view: View3d) {
     PROFILE.startProfile('processing');

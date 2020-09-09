@@ -87,9 +87,9 @@ export class GridBuilder extends BufferRenderable<GridSetup> {
       .gridSettings(vec4.set(this.gridSettings, this.grid.getGridSize(), this.range, 0, 0));
   }
 
-  public draw(consumer: DrawCallConsumer): void {
+  public drawCall(consumer: DrawCallConsumer): void {
     this.needToRebuild();
-    super.draw(consumer);
+    super.drawCall(consumer);
   }
 }
 
@@ -103,9 +103,9 @@ export class FlatBuilder extends BufferRenderable<BufferSetup> {
   protected textureHint() { return null }
   public applySetup(setup: BufferSetup) { setup.shader('baseFlatShader') }
 
-  public draw(consumer: DrawCallConsumer): void {
+  public drawCall(consumer: DrawCallConsumer): void {
     this.needToRebuild();
-    super.draw(consumer);
+    super.drawCall(consumer);
   }
 }
 

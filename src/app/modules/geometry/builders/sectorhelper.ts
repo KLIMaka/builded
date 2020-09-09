@@ -1,7 +1,7 @@
 import { Board, Sector } from "../../../../build/board/structs";
 import { createSlopeCalculator, sectorOfWall, ZSCALE } from "../../../../build/utils";
 import { Builders } from "../../../apis/builder";
-import { BuildRenderableProvider, LayeredRenderables, SectorRenderable, HELPER_GRID } from "../../../apis/renderable";
+import { BuildRenderableProvider, SectorRenderable, HELPER_GRID, Renderables } from "../../../apis/renderable";
 import { BuildBuffer } from "../../gl/buffers";
 import { RenderablesCacheContext } from "../cache";
 import { BuildersFactory, PointSpriteBuilder, SolidBuilder, WireframeBuilder } from "../common";
@@ -19,8 +19,8 @@ export class SectorHelperBuilder extends Builders implements SectorRenderable {
     readonly floorwire = factory.wireframe('helper'),
     readonly floorhinge = factory.wireframe('helper'),
     readonly floorgrid = factory.grid('helper').knd(HELPER_GRID),
-    readonly ceiling = new LayeredRenderables([ceilpoints, ceilwire, ceilhinge, ceilgrid]),
-    readonly floor = new LayeredRenderables([floorpoints, floorwire, floorhinge, floorgrid]),
+    readonly ceiling = new Renderables([ceilpoints, ceilwire, ceilhinge, ceilgrid]),
+    readonly floor = new Renderables([floorpoints, floorwire, floorhinge, floorgrid]),
   ) { super([ceilpoints, ceilwire, ceilhinge, ceilgrid, floorpoints, floorwire, floorhinge, floorgrid]) }
 }
 

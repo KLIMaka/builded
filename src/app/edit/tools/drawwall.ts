@@ -8,7 +8,7 @@ import { iter } from "../../../utils/iter";
 import { cyclic } from "../../../utils/mathutils";
 import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
 import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
-import { LayeredRenderables } from "../../apis/renderable";
+import { Renderables } from "../../apis/renderable";
 import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
 import { LineBuilder } from "../../modules/gl/buffers";
 import { Frame, NamedMessage, Render } from "../messages";
@@ -132,7 +132,7 @@ class PortalModel {
     private contour = factory.wireframe('utils'),
     private contourPoints = factory.pointSprite('utils'),
     private length = factory.pointSprite('utils'),
-    private renderable = new LayeredRenderables([contour, contourPoints, length])
+    private renderable = new Renderables([contour, contourPoints, length])
   ) { }
 
   public getRenderable() { this.update(); return this.renderable }
@@ -311,6 +311,6 @@ export class DrawWall extends MessageHandlerReflective {
 
   public Render(msg: Render) {
     if (this.wallId == -1) return;
-    this.portal.getRenderable().accept(msg.consumer);
+    msg.consumer(this.portal.getRenderable());
   }
 }

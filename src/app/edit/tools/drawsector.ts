@@ -9,7 +9,7 @@ import { create, Injector } from "../../../utils/injector";
 import { int, len2d } from "../../../utils/mathutils";
 import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
 import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
-import { LayeredRenderables } from "../../apis/renderable";
+import { Renderables } from "../../apis/renderable";
 import { writeText } from "../../modules/geometry/builders/common";
 import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
 import { getClosestSectorZ } from "../editutils";
@@ -28,7 +28,7 @@ class Contour {
     private contour = factory.wireframe('utils'),
     private contourPoints = factory.pointSprite('utils'),
     private length = factory.pointSprite('utils'),
-    private renderable = new LayeredRenderables([contour, contourPoints, length])
+    private renderable = new Renderables([contour, contourPoints, length])
   ) { if (firstPoint) this.pushPoint(0, 0) }
 
   public setZ(z: number) { this.z = z }
@@ -280,11 +280,6 @@ export class DrawSector extends MessageHandlerReflective {
     }
   }
 
-  public Frame(msg: Frame) {
-    this.update();
-  }
-
-  public Render(msg: Render,) {
-    this.contour.getRenderable().accept(msg.consumer);
-  }
+  public Frame(msg: Frame) { this.update() }
+  public Render(msg: Render) { msg.consumer(this.contour.getRenderable()) }
 }

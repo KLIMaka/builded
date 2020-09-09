@@ -2,7 +2,7 @@ import { create, Dependency, Injector } from '../../../utils/injector';
 import { ART, ArtProvider, BOARD, BoardProvider, STATE, State } from '../../apis/app';
 import { Builder } from '../../apis/builder';
 import { BUS, MessageHandler, MessageHandlerReflective } from '../../apis/handler';
-import { BuildRenderableProvider, ClusterRenderable, HintRenderable, RenderableProvider, SectorRenderable, WallRenderable } from '../../apis/renderable';
+import { BuildRenderableProvider, ClusterRenderable, SectorRenderable, WallRenderable, Renderable } from '../../apis/renderable';
 import { BoardInvalidate } from '../../edit/messages';
 import { SectorBuilder, updateSector } from './builders/sector';
 import { updateCluster } from './builders/sectorcluster';
@@ -74,8 +74,8 @@ export class CachedTopDownBuildRenderableProvider implements BuildRenderableProv
   sector(id: number): SectorRenderable { return this.NULL_SECTOR_RENDERABLE }
   sectorCluster(id: number): ClusterRenderable { throw new Error('Cant render clusters') }
   wall(id: number): WallRenderable { return this.walls.get(id, this.ctx) }
-  wallPoint(id: number): RenderableProvider<HintRenderable> { throw new Error('Cant render points') }
-  sprite(id: number): RenderableProvider<HintRenderable> { return this.sprites.get(id, this.ctx) }
+  wallPoint(id: number): Renderable { throw new Error('Cant render points') }
+  sprite(id: number): Renderable { return this.sprites.get(id, this.ctx) }
   invalidateSector(id: number) { }
   invalidateWall(id: number) { this.walls.invalidate(id) }
   invalidateSprite(id: number) { this.sprites.invalidate(id) }
@@ -99,8 +99,8 @@ export class CachedBuildRenderableProvider implements BuildRenderableProvider {
   sector(id: number): SectorRenderable { return this.sectors.get(id, this.ctx) }
   sectorCluster(id: number): ClusterRenderable { return this.clusters.get(id, this.ctx) }
   wall(id: number): WallRenderable { return this.walls.get(id, this.ctx) }
-  wallPoint(id: number): RenderableProvider<HintRenderable> { throw new Error('Cant render points') }
-  sprite(id: number): RenderableProvider<HintRenderable> { return this.sprites.get(id, this.ctx) }
+  wallPoint(id: number): Renderable { throw new Error('Cant render points') }
+  sprite(id: number): Renderable { return this.sprites.get(id, this.ctx) }
   invalidateSector(id: number) { this.sectors.invalidate(id) }
   invalidateWall(id: number) { this.walls.invalidate(id) }
   invalidateSprite(id: number) { this.sprites.invalidate(id) }
@@ -124,8 +124,8 @@ export class CachedSelectedRenderableProvider implements BuildRenderableProvider
   sector(id: number): SectorRenderable { return this.sectors.get(id, this.ctx) }
   sectorCluster(id: number): ClusterRenderable { throw new Error('Cant render clusters') }
   wall(id: number): WallRenderable { return this.walls.get(id, this.ctx) }
-  wallPoint(id: number): RenderableProvider<HintRenderable> { return null }
-  sprite(id: number): RenderableProvider<HintRenderable> { return null }
+  wallPoint(id: number): Renderable { return null }
+  sprite(id: number): Renderable { return null }
 }
 
 export class CachedHelperBuildRenderableProvider implements BuildRenderableProvider {
@@ -142,8 +142,8 @@ export class CachedHelperBuildRenderableProvider implements BuildRenderableProvi
   sector(id: number): SectorRenderable { return this.sectors.get(id, this.ctx) }
   sectorCluster(id: number): ClusterRenderable { throw new Error('Cant render clusters') }
   wall(id: number): WallRenderable { return this.walls.get(id, this.ctx) }
-  wallPoint(id: number): RenderableProvider<HintRenderable> { return this.wallPoints.get(id, this.ctx) }
-  sprite(id: number): RenderableProvider<HintRenderable> { return this.sprites.get(id, this.ctx) }
+  wallPoint(id: number): Renderable { return this.wallPoints.get(id, this.ctx) }
+  sprite(id: number): Renderable { return this.sprites.get(id, this.ctx) }
   invalidateSector(id: number) { this.sectors.invalidate(id) }
   invalidateSprite(id: number) { this.sprites.invalidate(id) }
 

@@ -386,6 +386,8 @@ export class DrawCall {
     readonly buffer: Buffer,
     readonly offset: number,
     readonly size: number,
-    readonly mode: number
+    readonly mode: number,
+    readonly hint: number,
+    readonly kind: number,
   ) { }
 }

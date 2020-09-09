@@ -1,13 +1,12 @@
+import { Board } from "../../build/board/structs";
 import { ArtInfoProvider } from "../../build/formats/art";
 import { Ray, Target } from "../../build/hitscan";
-import { Board } from "../../build/board/structs";
 import { MoveStruct } from "../../build/utils";
 import { Texture } from "../../utils/gl/drawstruct";
 import { Dependency } from "../../utils/injector";
 import { MessageHandler } from "./handler";
 import { ReferenceTracker } from "./referencetracker";
-import { HintRenderable, RenderableProvider } from "./renderable";
-import { DrawCall } from "../../utils/gl/stategl";
+import { Renderable } from "./renderable";
 
 export interface Storage {
   get(key: string): Promise<any>;
@@ -26,7 +25,7 @@ export interface ArtProvider extends ArtInfoProvider {
 export const ART = new Dependency<ArtProvider>('ArtProvider');
 
 export interface View extends MoveStruct, MessageHandler {
-  drawTools(provider: RenderableProvider<HintRenderable>): void;
+  drawTools(renderables: Iterable<Renderable>): void;
   target(): Target;
   snapTarget(): Target;
   dir(): Ray;

@@ -3,7 +3,7 @@ import { Board } from "../../../../build/board/structs";
 import { createSlopeCalculator, sectorOfWall, slope, ZSCALE } from "../../../../build/utils";
 import { int } from "../../../../utils/mathutils";
 import { Builders } from "../../../apis/builder";
-import { BuildRenderableProvider, LayeredRenderables, WallRenderable } from "../../../apis/renderable";
+import { BuildRenderableProvider, WallRenderable, Renderables } from "../../../apis/renderable";
 import { BuildBuffer } from "../../gl/buffers";
 import { RenderablesCacheContext } from "../cache";
 import { BuildersFactory, PointSpriteBuilder, SolidBuilder } from "../common";
@@ -23,9 +23,9 @@ export class WallHelperBuilder extends Builders implements WallRenderable {
     readonly botGrid = factory.grid('helper'),
     readonly botPoints = factory.pointSprite('helper'),
     readonly botLength = factory.pointSprite('helper'),
-    readonly top = new LayeredRenderables([topWire, topGrid, topPoints, topLength]),
-    readonly mid = new LayeredRenderables([midWire, midGrid]),
-    readonly bot = new LayeredRenderables([botWire, botGrid, botPoints, botLength]),
+    readonly top = new Renderables([topWire, topGrid, topPoints, topLength]),
+    readonly mid = new Renderables([midWire, midGrid]),
+    readonly bot = new Renderables([botWire, botGrid, botPoints, botLength]),
   ) {
     super([topWire, midWire, botWire, topGrid, midGrid, botGrid, topPoints, botPoints, topLength, botLength]);
   }

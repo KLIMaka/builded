@@ -77,6 +77,5 @@ export interface TaskHandle {
 
 export interface Scheduler {
   addTask(task: Generator): TaskHandle;
-  run(): void;
 }
 export const SCHEDULER = new Dependency<Scheduler>('Scheduler');

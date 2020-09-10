@@ -32,7 +32,7 @@ import { BUILDERS_FACTORY, DefaultBuildersFactory } from './geometry/common';
 import { BUFFER_FACTORY, DefaultBufferFactory } from './gl/buffers';
 import { BuildGlConstructor, BUILD_GL } from './gl/buildgl';
 import { SwappableViewConstructor } from './view/view';
-import { SchedulerConstructor } from '../apis/scheduler';
+import { DefaultScheduler } from '../apis/scheduler';
 
 export const KEYBINDS = new Dependency<string>('KeymapConfig');
 
@@ -81,7 +81,7 @@ export function DefaultSetupModule(injector: Injector) {
   injector.bind(BOARD, DefaultBoardProviderConstructor);
   injector.bind(ENTITY_FACTORY, EntityFactoryConstructor);
   injector.bind(INDEXED_IMG_LIB, IndexedImgLibJsConstructor);
-  injector.bind(SCHEDULER, SchedulerConstructor);
+  injector.bind(SCHEDULER, DefaultScheduler);
 
   injector.install(JoinSectorsModule);
   injector.install(DrawSectorModule);
@@ -161,6 +161,5 @@ export class MainLoop extends MessageHandlerReflective {
     this.drawTools();
     PROFILE.endProfile();
     this.bus.handle(POSTFRAME);
-    this.scheduler.run();
   }
 }

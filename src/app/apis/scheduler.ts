@@ -1,9 +1,14 @@
-import { Injector } from '../../utils/injector';
-import { Scheduler, TaskHandle } from './app';
 import { Deck } from '../../utils/collections';
+import { Injector } from '../../utils/injector';
+import { PostFrame } from '../edit/messages';
+import { Scheduler, TaskHandle } from './app';
+import { BUS, MessageHandlerReflective } from './handler';
 
-export async function SchedulerConstructor(injector: Injector) {
-  return new SchedulerImpl();
+export async function DefaultScheduler(injector: Injector) {
+  const bus = await injector.getInstance(BUS);
+  const scheduler = new SchedulerImpl();
+  bus.connect(scheduler);
+  return scheduler;
 }
 
 class TaskHandleImpl implements TaskHandle {
@@ -15,7 +20,7 @@ class TaskHandleImpl implements TaskHandle {
   isStopped() { return this.stopped }
 }
 
-class SchedulerImpl implements Scheduler {
+class SchedulerImpl extends MessageHandlerReflective implements Scheduler {
   private tasks = new Deck<[TaskHandleImpl, Generator]>();
   private nextTasks = new Deck<[TaskHandleImpl, Generator]>();
 
@@ -25,7 +30,7 @@ class SchedulerImpl implements Scheduler {
     return handle;
   }
 
-  run(): void {
+  PostFrame(msg: PostFrame) {
     this.nextTasks.clear();
     for (const ent of this.tasks) {
       const [handle, task] = ent;

@@ -4,7 +4,6 @@ import { AllBoardVisitorResult, createSectorCollector, createWallCollector, PvsB
 import { wallVisible, ZSCALE } from '../../../build/utils';
 import { mat4, vec2, vec3 } from '../../../libs_js/glmatrix';
 import { Deck } from '../../../utils/collections';
-import { State } from '../../../utils/gl/stategl';
 import { Dependency, Injector } from '../../../utils/injector';
 import { dot2d } from '../../../utils/mathutils';
 import * as PROFILE from '../../../utils/profiler';

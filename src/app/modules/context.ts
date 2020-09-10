@@ -6,7 +6,7 @@ import { IndexedImgLibJsConstructor, INDEXED_IMG_LIB } from '../../utils/imglib'
 import { create, Dependency, Injector } from '../../utils/injector';
 import { InputState } from '../../utils/input';
 import * as PROFILE from '../../utils/profiler';
-import { ART, BOARD, DEFAULT_BOARD, GRID, REFERENCE_TRACKER, State, STATE, STORAGES, View, VIEW } from '../apis/app';
+import { ART, BOARD, DEFAULT_BOARD, GRID, REFERENCE_TRACKER, State, STATE, STORAGES, View, VIEW, SCHEDULER, Scheduler } from '../apis/app';
 import { BUS, DefaultMessageBus, MessageBus, MessageHandlerReflective } from '../apis/handler';
 import { Renderable } from '../apis/renderable';
 import { EntityFactoryConstructor, ENTITY_FACTORY } from '../edit/context';
@@ -32,6 +32,7 @@ import { BUILDERS_FACTORY, DefaultBuildersFactory } from './geometry/common';
 import { BUFFER_FACTORY, DefaultBufferFactory } from './gl/buffers';
 import { BuildGlConstructor, BUILD_GL } from './gl/buildgl';
 import { SwappableViewConstructor } from './view/view';
+import { SchedulerConstructor } from '../apis/scheduler';
 
 export const KEYBINDS = new Dependency<string>('KeymapConfig');
 
@@ -80,6 +81,7 @@ export function DefaultSetupModule(injector: Injector) {
   injector.bind(BOARD, DefaultBoardProviderConstructor);
   injector.bind(ENTITY_FACTORY, EntityFactoryConstructor);
   injector.bind(INDEXED_IMG_LIB, IndexedImgLibJsConstructor);
+  injector.bind(SCHEDULER, SchedulerConstructor);
 
   injector.install(JoinSectorsModule);
   injector.install(DrawSectorModule);
@@ -96,7 +98,7 @@ export function DefaultSetupModule(injector: Injector) {
 }
 
 export function MainLoopConstructor(injector: Injector) {
-  return create(injector, MainLoop, VIEW, BUS, STATE, KEYBINDS);
+  return create(injector, MainLoop, VIEW, BUS, STATE, KEYBINDS, SCHEDULER);
 }
 
 function createTools() {
@@ -115,12 +117,15 @@ const tools = createTools();
 const RENDER = new Render(tools.consumer);
 
 export class MainLoop extends MessageHandlerReflective {
-  private view: View;
   private binder = new Binder();
-  private bus: MessageBus;
-  private state: State;
 
-  constructor(view: View, bus: MessageBus, state: State, binds: string) {
+  constructor(
+    private view: View,
+    private bus: MessageBus,
+    private state: State,
+    private binds: string,
+    private scheduler: Scheduler
+  ) {
     super();
     this.view = view;
     this.bus = bus;
@@ -156,5 +161,6 @@ export class MainLoop extends MessageHandlerReflective {
     this.drawTools();
     PROFILE.endProfile();
     this.bus.handle(POSTFRAME);
+    this.scheduler.run();
   }
 }

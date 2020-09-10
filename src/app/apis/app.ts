@@ -69,3 +69,14 @@ export interface GridController {
   snap(x: number): number;
 }
 export const GRID = new Dependency<GridController>('GridController');
+
+
+export interface TaskHandle {
+  stop(): void;
+}
+
+export interface Scheduler {
+  addTask(task: Generator): TaskHandle;
+  run(): void;
+}
+export const SCHEDULER = new Dependency<Scheduler>('Scheduler');

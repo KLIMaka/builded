@@ -29,7 +29,7 @@ export class RorLinks {
 }
 
 export interface Implementation {
-  rorLinks(): RorLinks;
+  rorLinks: () => RorLinks;
   isMirrorPic(picnum: number): boolean;
 }
 export const Implementation_ = new Dependency<Implementation>('Implementation');

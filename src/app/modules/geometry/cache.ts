@@ -1,9 +1,9 @@
 import { create, Dependency, Injector } from '../../../utils/injector';
-import { ART, ArtProvider, BOARD, BoardProvider, STATE, State } from '../../apis/app';
+import { ART, ArtProvider, BOARD, BoardProvider, STATE, State, SCHEDULER, Scheduler, TaskHandle } from '../../apis/app';
 import { Builder } from '../../apis/builder';
 import { BUS, MessageHandler, MessageHandlerReflective } from '../../apis/handler';
 import { BuildRenderableProvider, ClusterRenderable, SectorRenderable, WallRenderable, Renderable } from '../../apis/renderable';
-import { BoardInvalidate } from '../../edit/messages';
+import { BoardInvalidate, NamedMessage, LoadBoard } from '../../edit/messages';
 import { SectorBuilder, updateSector } from './builders/sector';
 import { updateCluster } from './builders/sectorcluster';
 import { SectorHelperBuilder, updateSectorHelper } from './builders/sectorhelper';
@@ -186,7 +186,7 @@ async function RenderablesCacheContextConstructor(injector: Injector): Promise<R
 }
 
 async function RenderablesCacheConstructor(injector: Injector) {
-  return create(injector, RenderablesCacheImpl, RENDERABLES_CACHE_CONTEXT);
+  return create(injector, RenderablesCacheImpl, RENDERABLES_CACHE_CONTEXT, SCHEDULER);
 }
 
 export const WALL_COLOR = 'wallColor';
@@ -214,31 +214,47 @@ export class RenderablesCacheImpl extends MessageHandlerReflective implements Re
   readonly topdown: CachedTopDownBuildRenderableProvider;
   readonly selected: CachedSelectedRenderableProvider;
 
+  private preloadTask: TaskHandle;
+
   constructor(
-    private ctx: RenderablesCacheContext
+    private ctx: RenderablesCacheContext,
+    private scheduler: Scheduler
   ) {
     super();
     this.geometry = new CachedBuildRenderableProvider(ctx);
     this.helpers = new CachedHelperBuildRenderableProvider(ctx, this.geometry);
     this.topdown = new CachedTopDownBuildRenderableProvider(ctx);
     this.selected = new CachedSelectedRenderableProvider(ctx, this.geometry);
-    this.prebuild();
+    this.launchPrebuild();
   }
 
-  private prebuild() {
+  private launchPrebuild() {
+    if (this.preloadTask != null) this.preloadTask.stop();
+    this.preloadTask = this.scheduler.addTask(this.prebuild());
+  }
+
+  private * prebuild() {
     const board = this.ctx.board();
     for (let i = 0; i < board.sectors.length; i++) {
       this.geometry.sector(i);
       this.topdown.sector(i);
+      yield;
     }
     for (let i = 0; i < board.walls.length; i++) {
       this.geometry.wall(i);
       this.helpers.wall(i);
+      yield;
     }
     for (let i = 0; i < board.sprites.length; i++) {
       this.geometry.sprite(i);
       this.topdown.sprite(i);
+      yield;
     }
+  }
+
+  LoadBoard(msg: LoadBoard) {
+    this.invalidateAll();
+    this.launchPrebuild();
   }
 
   BoardInvalidate(msg: BoardInvalidate) {

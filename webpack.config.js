@@ -1,6 +1,7 @@
 var path = require('path');
 
 module.exports = {
+  mode: 'development',
   entry: './src/builded',
   output: {
     path: path.resolve(__dirname, 'distr'),
@@ -18,7 +19,8 @@ module.exports = {
   },
   devServer: {
     contentBase: __dirname,
+    publicPath: '/distr/',
     compress: true,
-    port: 9000
+    port: 9000,
   }
 };

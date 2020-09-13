@@ -12,6 +12,8 @@
     "rootDir": "src",
     "sourceMap": true,
     "moduleResolution": "node",
+    "jsx": "preserve",
+    "allowJs": true,
   },
   "files": [
     "src/builded.ts"

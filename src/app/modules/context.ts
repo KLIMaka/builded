@@ -19,7 +19,7 @@ import { PICNUM_SELECTOR, SelectionModule } from '../edit/tools/selection';
 import { UtilsModule } from '../edit/tools/utils';
 import { Binder, loadBinds } from '../input/keymap';
 import { messageParser } from '../input/messageparser';
-import { InfoModule } from '../modules/info';
+import { InfoModule } from './info';
 import { StatusBarModule } from '../modules/statusbar';
 import { BuildArtProviderConstructor, TEXTURES_OVERRIDE } from './buildartprovider';
 import { DefaultGridController } from './default/grid';

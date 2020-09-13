@@ -14,11 +14,13 @@ module.exports = api => {
     : {
       presets: [
         ['@babel/preset-env', { modules: false, targets: { esmodules: true }, loose: true }],
-        '@babel/preset-typescript'
+        '@babel/preset-typescript',
+        'solid',
       ],
       plugins: [
         ['@babel/plugin-transform-typescript', { allowDeclareFields: true }],
         ['@babel/plugin-proposal-class-properties', { loose: true }],
+        ["@babel/plugin-syntax-jsx"],
       ]
     }
 };

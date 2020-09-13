@@ -14,11 +14,11 @@ export async function InfoModule(injector: Injector) {
 }
 
 const Rows = ({ rows }: { rows: { name: string, value: any }[] }) => {
-  return () => <table class='table-striped'>
+  return () => <table class='table-striped'><tbody>
     <For each={rows}>
       {row => <Row {...row} />}
     </For>
-  </table>
+  </tbody></table>
 }
 
 const Row = ({ name, value }: { name: string, value: any }) => {

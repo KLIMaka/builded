@@ -1,5 +1,6 @@
 import { createState, Match, SetStateFunction, State, Switch } from "solid-js";
 import { render } from "solid-js/dom";
+import h from "stage0";
 import { Sector, Sprite, Wall } from "../../build/board/structs";
 import { EntityType, isSector, isSprite, isWall } from "../../build/hitscan";
 import { create, Injector } from "../../utils/injector";
@@ -11,6 +12,38 @@ import { BoardInvalidate, Frame } from "../edit/messages";
 export async function InfoModule(injector: Injector) {
   const bus = await injector.getInstance(BUS);
   bus.connect(await create(injector, Info, VIEW, BOARD))
+}
+
+const rowTemplate = h`<tr><td>#nameNode</td><td>#valueNode</td></tr>`;
+function createRow(name: string): [Node, (v: any) => void] {
+  const root = rowTemplate.cloneNode(true);
+  const { nameNode, valueNode } = rowTemplate.collect(root);
+  nameNode.nodeValue = name;
+  const update = (v: any) => valueNode.nodeValue = v;
+  return [root, update];
+}
+
+const rowsTemplate = h`<table class="table-striped" #table><tbody></tbody></table>`;
+function createSprite() {
+  const root = rowsTemplate.cloneNode(true);
+  const { table } = rowsTemplate.collect(root);
+  const [head, headUpdater] = createRow("Type");
+  const [id, idUpdater] = createRow("Id");
+  const [picnum, picnumUpdater] = createRow("Picnum");
+  const [shade, shadeUpdater] = createRow("Shade");
+  const [pal, palUpdater] = createRow("Palette");
+  const [offset, offsetUpdater] = createRow("Offset");
+  const [repeat, repeatUpdater] = createRow("Repeat");
+  const [z, zUpdater] = createRow("Z");
+  table.appendChild(head);
+  table.appendChild(id);
+  table.appendChild(picnum);
+  table.appendChild(shade);
+  table.appendChild(pal);
+  table.appendChild(offset);
+  table.appendChild(repeat);
+  table.appendChild(z);
+  headUpdater('Sprite');
 }
 
 const Row = (ref: { name: string, value: any }) => {

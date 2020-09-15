@@ -20,6 +20,13 @@ class StatusbarState {
   public fps: string;
 }
 
+const PositionBox = (ref: { x: number, y: number }) => {
+  return () => <span class="title padded-horizontally-less">Position:
+  <span style="width: 45px; display: inline-block; text-align: right;">[{ref.x}</span>,
+  <span style="width: 45px; display: inline-block; text-align: left;">{ref.y}]</span>
+  </span>
+}
+
 const Box = (ref: { name: string, size: number, value: any }) => {
   return () => <span class="title padded-horizontally-less">{ref.name}:  <span style={`width: ${ref.size}px; display: inline-block;`}>{ref.value}</span></span>
 }
@@ -33,10 +40,7 @@ export class Statusbar extends MessageHandlerReflective {
     this.setState = setState;
     render(() => {
       return <span class="pull-right">
-        <span class="title padded-horizontally-less">Position:
-          <span style="width: 45px; display: inline-block; text-align: right;">[{state.posx}</span>,
-          <span style="width: 45px; display: inline-block; text-align: left;">{state.posy}]</span>
-        </span>
+        <PositionBox x={state.posx} y={state.posy} />
         <Box name='Sector' size={25} value={state.sector} />
         <Box name='Draws' size={85} value={state.draws} />
         <Box name='FPS' size={35} value={state.fps} />
@@ -49,10 +53,12 @@ export class Statusbar extends MessageHandlerReflective {
     const profile = PROFILE.get(null);
     const draws = profile.counts['drawsRequested'] ?? 0;
     const skips = profile.counts['drawsMerged'] ?? 0;
-    this.setState('posx', view.x);
-    this.setState('posy', view.y);
-    this.setState('sector', view.sec);
-    this.setState('fps', (1000 / profile.time).toFixed(0));
-    this.setState('draws', draws + ' / ' + (draws - skips));
+    this.setState({
+      posx: view.x,
+      posy: view.y,
+      sector: view.sec,
+      fps: (1000 / profile.time).toFixed(0),
+      draws: draws + ' / ' + (draws - skips)
+    });
   }
 }

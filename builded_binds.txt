@@ -64,6 +64,7 @@ SHIFT+mouse0    add_selection
 CTRL+D          clear_selection
 ALT+N           new_board
 CTRL+SHIFT+A    show_artedit
+CTRL+ALT+T    show_tasks
 
 +W              forward
 +S              backward

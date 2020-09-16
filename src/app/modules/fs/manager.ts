@@ -75,8 +75,8 @@ class FileBrowser {
 
   private replaceContent(newContent: HTMLElement) {
     const content = this.window.contentElement.firstChild
-    if (content) this.window.contentElement.removeChild(content);
-    this.window.contentElement.appendChild(newContent);
+    if (content) this.window.contentElement.replaceChild(newContent, content);
+    else this.window.contentElement.appendChild(newContent);
   }
 
   private toggleItem(target: HTMLElement, name: string) {

@@ -23,10 +23,10 @@ export function IconTextRenderer(value: IconText): Element {
 export async function renderGrid(grid: GridModel): Promise<Element> {
   const table = new Table();
   table.className("table-striped");
-  iter(await grid.rows()).forEach(f => {
-    const columns = [...iter(grid.columns()).enumerate().map(([r, i]) => r(f[i]))];
+  iter(await grid.rows()).forEach(dataRow => {
+    const columns = [...iter(grid.columns()).enumerate().map(([r, i]) => r(dataRow[i]))];
     const row = table.row(columns);
-    row.click(() => grid.onClick(f, row));
+    row.click(() => grid.onClick(dataRow, row));
   });
   return table;
 }
@@ -91,7 +91,8 @@ export interface SuggestionModel {
 export function search(hint: string, change: (s: string) => void): SerachBar {
   const suggestContainer = div('suggest');
   let suggestModel: SuggestionModel = null;
-  const textBox = tag('input').className('toolbar-control')
+  const textBox = tag('input')
+    .className('toolbar-control')
     .attr('type', 'text')
     .attr('placeholder', hint)
     .change(s => change(s));
@@ -124,8 +125,8 @@ export function search(hint: string, change: (s: string) => void): SerachBar {
     updateSuggestions(model: SuggestionModel) {
       suggestModel = model
       const sugg = suggestContainer.elem();
-      if (sugg.firstChild != null) sugg.removeChild(sugg.firstChild);
-      sugg.appendChild(model.widget);
+      if (sugg.firstChild != null) sugg.replaceChild(sugg.firstChild, model.widget);
+      else sugg.appendChild(model.widget);
       inst.show();
     },
   }

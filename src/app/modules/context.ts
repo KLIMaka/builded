@@ -33,6 +33,7 @@ import { BUFFER_FACTORY, DefaultBufferFactory } from './gl/buffers';
 import { BuildGlConstructor, BUILD_GL } from './gl/buildgl';
 import { SwappableViewConstructor } from './view/view';
 import { DefaultScheduler } from '../apis/scheduler';
+import { TaskManagerModule } from '../modules/taskmanager';
 
 export const KEYBINDS = new Dependency<string>('KeymapConfig');
 
@@ -92,6 +93,7 @@ export function DefaultSetupModule(injector: Injector) {
   injector.install(InfoModule);
   injector.install(StatusBarModule);
   injector.install(UtilsModule);
+  injector.install(TaskManagerModule);
 
   injector.install(newMap);
   // injector.install(mapBackupService);

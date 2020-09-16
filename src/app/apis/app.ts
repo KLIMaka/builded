@@ -71,11 +71,22 @@ export interface GridController {
 export const GRID = new Dependency<GridController>('GridController');
 
 
+
 export interface TaskHandle {
   stop(): void;
+  getDescription(): string;
+  getProgress(): number;
+}
+
+export interface ScheddulerHandler {
+  onTaskAdd(task: TaskHandle): void;
+  onTaskStop(task: TaskHandle): void;
+  onTaskUpdate(task: TaskHandle): void;
 }
 
 export interface Scheduler {
   addTask(task: Generator): TaskHandle;
+  addHandler(handler: ScheddulerHandler): void;
+  removeHandler(handler: ScheddulerHandler): void;
 }
 export const SCHEDULER = new Dependency<Scheduler>('Scheduler');

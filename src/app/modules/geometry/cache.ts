@@ -1,5 +1,5 @@
 import { create, Dependency, Injector } from '../../../utils/injector';
-import { ART, ArtProvider, BOARD, BoardProvider, STATE, State, SCHEDULER, Scheduler, TaskHandle } from '../../apis/app';
+import { ART, ArtProvider, BOARD, BoardProvider, STATE, State, SCHEDULER, Scheduler, TaskHandle, SchedulerTask } from '../../apis/app';
 import { Builder } from '../../apis/builder';
 import { BUS, MessageHandler, MessageHandlerReflective } from '../../apis/handler';
 import { BuildRenderableProvider, ClusterRenderable, SectorRenderable, WallRenderable, Renderable } from '../../apis/renderable';
@@ -233,22 +233,29 @@ export class RenderablesCacheImpl extends MessageHandlerReflective implements Re
     this.preloadTask = this.scheduler.addTask(this.prebuild());
   }
 
-  private * prebuild() {
+  private * prebuild(): SchedulerTask {
+    let handle = yield;
+    handle.setDescription('Prebuild...');
     const board = this.ctx.board();
     for (let i = 0; i < board.sectors.length; i++) {
       this.geometry.sector(i);
       this.topdown.sector(i);
-      yield;
+      handle.setDescription(`Prebuild. Sector ${i}`);
+      handle = yield;
     }
+    handle.setProgress(33);
     for (let i = 0; i < board.walls.length; i++) {
       this.geometry.wall(i);
       this.helpers.wall(i);
-      yield;
+      handle.setDescription(`Prebuild. Wall ${i}`);
+      handle = yield;
     }
+    handle.setProgress(66);
     for (let i = 0; i < board.sprites.length; i++) {
       this.geometry.sprite(i);
       this.topdown.sprite(i);
-      yield;
+      handle.setDescription(`Prebuild. Sprite ${i}`);
+      handle = yield;
     }
   }
 

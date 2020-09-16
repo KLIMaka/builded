@@ -283,3 +283,9 @@ export function addDragAndDrop(elem: HTMLElement, dropHandler: (e: DragEvent) =>
     dropHandler(e);
   }, false);
 }
+
+export function replaceContent(root: HTMLElement, newchild: HTMLElement) {
+  const child = root.firstChild;
+  if (child) root.replaceChild(newchild, child);
+  else root.appendChild(newchild);
+}

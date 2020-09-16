@@ -71,11 +71,14 @@ export interface GridController {
 export const GRID = new Dependency<GridController>('GridController');
 
 
+export type SchedulerTask = Generator<void, void, TaskHandle>;
 
 export interface TaskHandle {
   stop(): void;
   getDescription(): string;
   getProgress(): number;
+  setDescription(s: string): void;
+  setProgress(p: number): void;
 }
 
 export interface ScheddulerHandler {
@@ -85,8 +88,9 @@ export interface ScheddulerHandler {
 }
 
 export interface Scheduler {
-  addTask(task: Generator): TaskHandle;
+  addTask(task: SchedulerTask): TaskHandle;
   addHandler(handler: ScheddulerHandler): void;
   removeHandler(handler: ScheddulerHandler): void;
+  currentTasks(): Iterable<TaskHandle>;
 }
 export const SCHEDULER = new Dependency<Scheduler>('Scheduler');

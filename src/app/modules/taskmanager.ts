@@ -1,8 +1,8 @@
 import { create, Injector } from "../../utils/injector";
 import { iter } from "../../utils/iter";
 import { GridModel, renderGrid } from "../../utils/ui/renderers";
-import { div, Element, tag } from "../../utils/ui/ui";
-import { ScheddulerHandler, Scheduler, SCHEDULER, TaskHandle } from "../apis/app";
+import { div, Element, replaceContent, span, tag } from "../../utils/ui/ui";
+import { ScheddulerHandler, Scheduler, SCHEDULER, SchedulerTask, TaskHandle } from "../apis/app";
 import { BUS } from "../apis/handler";
 import { UI, Ui, Window } from "../apis/ui";
 import { namedMessageHandler } from "../edit/messages";
@@ -16,30 +16,39 @@ class TaskWidget {
 }
 
 function TaskWidgetRenderer(w: TaskWidget): Element {
-  const progress = tag('progress').attr('max', "100");
-  const cancel = div('cancel').text("X").click(() => w.handle.stop());
-  const descr = div('description');
+  const progress = tag('progress')
+    .css('width', '90%')
+    .css('height', '30px')
+    .attr('max', "100");
+  const cancel = span()
+    .className('icon icon-cancel-circled')
+    .css('font-size', '20px')
+    .css('color', '#666')
+    .css('float', 'right')
+    .click(() => w.handle.stop());
+  const descr = div('description')
+    .css('padding-left', '10px');
+  const container = div('task-container')
+    .css('width', 'auto')
+    .append(progress)
+    .append(descr);
   w.setUpdateHandler((s, p) => {
     progress.attr('value', p);
     descr.text(s);
   });
-  const widget = div('task')
-    .append(progress)
-    .append(descr)
-    .append(cancel);
-  return widget;
+  return div('task').append(cancel).append(container);
 }
 
 class TaskManager implements ScheddulerHandler {
   private tasks: TaskHandle[] = [];
   private taskWidgets: TaskWidget[] = [];
   private window: Window;
+  private active = false;
 
   constructor(
     ui: Ui,
     scheduler: Scheduler
   ) {
-    scheduler.addHandler(this);
     this.window = ui.builder.window()
       .title('Tasks')
       .draggable(true)
@@ -47,6 +56,9 @@ class TaskManager implements ScheddulerHandler {
       .centered(true)
       .size(600, 600)
       .build();
+    this.window.onclose = () => this.active = false;
+    scheduler.addHandler(this);
+    for (const task of scheduler.currentTasks()) this.onTaskAdd(task);
   }
 
   onTaskAdd(task: TaskHandle): void {
@@ -65,6 +77,7 @@ class TaskManager implements ScheddulerHandler {
   }
 
   onTaskUpdate(task: TaskHandle): void {
+    if (!this.active) return;
     const idx = this.tasks.indexOf(task);
     if (idx != -1) this.taskWidgets[idx].update();
   }
@@ -81,17 +94,12 @@ class TaskManager implements ScheddulerHandler {
   }
 
   private async refreshGrid() {
-    const table = await renderGrid(this.gridModel);
-    this.replaceContent(table.elem());
-  }
-
-  private replaceContent(newContent: HTMLElement) {
-    const content = this.window.contentElement.firstChild
-    if (content) this.window.contentElement.replaceChild(newContent, content);
-    else this.window.contentElement.appendChild(newContent);
+    if (!this.active) return;
+    replaceContent(this.window.contentElement, (await renderGrid(this.gridModel)).elem());
   }
 
   public async show() {
+    this.active = true;
     await this.refreshGrid();
     this.window.show()
   }
@@ -108,7 +116,18 @@ export async function showTasks(injector: Injector) {
   browser.show();
 }
 
+function* task(): SchedulerTask {
+  let handler = yield;
+  for (let i = 0; i < 100; i++) {
+    handler.setDescription(`Task ${i}%`);
+    handler.setProgress(i);
+    yield;
+  }
+}
+
 export async function TaskManagerModule(injector: Injector) {
   const bus = await injector.getInstance(BUS);
+  const scheduler = await injector.getInstance(SCHEDULER);
   bus.connect(namedMessageHandler('show_tasks', () => showTasks(injector)));
+  bus.connect(namedMessageHandler('add_test_task', () => scheduler.addTask(task())));
 }

@@ -16,7 +16,7 @@ test('quad', () => {
     const hull = buildHull(shift(points, i), proj);
     expect(hull.length).toBe(2);
     expect(hull[0]).toStrictEqual(new Point(0, 0, 0, 100, 0));
-    expect(hull[1]).toStrictEqual(new Point(100, 0, 0, 100, 0, -100));
+    expect(hull[1]).toStrictEqual(new Point(100, 0, 0, 100, 0));
   }
 })
 
@@ -26,9 +26,9 @@ test('tri', () => {
   for (let i = 0; i < points.length; i++) {
     const hull = buildHull(shift(points, i), proj);
     expect(hull.length).toBe(3);
-    expect(hull[0]).toStrictEqual(new Point(0, 0, 0, 0));
+    expect(hull[0]).toStrictEqual(new Point(0, 0, 0, 0, 0));
     expect(hull[1]).toStrictEqual(new Point(50, 0, 0, 100, 0));
-    expect(hull[2]).toStrictEqual(new Point(100, 0, 0, 0));
+    expect(hull[2]).toStrictEqual(new Point(100, 0, 0, 0, 0));
   }
 })
 
@@ -40,7 +40,7 @@ test('home', () => {
     expect(hull.length).toBe(3);
     expect(hull[0]).toStrictEqual(new Point(0, 0, 0, 100, 0));
     expect(hull[1]).toStrictEqual(new Point(50, 0, 0, 150, 0));
-    expect(hull[2]).toStrictEqual(new Point(100, 0, 0, 100, 0, -100));
+    expect(hull[2]).toStrictEqual(new Point(100, 0, 0, 100, 0, 0));
   }
 })
 
@@ -51,7 +51,7 @@ test('L', () => {
     expect(hull.length).toBe(3);
     expect(hull[0]).toStrictEqual(new Point(0, 0, 0, 100, 0));
     expect(hull[1]).toStrictEqual(new Point(50, 0, 0, 100, 0, -50));
-    expect(hull[2]).toStrictEqual(new Point(100, 0, 0, 50, 0, -50));
+    expect(hull[2]).toStrictEqual(new Point(100, 0, 0, 50, 0, 0));
   }
 })
 
@@ -63,7 +63,7 @@ test('U', () => {
     expect(hull[0]).toStrictEqual(new Point(0, 0, 0, 100, 0));
     expect(hull[1]).toStrictEqual(new Point(50, 0, 0, 100, 0, -50));
     expect(hull[2]).toStrictEqual(new Point(100, 0, 0, 50, 0, 50));
-    expect(hull[3]).toStrictEqual(new Point(150, 0, 0, 100, 0, -100));
+    expect(hull[3]).toStrictEqual(new Point(150, 0, 0, 100, 0, 0));
   }
 })
 
@@ -75,6 +75,6 @@ test('П', () => {
     expect(hull[0]).toStrictEqual(new Point(0, 0, 0, 100, 0));
     expect(hull[1]).toStrictEqual(new Point(50, 0, 0, 100, 0, 0, 50));
     expect(hull[2]).toStrictEqual(new Point(100, 0, 0, 100, 50, 0, -50));
-    expect(hull[3]).toStrictEqual(new Point(150, 0, 0, 100, 0, -100));
+    expect(hull[3]).toStrictEqual(new Point(150, 0, 0, 100, 0, 0));
   }
 })

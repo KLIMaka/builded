@@ -60,6 +60,7 @@ function splitSectorImpl(board: Board, sectorId: number, firstWall: number, last
     .filter(w => usedWalls.includes(board.walls[w]))
     .forEach(w => board.walls[w] = null);
   oldSectorBuilder.build(board, sectorId, refs);
+  return newSectorId;
 }
 
 const POINT_MAPPER = (w: Wall) => <point2d>[w.x, w.y];
@@ -77,9 +78,8 @@ function checkPointsOrder(board: Board, firstWall: number, lastWall: number, poi
 
 export function splitSector(board: Board, sectorId: number, points: Collection<point2d>, refs: BuildReferenceTracker) {
   const [firstWall, lastWall, loop] = checkSplitSector(board, sectorId, points);
-  if (checkPointsOrder(board, firstWall, lastWall, points)) {
-    splitSectorImpl(board, sectorId, firstWall, lastWall, loop, points, refs);
-  } else {
-    splitSectorImpl(board, sectorId, lastWall, firstWall, loop, wrap([...reversed(points)]), refs);
-  }
+  if (checkPointsOrder(board, firstWall, lastWall, points))
+    return splitSectorImpl(board, sectorId, firstWall, lastWall, loop, points, refs);
+  else
+    return splitSectorImpl(board, sectorId, lastWall, firstWall, loop, wrap([...reversed(points)]), refs);
 }

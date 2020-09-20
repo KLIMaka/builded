@@ -1,14 +1,18 @@
+import { wallInSector } from "../../../build/board/internal";
+import { splitSector } from "../../../build/board/splitsector";
 import { Board } from "../../../build/board/structs";
-import { createSlopeCalculator, sectorOfWall, ZSCALE } from "../../../build/utils";
-import { vec2 } from "../../../libs_js/glmatrix";
+import { closestWallSegmentInSector, createNewSector, lastwall, setFirstWall, splitWall } from "../../../build/boardutils";
+import { ANGSCALE, createSlopeCalculator, sectorOfWall, wallNormal, ZSCALE } from "../../../build/utils";
+import { vec2, vec3 } from "../../../libs_js/glmatrix";
+import { Deck } from "../../../utils/collections";
 import { create, Injector } from "../../../utils/injector";
-import { cyclic } from "../../../utils/mathutils";
+import { cyclic, int } from "../../../utils/mathutils";
 import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
 import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
 import { Renderables } from "../../apis/renderable";
 import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
 import { LineBuilder } from "../../modules/gl/buffers";
-import { Frame, NamedMessage, Render } from "../messages";
+import { BoardInvalidate, COMMIT, Frame, NamedMessage, Render } from "../messages";
 
 export type point_3d = [number, number, number];
 export type projector = (x: number, y: number) => [number, number, number];
@@ -76,14 +80,12 @@ class HullPoint {
   addLine(z1: number, z2: number) {
     if (z1 == Number.MAX_VALUE || z1 == -Number.MAX_VALUE) return;
     if (z1 > this.upline[0] || (z1 == this.upline[0] && z2 > this.upline[1])) {
-      const lastup0 = this.upline[0];
-      const lastup1 = this.upline[1];
+      const [lastup0, lastup1] = this.upline;
       this.upline[0] = z1;
       this.upline[1] = z2;
       this.addLine(lastup0, lastup1);
     } else if (z1 < this.downline[0] || (z1 == this.downline[0] && z2 < this.downline[1])) {
-      const lastdown0 = this.downline[0];
-      const lastdown1 = this.downline[1];
+      const [lastdown0, lastdown1] = this.downline;
       this.downline[0] = z1;
       this.downline[1] = z2;
       this.addLine(lastdown0, lastdown1);
@@ -105,6 +107,7 @@ export class Point {
 
 enum PortalType { UP, DOWN, MID };
 class PortalModel {
+  private wallId: number;
   private wallVec = vec2.create();
   private startPoint = vec2.create();
   private type: PortalType;
@@ -116,7 +119,6 @@ class PortalModel {
 
   constructor(
     factory: BuildersFactory,
-    private art: ArtProvider,
     private contour = factory.wireframe('utils'),
     private contourPoints = factory.pointSprite('utils'),
     private length = factory.pointSprite('utils'),
@@ -128,6 +130,7 @@ class PortalModel {
   public start(board: Board, wallId: number, x: number, y: number, z: number) {
     this.pointer = [x, y, z];
     this.points = [];
+    this.wallId = wallId;
     const wall = board.walls[wallId];
     const wall2 = board.walls[wall.point2];
     vec2.set(this.wallVec, wall2.x - wall.x, wall2.y - wall.y);
@@ -158,8 +161,66 @@ class PortalModel {
     this.addPoint();
   }
 
-  public stop() {
+  public stop(board: Board, art: ArtProvider, refs: BuildReferenceTracker) {
+    const hull = buildHull([...this.points, this.pointer], (x, y) => this.project(x, y));
+    const [nx, , ny] = wallNormal(vec3.create(), board, this.wallId);
+    const sectorId = sectorOfWall(board, this.wallId);
+    for (const p of hull) splitWall(board, closestWallSegmentInSector(board, sectorId, p.x, p.y, 0), p.x, p.y, art, refs);
+    if (this.type == PortalType.MID) this.mid(hull, nx, ny, board, refs);
+    else if (this.type == PortalType.DOWN) this.nonMid(hull, nx, ny, sectorId, board, refs, true);
+    else if (this.type == PortalType.UP) this.nonMid(hull, nx, ny, sectorId, board, refs, false);
+  }
 
+  private nonMid(hull: Point[], nx: number, ny: number, sectorId: number, board: Board, refs: BuildReferenceTracker, down: boolean) {
+    for (let i = 0; i < hull.length - 1; i++) {
+      const p1 = hull[i];
+      const p2 = hull[i + 1];
+      const points = new Deck<[number, number]>();
+      if (i == 0) points.push([int(p1.x), int(p1.y)]);
+      points
+        .push([int(p1.x + nx * 128), int(p1.y + ny * 128)])
+        .push([int(p2.x + nx * 128), int(p2.y + ny * 128)])
+        .push([int(p2.x), int(p2.y)])
+      const sec = splitSector(board, sectorId, points, refs);
+      const sector = board.sectors[sec];
+      const firsWall = lastwall(board, wallInSector(board, sec, int(p1.x), int(p1.y)));
+      setFirstWall(board, sec, firsWall, refs);
+      const doff = p2.off - p1.off;
+      const z = down ? p1.zup + p1.zupoff : p1.zdown + p1.zdownoff;
+      const k = down ? (p2.zup - z) / doff : (p2.zdown - z) / doff;
+      if (down) {
+        sector.floorz = int(z * ZSCALE);
+        sector.floorheinum = -int(k / ANGSCALE);
+      } else {
+        sector.ceilingz = int(z * ZSCALE);
+        sector.ceilingheinum = -int(k / ANGSCALE);
+      }
+    }
+  }
+
+  private mid(hull: Point[], nx: number, ny: number, board: Board, refs: BuildReferenceTracker) {
+    for (let i = 0; i < hull.length - 1; i++) {
+      const p1 = hull[i];
+      const p2 = hull[i + 1];
+      const points = new Deck<[number, number]>()
+        .push([int(p1.x), int(p1.y)])
+        .push([int(p2.x), int(p2.y)])
+        .push([int(p2.x - nx * 128), int(p2.y - ny * 128)])
+        .push([int(p1.x - nx * 128), int(p1.y - ny * 128)]);
+      const sec = createNewSector(board, points, refs);
+      const sector = board.sectors[sec];
+      const firsWall = wallInSector(board, sec, int(p1.x), int(p1.y));
+      setFirstWall(board, sec, firsWall, refs);
+      const doff = p2.off - p1.off;
+      const floorz = p1.zdown + p1.zdownoff;
+      const ceilingz = p1.zup + p1.zupoff;
+      const floork = (p2.zdown - floorz) / doff;
+      const ceilingk = (p2.zup - ceilingz) / doff;
+      sector.floorz = int(floorz * ZSCALE);
+      sector.ceilingz = int(ceilingz * ZSCALE);
+      sector.floorheinum = -int(floork / ANGSCALE);
+      sector.ceilingheinum = -int(ceilingk / ANGSCALE);
+    }
   }
 
   private project(x: number, y: number): point_3d {
@@ -195,6 +256,11 @@ class PortalModel {
   public addPoint() {
     this.points.push(this.pointer);
     this.pointer = [...this.pointer];
+    this.needToUpdate = true;
+  }
+
+  public popPoint() {
+    this.points.pop();
     this.needToUpdate = true;
   }
 
@@ -266,14 +332,22 @@ export class DrawWall extends MessageHandlerReflective {
     private refs: BuildReferenceTracker,
     private bus: MessageBus,
     private art: ArtProvider,
-    private portal = new PortalModel(factory, art),
+    private portal = new PortalModel(factory),
   ) { super() }
 
   private start() {
     const target = this.view.snapTarget();
     if (target.entity == null || !target.entity.isWall()) return;
-    this.portal.start(this.board(), target.entity.id, target.coords[0], target.coords[1], target.coords[2]);
+    const [x, y, z] = target.coords;
+    this.portal.start(this.board(), target.entity.id, x, y, z);
     this.wallId = target.entity.id;
+  }
+
+  private stop() {
+    this.portal.stop(this.board(), this.art, this.refs);
+    this.wallId = -1;
+    this.bus.handle(COMMIT);
+    this.bus.handle(new BoardInvalidate(null));
   }
 
   private insertPoint() {
@@ -282,13 +356,15 @@ export class DrawWall extends MessageHandlerReflective {
   }
 
   private popPoint() {
-
+    if (this.wallId == -1) return;
+    else this.portal.popPoint();
   }
 
   public NamedMessage(msg: NamedMessage) {
     switch (msg.name) {
       case 'draw_point': this.insertPoint(); return;
       case 'undo_draw_point': this.popPoint(); return;
+      case 'draw_portal': this.stop(); return;
     }
   }
 

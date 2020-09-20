@@ -4,7 +4,7 @@ import { vec3 } from '../libs_js/glmatrix';
 import { all, Collection, cyclicPairs, cyclicRange, Deck, enumerate, IndexedDeck, interpolate, intersect, loopPairs, map, reverse, wrap } from '../utils/collections';
 import { NumberInterpolator } from '../utils/interpolator';
 import { iter } from '../utils/iter';
-import { cross2d, cyclic, int, len2d, lenPointToLine, tuple2, tuple4 } from '../utils/mathutils';
+import { cross2d, cyclic, EPS, int, len2d, lenPointToLine, tuple2, tuple4 } from '../utils/mathutils';
 import { copySector, copySprite, copyWall, loopPoints, loopWalls, moveWalls, newSector, newSprite, newWall, resizeWalls, SectorBuilder } from './board/internal';
 import { Board, Sector, Sprite, Wall } from './board/structs';
 import { ArtInfoProvider } from './formats/art';
@@ -102,7 +102,7 @@ export function closestWallSegmentInSectorDist(board: Board, secId: number, x: n
 
 export function closestWallSegmentInSector(board: Board, secId: number, x: number, y: number, d: number): number {
   const [w, dist] = closestWallSegmentInSectorDist(board, secId, x, y);
-  return dist <= d ? w : -1;
+  return Math.abs(dist - d) < EPS ? w : -1;
 }
 
 const closestSpriteInSectorDist_: [number, number] = [0, 0];
@@ -212,7 +212,7 @@ function fixpoint2xpan(board: Board, wallId: number, art: ArtInfoProvider) {
   wall2.xpanning = ((wall.xpanning + (wall.xrepeat << 3)) % art.getInfo(wall.picnum).w) & 0xff;
 }
 
-export function insertWall(board: Board, wallId: number, x: number, y: number, art: ArtInfoProvider, refs: BuildReferenceTracker): number {
+function insertWall(board: Board, wallId: number, x: number, y: number, art: ArtInfoProvider, refs: BuildReferenceTracker): number {
   let secId = sectorOfWall(board, wallId);
   let wall = board.walls[wallId];
   let lenperrep = walllen(board, wallId) / Math.max(wall.xrepeat, 1);
@@ -643,6 +643,7 @@ export function createNewSector(board: Board, points: Collection<[number, number
   let walls = createNewWalls(points, mwalls, commonWall, board);
   new SectorBuilder().addLoop(walls).build(board, sectorId, refs);
   for (let w = sector.wallptr; w < sector.wallptr + sector.wallnum; w++) fixxrepeat(board, w);
+  return sectorId;
 }
 
 export function createInnerLoop(board: Board, sectorId: number, points: Collection<[number, number]>, refs: BuildReferenceTracker) {

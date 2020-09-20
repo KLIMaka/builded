@@ -299,18 +299,24 @@ export class Boardrenderer3D {
     PROFILE.endProfile();
 
     PROFILE.startProfile('draw');
+    this.drawImpl();
+    PROFILE.endProfile();
+  }
 
+  private drawImpl() {
     this.bgl.draw(this.surfaces);
+    this.bgl.flush();
     polyOffsetOn(this.bgl);
     this.bgl.draw(this.sprites);
+    this.bgl.flush();
     polyOffsetOff(this.bgl);
     blendOn(this.bgl);
     this.bgl.draw(this.surfacesTrans);
+    this.bgl.flush();
     polyOffsetOn(this.bgl);
     this.bgl.draw(this.spritesTrans);
+    this.bgl.flush();
     polyOffsetOff(this.bgl);
     blendOff(this.bgl);
-
-    PROFILE.endProfile();
   }
 }

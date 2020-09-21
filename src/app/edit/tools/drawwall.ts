@@ -1,17 +1,18 @@
 import { wallInSector } from "../../../build/board/internal";
 import { splitSector } from "../../../build/board/splitsector";
-import { Board } from "../../../build/board/structs";
-import { closestWallSegmentInSector, createNewSector, lastwall, setFirstWall, splitWall } from "../../../build/boardutils";
-import { ANGSCALE, createSlopeCalculator, sectorOfWall, wallNormal, ZSCALE } from "../../../build/utils";
+import { Board, Sector } from "../../../build/board/structs";
+import { closestWallSegmentInSector, createNewSector, lastwall, nextwall, setFirstWall, splitWall } from "../../../build/boardutils";
+import { ANGSCALE, build2gl, createSlopeCalculator, sectorOfWall, sectorWalls, wallNormal, ZSCALE } from "../../../build/utils";
 import { vec2, vec3 } from "../../../libs_js/glmatrix";
 import { Deck } from "../../../utils/collections";
 import { create, Injector } from "../../../utils/injector";
-import { cyclic, int } from "../../../utils/mathutils";
-import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
+import { cyclic, dot2d, int } from "../../../utils/mathutils";
+import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, GRID, GridController, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
 import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
 import { Renderables } from "../../apis/renderable";
 import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
 import { LineBuilder } from "../../modules/gl/buffers";
+import { MovingHandle } from "../handle";
 import { BoardInvalidate, COMMIT, Frame, NamedMessage, Render } from "../messages";
 
 export type point_3d = [number, number, number];
@@ -58,13 +59,13 @@ function convert(hull: HullPoint[]) {
   for (let i = 0; i < hull.length; i++) {
     const p = hull[i];
     if (i == 0) {
-      newHull.push(new Point(p.off, p.x, p.y, p.upline[0], p.downline[0]));
+      newHull.push(new Point(p.off, int(p.x), int(p.y), int(p.upline[0]), int(p.downline[0])));
     } else if (i == hull.length - 1) {
-      newHull.push(new Point(p.off, p.x, p.y, lastUp, lastDown));
+      newHull.push(new Point(p.off, int(p.x), int(p.y), int(lastUp), int(lastDown)));
     } else {
       const upoff = p.upline[0] - lastUp;
       const downoff = p.downline[0] - lastDown;
-      newHull.push(new Point(p.off, p.x, p.y, lastUp, lastDown, upoff, downoff));
+      newHull.push(new Point(p.off, int(p.x), int(p.y), int(lastUp), int(lastDown), int(upoff), int(downoff)));
     }
     lastUp = p.upline[1];
     lastDown = p.downline[1];
@@ -109,6 +110,7 @@ enum PortalType { UP, DOWN, MID };
 class PortalModel {
   private wallId: number;
   private wallVec = vec2.create();
+  private wallNormal = vec2.create();
   private startPoint = vec2.create();
   private type: PortalType;
   private points: point_3d[] = [];
@@ -116,6 +118,7 @@ class PortalModel {
   private slope: (x: number, y: number) => number;
   private needToUpdate = true;
   private lastMove: point_3d = [0, 0, 0];
+  private lastDistance = 0;
 
   constructor(
     factory: BuildersFactory,
@@ -125,7 +128,14 @@ class PortalModel {
     private renderable = new Renderables([contour, contourPoints, length])
   ) { }
 
-  public getRenderable() { this.update(); return this.renderable }
+  public getRenderable(distance: number) {
+    if (this.lastDistance != distance) {
+      this.lastDistance = distance;
+      this.needToUpdate = true;
+    }
+    this.update();
+    return this.renderable
+  }
 
   public start(board: Board, wallId: number, x: number, y: number, z: number) {
     this.pointer = [x, y, z];
@@ -135,6 +145,8 @@ class PortalModel {
     const wall2 = board.walls[wall.point2];
     vec2.set(this.wallVec, wall2.x - wall.x, wall2.y - wall.y);
     vec2.normalize(this.wallVec, this.wallVec);
+    const [nx, , ny] = wallNormal(vec3.create(), board, wallId);
+    vec2.set(this.wallNormal, nx, ny);
     vec2.set(this.startPoint, wall.x, wall.y);
     const sectorId = sectorOfWall(board, wallId);
     const sector = board.sectors[sectorId];
@@ -161,29 +173,30 @@ class PortalModel {
     this.addPoint();
   }
 
-  public stop(board: Board, art: ArtProvider, refs: BuildReferenceTracker) {
+  public stop(board: Board, art: ArtProvider, refs: BuildReferenceTracker, dist: number) {
     const hull = buildHull([...this.points, this.pointer], (x, y) => this.project(x, y));
     const [nx, , ny] = wallNormal(vec3.create(), board, this.wallId);
     const sectorId = sectorOfWall(board, this.wallId);
     for (const p of hull) splitWall(board, closestWallSegmentInSector(board, sectorId, p.x, p.y, 0), p.x, p.y, art, refs);
-    if (this.type == PortalType.MID) this.mid(hull, nx, ny, board, refs);
-    else if (this.type == PortalType.DOWN) this.nonMid(hull, nx, ny, sectorId, board, refs, true);
-    else if (this.type == PortalType.UP) this.nonMid(hull, nx, ny, sectorId, board, refs, false);
+    if (this.type == PortalType.MID) this.mid(dist, hull, nx, ny, sectorId, board, refs);
+    else if (this.type == PortalType.DOWN) this.nonMid(dist, hull, nx, ny, sectorId, board, refs, true);
+    else if (this.type == PortalType.UP) this.nonMid(dist, hull, nx, ny, sectorId, board, refs, false);
   }
 
-  private nonMid(hull: Point[], nx: number, ny: number, sectorId: number, board: Board, refs: BuildReferenceTracker, down: boolean) {
+  private nonMid(dist: number, hull: Point[], nx: number, ny: number, sectorId: number, board: Board, refs: BuildReferenceTracker, down: boolean) {
     for (let i = 0; i < hull.length - 1; i++) {
       const p1 = hull[i];
       const p2 = hull[i + 1];
       const points = new Deck<[number, number]>();
       if (i == 0) points.push([int(p1.x), int(p1.y)]);
       points
-        .push([int(p1.x + nx * 128), int(p1.y + ny * 128)])
-        .push([int(p2.x + nx * 128), int(p2.y + ny * 128)])
+        .push([int(p1.x + nx * dist), int(p1.y + ny * dist)])
+        .push([int(p2.x + nx * dist), int(p2.y + ny * dist)])
         .push([int(p2.x), int(p2.y)])
       const sec = splitSector(board, sectorId, points, refs);
       const sector = board.sectors[sec];
-      const firsWall = lastwall(board, wallInSector(board, sec, int(p1.x), int(p1.y)));
+      const firsWall = lastwall(board, wallInSector(board, sec, int(
+        p1.x), int(p1.y)));
       setFirstWall(board, sec, firsWall, refs);
       const doff = p2.off - p1.off;
       const z = down ? p1.zup + p1.zupoff : p1.zdown + p1.zdownoff;
@@ -198,19 +211,24 @@ class PortalModel {
     }
   }
 
-  private mid(hull: Point[], nx: number, ny: number, board: Board, refs: BuildReferenceTracker) {
+  private findPortalWall(board: Board, formSector: Sector, toSectorId: number): number {
+    for (const w of sectorWalls(formSector)) if (board.walls[w].nextsector == toSectorId) return board.walls[w].nextwall;
+    return -1;
+  }
+
+  private mid(dist: number, hull: Point[], nx: number, ny: number, sectorId: number, board: Board, refs: BuildReferenceTracker) {
     for (let i = 0; i < hull.length - 1; i++) {
       const p1 = hull[i];
       const p2 = hull[i + 1];
       const points = new Deck<[number, number]>()
         .push([int(p1.x), int(p1.y)])
         .push([int(p2.x), int(p2.y)])
-        .push([int(p2.x - nx * 128), int(p2.y - ny * 128)])
-        .push([int(p1.x - nx * 128), int(p1.y - ny * 128)]);
-      const sec = createNewSector(board, points, refs);
-      const sector = board.sectors[sec];
-      const firsWall = wallInSector(board, sec, int(p1.x), int(p1.y));
-      setFirstWall(board, sec, firsWall, refs);
+        .push([int(p2.x - nx * dist), int(p2.y - ny * dist)])
+        .push([int(p1.x - nx * dist), int(p1.y - ny * dist)]);
+      const newSectorId = createNewSector(board, points, refs);
+      const sector = board.sectors[newSectorId];
+      const firsWall = wallInSector(board, newSectorId, int(p1.x), int(p1.y));
+      setFirstWall(board, newSectorId, firsWall, refs);
       const doff = p2.off - p1.off;
       const floorz = p1.zdown + p1.zdownoff;
       const ceilingz = p1.zup + p1.zupoff;
@@ -220,6 +238,8 @@ class PortalModel {
       sector.ceilingz = int(ceilingz * ZSCALE);
       sector.floorheinum = -int(floork / ANGSCALE);
       sector.ceilingheinum = -int(ceilingk / ANGSCALE);
+      const pwall = this.findPortalWall(board, sector, sectorId);
+      board.walls[pwall].cstat.alignBottom = 1;
     }
   }
 
@@ -288,15 +308,15 @@ class PortalModel {
   private buildMid(line: LineBuilder, hull: Point[],) {
     const last = hull[hull.length - 1];
     const first = hull[0];
-    line.segment(last.x, last.zdown, last.y, last.x, last.zup, last.y);
-    line.segment(first.x, first.zdown, first.y, first.x, first.zup, first.y);
+    this.addSegment(line, last.x, last.zdown, last.y, last.x, last.zup, last.y);
+    this.addSegment(line, first.x, first.zdown, first.y, first.x, first.zup, first.y);
     for (let i = 0; i < hull.length - 1; i++) {
       const p1 = hull[i];
       const p2 = hull[i + 1];
-      line.segment(p1.x, p1.zup, p1.y, p1.x, p1.zup + p1.zupoff, p1.y);
-      line.segment(p1.x, p1.zdown, p1.y, p1.x, p1.zdown + p1.zdownoff, p1.y);
-      line.segment(p1.x, p1.zup + p1.zupoff, p1.y, p2.x, p2.zup, p2.y);
-      line.segment(p1.x, p1.zdown + p1.zdownoff, p1.y, p2.x, p2.zdown, p2.y);
+      this.addSegment(line, p1.x, p1.zup, p1.y, p1.x, p1.zup + p1.zupoff, p1.y);
+      this.addSegment(line, p1.x, p1.zdown, p1.y, p1.x, p1.zdown + p1.zdownoff, p1.y);
+      this.addSegment(line, p1.x, p1.zup + p1.zupoff, p1.y, p2.x, p2.zup, p2.y);
+      this.addSegment(line, p1.x, p1.zdown + p1.zdownoff, p1.y, p2.x, p2.zdown, p2.y);
     }
   }
 
@@ -305,25 +325,35 @@ class PortalModel {
     const first = hull[0];
     const lastz = this.slope(last.x, last.y);
     const firstz = this.slope(first.x, first.y);
-    line.segment(last.x, lastz, last.y, last.x, down ? last.zup : last.zdown, last.y);
-    line.segment(first.x, firstz, first.y, first.x, down ? first.zup : first.zdown, first.y);
-    line.segment(last.x, lastz, last.y, first.x, firstz, first.y);
+    this.addSegment(line, last.x, lastz, last.y, last.x, down ? last.zup : last.zdown, last.y);
+    this.addSegment(line, first.x, firstz, first.y, first.x, down ? first.zup : first.zdown, first.y);
+    this.addSegment(line, last.x, lastz, last.y, first.x, firstz, first.y);
     for (let i = 0; i < hull.length - 1; i++) {
       const p1 = hull[i];
       const p2 = hull[i + 1];
-      line.segment(p1.x, down ? p1.zup : p1.zdown, p1.y, p1.x, down ? p1.zup + p1.zupoff : p1.zdown + p1.zdownoff, p1.y);
-      line.segment(p1.x, down ? p1.zup + p1.zupoff : p1.zdown + p1.zdownoff, p1.y, p2.x, down ? p2.zup : p2.zdown, p2.y);
+      this.addSegment(line, p1.x, down ? p1.zup : p1.zdown, p1.y, p1.x, down ? p1.zup + p1.zupoff : p1.zdown + p1.zdownoff, p1.y);
+      this.addSegment(line, p1.x, down ? p1.zup + p1.zupoff : p1.zdown + p1.zdownoff, p1.y, p2.x, down ? p2.zup : p2.zdown, p2.y);
     }
+  }
+
+  private addSegment(line: LineBuilder, x1: number, z1: number, y1: number, x2: number, z2: number, y2: number) {
+    const dx = this.lastDistance * this.wallNormal[0];
+    const dy = this.lastDistance * this.wallNormal[1];
+    line.segment(x1, z1, y1, x2, z2, y2);
+    line.segment(x1 + dx, z1, y1 + dy, x2 + dx, z2, y2 + dy);
+    line.segment(x1 + dx, z1, y1 + dy, x1, z1, y1);
+    line.segment(x2 + dx, z2, y2 + dy, x2, z2, y2);
   }
 }
 
 export async function DrawWallModule(injector: Injector) {
   const bus = await injector.getInstance(BUS);
-  bus.connect(await create(injector, DrawWall, BUILDERS_FACTORY, VIEW, BOARD, REFERENCE_TRACKER, BUS, ART));
+  bus.connect(await create(injector, DrawWall, BUILDERS_FACTORY, VIEW, BOARD, REFERENCE_TRACKER, BUS, ART, GRID));
 }
 
 export class DrawWall extends MessageHandlerReflective {
   private wallId = -1;
+  private movingHandle = new MovingHandle();
 
   constructor(
     factory: BuildersFactory,
@@ -332,6 +362,7 @@ export class DrawWall extends MessageHandlerReflective {
     private refs: BuildReferenceTracker,
     private bus: MessageBus,
     private art: ArtProvider,
+    private grid: GridController,
     private portal = new PortalModel(factory),
   ) { super() }
 
@@ -344,10 +375,11 @@ export class DrawWall extends MessageHandlerReflective {
   }
 
   private stop() {
-    this.portal.stop(this.board(), this.art, this.refs);
+    this.portal.stop(this.board(), this.art, this.refs, this.getDistance());
     this.wallId = -1;
     this.bus.handle(COMMIT);
     this.bus.handle(new BoardInvalidate(null));
+    this.movingHandle.stop();
   }
 
   private insertPoint() {
@@ -360,23 +392,45 @@ export class DrawWall extends MessageHandlerReflective {
     else this.portal.popPoint();
   }
 
+  private pushPortal() {
+    const target = this.view.snapTarget();
+    this.movingHandle.start(build2gl(vec3.create(), target.coords));
+  }
+
+  private _wallNormal = vec3.create();
+  private getDistance(): number {
+    if (!this.movingHandle.isActive()) return 0;
+    const dx = this.movingHandle.dx;
+    const dy = this.movingHandle.dy;
+    const [nx, , ny] = wallNormal(this._wallNormal, this.board(), this.wallId);
+    return this.grid.snap(dot2d(nx, ny, dx, dy));
+  }
+
   public NamedMessage(msg: NamedMessage) {
     switch (msg.name) {
       case 'draw_point': this.insertPoint(); return;
       case 'undo_draw_point': this.popPoint(); return;
+      case 'push_portal': this.pushPortal(); return;
       case 'draw_portal': this.stop(); return;
     }
   }
 
+  private _start = vec3.create();
+  private _dir = vec3.create();
   public Frame(msg: Frame) {
-    if (this.wallId != -1) {
+    if (this.wallId == -1) return;
+    if (this.movingHandle.isActive()) {
+      const { start, dir } = this.view.dir();
+      this.movingHandle.update(false, false, build2gl(this._start, start), build2gl(this._dir, dir));
+    } else {
       const target = this.view.snapTarget();
-      this.portal.move(target.coords[0], target.coords[1], target.coords[2])
+      const [x, y, z] = target.coords;
+      this.portal.move(x, y, z);
     }
   }
 
   public Render(msg: Render) {
     if (this.wallId == -1) return;
-    msg.consumer(this.portal.getRenderable());
+    msg.consumer(this.portal.getRenderable(this.getDistance()));
   }
 }

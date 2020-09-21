@@ -23,6 +23,5 @@ module.exports = {
     publicPath: '/distr/',
     compress: true,
     port: 9000,
-    writeToDisk: true,
   }
 };

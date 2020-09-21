@@ -1,7 +1,7 @@
 import tippy from "tippy.js";
 import { MenuBuilder } from "../../app/apis/ui";
 import { iter } from "../iter";
-import { div, Element, span, Table, tag } from "./ui";
+import { div, Element, replaceContent, span, Table, tag } from "./ui";
 
 export type ColumnRenderer<T> = (value: T) => Element;
 
@@ -125,8 +125,7 @@ export function search(hint: string, change: (s: string) => void): SerachBar {
     updateSuggestions(model: SuggestionModel) {
       suggestModel = model
       const sugg = suggestContainer.elem();
-      if (sugg.firstChild != null) sugg.replaceChild(sugg.firstChild, model.widget);
-      else sugg.appendChild(model.widget);
+      replaceContent(sugg, model.widget);
       inst.show();
     },
   }

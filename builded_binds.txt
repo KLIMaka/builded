@@ -47,6 +47,7 @@ SHIFT+SPACE     draw_rect_wall
 BACKSPACE       undo_draw_wall
 G               draw_point
 H               draw_portal
+B               push_portal
 [               grid+
 ]               grid-
 J               join_sectors

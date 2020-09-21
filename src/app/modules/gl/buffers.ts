@@ -64,14 +64,15 @@ export class PointSpritesBuilder {
 }
 
 export class LineBuilder {
-  private vtxIndex: string[] = [];
+  private vtxIndex: Map<string, number> = new Map();
+  private linesIndex: Set<string> = new Set();
   private vtxs: [number, number, number][] = [];
   private lines: [number, number][] = [];
 
   public segment(x1: number, y1: number, z1: number, x2: number, y2: number, z2: number) {
     const idx1 = this.addVtx(x1, y1, z1);
     const idx2 = this.addVtx(x2, y2, z2);
-    this.lines.push([idx1, idx2]);
+    this.addLine(idx1, idx2);
   }
 
   public rect(
@@ -100,13 +101,23 @@ export class LineBuilder {
 
   private addVtx(x: number, y: number, z: number): number {
     const key = `${x},${y},${z}`;
-    let idx = this.vtxIndex.indexOf(key);
-    if (idx == -1) {
+    let idx = this.vtxIndex.get(key);
+    if (idx == undefined) {
       idx = this.vtxs.length;
-      this.vtxIndex.push(key);
+      this.vtxIndex.set(key, idx);
       this.vtxs.push([x, y, z]);
     }
     return idx;
+  }
+
+  private addLine(idx1: number, idx2: number) {
+    if (idx1 == idx2) return;
+    const key = `${idx1},${idx2}`;
+    this.linesIndex.has(key);
+    if (!this.linesIndex.has(key)) {
+      this.linesIndex.add(key);
+      this.lines.push([idx1, idx2]);
+    }
   }
 }
 

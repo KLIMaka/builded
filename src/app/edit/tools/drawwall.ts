@@ -59,13 +59,13 @@ function convert(hull: HullPoint[]) {
   for (let i = 0; i < hull.length; i++) {
     const p = hull[i];
     if (i == 0) {
-      newHull.push(new Point(p.off, int(p.x), int(p.y), int(p.upline[0]), int(p.downline[0])));
+      newHull.push(new Point(p.off, int(p.x), int(p.y), p.upline[0], p.downline[0]));
     } else if (i == hull.length - 1) {
-      newHull.push(new Point(p.off, int(p.x), int(p.y), int(lastUp), int(lastDown)));
+      newHull.push(new Point(p.off, int(p.x), int(p.y), lastUp, lastDown));
     } else {
       const upoff = p.upline[0] - lastUp;
       const downoff = p.downline[0] - lastDown;
-      newHull.push(new Point(p.off, int(p.x), int(p.y), int(lastUp), int(lastDown), int(upoff), int(downoff)));
+      newHull.push(new Point(p.off, int(p.x), int(p.y), lastUp, lastDown, upoff, downoff));
     }
     lastUp = p.upline[1];
     lastDown = p.downline[1];
@@ -188,19 +188,18 @@ class PortalModel {
       const p1 = hull[i];
       const p2 = hull[i + 1];
       const points = new Deck<[number, number]>();
-      if (i == 0) points.push([int(p1.x), int(p1.y)]);
+      if (i == 0) points.push([p1.x, p1.y]);
       points
         .push([int(p1.x + nx * dist), int(p1.y + ny * dist)])
         .push([int(p2.x + nx * dist), int(p2.y + ny * dist)])
-        .push([int(p2.x), int(p2.y)])
+        .push([p2.x, p2.y])
       const sec = splitSector(board, sectorId, points, refs);
       const sector = board.sectors[sec];
-      const firsWall = lastwall(board, wallInSector(board, sec, int(
-        p1.x), int(p1.y)));
+      const firsWall = lastwall(board, wallInSector(board, sec, p1.x, p1.y));
       setFirstWall(board, sec, firsWall, refs);
       const doff = p2.off - p1.off;
       const z = down ? p1.zup + p1.zupoff : p1.zdown + p1.zdownoff;
-      const k = down ? (p2.zup - z) / doff : (p2.zdown - z) / doff;
+      const k = (down ? (p2.zup - z) : (p2.zdown - z)) / doff;
       if (down) {
         sector.floorz = int(z * ZSCALE);
         sector.floorheinum = -int(k / ANGSCALE);
@@ -221,13 +220,13 @@ class PortalModel {
       const p1 = hull[i];
       const p2 = hull[i + 1];
       const points = new Deck<[number, number]>()
-        .push([int(p1.x), int(p1.y)])
-        .push([int(p2.x), int(p2.y)])
-        .push([int(p2.x - nx * dist), int(p2.y - ny * dist)])
-        .push([int(p1.x - nx * dist), int(p1.y - ny * dist)]);
+        .push([p1.x, p1.y])
+        .push([p2.x, p2.y])
+        .push([int(p2.x + nx * dist), int(p2.y + ny * dist)])
+        .push([int(p1.x + nx * dist), int(p1.y + ny * dist)]);
       const newSectorId = createNewSector(board, points, refs);
       const sector = board.sectors[newSectorId];
-      const firsWall = wallInSector(board, newSectorId, int(p1.x), int(p1.y));
+      const firsWall = wallInSector(board, newSectorId, p1.x, p1.y);
       setFirstWall(board, newSectorId, firsWall, refs);
       const doff = p2.off - p1.off;
       const floorz = p1.zdown + p1.zdownoff;

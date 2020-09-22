@@ -542,7 +542,7 @@ export function setFirstWall(board: Board, sectorId: number, newFirstWall: numbe
   const sector = board.sectors[sectorId];
   if (sector.wallptr == newFirstWall) return;
   const end = sector.wallptr + sector.wallnum;
-  if (newFirstWall < sector.wallptr || newFirstWall >= end) return;
+  if (newFirstWall < sector.wallptr || newFirstWall >= end) throw new Error(`Wall ${newFirstWall} not in sector ${sectorId}`);
   const loops = new Deck<Deck<Wall>>();
   const newFirstWallLoop = new Deck<Wall>();
   let currentLoop = new Deck<Wall>();
@@ -618,14 +618,14 @@ function commonSectorWall(board: Board, matched: [number, number][]): [Sector, W
   return [newSector(), newWall(0, 0)];
 }
 
-function* createNewWalls(points: Iterable<[number, number]>, mwalls: [number, number][], commonWall: Wall, board: Board): Generator<Wall> {
-  for (const [p, i] of enumerate(points)) {
-    const m = mwalls[i];
-    const baseWall = m == null ? commonWall : board.walls[m[1]];
-    const wall = copyWall(baseWall, p[0], p[1]);
-    if (m != null) {
-      wall.nextwall = m[1];
-      wall.nextsector = m[0];
+function* createNewWalls(points: Iterable<[number, number]>, matchedWalls: [number, number][], commonWall: Wall, board: Board): Generator<Wall> {
+  for (const [[x, y], i] of enumerate(points)) {
+    const matchedWall = matchedWalls[i];
+    const baseWall = matchedWall == null ? commonWall : board.walls[matchedWall[1]];
+    const wall = copyWall(baseWall, x, y);
+    if (matchedWall != null) {
+      wall.nextwall = matchedWall[1];
+      wall.nextsector = matchedWall[0];
     } else {
       wall.nextwall = -1;
       wall.nextsector = -1;
@@ -647,20 +647,18 @@ export function createNewSector(board: Board, points: Collection<[number, number
 }
 
 export function createInnerLoop(board: Board, sectorId: number, points: Collection<[number, number]>, refs: BuildReferenceTracker) {
-  let sector = board.sectors[sectorId];
+  const sector = board.sectors[sectorId];
   resizeWalls(board, sectorId, sector.wallnum + points.length(), refs);
-  let wallPtr = sector.wallptr + sector.wallnum - points.length();
-  let firstWall = board.walls[sector.wallptr];
+  const wallPtr = sector.wallptr + sector.wallnum - points.length();
+  const firstWall = board.walls[sector.wallptr];
   points = order(points, false);
-  for (let [p, i] of enumerate(points)) {
-    let wall = copyWall(firstWall, p[0], p[1]);
+  for (const [[x, y], i] of enumerate(points)) {
+    const wall = copyWall(firstWall, x, y);
     wall.point2 = i == points.length() - 1 ? wallPtr : wallPtr + i + 1;
     wall.nextsector = wall.nextwall = -1;
     board.walls[wallPtr + i] = wall;
   }
-  for (let w = wallPtr; w < sector.wallptr + sector.wallnum; w++) {
-    fixxrepeat(board, w);
-  }
+  for (let w = wallPtr; w < sector.wallptr + sector.wallnum; w++) fixxrepeat(board, w);
 }
 
 export function isOuterLoop(board: Board, wallId: number) {

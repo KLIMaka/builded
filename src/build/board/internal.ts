@@ -421,6 +421,7 @@ export function addSector(board: Board, sector: Sector) {
 }
 
 export function* wallsBetween(board: Board, from: number, to: number): Generator<Wall> {
+  if (loopStart(board, from) != loopStart(board, to)) throw new Error(`Walls ${from} and ${to} not from one loop`);
   const walls = board.walls;
   for (let w = from; w != to; w = walls[w].point2) yield walls[w];
 }

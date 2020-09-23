@@ -3,7 +3,7 @@ import { Collection, first, last, map, range, reversed, wrap } from '../../utils
 import { iter } from '../../utils/iter';
 import { Board, Wall } from '../board/structs';
 import { inPolygon, sectorWalls } from '../utils';
-import { addSector, clockwise, copySector, createNewWalls, loopPoints, loopStart, loopWalls, SectorBuilder, wallInSector, wallsBetween } from './internal';
+import { addSector, clockwise, copySector, copyWall, createNewWalls, loopPoints, loopStart, loopWalls, SectorBuilder, wallInSector, wallsBetween } from './internal';
 
 type point2d = [number, number];
 
@@ -66,7 +66,7 @@ function splitSectorImpl(board: Board, sectorId: number, firstWall: number, last
 const POINT_MAPPER = (w: Wall) => <point2d>[w.x, w.y];
 function getSplitLoop(board: Board, firstWall: number, lastWall: number, points: Iterable<point2d>): [Iterable<point2d>, Iterable<Wall>, Iterable<point2d>] {
   const newWalls = iter(points).butLast().collect();
-  const existedWalls = [...wallsBetween(board, lastWall, firstWall)];
+  const existedWalls = [...iter(wallsBetween(board, lastWall, firstWall)).map(w => copyWall(w, w.x, w.y))];
   const loopPoly = iter(map(existedWalls, POINT_MAPPER)).chain(newWalls).collect();
   return [newWalls, existedWalls, loopPoly];
 }

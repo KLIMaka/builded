@@ -7,7 +7,7 @@ import { FileBrowserModule } from './app/modules/fs/manager';
 import { ArtEditorModule } from './app/modules/arteditor';
 import { PhotonUiModule } from './app/modules/photonui';
 import { animate, createContextFromCanvas } from './utils/gl/gl';
-import { Injector } from './utils/injector';
+import { RootInjector } from './utils/injector';
 import * as INPUT from './utils/input';
 import { addLogAppender, CONSOLE } from './utils/logger';
 
@@ -15,7 +15,7 @@ addLogAppender(CONSOLE);
 const gl = createContextFromCanvas("display", { alpha: false, antialias: true, stencil: true });
 INPUT.bind(<HTMLCanvasElement>gl.canvas);
 
-const injector = new Injector();
+const injector = new RootInjector();
 injector.bindInstance(GL, gl);
 injector.install(DbFsModule('resources/engines/blood/'));
 injector.install(DefaultSetupModule);

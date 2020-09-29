@@ -1,7 +1,7 @@
 import { Lexer, LexerRule } from "../../../utils/lexer";
 import { Injector } from "../../../utils/injector";
 import { Texture } from "../../../utils/gl/drawstruct";
-import { GL, createIndexedTexture } from "../buildartprovider";
+import { GL, createIndexedTexture, TextureProvider } from "../buildartprovider";
 import { FS } from "../fs/fs";
 import { INDEXED_IMG_LIB } from "../../../utils/imglib";
 import { loadImageFromBuffer, loadImage } from "../../../utils/imgutils";
@@ -32,7 +32,7 @@ async function loadTexture(gl: WebGLRenderingContext, name: string, options: any
   return loadImage(name).then(img => createTexture(img[0], img[1], gl, options, img[2], format, bpp))
 }
 
-export async function DefaultAdditionalTextures(injector: Injector) {
+export async function DefaultAdditionalTextures(injector: Injector): Promise<TextureProvider> {
   const textures: { [index: number]: Texture } = {};
   const [gl, fs, lib] = await Promise.all([injector.getInstance(GL), injector.getInstance(FS), injector.getInstance(INDEXED_IMG_LIB)]);
   const file = await fs.get('texlist.lst');
@@ -58,6 +58,6 @@ export async function DefaultAdditionalTextures(injector: Injector) {
       }
     }
   } finally {
-    return textures;
+    return (id: number) => textures[id];
   }
 }

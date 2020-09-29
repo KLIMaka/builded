@@ -4,8 +4,8 @@ export class Dependency<T> { constructor(readonly name: string, readonly multi =
 export type InstanceProvider<T> = (injector: Injector) => Promise<T>;
 
 export class CircularDependencyError extends Error {
-  constructor(readonly dependencies: Dependency<any>[]) { super() }
-  get message() { return 'Circular dependency detected while trying to resolve ' + this.dependencies.map(d => d.name).join(' -> ') }
+  constructor(readonly dependencies: string[]) { super() }
+  get message() { return 'Circular dependency detected while trying to resolve ' + this.dependencies.join(' -> ') }
   name = 'CircularDependencyError'
   stack = super.stack
 }
@@ -30,62 +30,70 @@ class ChildInjector<T> implements ParentInjector {
   install(module: (injector: Injector) => void): void { this.parent.install(module) }
 }
 
-class DepNode {
-  readonly out = new Set<DepNode>();
-  readonly in = new Set<DepNode>();
+class DependencyNode {
+  readonly dependencies = new Set<DependencyNode>();
   constructor(readonly label: string) { };
 }
 
 class Graph {
-  private nodes = new Map<string, DepNode>();
+  private nodes = new Map<string, DependencyNode>();
 
   private ensureNode(label: string) {
     let node = this.nodes.get(label);
     if (node == undefined) {
-      node = new DepNode(label);
+      node = new DependencyNode(label);
       this.nodes.set(label, node);
     }
     return node;
   }
 
   public add(o: string, i: string) {
-    this.ensureNode(o).out.add(this.ensureNode(i));
-    this.ensureNode(i).in.add(this.ensureNode(o));
+    this.ensureNode(o).dependencies.add(this.ensureNode(i));
   }
 
   public checkCycles() {
-    const valid = new Set<string>();
-    for (const [label, node] of this.nodes) {
-      if (valid.has(label)) continue;
-      const visited = new Set<string>();
-      let current = node;
-      for (const n of node.out) {
-        if (visited.has(n.label)) throw new Error();
-        current = n
+    const colors = new Map<string, string>();
+    const paint = function (node: DependencyNode) {
+      colors.set(node.label, 'gray');
+      for (const child of node.dependencies) {
+        const c = colors.get(child.label);
+        if (c == undefined) {
+          try { paint(child) } catch (e) {
+            if (e instanceof CircularDependencyError) e.dependencies.unshift(child.label);
+            throw e;
+          }
+        }
+        else if (c == 'gray') throw new CircularDependencyError([child.label]);
       }
+      colors.set(node.label, 'black');
+    }
+    for (const [label, node] of this.nodes) {
+      if (colors.has(label)) continue;
+      paint(node);
     }
   }
 }
 
-function add<T>(graph: Graph, dependency: Dependency<T>, injector: Injector) {
-  const chain = [dependency.name];
-  let current = injector;
-  while (current instanceof ChildInjector) {
-    chain.unshift(current.dependency.name);
-    current = current.parent;
-  }
-  chain.unshift('root');
-  for (let i = 0; i < chain.length - 1; i++) graph.add(chain[i], chain[i + 1]);
-
-}
 
 export class RootInjector implements ParentInjector {
   private providers = new Map<Dependency<any>, InstanceProvider<any>[]>();
   private promises = new Map<Dependency<any>, Promise<any>>();
   private graph: Graph = new Graph();
 
+  private add<T>(dependency: Dependency<T>, injector: Injector) {
+    const chain = [dependency.name];
+    let current = injector;
+    while (current instanceof ChildInjector) {
+      chain.unshift(current.dependency.name);
+      current = current.parent;
+    }
+    chain.unshift('root');
+    for (let i = 0; i < chain.length - 1; i++) this.graph.add(chain[i], chain[i + 1]);
+    this.graph.checkCycles();
+  }
+
   public getInstanceParent<T>(dependency: Dependency<T>, injector: ParentInjector): Promise<T> {
-    add(this.graph, dependency, injector);
+    this.add(dependency, injector);
     let instance = this.promises.get(dependency);
     if (instance == undefined) {
       instance = this.create(dependency, injector);

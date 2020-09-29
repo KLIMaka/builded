@@ -18,7 +18,7 @@ function createStream(arr: Uint8Array) {
   return new Stream(arr.buffer, true);
 }
 
-let header1Struct = struct(Header1)
+const header1Struct = struct(Header1)
   .field('startX', int)
   .field('startY', int)
   .field('startZ', int)
@@ -26,7 +26,7 @@ let header1Struct = struct(Header1)
   .field('startSec', short)
   .field('unk', short);
 
-let header2Struct = array(ubyte, 9);
+const header2Struct = array(ubyte, 9);
 
 class Header3 {
   public mapRevisions: number;
@@ -35,13 +35,13 @@ class Header3 {
   public numSprites: number;
 }
 
-let header3Struct = struct(Header3)
+const header3Struct = struct(Header3)
   .field('mapRevisions', int)
   .field('numSectors', short)
   .field('numWalls', short)
   .field('numSprites', short);
 
-let sectorExtraStruct = struct(SectorExtra)
+const sectorExtraStruct = struct(SectorExtra)
   .field('reference', bits(-14))
   .field('state', bits(1))
   .field('busy', bits(17))
@@ -120,7 +120,7 @@ let sectorExtraStruct = struct(SectorExtra)
   .field('bobCeiling', bits(1))
   .field('bobRotate', bits(1));
 
-let wallExtraStruct = struct(WallExtra)
+const wallExtraStruct = struct(WallExtra)
   .field('reference', bits(-14))
   .field('state', bits(1))
   .field('busy', bits(17))
@@ -153,7 +153,7 @@ let wallExtraStruct = struct(WallExtra)
   .field('unk4', bits(4))
   .field('unk5', bits(32));
 
-let spriteExtraStruct = struct(SpriteExtra)
+const spriteExtraStruct = struct(SpriteExtra)
   .field('reference', bits(-14))
   .field('state', bits(1))
   .field('busy', bits(17))

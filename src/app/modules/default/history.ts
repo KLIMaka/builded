@@ -1,9 +1,9 @@
-import { Deck } from "../../../utils/collections";
 import { Board } from "../../../build/board/structs";
+import { Deck } from "../../../utils/collections";
 import { Injector } from "../../../utils/injector";
-import { BoardProvider, BoardManipulator_, DEFAULT_BOARD } from "../../apis/app";
+import { BoardManipulator_, BoardProvider, DEFAULT_BOARD } from "../../apis/app";
 import { BUS, MessageHandlerReflective } from "../../apis/handler";
-import { NamedMessage, INVALIDATE_ALL, LoadBoard } from "../../edit/messages";
+import { INVALIDATE_ALL, LoadBoard, NamedMessage } from "../../edit/messages";
 
 class History {
   private history: Deck<Board> = new Deck();

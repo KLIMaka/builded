@@ -10,7 +10,8 @@ import { ArtProvider } from "../apis/app";
 
 export const GL = new Dependency<WebGLRenderingContext>('GL');
 export const ART_FILES = new Dependency<ArtFiles>('ArtFiles');
-export const TEXTURES_OVERRIDE = new Dependency<{ [index: number]: Texture }>('Textures Override');
+export type TextureProvider = (id: number) => Texture;
+export const TEXTURES_OVERRIDE = new Dependency<TextureProvider>('Textures Override');
 export const PARALLAX_TEXTURES = new Dependency<number>('Number of parallax textures');
 
 export function createIndexedTexture(gl: WebGLRenderingContext, w: number, h: number, arr: Uint8Array, mipmaps = true, lib: IndexedImgLib): Texture {
@@ -67,14 +68,14 @@ export class BuildArtProvider implements ArtProvider {
 
   constructor(
     private arts: ArtFiles,
-    private addTextures: { [index: number]: Texture },
+    private addTextures: TextureProvider,
     private gl: WebGLRenderingContext,
     private parallaxPics: number,
     private lib: IndexedImgLib) {
   }
 
   public get(picnum: number): Texture {
-    const add = this.addTextures[picnum];
+    const add = this.addTextures(picnum);
     if (add != undefined) return add;
     let tex = this.textures[picnum];
     if (tex != undefined) return tex;
@@ -133,7 +134,7 @@ export class BuildArtProvider implements ArtProvider {
   public getInfo(picnum: number): ArtInfo {
     let info = this.infos[picnum];
     if (info != undefined) return info;
-    const add = this.addTextures[picnum];
+    const add = this.addTextures(picnum);
     info = add != undefined
       ? new ArtInfo(add.getWidth(), add.getHeight(), new Attributes(), (<TextureImpl>add).data)
       : this.arts.getInfo(picnum);

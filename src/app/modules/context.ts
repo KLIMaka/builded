@@ -6,9 +6,10 @@ import { IndexedImgLibJsConstructor, INDEXED_IMG_LIB } from '../../utils/imglib'
 import { create, Dependency, Injector } from '../../utils/injector';
 import { InputState } from '../../utils/input';
 import * as PROFILE from '../../utils/profiler';
-import { ART, BOARD, DEFAULT_BOARD, GRID, REFERENCE_TRACKER, State, STATE, STORAGES, View, VIEW, SCHEDULER, Scheduler } from '../apis/app';
+import { ART, BOARD, DEFAULT_BOARD, GRID, REFERENCE_TRACKER, SCHEDULER, Scheduler, State, STATE, STORAGES, View, VIEW } from '../apis/app';
 import { BUS, DefaultMessageBus, MessageBus, MessageHandlerReflective } from '../apis/handler';
 import { Renderable } from '../apis/renderable';
+import { DefaultScheduler } from '../apis/scheduler';
 import { EntityFactoryConstructor, ENTITY_FACTORY } from '../edit/context';
 import { Frame, LoadBoard, Mouse, namedMessageHandler, PostFrame, Render } from '../edit/messages';
 import { DrawSectorModule } from '../edit/tools/drawsector';
@@ -19,8 +20,8 @@ import { PICNUM_SELECTOR, SelectionModule } from '../edit/tools/selection';
 import { UtilsModule } from '../edit/tools/utils';
 import { Binder, loadBinds } from '../input/keymap';
 import { messageParser } from '../input/messageparser';
-import { InfoModule } from './info';
 import { StatusBarModule } from '../modules/statusbar';
+import { TaskManagerModule } from '../modules/taskmanager';
 import { BuildArtProviderConstructor, TEXTURES_OVERRIDE } from './buildartprovider';
 import { DefaultGridController } from './default/grid';
 import { DefaultBoardProviderConstructor } from './default/history';
@@ -31,9 +32,8 @@ import { RenderablesCacheModule } from './geometry/cache';
 import { BUILDERS_FACTORY, DefaultBuildersFactory } from './geometry/common';
 import { BUFFER_FACTORY, DefaultBufferFactory } from './gl/buffers';
 import { BuildGlConstructor, BUILD_GL } from './gl/buildgl';
+import { InfoModule } from './info';
 import { SwappableViewConstructor } from './view/view';
-import { DefaultScheduler } from '../apis/scheduler';
-import { TaskManagerModule } from '../modules/taskmanager';
 
 export const KEYBINDS = new Dependency<string>('KeymapConfig');
 
@@ -58,7 +58,6 @@ async function mapBackupService(injector: Injector) {
 
 async function newMap(injector: Injector) {
   const bus = await injector.getInstance(BUS);
-  const board = await injector.getInstance(BOARD);
   const defaultBoard = await injector.getInstance(DEFAULT_BOARD);
   bus.connect(namedMessageHandler('new_board', () => {
     bus.handle(new LoadBoard(defaultBoard));
@@ -100,7 +99,7 @@ export function DefaultSetupModule(injector: Injector) {
 }
 
 export function MainLoopConstructor(injector: Injector) {
-  return create(injector, MainLoop, VIEW, BUS, STATE, KEYBINDS, SCHEDULER);
+  return create(injector, MainLoop, VIEW, BUS, STATE, KEYBINDS);
 }
 
 function createTools() {
@@ -125,8 +124,7 @@ export class MainLoop extends MessageHandlerReflective {
     private view: View,
     private bus: MessageBus,
     private state: State,
-    private binds: string,
-    private scheduler: Scheduler
+    binds: string,
   ) {
     super();
     this.view = view;

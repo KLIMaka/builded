@@ -1,4 +1,4 @@
-import { connectedWalls, deleteWall, lastwall, mergePoints, moveWall, splitWall } from "../../build/boardutils";
+import { deleteWall, lastwall, mergePoints, moveWall, splitWall } from "../../build/boardutils";
 import { Entity, EntityType } from "../../build/hitscan";
 import { Board } from "../../build/board/structs";
 import { sectorOfWall } from "../../build/utils";
@@ -10,6 +10,7 @@ import { EditContext } from "./context";
 import { invalidateSectorAndWalls } from "./editutils";
 import { BoardInvalidate, EndMove, Flip, Highlight, Move, NamedMessage, Palette, PanRepeat, SetPicnum, Shade, StartMove, COMMIT } from "./messages";
 import { MOVE_COPY } from "./tools/selection";
+import { connectedWalls } from "../../build/board/loops";
 
 function collectConnectedWalls(board: Board, wallId: number) {
   let result = new Deck<number>();

@@ -6,7 +6,7 @@ import { IndexedImgLibJsConstructor, INDEXED_IMG_LIB } from '../../utils/imglib'
 import { create, Dependency, Injector } from '../../utils/injector';
 import { InputState } from '../../utils/input';
 import * as PROFILE from '../../utils/profiler';
-import { ART, BOARD, DEFAULT_BOARD, GRID, REFERENCE_TRACKER, SCHEDULER, Scheduler, State, STATE, STORAGES, View, VIEW } from '../apis/app';
+import { ART, BOARD, DEFAULT_BOARD, GRID, REFERENCE_TRACKER, SCHEDULER, State, STATE, STORAGES, View, VIEW } from '../apis/app';
 import { BUS, DefaultMessageBus, MessageBus, MessageHandlerReflective } from '../apis/handler';
 import { Renderable } from '../apis/renderable';
 import { DefaultScheduler } from '../apis/scheduler';

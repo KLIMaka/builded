@@ -1,8 +1,9 @@
 import { wallInSector } from "../../../build/board/internal";
+import { sectorWalls } from "../../../build/board/loops";
 import { splitSector } from "../../../build/board/splitsector";
 import { Board, Sector } from "../../../build/board/structs";
-import { closestWallSegmentInSector, createNewSector, lastwall, nextwall, setFirstWall, splitWall } from "../../../build/boardutils";
-import { ANGSCALE, build2gl, createSlopeCalculator, sectorOfWall, sectorWalls, wallNormal, ZSCALE } from "../../../build/utils";
+import { closestWallSegmentInSector, createNewSector, lastwall, setFirstWall, splitWall } from "../../../build/boardutils";
+import { ANGSCALE, build2gl, createSlopeCalculator, sectorOfWall, wallNormal, ZSCALE } from "../../../build/utils";
 import { vec2, vec3 } from "../../../libs_js/glmatrix";
 import { Deck } from "../../../utils/collections";
 import { create, Injector } from "../../../utils/injector";
@@ -210,8 +211,8 @@ class PortalModel {
     }
   }
 
-  private findPortalWall(board: Board, formSector: Sector, toSectorId: number): number {
-    for (const w of sectorWalls(formSector)) if (board.walls[w].nextsector == toSectorId) return board.walls[w].nextwall;
+  private findPortalWall(board: Board, fromSectorId: number, toSectorId: number): number {
+    for (const w of sectorWalls(board, fromSectorId)) if (board.walls[w].nextsector == toSectorId) return board.walls[w].nextwall;
     return -1;
   }
 
@@ -237,7 +238,7 @@ class PortalModel {
       sector.ceilingz = int(ceilingz * ZSCALE);
       sector.floorheinum = -int(floork / ANGSCALE);
       sector.ceilingheinum = -int(ceilingk / ANGSCALE);
-      const pwall = this.findPortalWall(board, sector, sectorId);
+      const pwall = this.findPortalWall(board, newSectorId, sectorId);
       board.walls[pwall].cstat.alignBottom = 1;
     }
   }

@@ -1,36 +1,18 @@
 import { BuildReferenceTracker, GridController } from '../app/apis/app';
 import { track } from '../app/apis/referencetracker';
 import { vec3 } from '../libs_js/glmatrix';
-import { all, Collection, cyclicPairs, cyclicRange, Deck, enumerate, IndexedDeck, interpolate, intersect, loopPairs, map, reverse, wrap } from '../utils/collections';
+import { all, Collection, cyclicRange, Deck, enumerate, interpolate, intersect, loopPairs, map, reverse, wrap } from '../utils/collections';
 import { NumberInterpolator } from '../utils/interpolator';
 import { iter } from '../utils/iter';
-import { cross2d, cyclic, EPS, int, len2d, lenPointToLine, tuple2, tuple4 } from '../utils/mathutils';
-import { copySector, copySprite, copyWall, loopPoints, loopWalls, moveWalls, newSector, newSprite, newWall, resizeWalls, SectorBuilder } from './board/internal';
+import { cross2d, EPS, int, len2d, lenPointToLine, tuple2 } from '../utils/mathutils';
+import { clockwise, copySector, copySprite, copyWall, moveWalls, newSector, newSprite, newWall, resizeWalls, SectorBuilder } from './board/internal';
+import { connectedWalls, innerSectors, isOuterLoop, loopWalls, sectorWalls } from './board/loops';
 import { Board, Sector, Sprite, Wall } from './board/structs';
 import { ArtInfoProvider } from './formats/art';
 import { Hitscan, hitscan } from './hitscan';
-import { findSector, sectorOfWall, sectorWalls, wallNormal, slope } from './utils';
+import { findSector, sectorOfWall, slope, wallNormal } from './utils';
 
 export const DEFAULT_REPEAT_RATE = 128;
-
-export function loopWallsFull(board: Board, wallId: number): Collection<number> {
-  const loop = new IndexedDeck<number>();
-  const cwalls = new Deck<number>();
-  const unconnected = new Deck<number>();
-  loop.pushAll(loopWalls(board, wallId));
-  for (const isec of loopInnerSectors(board, wallId)) {
-    for (const lpoint of loopPoints(board, isec)) {
-      const lwalls = loopWalls(board, lpoint);
-      unconnected.clear();
-      for (const w of lwalls) {
-        connectedWalls(board, w, cwalls.clear());
-        if (!loop.hasAny(cwalls)) unconnected.push(w);
-      }
-      loop.pushAll(unconnected);
-    }
-  }
-  return loop;
-}
 
 function distanceToWallSegment(board: Board, wallId: number, x: number, y: number): number {
   let wall = board.walls[wallId];
@@ -159,6 +141,17 @@ export function closestWallSegment(board: Board, x: number, y: number, d: number
   return dist <= d ? w : -1;
 }
 
+export function fillInnerLoop(board: Board, wallId: number, refs: BuildReferenceTracker) {
+  const wall = board.walls[wallId];
+  const WALL_MAPPER = (w: number) => <[number, number]>[board.walls[w].x, board.walls[w].y];
+  if (wall.nextsector != -1) throw new Error(`Already filled`);
+  const loop = [...loopWalls(board, wallId)];
+  if (!all(loop, w => board.walls[w].nextsector == -1)) throw new Error(`Already filled`);
+  const points = wrap([...map(loop, WALL_MAPPER)]);
+  if (clockwise(points)) throw new Error('Only inner loops can be filled');
+  createNewSector(board, points, refs);
+}
+
 function deleteSectorImpl(board: Board, sectorId: number, refs: BuildReferenceTracker) {
   if (board.sectors[sectorId].wallnum != 0)
     throw new Error(`Error while deleting sector #${sectorId}. wallnum != 0`);
@@ -263,35 +256,6 @@ function doMoveWall(board: Board, w: number, x: number, y: number) {
   fixxrepeat(board, lastwall(board, w));
 }
 
-let connectedSet = new Set<number>();
-export function connectedWalls(board: Board, wallId: number, result: Deck<number>): Deck<number> {
-  connectedSet.clear();
-  const walls = board.walls;
-  let counter = 0;
-  let w = wallId;
-  connectedSet.add(w);
-  do {
-    const wall = walls[w];
-    if (wall.nextwall != -1) {
-      w = nextwall(board, wall.nextwall);
-      connectedSet.add(w);
-    } else {
-      w = wallId;
-      do {
-        const last = lastwall(board, w);
-        const wall = walls[last];
-        if (wall.nextwall != -1) {
-          w = wall.nextwall;
-          connectedSet.add(w);
-        } else break;
-      } while (w != wallId)
-    }
-    counter++;
-    if (counter > board.numwalls) throw new Error('Cycled connected walls');
-  } while (w != wallId)
-  return result.pushAll(connectedSet);
-}
-
 let wallsToMove = new Deck<number>();
 export function moveWall(board: Board, wallId: number, x: number, y: number): boolean {
   let walls = board.walls;
@@ -386,9 +350,8 @@ export function moveSpriteX(board: Board, spriteId: number, x: number, y: number
   if (sprite.x == x && sprite.y == y && sprite.z == z) return false;
   const tsectorId = findSector(board, x, y, sprite.sectnum);
   const newSectorId = tsectorId == -1 ? sprite.sectnum : tsectorId;
-  const newSector = board.sectors[newSectorId];
   const d = grid.getGridSize();
-  const w = iter(sectorWalls(newSector)).first(w => distanceToWallSegment(board, w, x, y) <= d, -1);
+  const w = iter(sectorWalls(board, newSectorId)).first(w => distanceToWallSegment(board, w, x, y) <= d, -1);
   if (w != -1) {
     const ow = selectOrnamentWall(board, newSectorId, w, x, y, sprite.z);
     if (ow[0] == -1) {
@@ -468,8 +431,7 @@ export function isJoinedSectors(board: Board, s1: number, s2: number) {
 }
 
 function fillSectorWalls(board: Board, s: number, set: Set<number>) {
-  let sec = board.sectors[s];
-  for (const w of sectorWalls(sec)) set.add(w);
+  for (const w of sectorWalls(board, s)) set.add(w);
 }
 
 let wallset = new Set<number>();
@@ -568,26 +530,6 @@ export function setFirstWall(board: Board, sectorId: number, newFirstWall: numbe
   builder.build(board, sectorId, refs);
 }
 
-export function clockwise(walls: Collection<[number, number]>): boolean {
-  let minx = Number.MAX_VALUE;
-  let minwall = -1;
-  for (const [w1, w2] of cyclicPairs(walls.length())) {
-    let wall2 = walls.get(w2);
-    if (wall2[0] < minx) {
-      minx = wall2[0];
-      minwall = w1;
-    }
-  }
-  let wall0 = walls.get(minwall);
-  let wall1 = walls.get(cyclic(minwall + 1, walls.length()));
-  let wall2 = walls.get(cyclic(minwall + 2, walls.length()));
-
-  if (wall2[1] <= wall1[1] && wall1[1] <= wall0[1]) return true;
-  if (wall0[1] <= wall1[1] && wall1[1] <= wall2[1]) return false;
-
-  return cross2d(wall0[0] - wall1[0], wall0[1] - wall1[1], wall2[0] - wall1[0], wall2[1] - wall1[1]) < 0;
-}
-
 function order(points: Collection<[number, number]>, cw = true): Collection<[number, number]> {
   let actual = clockwise(points);
   return actual == cw ? points : reverse(points);
@@ -661,49 +603,12 @@ export function createInnerLoop(board: Board, sectorId: number, points: Collecti
   for (let w = wallPtr; w < sector.wallptr + sector.wallnum; w++) fixxrepeat(board, w);
 }
 
-export function isOuterLoop(board: Board, wallId: number) {
-  const points = new Deck<[number, number]>();
-  const loop = loopWalls(board, wallId);
-  for (let w of loop) points.push([board.walls[w].x, board.walls[w].y]);
-  return clockwise(points);
-}
-
-export function fillInnerLoop(board: Board, wallId: number, refs: BuildReferenceTracker) {
-  const wall = board.walls[wallId];
-  const WALL_MAPPER = (w: number) => <[number, number]>[board.walls[w].x, board.walls[w].y];
-  if (wall.nextsector != -1) throw new Error(`Already filled`);
-  const loop = [...loopWalls(board, wallId)];
-  if (!all(loop, w => board.walls[w].nextsector == -1)) throw new Error(`Already filled`);
-  const points = wrap([...map(loop, WALL_MAPPER)]);
-  if (clockwise(points)) throw new Error('Only inner loops can be filled');
-  createNewSector(board, points, refs);
-}
-
 export function deleteLoop(board: Board, wallId: number, refs: BuildReferenceTracker) {
   const loop = [...loopWalls(board, wallId)];
   for (let w of loop) if (board.walls[w].nextsector != -1) throw new Error('Cannot delete filled loop');
   if (isOuterLoop(board, wallId)) throw new Error('Cannot delete outer loops');
   const sectorId = sectorOfWall(board, wallId);
   moveWalls(board, sectorId, loop[0], -loop.length, refs);
-}
-
-export function loopInnerSectors(board: Board, wallId: number, sectors: Set<number> = new Set<number>()): Set<number> {
-  if (isOuterLoop(board, wallId)) return sectors;
-  const loop = loopWalls(board, wallId);
-  for (let w of loop) {
-    const wall = board.walls[w];
-    const nextsector = wall.nextsector;
-    if (nextsector == -1 || sectors.has(nextsector)) continue;
-    sectors.add(nextsector);
-    innerSectors(board, nextsector, sectors);
-  }
-  return sectors;
-}
-
-export function innerSectors(board: Board, sectorId: number, sectors: Set<number> = new Set<number>()): Set<number> {
-  const loops = loopPoints(board, sectorId);
-  for (let loopoint of loops) loopInnerSectors(board, loopoint, sectors);
-  return sectors;
 }
 
 function deleteSectors(board: Board, sectors: Iterable<number>, refs: BuildReferenceTracker) {
@@ -733,11 +638,6 @@ export function deleteLoopFull(board: Board, wallId: number, refs: BuildReferenc
     deleteSectors(board, sectors, refs);
     deleteLoop(board, wallRefs.val(wallref), refs);
   });
-}
-
-export function* wallsBetween(board: Board, from: number, to: number): Generator<Wall> {
-  const walls = board.walls;
-  for (let w = from; w != to; w = walls[w].point2) yield walls[w];
 }
 
 export function insertSprite(board: Board, x: number, y: number, z: number, sprite: Sprite = newSprite(0, 0, 0)) {

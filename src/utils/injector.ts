@@ -87,7 +87,6 @@ export class RootInjector implements ParentInjector {
       chain.unshift(current.dependency.name);
       current = current.parent;
     }
-    chain.unshift('root');
     for (let i = 0; i < chain.length - 1; i++) this.graph.add(chain[i], chain[i + 1]);
     this.graph.checkCycles();
   }

@@ -178,7 +178,7 @@ export function BloodModule(injector: Injector) {
   injector.bind(RESOURCES, BloodResources);
   injector.bind(ART_FILES, loadArtFiles);
   injector.bind(RAW_PAL, loadPal);
-  injector.bind(RAW_PLUs, loarRawPlus);
+  injector.bind<Uint8Array[]>(RAW_PLUs, loarRawPlus);
   injector.bind(PALSWAPS, loadPLUs);
   injector.bind(PAL_TEXTURE, loadPalTexture);
   injector.bind(PLU_TEXTURE, loadPluTexture);

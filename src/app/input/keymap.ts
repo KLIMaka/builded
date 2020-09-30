@@ -56,32 +56,29 @@ export class Binder {
 
   public poolEvents(state: InputState): Iterable<Message> {
     for (let i = this.handlers.length - 1; i >= 0; i--) {
-      if (this.handlers[i](state))
-        return this.messages[i];
+      if (this.handlers[i](state)) return this.messages[i];
     }
     return EMPTY_COLLECTION;
   }
 
   public updateState(input: InputState, state: State) {
     for (let i = 0; i < this.stateHandlers.length; i++) {
-      for (let [name, on, off] of this.stateValues[i]) {
-        try {
-          state.set(name, this.stateHandlers[i](input) ? on : off);
-        } catch (e) {
-          warning(`Problem with setting state ${name}`);
-        }
+      const handler = this.stateHandlers[i];
+      const values = this.stateValues[i];
+      for (const [name, on, off] of values) {
+        if (state.has(name)) state.set(name, handler(input) ? on : off);
       }
     }
   }
 
   public addStateBind(name: string, enabled: any, disabled: any, ...keys: string[]) {
-    let last = keys.pop();
-    let bindName = canonizeBind(last, keys);
-    let idx = this.stateBinds.indexOf(bindName);
+    const last = keys.pop();
+    const bindName = canonizeBind(last, keys);
+    const idx = this.stateBinds.indexOf(bindName);
     if (idx == -1) {
       this.stateBinds.push(bindName);
       let handler = parseMod(last);
-      for (let key of keys) handler = combination(handler, parseMod(key));
+      for (const key of keys) handler = combination(handler, parseMod(key));
       this.stateHandlers.push(handler);
       this.stateValues.push([[name, enabled, disabled]]);
     } else {
@@ -90,10 +87,10 @@ export class Binder {
   }
 
   public addBind(messages: Collection<Message>, key: string, ...mods: string[]) {
-    let bindName = canonizeBind(key, mods);
-    let bindIdx = this.findBind(bindName, mods.length);
+    const bindName = canonizeBind(key, mods);
+    const bindIdx = this.findBind(bindName, mods.length);
     if (bindIdx == -1) {
-      let handler = createHandler(key, mods);
+      const handler = createHandler(key, mods);
       this.insertBind(bindName, handler, messages, mods.length);
     } else {
       this.messages[bindIdx].pushAll(messages);
@@ -102,7 +99,7 @@ export class Binder {
 
   private insertBind(bindName: string, handler: InputHandler, messages: Collection<Message>, mods: number): void {
     this.ensureSortTable(mods);
-    let pos = this.sorttable[mods];
+    const pos = this.sorttable[mods];
     this.binds.splice(pos, 0, bindName);
     this.handlers.splice(pos, 0, handler);
     this.messages.splice(pos, 0, new Deck<Message>().pushAll(messages));
@@ -113,10 +110,9 @@ export class Binder {
 
   private findBind(bindName: string, mods: number) {
     this.ensureSortTable(mods);
-    let start = mods == 0 ? 0 : this.sorttable[mods - 1]
-    for (let i = start; i < this.sorttable[mods]; i++) {
+    const start = mods == 0 ? 0 : this.sorttable[mods - 1]
+    for (let i = start; i < this.sorttable[mods]; i++)
       if (this.binds[i] == bindName) return i;
-    }
     return -1;
   }
 
@@ -131,11 +127,11 @@ export class Binder {
 export type EventParser = (str: string) => Collection<Message>;
 
 export function loadBinds(binds: string, binder: Binder, messageParser: EventParser) {
-  let lines = binds.split(/\r?\n/);
+  const lines = binds.split(/\r?\n/);
   for (let line of lines) {
     line = line.trim();
     if (line.length == 0) continue;
-    let idx = line.indexOf(' ');
+    const idx = line.indexOf(' ');
     if (idx == -1) {
       warning(`Skipping bind line: ${line}`);
       continue;
@@ -143,16 +139,16 @@ export function loadBinds(binds: string, binder: Binder, messageParser: EventPar
     let keys = line.substr(0, idx).toLowerCase();
     if (keys.startsWith('+')) {
       keys = keys.substr(1);
-      let keyParts = keys.split('+');
+      const keyParts = keys.split('+');
       binder.addStateBind(line.substr(idx + 1).trim(), true, false, ...keyParts);
     } else {
-      let str = line.substr(idx + 1).trim();
-      let messages = messageParser(str);
+      const str = line.substr(idx + 1).trim();
+      const messages = messageParser(str);
       if (messages == null) {
         warning(`'${str}' failed to parse`);
         continue;
       }
-      let keyParts = keys.split('+');
+      const keyParts = keys.split('+');
       binder.addBind(messages, keyParts.pop(), ...keyParts);
     }
   }

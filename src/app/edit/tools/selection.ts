@@ -1,6 +1,7 @@
-import { loopWalls } from "../../../build/board/internal";
+import { } from "../../../build/board/internal";
+import { loopWallsFull, loopWalls } from "../../../build/board/loops";
 import { Board } from "../../../build/board/structs";
-import { loopWallsFull, nextwall } from "../../../build/boardutils";
+import { nextwall } from "../../../build/boardutils";
 import { Entity, EntityType, Target } from "../../../build/hitscan";
 import { build2gl } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";

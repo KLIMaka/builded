@@ -1,5 +1,5 @@
 import { vec2, vec3, Vec3Array } from '../libs_js/glmatrix';
-import { Collection, loopPairs } from '../utils/collections';
+import { loopPairs } from '../utils/collections';
 import { cross2d, int, len2d, monoatan2, PI2 } from '../utils/mathutils';
 import { normal2d } from '../utils/vecmath';
 import { Board, Sector, Sprite, Wall } from './board/structs';
@@ -7,11 +7,6 @@ import { Entity, EntityType } from './hitscan';
 
 export const ZSCALE = -16;
 
-
-export function* sectorWalls(sector: Sector): Generator<number> {
-  const end = sector.wallnum + sector.wallptr;
-  for (let w = sector.wallptr; w < end; w++) yield w;
-}
 
 export function build2gl(out: Vec3Array, vec: Vec3Array): Vec3Array {
   return vec3.set(out, vec[0], vec[2] / ZSCALE, vec[1]);

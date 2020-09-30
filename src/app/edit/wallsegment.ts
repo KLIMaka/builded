@@ -1,6 +1,7 @@
-import { connectedWalls, fixxrepeat, lastwall, mergePoints, moveWall } from "../../build/boardutils";
-import { Entity, EntityType, Target } from "../../build/hitscan";
+import { connectedWalls } from "../../build/board/loops";
 import { Board } from "../../build/board/structs";
+import { fixxrepeat, mergePoints, moveWall } from "../../build/boardutils";
+import { Entity, EntityType, Target } from "../../build/hitscan";
 import { sectorOfWall } from "../../build/utils";
 import { mat2d, vec2 } from "../../libs_js/glmatrix";
 import { Deck, IndexedDeck } from "../../utils/collections";

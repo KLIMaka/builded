@@ -4,7 +4,7 @@ export class StateImpl implements State {
   private state: { [index: string]: any } = {};
 
   register<T>(name: string, defaultValue: T): void {
-    let prevState = this.state[name];
+    const prevState = this.state[name];
     if (prevState != undefined) throw new Error(`Redefining state ${name}`);
     this.state[name] = defaultValue;
   }
@@ -15,8 +15,12 @@ export class StateImpl implements State {
   }
 
   get<T>(name: string): T {
-    let stateValue = this.state[name];
+    const stateValue = this.state[name];
     if (stateValue == undefined) throw new Error(`State ${name} is unregistered`);
     return stateValue;
+  }
+
+  has(name: string): boolean {
+    return this.state[name] != undefined;
   }
 }

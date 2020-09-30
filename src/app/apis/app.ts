@@ -44,6 +44,7 @@ export interface State {
   register<T>(name: string, defaultValue: T): void;
   set<T>(name: string, value: T): void;
   get<T>(name: string): T;
+  has(name: string): boolean;
 }
 export const STATE = new Dependency<State>('State');
 

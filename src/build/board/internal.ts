@@ -1,10 +1,11 @@
-import { cyclicPairs, range, enumerate, Deck, map, forEach } from "../../utils/collections";
-import { cross2d, cyclic } from "../../utils/mathutils";
-import { Board, Wall, WallStats, Sector, SectorStats, SpriteStats, FACE_SPRITE, Sprite } from "./structs";
 import { BuildReferenceTracker } from "../../app/apis/app";
-import { iter } from "../../utils/iter";
-import { sectorWalls, ZSCALE } from "../utils";
 import { track } from "../../app/apis/referencetracker";
+import { cyclicPairs, Deck, enumerate, forEach, map, range } from "../../utils/collections";
+import { iter } from "../../utils/iter";
+import { cross2d, cyclic } from "../../utils/mathutils";
+import { ZSCALE } from "../utils";
+import { sectorWalls } from "./loops";
+import { Board, FACE_SPRITE, Sector, SectorStats, Sprite, SpriteStats, Wall, WallStats } from "./structs";
 
 export class SectorBuilder {
   private walls = new Deck<Wall>();
@@ -122,33 +123,8 @@ export function resizeWalls(board: Board, sectorId: number, newSize: number, ref
   }
 }
 
-export function* loopPoints(board: Board, sectorId: number): Generator<number> {
-  const sec = board.sectors[sectorId];
-  for (const w of sectorWalls(sec)) {
-    const wall = board.walls[w];
-    if (w > wall.point2) yield w;
-  }
-}
-
-export function* loopWalls(board: Board, wallId: number): Generator<number> {
-  const start = loopStart(board, wallId);
-  yield start;
-  for (let w = board.walls[start].point2; w != start; w = board.walls[w].point2) yield w;
-}
-
-export function loopStart(board: Board, wallId: number): number {
-  if (wallId < 0 || wallId >= board.numwalls) throw new Error(`Invalid wall ${wallId}`);
-  if (wallId > board.walls[wallId].point2) return board.walls[wallId].point2;
-  for (let w = board.walls[wallId].point2; w != wallId; w = board.walls[w].point2) {
-    const wall = board.walls[w];
-    if (w > wall.point2) return wall.point2;
-  }
-  return -1;
-}
-
-export function wallInSector(board: Board, secId: number, x: number, y: number) {
-  const sec = board.sectors[secId];
-  return iter(sectorWalls(sec)).first(w => board.walls[w].x == x && board.walls[w].y == y, -1)
+export function wallInSector(board: Board, sectorId: number, x: number, y: number) {
+  return iter(sectorWalls(board, sectorId)).first(w => board.walls[w].x == x && board.walls[w].y == y, -1)
 }
 
 export function copyWallStats(stat: WallStats): WallStats {
@@ -418,10 +394,4 @@ export function addSector(board: Board, sector: Sector) {
   sector.wallptr = board.numwalls;
   board.numsectors++;
   return idx;
-}
-
-export function* wallsBetween(board: Board, from: number, to: number): Generator<Wall> {
-  if (loopStart(board, from) != loopStart(board, to)) throw new Error(`Walls ${from} and ${to} not from one loop`);
-  const walls = board.walls;
-  for (let w = from; w != to; w = walls[w].point2) yield walls[w];
 }

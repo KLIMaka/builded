@@ -1,15 +1,15 @@
 import { BuildReferenceTrackerImpl } from '../src/app/modules/default/reftracker';
-import { Board, Wall } from '../src/build/board/structs';
-import { clockwise, createInnerLoop, createNewSector, deleteLoop, deleteSector, deleteWall, fillInnerLoop, findContainingSector, findContainingSectorMidPoints, findSectorsAtPoint, innerSectors, isOuterLoop, loopInnerSectors, loopWallsFull, mergePoints, splitWall, wallInSector, walllen, wallsBetween } from '../src/build/boardutils';
-import { ArtInfo, ArtInfoProvider, Attributes } from '../src/build/formats/art';
-import { inPolygon, inSector, findSector } from '../src/build/utils';
-import { map, wrap } from '../src/utils/collections';
-import { splitSector } from '../src/build/board/splitsector';
-import { saveBuildMap, loadBuildMap } from '../src/build/maploader';
-import { saveBloodMap, loadBloodMap, cloneBoard } from '../src/build/blood/maploader';
-import { loopPoints, loopWalls, loopStart } from '../src/build/board/internal';
-import { Stream } from '../src/utils/stream';
+import { cloneBoard, loadBloodMap, saveBloodMap } from '../src/build/blood/maploader';
 import { BloodBoard } from '../src/build/blood/structs';
+import { innerSectors, isOuterLoop, loopInnerSectors, loopPoints, loopStart, loopWalls, loopWallsFull, wallsBetween } from '../src/build/board/loops';
+import { splitSector } from '../src/build/board/splitsector';
+import { Board } from '../src/build/board/structs';
+import { clockwise, createInnerLoop, createNewSector, deleteLoop, deleteSector, deleteWall, fillInnerLoop, findContainingSector, findContainingSectorMidPoints, findSectorsAtPoint, mergePoints, splitWall, wallInSector, walllen } from '../src/build/boardutils';
+import { ArtInfo, ArtInfoProvider, Attributes } from '../src/build/formats/art';
+import { loadBuildMap, saveBuildMap } from '../src/build/maploader';
+import { findSector, inPolygon, inSector } from '../src/build/utils';
+import { map, wrap } from '../src/utils/collections';
+import { Stream } from '../src/utils/stream';
 
 const REFS = new BuildReferenceTrackerImpl();
 const ART_PROVIDER: ArtInfoProvider = {
@@ -121,7 +121,7 @@ test('deleteSector', () => {
 
 test('loops', () => {
   const board = createBoardWSector();
-  const WALL_MAPPER = (w: Wall) => [w.x, w.y];
+  const WALL_MAPPER = (w: number) => [board.walls[w].x, board.walls[w].y];
 
   expect([...map(wallsBetween(board, 1, 3), WALL_MAPPER)]).toStrictEqual([[1024, 0], [1024, 1024]]);
   expect([...map(wallsBetween(board, 0, 3), WALL_MAPPER)]).toStrictEqual([[0, 0], [1024, 0], [1024, 1024]]);

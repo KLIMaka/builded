@@ -1,10 +1,11 @@
 import { BuildReferenceTrackerImpl } from '../src/app/modules/default/reftracker';
 import { cloneBoard, loadBloodMap, saveBloodMap } from '../src/build/blood/maploader';
 import { BloodBoard } from '../src/build/blood/structs';
+import { clockwise } from '../src/build/board/internal';
 import { innerSectors, isOuterLoop, loopInnerSectors, loopPoints, loopStart, loopWalls, loopWallsFull, wallsBetween } from '../src/build/board/loops';
 import { splitSector } from '../src/build/board/splitsector';
 import { Board } from '../src/build/board/structs';
-import { clockwise, createInnerLoop, createNewSector, deleteLoop, deleteSector, deleteWall, fillInnerLoop, findContainingSector, findContainingSectorMidPoints, findSectorsAtPoint, mergePoints, splitWall, wallInSector, walllen } from '../src/build/boardutils';
+import { createInnerLoop, createNewSector, deleteLoop, deleteSector, deleteWall, fillInnerLoop, findContainingSector, findContainingSectorMidPoints, findSectorsAtPoint, mergePoints, splitWall, wallInSector, walllen } from '../src/build/boardutils';
 import { ArtInfo, ArtInfoProvider, Attributes } from '../src/build/formats/art';
 import { loadBuildMap, saveBuildMap } from '../src/build/maploader';
 import { findSector, inPolygon, inSector } from '../src/build/utils';

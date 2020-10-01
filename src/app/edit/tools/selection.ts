@@ -1,5 +1,4 @@
-import { } from "../../../build/board/internal";
-import { loopWallsFull, loopWalls } from "../../../build/board/loops";
+import { innerWalls, loopWalls } from "../../../build/board/loops";
 import { Board } from "../../../build/board/structs";
 import { nextwall } from "../../../build/boardutils";
 import { Entity, EntityType, Target } from "../../../build/hitscan";
@@ -47,7 +46,7 @@ export function getFromHitscan(factory: EntityFactory): Deck<MessageHandler> {
   list.clear();
   if (target.entity == null) return list;
   const fullLoop = factory.ctx.state.get<boolean>(FULL_LOOP_STATE)
-    ? loopWallsFull
+    ? innerWalls
     : factory.ctx.state.get<boolean>(LOOP_STATE)
       ? loopWalls
       : null;

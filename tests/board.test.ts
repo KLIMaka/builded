@@ -2,7 +2,7 @@ import { BuildReferenceTrackerImpl } from '../src/app/modules/default/reftracker
 import { cloneBoard, loadBloodMap, saveBloodMap } from '../src/build/blood/maploader';
 import { BloodBoard } from '../src/build/blood/structs';
 import { clockwise } from '../src/build/board/internal';
-import { innerSectors, isOuterLoop, loopInnerSectors, loopPoints, loopStart, loopWalls, loopWallsFull, wallsBetween } from '../src/build/board/loops';
+import { innerSectors, isOuterLoop, loopPoints, loopStart, loopWalls, wallsBetween, innerWalls, innerSectorsOfLoop } from '../src/build/board/loops';
 import { splitSector } from '../src/build/board/splitsector';
 import { Board } from '../src/build/board/structs';
 import { createInnerLoop, createNewSector, deleteLoop, deleteSector, deleteWall, fillInnerLoop, findContainingSector, findContainingSectorMidPoints, findSectorsAtPoint, mergePoints, splitWall, wallInSector, walllen } from '../src/build/boardutils';
@@ -149,23 +149,23 @@ test('loops', () => {
   expect([...loopWalls(board, 9)]).toStrictEqual([8, 9, 10, 11]);
   expect(() => [...loopWalls(board, -1)]).toThrow();
   expect(() => [...loopWalls(board, 12)]).toThrow();
-  expect([...loopWallsFull(board, 4)]).toStrictEqual([4, 5, 6, 7]);
+  expect([...innerWalls(board, 4)]).toStrictEqual([4, 5, 6, 7]);
   expect(isOuterLoop(board, 8)).toBe(true);
-  expect([...loopInnerSectors(board, 1)]).toStrictEqual([]);
-  expect([...loopInnerSectors(board, 8)]).toStrictEqual([]);
-  expect([...loopInnerSectors(board, 4)]).toStrictEqual([1]);
+  expect([...innerSectorsOfLoop(board, 1)]).toStrictEqual([]);
+  expect([...innerSectorsOfLoop(board, 8)]).toStrictEqual([]);
+  expect([...innerSectorsOfLoop(board, 4)]).toStrictEqual([1]);
   expect([...innerSectors(board, 0)]).toStrictEqual([1]);
 
   createInnerLoop(board, 1, wrap([[200, 200], [800, 200], [800, 800], [200, 800]]), REFS);
   fillInnerLoop(board, 12, REFS);
   expect(board.numsectors).toBe(3);
   expect(board.numwalls).toBe(20);
-  expect([...loopWallsFull(board, 4)]).toStrictEqual([4, 5, 6, 7, 12, 13, 14, 15]);
+  expect([...innerWalls(board, 4)]).toStrictEqual([4, 5, 6, 7, 12, 13, 14, 15]);
   expect(isOuterLoop(board, 8)).toBe(true);
   expect(isOuterLoop(board, 16)).toBe(true);
-  expect([...loopInnerSectors(board, 1)]).toStrictEqual([]);
-  expect([...loopInnerSectors(board, 4)]).toStrictEqual([1, 2]);
-  expect([...loopInnerSectors(board, 8)]).toStrictEqual([]);
+  expect([...innerSectorsOfLoop(board, 1)]).toStrictEqual([]);
+  expect([...innerSectorsOfLoop(board, 4)]).toStrictEqual([1, 2]);
+  expect([...innerSectorsOfLoop(board, 8)]).toStrictEqual([]);
   expect([...innerSectors(board, 0)]).toStrictEqual([1, 2]);
   expect(loopStart(board, 0)).toBe(0);
   expect(loopStart(board, 5)).toBe(4);
@@ -187,11 +187,11 @@ test('loops', () => {
   expect([...loopWalls(board, 9)]).toStrictEqual([8, 9, 10, 11]);
   expect(() => [...loopWalls(board, -1)]).toThrow();
   expect(() => [...loopWalls(board, 12)]).toThrow();
-  expect([...loopWallsFull(board, 4)]).toStrictEqual([4, 5, 6, 7]);
+  expect([...innerWalls(board, 4)]).toStrictEqual([4, 5, 6, 7]);
   expect(isOuterLoop(board, 8)).toBe(true);
-  expect([...loopInnerSectors(board, 1)]).toStrictEqual([]);
-  expect([...loopInnerSectors(board, 8)]).toStrictEqual([]);
-  expect([...loopInnerSectors(board, 4)]).toStrictEqual([1]);
+  expect([...innerSectorsOfLoop(board, 1)]).toStrictEqual([]);
+  expect([...innerSectorsOfLoop(board, 8)]).toStrictEqual([]);
+  expect([...innerSectorsOfLoop(board, 4)]).toStrictEqual([1]);
   expect([...innerSectors(board, 0)]).toStrictEqual([1]);
 });
 

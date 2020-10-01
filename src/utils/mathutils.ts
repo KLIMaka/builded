@@ -135,3 +135,14 @@ export function tuple4<T1, T2, T3, T4>(value: [T1, T2, T3, T4], v0: T1, v1: T2, 
   value[3] = v3;
   return value;
 }
+
+export function value(start: number, f: (lh: number, rh: number) => number) {
+  return {
+    get: () => start,
+    set: (v: number) => start = f(start, v)
+  }
+}
+
+export function minValue(start: number) {
+  return value(start, (lh, rh) => Math.min(rh, lh));
+}

@@ -1,22 +1,16 @@
+import { connectedWalls as connected } from "../../build/board/loops";
 import { deleteWall, lastwall, mergePoints, moveWall, splitWall } from "../../build/boardutils";
 import { Entity, EntityType } from "../../build/hitscan";
-import { Board } from "../../build/board/structs";
 import { sectorOfWall } from "../../build/utils";
 import { vec2 } from "../../libs_js/glmatrix";
-import { Deck, IndexedDeck } from "../../utils/collections";
+import { IndexedDeck } from "../../utils/collections";
 import { cyclic, tuple } from "../../utils/mathutils";
 import { Message, MessageHandlerReflective } from "../apis/handler";
 import { EditContext } from "./context";
 import { invalidateSectorAndWalls } from "./editutils";
-import { BoardInvalidate, EndMove, Flip, Highlight, Move, NamedMessage, Palette, PanRepeat, SetPicnum, Shade, StartMove, COMMIT } from "./messages";
+import { BoardInvalidate, COMMIT, EndMove, Flip, Highlight, Move, NamedMessage, Palette, PanRepeat, SetPicnum, Shade, StartMove } from "./messages";
 import { MOVE_COPY } from "./tools/selection";
-import { connectedWalls } from "../../build/board/loops";
 
-function collectConnectedWalls(board: Board, wallId: number) {
-  let result = new Deck<number>();
-  connectedWalls(board, wallId, result);
-  return result;
-}
 
 export class WallEnt extends MessageHandlerReflective {
   private static invalidatedSectors = new IndexedDeck<number>();
@@ -26,7 +20,7 @@ export class WallEnt extends MessageHandlerReflective {
     private ctx: EditContext,
     public origin = vec2.create(),
     public active = false,
-    public connectedWalls = collectConnectedWalls(ctx.board(), wallId),
+    public connectedWalls = connected(ctx.board(), wallId),
     private valid = true) { super() }
 
   public StartMove(msg: StartMove) {
@@ -34,7 +28,7 @@ export class WallEnt extends MessageHandlerReflective {
     const wall = board.walls[this.wallId];
     if (this.ctx.state.get(MOVE_COPY)) {
       this.wallId = splitWall(board, this.wallId, wall.x, wall.y, this.ctx.art, this.ctx.refs);
-      this.connectedWalls = collectConnectedWalls(board, this.wallId);
+      this.connectedWalls = connected(board, this.wallId);
     }
     vec2.set(this.origin, wall.x, wall.y);
     this.active = true;

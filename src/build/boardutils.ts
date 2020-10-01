@@ -256,13 +256,13 @@ function doMoveWall(board: Board, w: number, x: number, y: number) {
   fixxrepeat(board, lastwall(board, w));
 }
 
-let wallsToMove = new Deck<number>();
+const _wallsToMove = new Deck<number>();
 export function moveWall(board: Board, wallId: number, x: number, y: number): boolean {
   let walls = board.walls;
   let wall = walls[wallId];
   if (wall.x == x && wall.y == y) return false;
-  connectedWalls(board, wallId, wallsToMove.clear());
-  for (let w of wallsToMove) doMoveWall(board, w, x, y);
+  connectedWalls(board, wallId, _wallsToMove.clear());
+  for (let w of _wallsToMove) doMoveWall(board, w, x, y);
   return true;
 }
 
@@ -726,7 +726,7 @@ export function findSectorsAtPoint(board: Board, x: number, y: number): Set<numb
   if (sectorId == -1) return NULL_SECTOR_SET;
   const wallId = wallInSector(board, sectorId, x, y);
   if (wallId == -1) return new Set([sectorId]);
-  return new Set(iter(connectedWalls(board, wallId, new Deck()))
+  return new Set(iter(connectedWalls(board, wallId))
     .map(w => sectorOfWall(board, w)));
 }
 

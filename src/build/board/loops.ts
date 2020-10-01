@@ -1,10 +1,12 @@
-import { Collection, Deck, IndexedDeck, wrap } from "../../utils/collections";
+import { Collection, Deck, IndexedDeck } from "../../utils/collections";
 import { iter } from "../../utils/iter";
+import { minValue } from "../../utils/mathutils";
 import { lastwall, nextwall } from "../boardutils";
 import { clockwise } from "./internal";
 import { Board } from "./structs";
 
 export function* sectorWalls(board: Board, sectorId: number): Generator<number> {
+  if (sectorId < 0 || sectorId >= board.numsectors) throw new Error(`Invalid sectorId: ${sectorId}`);
   const sector = board.sectors[sectorId];
   const end = sector.wallnum + sector.wallptr;
   for (let w = sector.wallptr; w < end; w++) yield w;
@@ -24,7 +26,7 @@ export function* loopWalls(board: Board, wallId: number): Generator<number> {
 }
 
 export function loopStart(board: Board, wallId: number): number {
-  if (wallId < 0 || wallId >= board.numwalls) throw new Error(`Invalid wall ${wallId}`);
+  if (wallId < 0 || wallId >= board.numwalls) throw new Error(`Invalid wallId: ${wallId}`);
   if (wallId > board.walls[wallId].point2) return board.walls[wallId].point2;
   for (let w = board.walls[wallId].point2; w != wallId; w = board.walls[w].point2) {
     const wall = board.walls[w];
@@ -38,7 +40,7 @@ export function* wallsBetween(board: Board, from: number, to: number): Generator
   for (let w = from; w != to; w = board.walls[w].point2) yield w;
 }
 
-export function loopInnerSectors(board: Board, wallId: number, sectors: Set<number> = new Set<number>()): Set<number> {
+export function innerSectorsOfLoop(board: Board, wallId: number, sectors: Set<number> = new Set<number>()): Set<number> {
   if (isOuterLoop(board, wallId)) return sectors;
   for (const w of loopWalls(board, wallId)) {
     const wall = board.walls[w];
@@ -51,24 +53,18 @@ export function loopInnerSectors(board: Board, wallId: number, sectors: Set<numb
 }
 
 export function innerSectors(board: Board, sectorId: number, sectors: Set<number> = new Set<number>()): Set<number> {
-  for (const loopoint of loopPoints(board, sectorId)) loopInnerSectors(board, loopoint, sectors);
+  for (const loopoint of loopPoints(board, sectorId)) innerSectorsOfLoop(board, loopoint, sectors);
   return sectors;
 }
 
-export function loopWallsFull(board: Board, wallId: number): Collection<number> {
-  const loop = new IndexedDeck<number>();
-  const cwalls = new Deck<number>();
-  const unconnected = new Deck<number>();
-  loop.pushAll(loopWalls(board, wallId));
-  for (const isec of loopInnerSectors(board, wallId)) {
+export function innerWalls(board: Board, wallId: number): Iterable<number> {
+  const loop = new Set<number>();
+  iter(loopWalls(board, wallId)).map(w => canonicalWall(board, w)).forEach(w => loop.add(w));
+  for (const isec of innerSectorsOfLoop(board, wallId)) {
     for (const lpoint of loopPoints(board, isec)) {
-      const lwalls = loopWalls(board, lpoint);
-      unconnected.clear();
-      for (const w of lwalls) {
-        connectedWalls(board, w, cwalls.clear());
-        if (!loop.hasAny(cwalls)) unconnected.push(w);
+      for (const w of loopWalls(board, lpoint)) {
+        loop.add(canonicalWall(board, w));
       }
-      loop.pushAll(unconnected);
     }
   }
   return loop;
@@ -79,8 +75,30 @@ export function isOuterLoop(board: Board, wallId: number) {
   return clockwise(iter(loopWalls(board, wallId)).map(WALL_MAPPER));
 }
 
+export function canonicalWall(board: Board, wallId: number): number {
+  const canonical = minValue(wallId);
+  let w = wallId;
+  do {
+    const wall = board.walls[w];
+    if (wall.nextwall != -1) {
+      w = nextwall(board, wall.nextwall);
+      canonical.set(w);
+    } else {
+      w = wallId;
+      do {
+        const wall = board.walls[lastwall(board, w)];
+        if (wall.nextwall != -1) {
+          w = wall.nextwall;
+          canonical.set(w);
+        } else break;
+      } while (w != wallId)
+    }
+  } while (w != wallId)
+  return canonical.get();
+}
+
 const _connectedSet = new Set<number>();
-export function connectedWalls(board: Board, wallId: number, result: Deck<number>): Deck<number> {
+export function connectedWalls(board: Board, wallId: number, result = new Deck<number>()): Deck<number> {
   _connectedSet.clear();
   const walls = board.walls;
   let counter = 0;

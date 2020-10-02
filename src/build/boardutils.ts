@@ -256,13 +256,11 @@ function doMoveWall(board: Board, w: number, x: number, y: number) {
   fixxrepeat(board, lastwall(board, w));
 }
 
-const _wallsToMove = new Deck<number>();
 export function moveWall(board: Board, wallId: number, x: number, y: number): boolean {
   let walls = board.walls;
   let wall = walls[wallId];
   if (wall.x == x && wall.y == y) return false;
-  connectedWalls(board, wallId, _wallsToMove.clear());
-  for (let w of _wallsToMove) doMoveWall(board, w, x, y);
+  for (let w of connectedWalls(board, wallId)) doMoveWall(board, w, x, y);
   return true;
 }
 
@@ -715,8 +713,8 @@ export function deleteWall(board: Board, wallId: number, refs: BuildReferenceTra
 }
 
 export function mergePoints(board: Board, wallId: number, refs: BuildReferenceTracker) {
-  let wall = board.walls[wallId];
-  let wall2 = board.walls[wall.point2];
+  const wall = board.walls[wallId];
+  const wall2 = board.walls[wall.point2];
   if (wall.x == wall2.x && wall.y == wall2.y) deleteWall(board, wallId, refs);
 }
 

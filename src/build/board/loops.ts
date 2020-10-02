@@ -1,4 +1,3 @@
-import { Collection, Deck, IndexedDeck } from "../../utils/collections";
 import { iter } from "../../utils/iter";
 import { minValue } from "../../utils/mathutils";
 import { lastwall, nextwall } from "../boardutils";
@@ -58,13 +57,10 @@ export function innerSectors(board: Board, sectorId: number, sectors: Set<number
 }
 
 export function innerWalls(board: Board, wallId: number): Iterable<number> {
-  const loop = new Set<number>();
-  iter(loopWalls(board, wallId)).map(w => canonicalWall(board, w)).forEach(w => loop.add(w));
+  const loop = new Set<number>(loopWalls(board, wallId));
   for (const isec of innerSectorsOfLoop(board, wallId)) {
-    for (const lpoint of loopPoints(board, isec)) {
-      for (const w of loopWalls(board, lpoint)) {
-        loop.add(canonicalWall(board, w));
-      }
+    for (const w of sectorWalls(board, isec)) {
+      loop.add(w);
     }
   }
   return loop;
@@ -97,18 +93,16 @@ export function canonicalWall(board: Board, wallId: number): number {
   return canonical.get();
 }
 
-const _connectedSet = new Set<number>();
-export function connectedWalls(board: Board, wallId: number, result = new Deck<number>()): Deck<number> {
-  _connectedSet.clear();
+export function connectedWalls(board: Board, wallId: number, result = new Set<number>()): Iterable<number> {
   const walls = board.walls;
   let counter = 0;
   let w = wallId;
-  _connectedSet.add(w);
+  result.add(w);
   do {
     const wall = walls[w];
     if (wall.nextwall != -1) {
       w = nextwall(board, wall.nextwall);
-      _connectedSet.add(w);
+      result.add(w);
     } else {
       w = wallId;
       do {
@@ -116,12 +110,12 @@ export function connectedWalls(board: Board, wallId: number, result = new Deck<n
         const wall = walls[last];
         if (wall.nextwall != -1) {
           w = wall.nextwall;
-          _connectedSet.add(w);
+          result.add(w);
         } else break;
       } while (w != wallId)
     }
     counter++;
     if (counter > board.numwalls) throw new Error('Cycled connected walls');
   } while (w != wallId)
-  return result.pushAll(_connectedSet);
+  return result;
 }

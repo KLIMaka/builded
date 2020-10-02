@@ -22,6 +22,7 @@ export class Iter<T> implements Iterable<T>{
   chain(i: Iterable<T>): Iter<T> { return new Iter(chain(this.iter, i)) }
   butLast(): Iter<T> { return new Iter(butLast(this.iter)) }
   collect(): T[] { return [...this.iter] }
+  set(): Set<T> { return new Set(this.iter) }
 }
 
 export function iter<T>(iter: Iterable<T>) {

@@ -3,6 +3,17 @@ export var degInRad = Math.PI / 180;
 export var PI2 = Math.PI * 2;
 export var EPS = 1e-9;
 
+export function eq(lh: number, rh: number) {
+  return Math.abs(lh - rh) < EPS;
+}
+
+export function lse(lh: number, rh: number) {
+  return eq(lh, rh) || lh < rh;
+}
+export function gte(lh: number, rh: number) {
+  return eq(lh, rh) || lh > rh;
+}
+
 export function deg2rad(deg: number): number {
   return deg * degInRad;
 }

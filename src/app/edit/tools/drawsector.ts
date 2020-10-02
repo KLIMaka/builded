@@ -1,5 +1,5 @@
 import { Board } from "../../../build/board/structs";
-import { closestWallPointDist, createInnerLoop, createNewSector, findContainingSectorMidPoints, wallInSector } from "../../../build/boardutils";
+import { createInnerLoop, createNewSector, findContainingSectorMidPoints, wallInSector } from "../../../build/boardutils";
 import { splitSector } from "../../../build/board/splitsector";
 import { Target } from "../../../build/hitscan";
 import { sectorOfWall, ZSCALE } from "../../../build/utils";
@@ -15,6 +15,7 @@ import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common
 import { getClosestSectorZ } from "../editutils";
 import { BoardInvalidate, COMMIT, Frame, NamedMessage, Render } from "../messages";
 import { PointSpritesBuilder, LineBuilder } from "../../modules/gl/buffers";
+import { closestWallPointDist } from "../../../build/board/distances";
 
 class Contour {
   private points: Array<[number, number]> = [];

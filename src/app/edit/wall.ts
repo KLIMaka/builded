@@ -1,3 +1,4 @@
+import { copyWall } from "../../build/board/internal";
 import { connectedWalls as connected } from "../../build/board/loops";
 import { deleteWall, lastwall, mergePoints, moveWall, splitWall } from "../../build/boardutils";
 import { Entity, EntityType } from "../../build/hitscan";
@@ -63,16 +64,11 @@ export class WallEnt extends MessageHandlerReflective {
   public Highlight(msg: Highlight) {
     if (this.active) {
       const board = this.ctx.board();
-      let cwalls = this.connectedWalls;
-      for (let i = 0; i < cwalls.length(); i++) {
-        let w = cwalls.get(i);
-        // let s = sectorOfWall(board, w);
-        let p = lastwall(board, w);
+      for (const w of this.connectedWalls) {
+        const p = lastwall(board, w);
         msg.set.add(tuple(2, w));
         msg.set.add(tuple(3, w));
         msg.set.add(tuple(2, p));
-        // msg.set.add(tuple(0, s));
-        // msg.set.add(tuple(1, s));
       }
     } else {
       msg.set.add(tuple(3, this.wallId));

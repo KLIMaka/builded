@@ -1,6 +1,5 @@
-import { walllen } from "../../../../build/boardutils";
 import { Board } from "../../../../build/board/structs";
-import { createSlopeCalculator, sectorOfWall, slope, ZSCALE } from "../../../../build/utils";
+import { createSlopeCalculator, slope, ZSCALE } from "../../../../build/utils";
 import { int } from "../../../../utils/mathutils";
 import { Builders } from "../../../apis/builder";
 import { BuildRenderableProvider, WallRenderable, Renderables } from "../../../apis/renderable";
@@ -9,6 +8,7 @@ import { RenderablesCacheContext } from "../cache";
 import { BuildersFactory, PointSpriteBuilder, SolidBuilder } from "../common";
 import { text, createGridWallMatrix, WallGridType } from "./common";
 import { vec4, mat4 } from "../../../../libs_js/glmatrix";
+import { sectorOfWall, walllen } from "../../../../build/board/query";
 
 export class WallHelperBuilder extends Builders implements WallRenderable {
   constructor(

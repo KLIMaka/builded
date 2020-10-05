@@ -1,6 +1,6 @@
-import { walllen, DEFAULT_REPEAT_RATE } from '../../../../build/boardutils';
+import { DEFAULT_REPEAT_RATE } from '../../../../build/boardutils';
 import { Board, Sector, Wall } from '../../../../build/board/structs';
-import { slope, ZSCALE, sectorOfWall } from '../../../../build/utils';
+import { slope, ZSCALE } from '../../../../build/utils';
 import { mat4, vec4 } from '../../../../libs_js/glmatrix';
 import { Texture } from '../../../../utils/gl/drawstruct';
 import { int, len2d } from '../../../../utils/mathutils';
@@ -8,6 +8,7 @@ import { Tiler } from '../../../../utils/tiler';
 import { BuildBuffer } from '../../gl/buffers';
 import { RenderablesCacheContext } from '../cache';
 import { PointSpriteBuilder, WireframeBuilder } from '../common';
+import { sectorOfWall, walllen } from '../../../../build/board/query';
 
 export const GRID_SECTOR_MATRIX = mat4.create();
 mat4.identity(GRID_SECTOR_MATRIX);

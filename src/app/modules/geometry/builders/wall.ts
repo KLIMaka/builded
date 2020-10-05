@@ -1,8 +1,9 @@
-import { ArtInfo } from "../../../../build/formats/art";
+import { sectorOfWall } from "../../../../build/board/query";
 import { Wall } from "../../../../build/board/structs";
-import { createSlopeCalculator, sectorOfWall, wallNormal, ZSCALE } from "../../../../build/utils";
+import { ArtInfo } from "../../../../build/formats/art";
+import { createSlopeCalculator, wallNormal, ZSCALE } from "../../../../build/utils";
 import { mat4, Mat4Array, vec3, Vec3Array, vec4 } from "../../../../libs_js/glmatrix";
-import { len2d, len3d } from "../../../../utils/mathutils";
+import { len2d } from "../../../../utils/mathutils";
 import { Builders } from "../../../apis/builder";
 import { WallRenderable } from "../../../apis/renderable";
 import { BuildBuffer } from "../../gl/buffers";

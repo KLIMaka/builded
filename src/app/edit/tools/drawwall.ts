@@ -1,10 +1,11 @@
 import { closestWallSegmentInSector } from "../../../build/board/distances";
 import { wallInSector } from "../../../build/board/internal";
 import { sectorWalls } from "../../../build/board/loops";
+import { lastwall, sectorOfWall } from "../../../build/board/query";
 import { splitSector } from "../../../build/board/splitsector";
 import { Board, Sector } from "../../../build/board/structs";
-import { createNewSector, lastwall, setFirstWall, splitWall } from "../../../build/boardutils";
-import { ANGSCALE, build2gl, createSlopeCalculator, sectorOfWall, wallNormal, ZSCALE } from "../../../build/utils";
+import { createNewSector, setFirstWall, splitWall } from "../../../build/boardutils";
+import { ANGSCALE, build2gl, createSlopeCalculator, wallNormal, ZSCALE } from "../../../build/utils";
 import { vec2, vec3 } from "../../../libs_js/glmatrix";
 import { Deck } from "../../../utils/collections";
 import { create, Injector } from "../../../utils/injector";

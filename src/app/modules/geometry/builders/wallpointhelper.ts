@@ -1,5 +1,6 @@
+import { sectorOfWall } from "../../../../build/board/query";
 import { Board } from "../../../../build/board/structs";
-import { createSlopeCalculator, sectorOfWall, slope, ZSCALE } from "../../../../build/utils";
+import { createSlopeCalculator, slope, ZSCALE } from "../../../../build/utils";
 import { Builders } from "../../../apis/builder";
 import { BuildBuffer } from "../../gl/buffers";
 import { RenderablesCacheContext } from "../cache";

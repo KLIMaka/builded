@@ -2,7 +2,8 @@ import { vec2, vec3, Vec3Array } from '../libs_js/glmatrix';
 import { loopPairs } from '../utils/collections';
 import { cross2d, int, len2d, monoatan2, PI2 } from '../utils/mathutils';
 import { normal2d } from '../utils/vecmath';
-import { Board, Sector, Sprite, Wall } from './board/structs';
+import { sectorWalls } from './board/loops';
+import { Board, Sprite } from './board/structs';
 import { Entity, EntityType } from './hitscan';
 
 export const ZSCALE = -16;
@@ -66,54 +67,6 @@ export function inPolygon(x: number, y: number, points: Iterable<[number, number
   return (inter >>> 31) == 1;
 }
 
-export function inSector(board: Board, x: number, y: number, secnum: number): boolean {
-  x = int(x);
-  y = int(y);
-  const sec = board.sectors[secnum];
-  if (!sec) return false;
-  const end = sec.wallptr + sec.wallnum;
-  let inter = 0;
-  for (let w = sec.wallptr; w < end; w++) {
-    const wall = board.walls[w];
-    const wall2 = board.walls[wall.point2];
-    const dy1 = wall.y - y;
-    const dy2 = wall2.y - y;
-    const dx1 = wall.x - x;
-    const dx2 = wall2.x - x;
-    if (dx1 == 0 && dx2 == 0 && (dy1 == 0 || dy2 == 0 || (dy1 ^ dy2) < 0)) return true;
-    if (dy1 == 0 && dy2 == 0 && (dx1 == 0 || dx2 == 0 || (dx1 ^ dx2) < 0)) return true;
-
-    if ((dy1 ^ dy2) < 0) {
-      if ((dx1 ^ dx2) >= 0)
-        inter ^= dx1;
-      else
-        inter ^= cross2d(dx1, dy1, dx2, dy2) ^ dy2;
-    }
-  }
-  return (inter >>> 31) == 1;
-}
-
-export function sectorOfWall(board: Board, wallId: number): number {
-  if (wallId < 0 || wallId >= board.numwalls)
-    return -1;
-  const wall = board.walls[wallId];
-  if (wall.nextwall != -1)
-    return board.walls[wall.nextwall].nextsector;
-  let start = 0;
-  let end = board.numsectors - 1;
-  while (end - start >= 0) {
-    const pivot = int(start + (end - start) / 2);
-    const sec = board.sectors[pivot];
-    if (sec.wallptr <= wallId && sec.wallptr + sec.wallnum - 1 >= wallId)
-      return pivot;
-    if (sec.wallptr > wallId) {
-      end = pivot - 1;
-    } else {
-      start = pivot + 1;
-    }
-  }
-}
-
 export function sectorZ(board: Board, sectorEnt: Entity) {
   const sec = board.sectors[sectorEnt.id];
   return (sectorEnt.type == EntityType.CEILING ? sec.ceilingz : sec.floorz);
@@ -150,43 +103,6 @@ export function setSectorPicnum(board: Board, sectorEnt: Entity, picnum: number)
   const sec = board.sectors[sectorEnt.id];
   if (sectorEnt.type == EntityType.CEILING) sec.ceilingpicnum = picnum; else sec.floorpicnum = picnum;
   return true;
-}
-
-export function findSector(board: Board, x: number, y: number, secnum: number = -1): number {
-  if (secnum == -1 || secnum >= board.numsectors) return findSectorAll(board, x, y);
-  const secs = [secnum];
-  for (let i = 0; i < secs.length; i++) {
-    secnum = secs[i];
-    const sec = board.sectors[secnum];
-    if (inSector(board, x, y, secnum))
-      return secnum;
-
-    for (let w = 0; w < sec.wallnum; w++) {
-      const wallidx = w + sec.wallptr;
-      const wall = board.walls[wallidx];
-      if (wall.nextsector != -1) {
-        const nextsector = wall.nextsector;
-        if (secs.indexOf(nextsector) == -1)
-          secs.push(nextsector);
-      }
-    }
-  }
-  return -1;
-}
-
-function findSectorAll(board: Board, x: number, y: number) {
-  for (let s = 0; s < board.numsectors; s++) if (inSector(board, x, y, s)) return s;
-  return -1;
-}
-
-export function getSprites(board: Board, secnum: number): number[] {
-  const ret = [];
-  const sprites = board.sprites;
-  for (let i = 0; i < board.numsprites; i++) {
-    if (sprites[i].sectnum == secnum)
-      ret.push(i);
-  }
-  return ret;
 }
 
 export function groupSprites(board: Board): { [index: number]: number[] } {
@@ -234,20 +150,6 @@ export function createSlopeCalculator(board: Board, sectorId: number) {
     const k = -cross2d(dx, dy, dx1, dy1);
     return int(heinum * ANGSCALE * k * ZSCALE);
   };
-}
-
-export function heinumCalc(board: Board, sectorId: number, x: number, y: number, z: number) {
-  const sec = board.sectors[sectorId];
-  const wall1 = board.walls[sec.wallptr];
-  const wall2 = board.walls[wall1.point2];
-  let dx = wall2.x - wall1.x;
-  let dy = wall2.y - wall1.y;
-  const ln = len2d(dx, dy);
-  dx /= ln; dy /= ln;
-  const dx1 = x - wall1.x;
-  const dy1 = y - wall1.y;
-  const k = cross2d(dx, dy, dx1, dy1);
-  return Math.round(z / (ANGSCALE * k * ZSCALE));
 }
 
 export function lineIntersect(
@@ -319,9 +221,10 @@ export function rayIntersect(
   return [x, y, z, t];
 }
 
-export function getFirstWallAngle(sector: Sector, walls: Wall[]): number {
-  const w1 = walls[sector.wallptr];
-  const w2 = walls[w1.point2];
+export function getFirstWallAngle(board: Board, sectorId: number): number {
+  const sector = board.sectors[sectorId];
+  const w1 = board.walls[sector.wallptr];
+  const w2 = board.walls[w1.point2];
   const dx = w2.x - w1.x;
   const dy = w2.y - w1.y;
   return Math.atan2(-dy, dx);
@@ -337,26 +240,26 @@ export function wallVisible(board: Board, wallId: number, ms: MoveStruct) {
   return cross2d(dx1, dy1, dx2, dy2) >= 0;
 }
 
-const normal_ = vec2.create();
+const _normal = vec2.create();
 export function wallNormal(out: Vec3Array, board: Board, wallId: number): Vec3Array {
   const w1 = board.walls[wallId];
   const w2 = board.walls[w1.point2];
-  vec2.set(normal_, w1.x - w2.x, w1.y - w2.y);
-  normal2d(normal_, normal_);
-  vec3.set(out, normal_[0], 0, normal_[1]);
+  vec2.set(_normal, w1.x - w2.x, w1.y - w2.y);
+  normal2d(_normal, _normal);
+  vec3.set(out, _normal[0], 0, _normal[1]);
   return out;
 }
 
-const wn = vec3.create();
-const up = vec3.fromValues(0, 1, 0);
-const down = vec3.fromValues(0, -1, 0);
+const _wn = vec3.create();
+const _up = vec3.fromValues(0, 1, 0);
+const _down = vec3.fromValues(0, -1, 0);
 export function sectorNormal(out: Vec3Array, board: Board, sectorId: number, ceiling: boolean): Vec3Array {
-  const sec = board.sectors[sectorId];
-  wallNormal(wn, board, sec.wallptr);
-  vec3.negate(wn, wn);
-  const h = ceiling ? sec.ceilingheinum : sec.floorheinum;
-  const normal = ceiling ? down : up;
-  vec3.lerp(out, normal, wn, Math.atan(h * ANGSCALE) / (Math.PI / 2));
+  const sector = board.sectors[sectorId];
+  wallNormal(_wn, board, sector.wallptr);
+  vec3.negate(_wn, _wn);
+  const h = ceiling ? sector.ceilingheinum : sector.floorheinum;
+  const normal = ceiling ? _down : _up;
+  vec3.lerp(out, normal, _wn, Math.atan(h * ANGSCALE) / (Math.PI / 2));
   return out;
 }
 

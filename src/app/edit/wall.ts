@@ -1,8 +1,7 @@
-import { copyWall } from "../../build/board/internal";
 import { connectedWalls as connected } from "../../build/board/loops";
-import { deleteWall, lastwall, mergePoints, moveWall, splitWall } from "../../build/boardutils";
+import { lastwall, sectorOfWall } from "../../build/board/query";
+import { deleteWall, mergePoints, moveWall, splitWall } from "../../build/boardutils";
 import { Entity, EntityType } from "../../build/hitscan";
-import { sectorOfWall } from "../../build/utils";
 import { vec2 } from "../../libs_js/glmatrix";
 import { IndexedDeck } from "../../utils/collections";
 import { cyclic, tuple } from "../../utils/mathutils";

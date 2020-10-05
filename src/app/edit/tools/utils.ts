@@ -1,7 +1,7 @@
 import { deleteLoop, deleteLoopFull, deleteSectorFull, fillInnerLoop, insertSprite, setFirstWall, splitWall } from "../../../build/boardutils";
 import { EntityType } from "../../../build/hitscan";
 import { Board, WALL_SPRITE } from "../../../build/board/structs";
-import { sectorOfWall, slope, vec2ang, wallNormal } from "../../../build/utils";
+import { slope, vec2ang, wallNormal } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 import { create, Injector } from "../../../utils/injector";
 import { info } from "../../../utils/logger";
@@ -11,6 +11,7 @@ import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
 import { COMMIT, INVALIDATE_ALL, NamedMessage } from "../messages";
 import { PicNumSelector, PICNUM_SELECTOR } from "./selection";
 import { invalidateSectorAndWalls } from "../editutils";
+import { sectorOfWall } from "../../../build/board/query";
 
 export async function UtilsModule(injector: Injector) {
   const bus = await injector.getInstance(BUS);

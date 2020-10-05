@@ -1,5 +1,6 @@
+import { sectorOfWall } from "../../../build/board/query";
 import { pushWall } from "../../../build/boardutils";
-import { build2gl, createSlopeCalculator, sectorOfWall, wallNormal, ZSCALE } from "../../../build/utils";
+import { build2gl, createSlopeCalculator, wallNormal, ZSCALE } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 import { create, Injector } from "../../../utils/injector";
 import { dot2d, int } from "../../../utils/mathutils";

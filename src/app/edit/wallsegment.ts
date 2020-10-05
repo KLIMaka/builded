@@ -1,10 +1,10 @@
 import { canonicalWall, connectedWalls } from "../../build/board/loops";
+import { sectorOfWall } from "../../build/board/query";
 import { Board } from "../../build/board/structs";
 import { fixxrepeat, mergePoints, moveWall } from "../../build/boardutils";
 import { Entity, EntityType, Target } from "../../build/hitscan";
-import { sectorOfWall } from "../../build/utils";
 import { mat2d, vec2 } from "../../libs_js/glmatrix";
-import { Deck, IndexedDeck, intersect } from "../../utils/collections";
+import { IndexedDeck } from "../../utils/collections";
 import { iter } from "../../utils/iter";
 import { cyclic, int, len2d, tuple } from "../../utils/mathutils";
 import { Message, MessageHandlerReflective } from "../apis/handler";

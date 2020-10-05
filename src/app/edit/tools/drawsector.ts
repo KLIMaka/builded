@@ -1,8 +1,8 @@
 import { Board } from "../../../build/board/structs";
-import { createInnerLoop, createNewSector, findContainingSectorMidPoints, wallInSector } from "../../../build/boardutils";
+import { createInnerLoop, createNewSector } from "../../../build/boardutils";
 import { splitSector } from "../../../build/board/splitsector";
 import { Target } from "../../../build/hitscan";
-import { sectorOfWall, ZSCALE } from "../../../build/utils";
+import { ZSCALE } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 import { Deck, wrap } from "../../../utils/collections";
 import { create, Injector } from "../../../utils/injector";
@@ -16,6 +16,8 @@ import { getClosestSectorZ } from "../editutils";
 import { BoardInvalidate, COMMIT, Frame, NamedMessage, Render } from "../messages";
 import { PointSpritesBuilder, LineBuilder } from "../../modules/gl/buffers";
 import { closestWallPointDist } from "../../../build/board/distances";
+import { wallInSector } from "../../../build/board/internal";
+import { findContainingSectorMidPoints, sectorOfWall } from "../../../build/board/query";
 
 class Contour {
   private points: Array<[number, number]> = [];

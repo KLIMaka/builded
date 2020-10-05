@@ -1,7 +1,7 @@
 import { Board } from "../../../build/board/structs";
 import { closestSpriteInSector, closestWallPoint, closestWallSegment } from "../../../build/board/distances";
 import { Entity, EntityType, Hitscan, hitscan, Ray, Target } from "../../../build/hitscan";
-import { findSector, getPlayerStart, inSector, ZSCALE } from "../../../build/utils";
+import { getPlayerStart, ZSCALE } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 import { CachedValue } from "../../../utils/cachedvalue";
 import { Controller2D } from "../../../utils/camera/controller2d";
@@ -16,6 +16,7 @@ import { BoardInvalidate, LoadBoard, Mouse } from "../../edit/messages";
 import { BuildGl, BUILD_GL } from "../gl/buildgl";
 import { BoardRenderer2D, Renderer2D } from "./boardrenderer2d";
 import { snapWall, TargetImpl, ViewPosition } from "./view";
+import { inSector, findSector } from "../../../build/board/query";
 
 
 export async function View2dConstructor(injector: Injector) {

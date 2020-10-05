@@ -6,24 +6,17 @@ import { NumberInterpolator } from '../utils/interpolator';
 import { iter } from '../utils/iter';
 import { cross2d, int, len2d, tuple2 } from '../utils/mathutils';
 import { distanceToWallSegment } from "./board/distances";
-import { clockwise, copySector, copySprite, copyWall, moveWalls, newSector, newSprite, newWall, resizeWalls, SectorBuilder } from './board/internal';
+import { clockwise, copySector, copySprite, copyWall, moveWalls, newSector, newSprite, newWall, resizeWalls, SectorBuilder, wallInSector } from './board/internal';
 import { connectedWalls, innerSectors, isOuterLoop, loopWalls, sectorWalls } from './board/loops';
 import { Board, Sector, Sprite, Wall } from './board/structs';
 import { ArtInfoProvider } from './formats/art';
 import { Hitscan, hitscan } from './hitscan';
-import { findSector, sectorOfWall, slope, wallNormal } from './utils';
+import { slope, wallNormal } from './utils';
+import { findSector, isJoinedSectors, isTJunction, lastwall, nextwall, sectorOfWall, walllen } from './board/query';
 
 export const DEFAULT_REPEAT_RATE = 128;
 
-export function wallInSector(board: Board, secId: number, x: number, y: number) {
-  let sec = board.sectors[secId];
-  let end = sec.wallptr + sec.wallnum;
-  for (let w = sec.wallptr; w < end; w++) {
-    let wall = board.walls[w];
-    if (wall.x == x && wall.y == y) return w;
-  }
-  return -1;
-}
+
 
 export function fillInnerLoop(board: Board, wallId: number, refs: BuildReferenceTracker) {
   const wall = board.walls[wallId];
@@ -70,14 +63,6 @@ function addSector(board: Board, sector: Sector) {
   return idx;
 }
 
-export function walllen(board: Board, wallId: number) {
-  let wall = board.walls[wallId];
-  let wall2 = board.walls[wall.point2];
-  let dx = wall2.x - wall.x;
-  let dy = wall2.y - wall.y;
-  return len2d(dx, dy);
-}
-
 export function fixxrepeat(board: Board, wallId: number, reprate: number = DEFAULT_REPEAT_RATE) {
   let wall = board.walls[wallId];
   wall.xrepeat = Math.min(255, Math.max(1, Math.round((walllen(board, wallId) + 0.5) / reprate)))
@@ -118,19 +103,6 @@ export function splitWall(board: Board, wallId: number, x: number, y: number, ar
     return wallId;
   }
   return wallId;
-}
-
-export function lastwall(board: Board, wallId: number): number {
-  if (wallId > 0 && board.walls[wallId - 1].point2 == wallId)
-    return wallId - 1;
-  for (let w = wallId; ; w = board.walls[w].point2) {
-    if (board.walls[w].point2 == wallId)
-      return w;
-  }
-}
-
-export function nextwall(board: Board, wallId: number): number {
-  return board.walls[wallId].point2;
 }
 
 function doMoveWall(board: Board, w: number, x: number, y: number) {
@@ -301,16 +273,7 @@ export function unpackSectorId(wallSectorId: number) {
   return (wallSectorId >> 16) & 0xffff;
 }
 
-export function isJoinedSectors(board: Board, s1: number, s2: number) {
-  let sec1 = board.sectors[s1];
-  let end = sec1.wallptr + sec1.wallnum;
-  for (let w = sec1.wallptr; w < end; w++) {
-    let wall = board.walls[w];
-    if (wall.nextsector == s2)
-      return w;
-  }
-  return -1;
-}
+
 
 function fillSectorWalls(board: Board, s: number, set: Set<number>) {
   for (const w of sectorWalls(board, s)) set.add(w);
@@ -359,7 +322,7 @@ function getJoinedWallsLoops(board: Board, s1: number, s2: number): SectorBuilde
 }
 
 export function joinSectors(board: Board, s1: number, s2: number, refs: BuildReferenceTracker) {
-  if (isJoinedSectors(board, s1, s2) == -1) return -1;
+  if (isJoinedSectors(board, s1, s2)) return -1;
   getJoinedWallsLoops(board, s1, s2).build(board, s1, refs);
   updateSpriteSector(board, s2);
   resizeWalls(board, s2, 0, refs);
@@ -433,7 +396,7 @@ function searchMatchWall(board: Board, p1: [number, number], p2: [number, number
   return null;
 }
 
-function matchWalls(board: Board, points: Collection<[number, number]>): [number, number][] {
+function matchWalls(board: Board, points: Iterable<[number, number]>): [number, number][] {
   return iter(loopPairs(points)).map(([p1, p2]) => searchMatchWall(board, p1, p2)).collect();
 }
 
@@ -560,12 +523,6 @@ function deleteWallImpl(board: Board, wallId: number) {
   }
 }
 
-export function isSectorTJunction(board: Board, wallId: number) {
-  const wall = board.walls[wallId];
-  const lwall = board.walls[lastwall(board, wallId)];
-  return wall.nextsector != lwall.nextsector;
-}
-
 function deletedWallUpdater(wallId: number) {
   return (w: number) => {
     if (w == wallId) return -1
@@ -575,7 +532,7 @@ function deletedWallUpdater(wallId: number) {
 }
 
 export function deleteWall(board: Board, wallId: number, refs: BuildReferenceTracker) {
-  if (isSectorTJunction(board, wallId)) throw new Error(`Wall ${wallId} is sector T junction`);
+  if (isTJunction(board, wallId)) throw new Error(`Wall ${wallId} is sector T junction`);
   const loop = [...loopWalls(board, wallId)];
   if (loop.length < 4) throw new Error(`Loop of Wall ${wallId} need to have 3 walls at minimum`);
   const wall = board.walls[wallId];
@@ -600,29 +557,4 @@ export function mergePoints(board: Board, wallId: number, refs: BuildReferenceTr
   const wall = board.walls[wallId];
   const wall2 = board.walls[wall.point2];
   if (wall.x == wall2.x && wall.y == wall2.y) deleteWall(board, wallId, refs);
-}
-
-const NULL_SECTOR_SET = new Set([-1]);
-export function findSectorsAtPoint(board: Board, x: number, y: number): Set<number> {
-  const sectorId = findSector(board, x, y);
-  if (sectorId == -1) return NULL_SECTOR_SET;
-  const wallId = wallInSector(board, sectorId, x, y);
-  if (wallId == -1) return new Set([sectorId]);
-  return new Set(iter(connectedWalls(board, wallId))
-    .map(w => sectorOfWall(board, w)));
-}
-
-export function findContainingSector(board: Board, points: Iterable<[number, number]>) {
-  return iter(points)
-    .map(p => findSectorsAtPoint(board, p[0], p[1]))
-    .reduce((lh, rh) => { return lh == null ? rh : intersect(lh, rh) }, null)
-}
-
-function pointInterpolator(lh: [number, number], rh: [number, number], t: number) {
-  return <[number, number]>[NumberInterpolator(lh[0], rh[0], t), NumberInterpolator(lh[1], rh[1], t)]
-}
-
-export function findContainingSectorMidPoints(board: Board, points: Iterable<[number, number]>): Set<number> {
-  const interpolated = interpolate(points, pointInterpolator);
-  return findContainingSector(board, interpolated);
 }

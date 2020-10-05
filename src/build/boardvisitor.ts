@@ -2,9 +2,10 @@ import { arcsIntersects, monoatan2, dot2d, len2d } from '../utils/mathutils';
 import * as GLM from '../libs_js/glmatrix';
 import { Deck, IndexedDeck } from '../utils/collections';
 import * as PROFILE from '../utils/profiler';
-import { nextwall, packWallSectorId, unpackSectorId, unpackWallId } from './boardutils';
+import { packWallSectorId, unpackSectorId, unpackWallId } from './boardutils';
 import { Board } from './board/structs';
 import * as U from './utils';
+import { inSector, nextwall } from './board/query';
 
 export interface VisResult {
   forSector<T>(ctx: T, secv: SectorVisitor<T>): void;
@@ -130,7 +131,7 @@ export class TopDownBoardVisitorResult implements VisResult {
   private prescan() {
     this.visibleSectors.clear();
     for (let s = 0; s < this.board.numsectors; s++) {
-      if (U.inSector(this.board, this.cx, this.cy, s)) {
+      if (inSector(this.board, this.cx, this.cy, s)) {
         this.visibleSectors.add(s);
         continue;
       }

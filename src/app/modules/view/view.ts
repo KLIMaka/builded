@@ -1,4 +1,4 @@
-import { DEFAULT_REPEAT_RATE, nextwall } from "../../../build/boardutils";
+import { DEFAULT_REPEAT_RATE } from "../../../build/boardutils";
 import { Entity, Target } from "../../../build/hitscan";
 import { Board } from "../../../build/board/structs";
 import { create, Dependency, Injector } from "../../../utils/injector";
@@ -9,6 +9,7 @@ import { Renderable } from "../../apis/renderable";
 import { LoadBoard, NamedMessage } from "../../edit/messages";
 import { View2d, View2dConstructor } from "./view2d";
 import { View3d, View3dConstructor } from "./view3d";
+import { nextwall } from "../../../build/board/query";
 
 export class TargetImpl implements Target {
   public coords_: [number, number, number] = [0, 0, 0];

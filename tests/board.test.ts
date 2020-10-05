@@ -1,14 +1,15 @@
 import { BuildReferenceTrackerImpl } from '../src/app/modules/default/reftracker';
 import { cloneBoard, loadBloodMap, saveBloodMap } from '../src/build/blood/maploader';
 import { BloodBoard } from '../src/build/blood/structs';
-import { clockwise } from '../src/build/board/internal';
+import { clockwise, wallInSector } from '../src/build/board/internal';
 import { innerSectors, isOuterLoop, loopPoints, loopStart, loopWalls, wallsBetween, innerWalls, innerSectorsOfLoop, canonicalWall } from '../src/build/board/loops';
+import { walllen, inSector, findContainingSector, findContainingSectorMidPoints, findSectorsAtPoint, findSector } from '../src/build/board/query';
 import { splitSector } from '../src/build/board/splitsector';
 import { Board } from '../src/build/board/structs';
-import { createInnerLoop, createNewSector, deleteLoop, deleteSector, deleteWall, fillInnerLoop, findContainingSector, findContainingSectorMidPoints, findSectorsAtPoint, mergePoints, splitWall, wallInSector, walllen } from '../src/build/boardutils';
+import { createInnerLoop, createNewSector, deleteLoop, deleteSector, deleteWall, fillInnerLoop, mergePoints, splitWall } from '../src/build/boardutils';
 import { ArtInfo, ArtInfoProvider, Attributes } from '../src/build/formats/art';
 import { loadBuildMap, saveBuildMap } from '../src/build/maploader';
-import { findSector, inPolygon, inSector } from '../src/build/utils';
+import { inPolygon } from '../src/build/utils';
 import { map, wrap } from '../src/utils/collections';
 import { iter } from '../src/utils/iter';
 import { Stream } from '../src/utils/stream';

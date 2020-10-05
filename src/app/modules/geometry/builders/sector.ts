@@ -1,5 +1,5 @@
 import { sectorWalls } from "../../../../build/board/loops";
-import { Board, Sector, Wall } from "../../../../build/board/structs";
+import { Board, Wall } from "../../../../build/board/structs";
 import { ArtInfo } from "../../../../build/formats/art";
 import { createSlopeCalculator, getFirstWallAngle, sectorNormal, ZSCALE } from "../../../../build/utils";
 import { mat4, Mat4Array, vec3, Vec3Array, vec4 } from "../../../../libs_js/glmatrix";
@@ -20,7 +20,8 @@ export class SectorBuilder extends Builders implements SectorRenderable {
   ) { super([ceiling, floor]) }
 }
 
-function applySectorTextureTransform(sector: Sector, ceiling: boolean, walls: Wall[], info: ArtInfo, texMat: Mat4Array) {
+function applySectorTextureTransform(board: Board, sectorId: number, ceiling: boolean, info: ArtInfo, texMat: Mat4Array) {
+  const sector = board.sectors[sectorId];
   const xpan = (ceiling ? sector.ceilingxpanning : sector.floorxpanning) / 256.0;
   const ypan = (ceiling ? sector.ceilingypanning : sector.floorypanning) / 256.0;
   const stats = ceiling ? sector.ceilingstat : sector.floorstat;
@@ -36,8 +37,8 @@ function applySectorTextureTransform(sector: Sector, ceiling: boolean, walls: Wa
     mat4.rotateZ(texMat, texMat, Math.PI / 2);
   }
   if (stats.alignToFirstWall) {
-    const w1 = walls[sector.wallptr];
-    mat4.rotateZ(texMat, texMat, getFirstWallAngle(sector, walls));
+    const w1 = board.walls[sector.wallptr];
+    mat4.rotateZ(texMat, texMat, getFirstWallAngle(board, sectorId));
     mat4.translate(texMat, texMat, [-w1.x, -w1.y, 0, 0])
   }
   mat4.rotateX(texMat, texMat, -Math.PI / 2);
@@ -172,13 +173,13 @@ export function updateSector(ctx: RenderablesCacheContext, sectorId: number, bui
   const sector = board.sectors[sectorId];
 
   const ceilinginfo = art.getInfo(sector.ceilingpicnum);
-  applySectorTextureTransform(sector, true, board.walls, ceilinginfo, texMat_);
+  applySectorTextureTransform(board, sectorId, true, ceilinginfo, texMat_);
   fillBuffersForSector(true, board, sectorId, builder, sectorNormal(sectorNormal_, board, sectorId, true), texMat_);
   builder.ceiling.tex = sector.ceilingstat.parallaxing ? art.getParallaxTexture(sector.ceilingpicnum) : art.get(sector.ceilingpicnum);
   builder.ceiling.parallax = sector.ceilingstat.parallaxing;
 
   const floorinfo = art.getInfo(sector.floorpicnum);
-  applySectorTextureTransform(sector, false, board.walls, floorinfo, texMat_);
+  applySectorTextureTransform(board, sectorId, false, floorinfo, texMat_);
   fillBuffersForSector(false, board, sectorId, builder, sectorNormal(sectorNormal_, board, sectorId, false), texMat_);
   builder.floor.tex = sector.floorstat.parallaxing ? art.getParallaxTexture(sector.floorpicnum) : art.get(sector.floorpicnum);
   builder.floor.parallax = sector.floorstat.parallaxing;

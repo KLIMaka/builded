@@ -1,7 +1,8 @@
 import { closestWallInSector, closestWallSegmentInSector } from "../../../build/board/distances";
+import { inSector, findSector, sectorOfWall } from "../../../build/board/query";
 import { Board } from "../../../build/board/structs";
 import { Entity, EntityType, Hitscan, hitscan, Ray, Target } from "../../../build/hitscan";
-import { build2gl, findSector, getPlayerStart, gl2build, inSector, sectorOfWall, ZSCALE } from "../../../build/utils";
+import { build2gl, getPlayerStart, gl2build, ZSCALE } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 import { CachedValue } from "../../../utils/cachedvalue";
 import { Controller3D } from "../../../utils/camera/controller3d";

@@ -1,7 +1,7 @@
 import { range } from '../../utils/collections';
 import { iter } from '../../utils/iter';
 import { array, atomic_array, bits, byte, int, short, Stream, struct, ubyte } from '../../utils/stream';
-import { Header1, Wall } from '../board/structs';
+import { Header1 } from '../board/structs';
 import { initSector, initSprite, initWall, sectorStruct, spriteStruct, wallStruct } from '../maploader';
 import { BloodBoard, BloodSector, BloodSprite, BloodWall, SectorExtra, SpriteExtra, WallExtra } from './structs';
 

@@ -281,6 +281,19 @@ export function newSprite() {
   return initSprite(new Sprite())
 }
 
+export function newBoard() {
+  const board = new Board();
+  board.walls = [];
+  board.sectors = [];
+  board.sprites = [];
+  board.numwalls = 0;
+  board.numsectors = 0;
+  board.numsprites = 0;
+  board.version = 0x0007;
+  board.posx = board.posy = board.posz = board.cursectnum = board.ang = 0;
+  return board;
+}
+
 export function cloneSector(sector: Sector): Sector {
   let sectorCopy = new Sector();
   Object.assign(sectorCopy, sector);

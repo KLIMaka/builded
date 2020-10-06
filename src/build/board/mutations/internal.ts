@@ -25,6 +25,7 @@ export function addSector(board: Board, sector: Sector) {
   const newSectorIdx = board.numsectors;
   board.sectors[newSectorIdx] = sector;
   sector.wallptr = board.numwalls;
+  sector.wallnum = 0;
   board.numsectors++;
   return newSectorIdx;
 }

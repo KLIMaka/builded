@@ -1,7 +1,7 @@
 
 export class Dependency<T> { constructor(readonly name: string, readonly multi = false) { } }
-
 export type InstanceProvider<T> = (injector: Injector) => Promise<T>;
+export type Module = (injector: Injector) => void;
 
 export class CircularDependencyError extends Error {
   constructor(readonly dependencies: string[]) { super() }
@@ -14,7 +14,7 @@ export interface Injector {
   getInstance<T>(dependency: Dependency<T>): Promise<T>;
   bind<T>(dependency: Dependency<T | T[]>, provider: InstanceProvider<T>): void;
   bindInstance<T>(dependency: Dependency<T>, instance: T): void;
-  install(module: (injector: Injector) => void): void;
+  install(module: Module): void;
 }
 
 interface ParentInjector extends Injector {
@@ -27,7 +27,7 @@ class ChildInjector<T> implements ParentInjector {
   getInstance<T>(dependency: Dependency<T>): Promise<T> { return this.parent.getInstanceParent(dependency, this) }
   bind<T>(dependency: Dependency<T | T[]>, provider: InstanceProvider<T>): void { this.parent.bind(dependency, provider) }
   bindInstance<T>(dependency: Dependency<T>, instance: T): void { this.parent.bindInstance(dependency, instance) }
-  install(module: (injector: Injector) => void): void { this.parent.install(module) }
+  install(module: Module): void { this.parent.install(module) }
 }
 
 class DependencyNode {
@@ -78,6 +78,7 @@ class Graph {
 export class RootInjector implements ParentInjector {
   private providers = new Map<Dependency<any>, InstanceProvider<any>[]>();
   private promises = new Map<Dependency<any>, Promise<any>>();
+  private modules: ((i: Injector) => void)[] = [];
   private graph: Graph = new Graph();
 
   private add<T>(dependency: Dependency<T>, injector: Injector) {
@@ -123,8 +124,12 @@ export class RootInjector implements ParentInjector {
     this.promises.set(dependency, Promise.resolve(instance));
   }
 
-  public install(module: (injector: Injector) => void) {
-    module(this);
+  public install(module: Module) {
+    this.modules.push(module);
+  }
+
+  public start() {
+    for (const m of this.modules) m(this);
   }
 
   private create<T>(dependency: Dependency<T>, parent: ParentInjector) {

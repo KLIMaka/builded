@@ -17,7 +17,7 @@ import { PointSpritesBuilder, LineBuilder } from "../../modules/gl/buffers";
 import { closestWallPointDist } from "../../../build/board/distances";
 import { findContainingSectorMidPoints, sectorOfWall, wallInSector } from "../../../build/board/query";
 import { EngineApi } from "../../../build/board/mutations/api";
-import { createNewSector } from "../../../build/board/mutations/ceateSector";
+import { createNewSector } from "../../../build/board/mutations/ceatesector";
 import { createInnerLoop } from "../../../build/board/mutations/sectors";
 
 class Contour {

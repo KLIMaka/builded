@@ -24,6 +24,7 @@ injector.install(BloodModule);
 injector.install(PhotonUiModule);
 injector.install(FileBrowserModule);
 injector.install(ArtEditorModule);
+injector.start();
 
 MainLoopConstructor(injector).then(mainLoop => {
   animate(gl, (gl: WebGLRenderingContext, time: number) => {

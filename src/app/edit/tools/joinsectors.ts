@@ -1,4 +1,4 @@
-import { joinSectors } from "../../../build/boardutils";
+import { joinSectors } from "../../../build/board/mutations/joinsectors";
 import { create, Injector } from "../../../utils/injector";
 import { BOARD, BoardProvider, BuildReferenceTracker, REFERENCE_TRACKER, VIEW, View } from "../../apis/app";
 import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";

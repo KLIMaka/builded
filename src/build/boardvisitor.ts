@@ -2,10 +2,22 @@ import { arcsIntersects, monoatan2, dot2d, len2d } from '../utils/mathutils';
 import * as GLM from '../libs_js/glmatrix';
 import { Deck, IndexedDeck } from '../utils/collections';
 import * as PROFILE from '../utils/profiler';
-import { packWallSectorId, unpackSectorId, unpackWallId } from './boardutils';
 import { Board } from './board/structs';
 import * as U from './utils';
 import { inSector, nextwall } from './board/query';
+
+export function packWallSectorId(wallId: number, sectorId: number) {
+  return wallId | (sectorId << 16)
+}
+
+export function unpackWallId(wallSectorId: number) {
+  return wallSectorId & 0xffff;
+}
+
+export function unpackSectorId(wallSectorId: number) {
+  return (wallSectorId >> 16) & 0xffff;
+}
+
 
 export interface VisResult {
   forSector<T>(ctx: T, secv: SectorVisitor<T>): void;

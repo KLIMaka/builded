@@ -1,8 +1,8 @@
 import { range } from '../../utils/collections';
 import { iter } from '../../utils/iter';
 import { array, atomic_array, bits, byte, int, short, Stream, struct, ubyte } from '../../utils/stream';
-import { Header1 } from '../board/structs';
-import { sectorStruct, spriteStruct, wallStruct } from '../maploader';
+import { Header1, Wall } from '../board/structs';
+import { initSector, initSprite, initWall, sectorStruct, spriteStruct, wallStruct } from '../maploader';
 import { BloodBoard, BloodSector, BloodSprite, BloodWall, SectorExtra, SpriteExtra, WallExtra } from './structs';
 
 
@@ -224,8 +224,8 @@ function readSectors(header3: Header3, stream: Stream): BloodSector[] {
     decryptBuffer(buf, sectorStruct.size, dec);
     const sector = cloneSector(<BloodSector>sectorStruct.read(createStream(buf)));
     sectors.push(sector);
-    if (sector.extra != 0 && sector.extra != 65535)
-      sector.extraData = sectorExtraStruct.read(stream);
+    if (sector.extra != 0 && sector.extra != 65535) sector.extraData = sectorExtraStruct.read(stream);
+    else sector.extraData = null;
   }
   return sectors;
 }
@@ -239,8 +239,8 @@ function readWalls(header3: any, stream: Stream): BloodWall[] {
     decryptBuffer(buf, wallStruct.size, dec);
     const wall = cloneWall(<BloodWall>wallStruct.read(createStream(buf)));
     walls.push(wall);
-    if (wall.extra != 0 && wall.extra != 65535)
-      wall.extraData = wallExtraStruct.read(stream);
+    if (wall.extra != 0 && wall.extra != 65535) wall.extraData = wallExtraStruct.read(stream);
+    else wall.extraData = null;
   }
   return walls;
 }
@@ -254,8 +254,8 @@ function readSprites(header3: any, stream: Stream): BloodSprite[] {
     decryptBuffer(buf, spriteStruct.size, dec);
     const sprite = cloneSprite(<BloodSprite>spriteStruct.read(createStream(buf)));
     sprites.push(sprite);
-    if (sprite.extra != 0 && sprite.extra != 65535)
-      sprite.extraData = spriteExtraStruct.read(stream);
+    if (sprite.extra != 0 && sprite.extra != 65535) sprite.extraData = spriteExtraStruct.read(stream);
+    else sprite.extraData = null;
   }
   return sprites;
 }
@@ -404,6 +404,40 @@ function createHeader1(board: BloodBoard) {
   header1.startZ = board.posz;
   header1.unk = 0;
   return header1;
+}
+
+export function newBoard() {
+  const board = new BloodBoard();
+  board.walls = [];
+  board.sectors = [];
+  board.sprites = [];
+  board.numwalls = 0;
+  board.numsectors = 0;
+  board.numsprites = 0;
+  board.version = 0x0700;
+  board.posx = board.posy = board.posz = board.cursectnum = board.ang = 0;
+  return board;
+}
+
+export function newSector() {
+  const sector = new BloodSector();
+  initSector(sector);
+  sector.extraData = null;
+  return sector;
+}
+
+export function newWall() {
+  const wall = new BloodWall();
+  initWall(wall);
+  wall.extraData = null;
+  return wall;
+}
+
+export function newSprite() {
+  const sprite = new BloodSprite();
+  initSprite(sprite);
+  sprite.extraData = null;
+  return sprite;
 }
 
 export function cloneSector(sector: BloodSector): BloodSector {

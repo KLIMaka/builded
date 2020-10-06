@@ -1,6 +1,7 @@
+import { EngineApi } from "../../build/board/mutations/api";
 import { Entity } from "../../build/hitscan";
 import { Dependency, Injector } from "../../utils/injector";
-import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, REFERENCE_TRACKER, State, STATE, View, VIEW, GridController, GRID } from "../apis/app";
+import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, REFERENCE_TRACKER, State, STATE, View, VIEW, GridController, GRID, ENGINE_API } from "../apis/app";
 import { BUS, MessageBus } from "../apis/handler";
 import { SectorEnt } from "./sector";
 import { SpriteEnt } from "./sprite";
@@ -9,6 +10,7 @@ import { WallSegmentsEnt } from "./wallsegment";
 
 export class EditContext {
   readonly board: BoardProvider;
+  readonly api: EngineApi;
   readonly view: View
   readonly gridController: GridController;
   readonly bus: MessageBus;
@@ -18,8 +20,9 @@ export class EditContext {
 }
 
 export async function EditContextConstructor(injector: Injector): Promise<EditContext> {
-  const [board, view, gridController, bus, state, refs, art] = await Promise.all([
+  const [board, api, view, gridController, bus, state, refs, art] = await Promise.all([
     injector.getInstance(BOARD),
+    injector.getInstance(ENGINE_API),
     injector.getInstance(VIEW),
     injector.getInstance(GRID),
     injector.getInstance(BUS),
@@ -27,7 +30,7 @@ export async function EditContextConstructor(injector: Injector): Promise<EditCo
     injector.getInstance(REFERENCE_TRACKER),
     injector.getInstance(ART),
   ]);
-  return { board, view, gridController, bus, state, refs, art }
+  return { board, api, view, gridController, bus, state, refs, art }
 }
 
 export class EntityFactory {

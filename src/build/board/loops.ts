@@ -1,6 +1,6 @@
-import { iter } from "../../utils/iter";
+import { map } from "../../utils/collections";
 import { minValue } from "../../utils/mathutils";
-import { clockwise } from "./internal";
+import { clockwise } from "../utils";
 import { isValidSectorId, lastwall, nextwall } from "./query";
 import { Board } from "./structs";
 
@@ -68,7 +68,7 @@ export function innerWalls(board: Board, wallId: number): Iterable<number> {
 
 export function isOuterLoop(board: Board, wallId: number) {
   const WALL_MAPPER = (w: number) => <[number, number]>[board.walls[w].x, board.walls[w].y];
-  return clockwise(iter(loopWalls(board, wallId)).map(WALL_MAPPER));
+  return clockwise(map(loopWalls(board, wallId), WALL_MAPPER));
 }
 
 export function canonicalWall(board: Board, wallId: number): number {

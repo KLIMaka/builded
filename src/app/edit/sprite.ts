@@ -1,4 +1,5 @@
-import { deleteSprite, insertSprite, moveSprite, moveSpriteHitscan, moveSpriteX } from "../../build/boardutils";
+import { addSprite, deleteSprite } from "../../build/board/mutations/internal";
+import { moveSpriteX } from "../../build/board/mutations/sprites";
 import { Entity, EntityType } from "../../build/hitscan";
 import { ZSCALE } from "../../build/utils";
 import * as GLM from "../../libs_js/glmatrix";
@@ -19,17 +20,20 @@ export class SpriteEnt extends MessageHandlerReflective {
 
   public StartMove(msg: StartMove) {
     const board = this.ctx.board();
-    let spr = board.sprites[this.spriteId];
-    if (this.ctx.state.get(MOVE_COPY)) this.spriteId = insertSprite(board, spr.x, spr.y, spr.z, spr);
+    const spr = board.sprites[this.spriteId];
+    if (this.ctx.state.get(MOVE_COPY)) {
+      const newSprite = this.ctx.api.cloneSprite(spr);
+      this.spriteId = addSprite(board, newSprite);
+    }
     GLM.vec3.set(this.origin, spr.x, spr.z / ZSCALE, spr.y);
     this.origAng = spr.ang;
   }
 
   public Move(msg: Move) {
     const board = this.ctx.board();
-    let x = this.ctx.gridController.snap(this.origin[0] + msg.dx);
-    let y = this.ctx.gridController.snap(this.origin[2] + msg.dy);
-    let z = this.ctx.gridController.snap(this.origin[1] + msg.dz) * ZSCALE;
+    const x = this.ctx.gridController.snap(this.origin[0] + msg.dx);
+    const y = this.ctx.gridController.snap(this.origin[2] + msg.dy);
+    const z = this.ctx.gridController.snap(this.origin[1] + msg.dz) * ZSCALE;
     if (moveSpriteX(board, this.spriteId, x, y, z, this.ctx.gridController)) {
       this.ctx.bus.handle(new BoardInvalidate(new Entity(this.spriteId, EntityType.SPRITE)));
     }

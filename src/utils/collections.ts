@@ -134,6 +134,11 @@ export function reverse<T>(c: Collection<T>): Collection<T> {
     }
 }
 
+export function length<T>(it: Iterable<T>): number {
+  let length = 0;
+  for (const _ of it) length++;
+  return length;
+}
 
 export function* filter<T>(i: Iterable<T>, f: (t: T) => boolean): Generator<T> {
   for (const v of i) if (f(v)) yield v;
@@ -289,7 +294,6 @@ export function skipWhile<T>(i: Iterable<T>, f: (t: T) => boolean): Iterable<T> 
   for (; ;) {
     const v = iter.next();
     if (v.done || !f(v.value)) break;
-
   }
   return {
     [Symbol.iterator]: () => {

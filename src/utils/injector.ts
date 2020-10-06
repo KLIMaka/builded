@@ -137,8 +137,9 @@ export class RootInjector implements ParentInjector {
   }
 }
 
-export async function create<T, D1, D2, D3, D4, D5, D6, D7>(i: Injector, ctr: { new(d1: D1, d2?: D2, d3?: D3, d4?: D4, d5?: D5, d6?: D6, d7?: D7): T },
-  d1: Dependency<D1>, d2?: Dependency<D2>, d3?: Dependency<D3>, d4?: Dependency<D4>, d5?: Dependency<D5>, d6?: Dependency<D6>, d7?: Dependency<D7>): Promise<T> {
+export async function create<T, D1, D2, D3, D4, D5, D6, D7, D8>(i: Injector, ctr: { new(d1: D1, d2?: D2, d3?: D3, d4?: D4, d5?: D5, d6?: D6, d7?: D7, d8?: D8): T },
+  d1: Dependency<D1>, d2?: Dependency<D2>, d3?: Dependency<D3>, d4?: Dependency<D4>, d5?: Dependency<D5>, d6?: Dependency<D6>, d7?: Dependency<D7>, d8?: Dependency<D8>): Promise<T> {
+  if (d8 != undefined) return create8(i, ctr, d1, d2, d3, d4, d5, d6, d7, d8);
   if (d7 != undefined) return create7(i, ctr, d1, d2, d3, d4, d5, d6, d7);
   if (d6 != undefined) return create6(i, ctr, d1, d2, d3, d4, d5, d6);
   if (d5 != undefined) return create5(i, ctr, d1, d2, d3, d4, d5);
@@ -147,6 +148,21 @@ export async function create<T, D1, D2, D3, D4, D5, D6, D7>(i: Injector, ctr: { 
   if (d2 != undefined) return create2(i, ctr, d1, d2);
   if (d1 != undefined) return create1(i, ctr, d1);
   throw new Error('Invalid create usage');
+}
+
+async function create8<T, D1, D2, D3, D4, D5, D6, D7, D8>(i: Injector, ctr: { new(d1: D1, d2: D2, d3: D3, d4: D4, d5: D5, d6: D6, d7: D7, d8: D8): T },
+  d1: Dependency<D1>, d2: Dependency<D2>, d3: Dependency<D3>, d4: Dependency<D4>, d5: Dependency<D5>, d6: Dependency<D6>, d7: Dependency<D7>, d8: Dependency<D8>): Promise<T> {
+  const [i1, i2, i3, i4, i5, i6, i7, i8] = await Promise.all([
+    i.getInstance(d1),
+    i.getInstance(d2),
+    i.getInstance(d3),
+    i.getInstance(d4),
+    i.getInstance(d5),
+    i.getInstance(d6),
+    i.getInstance(d7),
+    i.getInstance(d8),
+  ]);
+  return new ctr(i1, i2, i3, i4, i5, i6, i7, i8);
 }
 
 async function create7<T, D1, D2, D3, D4, D5, D6, D7>(i: Injector, ctr: { new(d1: D1, d2: D2, d3: D3, d4: D4, d5: D5, d6: D6, d7: D7): T },

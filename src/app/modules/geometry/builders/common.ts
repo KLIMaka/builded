@@ -1,4 +1,3 @@
-import { DEFAULT_REPEAT_RATE } from '../../../../build/boardutils';
 import { Board, Sector, Wall } from '../../../../build/board/structs';
 import { slope, ZSCALE } from '../../../../build/utils';
 import { mat4, vec4 } from '../../../../libs_js/glmatrix';
@@ -9,6 +8,7 @@ import { BuildBuffer } from '../../gl/buffers';
 import { RenderablesCacheContext } from '../cache';
 import { PointSpriteBuilder, WireframeBuilder } from '../common';
 import { sectorOfWall, walllen } from '../../../../build/board/query';
+import { DEFAULT_REPEAT_RATE } from '../../../../build/board/mutations/internal';
 
 export const GRID_SECTOR_MATRIX = mat4.create();
 mat4.identity(GRID_SECTOR_MATRIX);

@@ -1,6 +1,6 @@
 import { connectedWalls as connected } from "../../build/board/loops";
+import { splitWall, moveWall, mergePoints, deleteWall } from "../../build/board/mutations/walls";
 import { lastwall, sectorOfWall } from "../../build/board/query";
-import { deleteWall, mergePoints, moveWall, splitWall } from "../../build/boardutils";
 import { Entity, EntityType } from "../../build/hitscan";
 import { vec2 } from "../../libs_js/glmatrix";
 import { IndexedDeck } from "../../utils/collections";
@@ -27,7 +27,7 @@ export class WallEnt extends MessageHandlerReflective {
     const board = this.ctx.board();
     const wall = board.walls[this.wallId];
     if (this.ctx.state.get(MOVE_COPY)) {
-      this.wallId = splitWall(board, this.wallId, wall.x, wall.y, this.ctx.art, this.ctx.refs);
+      this.wallId = splitWall(board, this.wallId, wall.x, wall.y, this.ctx.art, this.ctx.refs, this.ctx.api.cloneWall);
       this.connectedWalls = connected(board, this.wallId);
     }
     vec2.set(this.origin, wall.x, wall.y);

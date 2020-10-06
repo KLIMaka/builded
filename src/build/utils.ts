@@ -1,13 +1,11 @@
 import { vec2, vec3, Vec3Array } from '../libs_js/glmatrix';
-import { loopPairs } from '../utils/collections';
-import { cross2d, int, len2d, monoatan2, PI2 } from '../utils/mathutils';
+import { cyclicPairs, loopPairs, reverse } from '../utils/collections';
+import { cross2d, cyclic, int, len2d, monoatan2, PI2 } from '../utils/mathutils';
 import { normal2d } from '../utils/vecmath';
-import { sectorWalls } from './board/loops';
 import { Board, Sprite } from './board/structs';
 import { Entity, EntityType } from './hitscan';
 
 export const ZSCALE = -16;
-
 
 export function build2gl(out: Vec3Array, vec: Vec3Array): Vec3Array {
   return vec3.set(out, vec[0], vec[2] / ZSCALE, vec[1]);
@@ -274,4 +272,36 @@ export function spriteAngle(ang: number): number {
 
 export function vec2ang(x: number, y: number) {
   return int((monoatan2(y, x) / PI2) / ANGSCALE / 2);
+}
+
+export function clockwise(polygon: Iterable<[number, number]>): boolean {
+  let minx = Number.MAX_VALUE;
+  let minwall = -1;
+  const points = [...polygon];
+  const len = points.length;
+  for (const [w1, w2] of cyclicPairs(len)) {
+    const wall2 = points[w2];
+    if (wall2[0] < minx) {
+      minx = wall2[0];
+      minwall = w1;
+    }
+  }
+  const wall0 = points[minwall];
+  const wall1 = points[cyclic(minwall + 1, len)];
+  const wall2 = points[cyclic(minwall + 2, len)];
+
+  if (wall2[1] <= wall1[1] && wall1[1] <= wall0[1]) return true;
+  if (wall0[1] <= wall1[1] && wall1[1] <= wall2[1]) return false;
+
+  return cross2d(wall0[0] - wall1[0], wall0[1] - wall1[1], wall2[0] - wall1[0], wall2[1] - wall1[1]) < 0;
+}
+
+export function order(points: Iterable<[number, number]>, cw = true): Iterable<[number, number]> {
+  const actual = clockwise(points);
+  if (actual == cw) return points;
+  else {
+    const reversed = [...points];
+    reversed.reverse();
+    return reversed;
+  }
 }

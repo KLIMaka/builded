@@ -1,22 +1,24 @@
 import { closestWallSegmentInSector } from "../../../build/board/distances";
-import { wallInSector } from "../../../build/board/internal";
 import { sectorWalls } from "../../../build/board/loops";
-import { lastwall, sectorOfWall } from "../../../build/board/query";
-import { splitSector } from "../../../build/board/splitsector";
+import { lastwall, sectorOfWall, wallInSector } from "../../../build/board/query";
+import { splitSector } from "../../../build/board/mutations/splitsector";
 import { Board, Sector } from "../../../build/board/structs";
-import { createNewSector, setFirstWall, splitWall } from "../../../build/boardutils";
 import { ANGSCALE, build2gl, createSlopeCalculator, wallNormal, ZSCALE } from "../../../build/utils";
 import { vec2, vec3 } from "../../../libs_js/glmatrix";
 import { Deck } from "../../../utils/collections";
 import { create, Injector } from "../../../utils/injector";
 import { cyclic, dot2d, int } from "../../../utils/mathutils";
-import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, GRID, GridController, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
+import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, GRID, GridController, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
 import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
 import { Renderables } from "../../apis/renderable";
 import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
 import { LineBuilder } from "../../modules/gl/buffers";
 import { MovingHandle } from "../handle";
 import { BoardInvalidate, COMMIT, Frame, NamedMessage, Render } from "../messages";
+import { createNewSector } from "../../../build/board/mutations/ceateSector";
+import { setFirstWall } from "../../../build/board/mutations/sectors";
+import { splitWall } from "../../../build/board/mutations/walls";
+import { EngineApi } from "../../../build/board/mutations/api";
 
 export type point_3d = [number, number, number];
 export type projector = (x: number, y: number) => [number, number, number];
@@ -176,17 +178,17 @@ class PortalModel {
     this.addPoint();
   }
 
-  public stop(board: Board, art: ArtProvider, refs: BuildReferenceTracker, dist: number) {
+  public stop(board: Board, art: ArtProvider, refs: BuildReferenceTracker, api: EngineApi, dist: number) {
     const hull = buildHull([...this.points, this.pointer], (x, y) => this.project(x, y));
     const [nx, , ny] = wallNormal(vec3.create(), board, this.wallId);
     const sectorId = sectorOfWall(board, this.wallId);
-    for (const p of hull) splitWall(board, closestWallSegmentInSector(board, sectorId, p.x, p.y, 0), p.x, p.y, art, refs);
-    if (this.type == PortalType.MID) this.mid(dist, hull, nx, ny, sectorId, board, refs);
-    else if (this.type == PortalType.DOWN) this.nonMid(dist, hull, nx, ny, sectorId, board, refs, true);
-    else if (this.type == PortalType.UP) this.nonMid(dist, hull, nx, ny, sectorId, board, refs, false);
+    for (const p of hull) splitWall(board, closestWallSegmentInSector(board, sectorId, p.x, p.y, 0), p.x, p.y, art, refs, api.cloneWall);
+    if (this.type == PortalType.MID) this.mid(dist, hull, nx, ny, sectorId, board, refs, api);
+    else if (this.type == PortalType.DOWN) this.nonMid(dist, hull, nx, ny, sectorId, board, refs, api, true);
+    else if (this.type == PortalType.UP) this.nonMid(dist, hull, nx, ny, sectorId, board, refs, api, false);
   }
 
-  private nonMid(dist: number, hull: Point[], nx: number, ny: number, sectorId: number, board: Board, refs: BuildReferenceTracker, down: boolean) {
+  private nonMid(dist: number, hull: Point[], nx: number, ny: number, sectorId: number, board: Board, refs: BuildReferenceTracker, api: EngineApi, down: boolean) {
     for (let i = 0; i < hull.length - 1; i++) {
       const p1 = hull[i];
       const p2 = hull[i + 1];
@@ -196,7 +198,7 @@ class PortalModel {
         .push([int(p1.x + nx * dist), int(p1.y + ny * dist)])
         .push([int(p2.x + nx * dist), int(p2.y + ny * dist)])
         .push([p2.x, p2.y])
-      const sec = splitSector(board, sectorId, points, refs);
+      const sec = splitSector(board, sectorId, points, refs, api);
       const sector = board.sectors[sec];
       const firsWall = lastwall(board, wallInSector(board, sec, p1.x, p1.y));
       setFirstWall(board, sec, firsWall, refs);
@@ -218,7 +220,7 @@ class PortalModel {
     return -1;
   }
 
-  private mid(dist: number, hull: Point[], nx: number, ny: number, sectorId: number, board: Board, refs: BuildReferenceTracker) {
+  private mid(dist: number, hull: Point[], nx: number, ny: number, sectorId: number, board: Board, refs: BuildReferenceTracker, api: EngineApi) {
     for (let i = 0; i < hull.length - 1; i++) {
       const p1 = hull[i];
       const p2 = hull[i + 1];
@@ -227,7 +229,7 @@ class PortalModel {
         .push([p2.x, p2.y])
         .push([int(p2.x + nx * dist), int(p2.y + ny * dist)])
         .push([int(p1.x + nx * dist), int(p1.y + ny * dist)]);
-      const newSectorId = createNewSector(board, points, refs);
+      const newSectorId = createNewSector(board, points, refs, api);
       const sector = board.sectors[newSectorId];
       const firsWall = wallInSector(board, newSectorId, p1.x, p1.y);
       setFirstWall(board, newSectorId, firsWall, refs);
@@ -349,8 +351,17 @@ class PortalModel {
 }
 
 export async function DrawWallModule(injector: Injector) {
-  const bus = await injector.getInstance(BUS);
-  bus.connect(await create(injector, DrawWall, BUILDERS_FACTORY, VIEW, BOARD, REFERENCE_TRACKER, BUS, ART, GRID));
+  const [bus, api, builders, view, board, refs, art, grid] = await Promise.all([
+    injector.getInstance(BUS),
+    injector.getInstance(ENGINE_API),
+    injector.getInstance(BUILDERS_FACTORY),
+    injector.getInstance(VIEW),
+    injector.getInstance(BOARD),
+    injector.getInstance(REFERENCE_TRACKER),
+    injector.getInstance(ART),
+    injector.getInstance(GRID),
+  ]);
+  bus.connect(new DrawWall(builders, api, view, board, refs, bus, art, grid));
 }
 
 export class DrawWall extends MessageHandlerReflective {
@@ -359,6 +370,7 @@ export class DrawWall extends MessageHandlerReflective {
 
   constructor(
     factory: BuildersFactory,
+    private api: EngineApi,
     private view: View,
     private board: BoardProvider,
     private refs: BuildReferenceTracker,
@@ -377,7 +389,7 @@ export class DrawWall extends MessageHandlerReflective {
   }
 
   private stop() {
-    this.portal.stop(this.board(), this.art, this.refs, this.getDistance());
+    this.portal.stop(this.board(), this.art, this.refs, this.api, this.getDistance());
     this.wallId = -1;
     this.bus.handle(COMMIT);
     this.bus.handle(new BoardInvalidate(null));

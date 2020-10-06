@@ -1,5 +1,6 @@
 import { struct, bits, ushort, int, short, byte, ubyte, uint, Stream, array } from '../utils/stream';
-import { SectorStats, Sector, WallStats, Wall, SpriteStats, Sprite, Board } from './board/structs';
+import { SectorStats, Sector, WallStats, Wall, SpriteStats, Sprite, Board, FACE_SPRITE } from './board/structs';
+import { ZSCALE } from './utils';
 
 let sectorStats = struct(SectorStats)
   .field('parallaxing', bits(1))
@@ -149,6 +150,135 @@ function fixSectorSlopes(sectors: Sector[]) {
     sec.floorstat.slopped = 1;
   }
   return sectors;
+}
+
+export function initWallStats(stat: WallStats) {
+  stat.alignBottom = 0;
+  stat.blocking = 0;
+  stat.blocking2 = 0;
+  stat.masking = 0;
+  stat.oneWay = 0;
+  stat.swapBottoms = 0;
+  stat.translucent = 0;
+  stat.translucentReversed = 0;
+  stat.xflip = 0;
+  stat.yflip = 0;
+  stat.unk = 0;
+  return stat;
+}
+
+export function initWall(wall: Wall) {
+  wall.x = 0;
+  wall.y = 0;
+  wall.point2 = -1;
+  wall.nextwall = -1;
+  wall.nextsector = -1;
+  wall.cstat = initWallStats(new WallStats());
+  wall.picnum = 0;
+  wall.overpicnum = 0;
+  wall.shade = 0;
+  wall.pal = 0;
+  wall.xrepeat = 8;
+  wall.yrepeat = 8;
+  wall.xpanning = 0;
+  wall.ypanning = 0;
+  wall.lotag = 0;
+  wall.hitag = 0
+  wall.extra = 65535;
+  return wall;
+}
+
+export function newWall() {
+  return initWall(new Wall())
+}
+
+export function initSectorStats(stat: SectorStats) {
+  stat.alignToFirstWall = 0;
+  stat.doubleSmooshiness = 0;
+  stat.parallaxing = 0;
+  stat.slopped = 0;
+  stat.swapXY = 0;
+  stat.xflip = 0;
+  stat.yflip = 0;
+  stat.unk = 0;
+  return stat;
+}
+
+export function initSector(sector: Sector) {
+  sector.ceilingheinum = 0;
+  sector.ceilingpal = 0;
+  sector.ceilingpicnum = 0;
+  sector.ceilingshade = 0;
+  sector.ceilingstat = initSectorStats(new SectorStats());
+  sector.ceilingxpanning = 0;
+  sector.ceilingypanning = 0;
+  sector.ceilingz = 2048 * ZSCALE;
+  sector.extra = 65535;
+  sector.floorheinum = 0;
+  sector.floorpal = 0;
+  sector.floorpicnum = 0;
+  sector.floorshade = 0;
+  sector.floorstat = initSectorStats(new SectorStats())
+  sector.floorxpanning = 0;
+  sector.floorypanning = 0;
+  sector.floorz = 0;
+  sector.hitag = 0;
+  sector.lotag = 0;
+  sector.visibility = 0;
+  sector.wallnum = 0;
+  sector.wallptr = 0;
+  sector.filler = 0;
+  return sector;
+}
+
+export function newSector() {
+  return initSector(new Sector())
+}
+
+export function initSpriteStats(stats: SpriteStats) {
+  stats.blocking = 0;
+  stats.blocking2 = 0;
+  stats.invisible = 0;
+  stats.noautoshading = 0;
+  stats.onesided = 0;
+  stats.realCenter = 0;
+  stats.tranclucentReversed = 0;
+  stats.translucent = 0;
+  stats.type = FACE_SPRITE;
+  stats.xflip = 0;
+  stats.yflip = 0;
+  stats.unk = 0;
+  return stats;
+}
+
+export function initSprite(sprite: Sprite) {
+  sprite.ang = 0;
+  sprite.clipdist = 0;
+  sprite.cstat = initSpriteStats(new SpriteStats());
+  sprite.extra = 65535;
+  sprite.hitag = 0;
+  sprite.lotag = 0;
+  sprite.owner = -1;
+  sprite.pal = 0;
+  sprite.picnum = 1;
+  sprite.sectnum = -1;
+  sprite.shade = 0;
+  sprite.statnum = 0;
+  sprite.x = 0;
+  sprite.y = 0;
+  sprite.z = 0;
+  sprite.xoffset = 0;
+  sprite.yoffset = 0;
+  sprite.xvel = 0;
+  sprite.yvel = 0;
+  sprite.xrepeat = 64;
+  sprite.yrepeat = 64;
+  sprite.filler = 0;
+  return sprite;
+}
+
+export function newSprite() {
+  return initSprite(new Sprite())
 }
 
 export function cloneSector(sector: Sector): Sector {

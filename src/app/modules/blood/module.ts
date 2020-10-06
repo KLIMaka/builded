@@ -1,4 +1,4 @@
-import { cloneBoard, loadBloodMap, saveBloodMap } from '../../../build/blood/maploader';
+import { cloneBoard, loadBloodMap, saveBloodMap, cloneSector, cloneSprite, cloneWall, newSector, newSprite, newWall, newBoard } from '../../../build/blood/maploader';
 import { BloodBoard } from '../../../build/blood/structs';
 import { BloodImplementationConstructor } from '../../../build/blood/utils';
 import { ArtFile, ArtFiles } from '../../../build/formats/art';
@@ -6,7 +6,7 @@ import { RffFile } from '../../../build/formats/rff';
 import { createTexture } from '../../../utils/gl/textures';
 import { Dependency, Injector } from '../../../utils/injector';
 import { Stream } from '../../../utils/stream';
-import { BoardManipulator_, BuildResources, DEFAULT_BOARD, RESOURCES, BOARD } from '../../apis/app';
+import { BuildResources, DEFAULT_BOARD, RESOURCES, BOARD, ENGINE_API } from '../../apis/app';
 import { BUS } from '../../apis/handler';
 import { LoadBoard, namedMessageHandler } from '../../edit/messages';
 import { RAW_PAL, PIC_TAGS, RAW_PLUs } from '../artselector';
@@ -16,6 +16,7 @@ import { PALSWAPS, PAL_TEXTURE, PLU_TEXTURE, SHADOWSTEPS } from '../gl/buildgl';
 import { MAP_NAMES, showMapSelection } from '../selectmap';
 import { Implementation_ } from '../view/boardrenderer3d';
 import { FS_MANAGER } from '../fs/manager';
+import { EngineApi } from '../../../build/board/mutations/api';
 
 async function loadArtFiles(injector: Injector): Promise<ArtFiles> {
   const res = await injector.getInstance(RESOURCES);
@@ -171,9 +172,13 @@ async function PicTags(injector: Injector) {
   }
 }
 
+function engineApi(): EngineApi {
+  return { cloneBoard, cloneWall, cloneSprite, cloneSector, newWall, newSector, newSprite, newBoard };
+}
+
 export function BloodModule(injector: Injector) {
   injector.bindInstance(PARALLAX_TEXTURES, 16);
-  injector.bindInstance(BoardManipulator_, { cloneBoard });
+  injector.bindInstance(ENGINE_API, engineApi());
   injector.bindInstance(SHADOWSTEPS, 64);
   injector.bind(RESOURCES, BloodResources);
   injector.bind(ART_FILES, loadArtFiles);

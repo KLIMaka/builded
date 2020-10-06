@@ -7,6 +7,7 @@ import { Dependency } from "../../utils/injector";
 import { MessageHandler } from "./handler";
 import { ReferenceTracker } from "./referencetracker";
 import { Renderable } from "./renderable";
+import { EngineApi } from "../../build/board/mutations/api"
 
 export interface Storage {
   get(key: string): Promise<any>;
@@ -32,10 +33,7 @@ export interface View extends MoveStruct, MessageHandler {
 }
 export const VIEW = new Dependency<View>('View');
 
-export interface BoardManipulator {
-  cloneBoard(board: Board): Board;
-}
-export const BoardManipulator_ = new Dependency<BoardManipulator>('BoardManipulator');
+export const ENGINE_API = new Dependency<EngineApi>("Engine Api");
 export type BoardProvider = () => Board;
 export const BOARD = new Dependency<BoardProvider>('Borad');
 export const DEFAULT_BOARD = new Dependency<Board>('Default Board');

@@ -1,13 +1,12 @@
 import { Board } from "../../../build/board/structs";
-import { createInnerLoop, createNewSector } from "../../../build/boardutils";
-import { splitSector } from "../../../build/board/splitsector";
+import { splitSector } from "../../../build/board/mutations/splitsector";
 import { Target } from "../../../build/hitscan";
 import { ZSCALE } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 import { Deck, wrap } from "../../../utils/collections";
 import { create, Injector } from "../../../utils/injector";
 import { int, len2d } from "../../../utils/mathutils";
-import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
+import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
 import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
 import { Renderables } from "../../apis/renderable";
 import { writeText } from "../../modules/geometry/builders/common";
@@ -16,8 +15,10 @@ import { getClosestSectorZ } from "../editutils";
 import { BoardInvalidate, COMMIT, Frame, NamedMessage, Render } from "../messages";
 import { PointSpritesBuilder, LineBuilder } from "../../modules/gl/buffers";
 import { closestWallPointDist } from "../../../build/board/distances";
-import { wallInSector } from "../../../build/board/internal";
-import { findContainingSectorMidPoints, sectorOfWall } from "../../../build/board/query";
+import { findContainingSectorMidPoints, sectorOfWall, wallInSector } from "../../../build/board/query";
+import { EngineApi } from "../../../build/board/mutations/api";
+import { createNewSector } from "../../../build/board/mutations/ceateSector";
+import { createInnerLoop } from "../../../build/board/mutations/sectors";
 
 class Contour {
   private points: Array<[number, number]> = [];
@@ -120,7 +121,7 @@ class Contour {
 
 export async function DrawSectorModule(injector: Injector) {
   const bus = await injector.getInstance(BUS);
-  bus.connect(await create(injector, DrawSector, BUILDERS_FACTORY, ART, VIEW, BOARD, REFERENCE_TRACKER, BUS));
+  bus.connect(await create(injector, DrawSector, BUILDERS_FACTORY, ART, ENGINE_API, VIEW, BOARD, REFERENCE_TRACKER, BUS));
 }
 
 export class DrawSector extends MessageHandlerReflective {
@@ -131,6 +132,7 @@ export class DrawSector extends MessageHandlerReflective {
   constructor(
     factory: BuildersFactory,
     art: ArtProvider,
+    private api: EngineApi,
     private view: View,
     private board: BoardProvider,
     private refs: BuildReferenceTracker,
@@ -257,8 +259,8 @@ export class DrawSector extends MessageHandlerReflective {
     let sectorId = this.findContainingSector();
     const board = this.board();
     if (sectorId != -1)
-      createInnerLoop(board, sectorId, this.points, this.refs);
-    createNewSector(board, this.points, this.refs);
+      createInnerLoop(board, sectorId, this.points, this.refs, this.api);
+    createNewSector(board, this.points, this.refs, this.api);
     this.bus.handle(COMMIT);
     this.bus.handle(new BoardInvalidate(null));
     this.points.clear();
@@ -267,7 +269,7 @@ export class DrawSector extends MessageHandlerReflective {
   }
 
   private splitSector(sectorId: number): void {
-    splitSector(this.board(), sectorId, wrap([...this.points, <[number, number]>this.pointer]), this.refs);
+    splitSector(this.board(), sectorId, wrap([...this.points, <[number, number]>this.pointer]), this.refs, this.api);
     this.bus.handle(COMMIT);
     this.bus.handle(new BoardInvalidate(null));
     this.points.clear();

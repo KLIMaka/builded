@@ -1,10 +1,11 @@
+import { EngineApi } from "../../../build/board/mutations/api";
+import { pushWall } from "../../../build/board/mutations/walls";
 import { sectorOfWall } from "../../../build/board/query";
-import { pushWall } from "../../../build/boardutils";
 import { build2gl, createSlopeCalculator, wallNormal, ZSCALE } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 import { create, Injector } from "../../../utils/injector";
 import { dot2d, int } from "../../../utils/mathutils";
-import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, GRID, GridController, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
+import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, GRID, GridController, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
 import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
 import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
 import { LineBuilder } from "../../modules/gl/buffers";
@@ -18,8 +19,17 @@ const start_ = vec3.create();
 const dir_ = vec3.create();
 
 export async function PushWallModule(injector: Injector) {
-  const bus = await injector.getInstance(BUS);
-  bus.connect(await create(injector, PushWall, BUILDERS_FACTORY, VIEW, ART, BOARD, REFERENCE_TRACKER, BUS, GRID));
+  const [bus, api, builders, view, art, board, refs, grid] = await Promise.all([
+    injector.getInstance(BUS),
+    injector.getInstance(ENGINE_API),
+    injector.getInstance(BUILDERS_FACTORY),
+    injector.getInstance(VIEW),
+    injector.getInstance(ART),
+    injector.getInstance(BOARD),
+    injector.getInstance(REFERENCE_TRACKER),
+    injector.getInstance(GRID),
+  ])
+  bus.connect(new PushWall(builders, api, view, art, board, refs, bus, grid));
 }
 
 export class PushWall extends MessageHandlerReflective {
@@ -29,6 +39,7 @@ export class PushWall extends MessageHandlerReflective {
 
   constructor(
     builders: BuildersFactory,
+    private api: EngineApi,
     private view: View,
     private art: ArtProvider,
     private board: BoardProvider,
@@ -52,7 +63,7 @@ export class PushWall extends MessageHandlerReflective {
   }
 
   private stop() {
-    pushWall(this.board(), this.wallId, this.getDistance(), this.art, this.copy, this.refs);
+    pushWall(this.board(), this.wallId, this.getDistance(), this.art, this.copy, this.refs, this.api);
     this.bus.handle(COMMIT);
     this.bus.handle(INVALIDATE_ALL);
     this.abort();

@@ -1,26 +1,39 @@
-import { deleteLoop, deleteLoopFull, deleteSectorFull, fillInnerLoop, insertSprite, setFirstWall, splitWall } from "../../../build/boardutils";
-import { EntityType } from "../../../build/hitscan";
+import { EngineApi } from "../../../build/board/mutations/api";
+import { deleteLoop, deleteLoopFull, deleteSectorFull, fillInnerLoop, setFirstWall } from "../../../build/board/mutations/sectors";
+import { addSprite } from "../../../build/board/mutations/internal";
+import { splitWall } from "../../../build/board/mutations/walls";
+import { sectorOfWall } from "../../../build/board/query";
 import { Board, WALL_SPRITE } from "../../../build/board/structs";
+import { EntityType } from "../../../build/hitscan";
 import { slope, vec2ang, wallNormal } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
-import { create, Injector } from "../../../utils/injector";
+import { Injector } from "../../../utils/injector";
 import { info } from "../../../utils/logger";
 import { int } from "../../../utils/mathutils";
-import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, REFERENCE_TRACKER, View, VIEW, GRID, GridController } from "../../apis/app";
+import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, GRID, GridController, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
 import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
+import { invalidateSectorAndWalls } from "../editutils";
 import { COMMIT, INVALIDATE_ALL, NamedMessage } from "../messages";
 import { PicNumSelector, PICNUM_SELECTOR } from "./selection";
-import { invalidateSectorAndWalls } from "../editutils";
-import { sectorOfWall } from "../../../build/board/query";
 
 export async function UtilsModule(injector: Injector) {
-  const bus = await injector.getInstance(BUS);
-  bus.connect(await create(injector, Utils, BOARD, ART, VIEW, BUS, REFERENCE_TRACKER, GRID, PICNUM_SELECTOR));
+  const [board, api, art, view, bus, refs, grid, pics] = await Promise.all([
+    injector.getInstance(BOARD),
+    injector.getInstance(ENGINE_API),
+    injector.getInstance(ART),
+    injector.getInstance(VIEW),
+    injector.getInstance(BUS),
+    injector.getInstance(REFERENCE_TRACKER),
+    injector.getInstance(GRID),
+    injector.getInstance(PICNUM_SELECTOR),
+  ])
+  bus.connect(new Utils(board, api, art, view, bus, refs, grid, pics));
 }
 
 class Utils extends MessageHandlerReflective {
   constructor(
     private board: BoardProvider,
+    private api: EngineApi,
     private art: ArtProvider,
     private view: View,
     private bus: MessageBus,
@@ -54,15 +67,24 @@ class Utils extends MessageHandlerReflective {
         const normal = wallNormal(vec3.create(), board, ent.id);
         const offx = normal[0] * 4;
         const offy = normal[2] * 4;
-        const spriteId = insertSprite(board, int(x + offx), int(y + offy), this.gridController.snap(z));
-        const sprite = board.sprites[spriteId];
+        const sprite = this.api.newSprite();
+        sprite.x = int(x + offx);
+        sprite.y = int(y + offy)
+        sprite.z = this.gridController.snap(z);
+        sprite.sectnum = sectorOfWall(board, ent.id);
         sprite.picnum = picnum;
         sprite.cstat.type = WALL_SPRITE;
         sprite.ang = vec2ang(normal[0], normal[2]);
+        addSprite(board, sprite);
       } else {
-        const spriteId = insertSprite(board, x, y, z);
-        const sprite = board.sprites[spriteId];
+        const sectorId = ent.isSector() ? ent.id : ent.isSprite() ? board.sprites[ent.id].sectnum : -1;
+        const sprite = this.api.newSprite();
+        sprite.x = int(x);
+        sprite.y = int(y)
+        sprite.z = int(z);
+        sprite.sectnum = sectorId;
         sprite.picnum = picnum;
+        addSprite(board, sprite);
       }
       this.commit();
     });
@@ -79,7 +101,7 @@ class Utils extends MessageHandlerReflective {
   private fillInnerLoop() {
     const target = this.view.snapTarget();
     if (target.entity == null || !target.entity.isWall()) return;
-    fillInnerLoop(this.board(), target.entity.id, this.refs);
+    fillInnerLoop(this.board(), target.entity.id, this.refs, this.api);
     this.commit();
     this.invalidateAll();
   }
@@ -109,7 +131,7 @@ class Utils extends MessageHandlerReflective {
     const id = target.entity.id;
     const board = this.board();
 
-    splitWall(board, id, x, y, this.art, this.refs);
+    splitWall(board, id, x, y, this.art, this.refs, this.api.cloneWall);
     this.commit();
     const s = sectorOfWall(board, id);
     invalidateSectorAndWalls(s, board, this.bus);

@@ -1,6 +1,5 @@
 import { Board } from '../../../build/board/structs';
-import { unpackWallId } from '../../../build/boardutils';
-import { AllBoardVisitorResult, createSectorCollector, createWallCollector, PvsBoardVisitorResult, VisResult } from '../../../build/boardvisitor';
+import { AllBoardVisitorResult, createSectorCollector, createWallCollector, PvsBoardVisitorResult, unpackWallId, VisResult } from '../../../build/boardvisitor';
 import { wallVisible, ZSCALE } from '../../../build/utils';
 import { mat4, vec2, vec3 } from '../../../libs_js/glmatrix';
 import { Deck } from '../../../utils/collections';

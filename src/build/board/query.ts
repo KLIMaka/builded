@@ -1,8 +1,10 @@
+import { GridController } from "../../app/apis/app";
 import { any, findFirst, interpolate, intersect, range } from "../../utils/collections";
 import { NumberInterpolator } from "../../utils/interpolator";
 import { iter } from "../../utils/iter";
-import { cross2d, int, len2d } from "../../utils/mathutils";
+import { cross2d, int, len2d, tuple2 } from "../../utils/mathutils";
 import { connectedWalls, sectorWalls } from "./loops";
+import { DEFAULT_REPEAT_RATE } from "./mutations/internal";
 import { Board } from "./structs";
 
 export function isValidWallId(board: Board, wallId: number): boolean {
@@ -95,10 +97,8 @@ export function inSector(board: Board, x: number, y: number, sectorId: number): 
     if (dy1 == 0 && dy2 == 0 && (dx1 == 0 || dx2 == 0 || (dx1 ^ dx2) < 0)) return true;
 
     if ((dy1 ^ dy2) < 0) {
-      if ((dx1 ^ dx2) >= 0)
-        inter ^= dx1;
-      else
-        inter ^= cross2d(dx1, dy1, dx2, dy2) ^ dy2;
+      if ((dx1 ^ dx2) >= 0) inter ^= dx1;
+      else inter ^= cross2d(dx1, dy1, dx2, dy2) ^ dy2;
     }
   }
   return (inter >>> 31) == 1;
@@ -141,4 +141,21 @@ export function findSector(board: Board, x: number, y: number, sectorId: number 
 
 function findSectorAll(board: Board, x: number, y: number) {
   return findFirst(range(0, board.numsectors), s => inSector(board, x, y, s), -1);
+}
+
+export function snapWall(board: Board, wallId: number, x: number, y: number, grid: GridController) {
+  if (!isValidWallId(board, wallId)) throw new Error(`Invalid wallId: ${wallId}`);
+  const wall = board.walls[wallId];
+  const w1 = nextwall(board, wallId);
+  const wall1 = board.walls[w1];
+  const dx = wall1.x - wall.x;
+  const dy = wall1.y - wall.y;
+  const repeat = DEFAULT_REPEAT_RATE * wall.xrepeat;
+  const dxt = x - wall.x;
+  const dyt = y - wall.y;
+  const dt = len2d(dxt, dyt) / len2d(dx, dy);
+  const t = grid.snap(dt * repeat) / repeat;
+  const xs = int(wall.x + (t * dx));
+  const ys = int(wall.y + (t * dy));
+  return [xs, ys];
 }

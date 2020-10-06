@@ -1,7 +1,6 @@
 import { canonicalWall, connectedWalls } from "../../build/board/loops";
 import { sectorOfWall } from "../../build/board/query";
 import { Board } from "../../build/board/structs";
-import { fixxrepeat, mergePoints, moveWall } from "../../build/boardutils";
 import { Entity, EntityType, Target } from "../../build/hitscan";
 import { mat2d, vec2 } from "../../libs_js/glmatrix";
 import { IndexedDeck } from "../../utils/collections";
@@ -11,6 +10,7 @@ import { Message, MessageHandlerReflective } from "../apis/handler";
 import { EditContext } from "./context";
 import { invalidateSectorAndWalls } from "./editutils";
 import { BoardInvalidate, EndMove, Flip, Highlight, Move, Palette, PanRepeat, ResetPanRepeat, Rotate, SetPicnum, SetWallCstat, Shade, StartMove } from "./messages";
+import { fixxrepeat, mergePoints, moveWall } from "../../build/board/mutations/walls"
 
 function getClosestWallByIds(board: Board, target: Target, ids: Iterable<number>): number {
   let id = -1;

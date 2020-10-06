@@ -1,4 +1,4 @@
-import { deleteSector } from "../../build/boardutils";
+import { deleteSector } from "../../build/board/mutations/internal";
 import { Entity, EntityType } from "../../build/hitscan";
 import { sectorHeinum, sectorZ, setSectorHeinum, setSectorPicnum, setSectorZ, ZSCALE } from "../../build/utils";
 import * as GLM from "../../libs_js/glmatrix";

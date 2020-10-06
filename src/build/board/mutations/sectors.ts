@@ -1,15 +1,15 @@
 import { BuildReferenceTracker } from "../../../app/apis/app";
-import { any, map, wrap, Collection, length, enumerate, cyclicRange, Deck, chain } from "../../../utils/collections";
-import { innerSectors, innerSectorsOfLoop, isOuterLoop, loopStart, loopWalls } from "../loops";
-import { deleteSector, moveWalls, resizeWalls } from "./internal";
+import { track } from "../../../app/apis/referencetracker";
+import { any, chain, cyclicRange, Deck, enumerate, length, map, wrap } from "../../../utils/collections";
+import { order } from "../../utils";
+import { innerSectors, innerSectorsOfLoop, isOuterLoop, loopWalls } from "../loops";
+import { sectorOfWall } from "../query";
 import { Board, Wall } from "../structs";
 import { EngineApi } from "./api";
-import { createNewSector } from "./ceateSector";
-import { fixxrepeat } from "./walls";
-import { order } from "../../utils";
+import { createNewSector } from "./ceatesector";
+import { deleteSector, moveWalls, resizeWalls } from "./internal";
 import { SectorBuilder } from "./sectorbuilder";
-import { track } from "../../../app/apis/referencetracker";
-import { sectorOfWall } from "../query";
+import { fixxrepeat } from "./walls";
 
 export function fillInnerLoop(board: Board, wallId: number, refs: BuildReferenceTracker, api: EngineApi) {
   if (isOuterLoop(board, wallId)) throw new Error('Only inner loops can be filled');

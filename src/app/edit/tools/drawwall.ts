@@ -1,12 +1,16 @@
 import { closestWallSegmentInSector } from "../../../build/board/distances";
 import { sectorWalls } from "../../../build/board/loops";
-import { lastwall, sectorOfWall, wallInSector } from "../../../build/board/query";
+import { EngineApi } from "../../../build/board/mutations/api";
+import { createNewSector } from "../../../build/board/mutations/ceatesector";
+import { setFirstWall } from "../../../build/board/mutations/sectors";
 import { splitSector } from "../../../build/board/mutations/splitsector";
-import { Board, Sector } from "../../../build/board/structs";
+import { splitWall } from "../../../build/board/mutations/walls";
+import { lastwall, sectorOfWall, wallInSector } from "../../../build/board/query";
+import { Board } from "../../../build/board/structs";
 import { ANGSCALE, build2gl, createSlopeCalculator, wallNormal, ZSCALE } from "../../../build/utils";
 import { vec2, vec3 } from "../../../libs_js/glmatrix";
 import { Deck } from "../../../utils/collections";
-import { create, Injector } from "../../../utils/injector";
+import { Injector } from "../../../utils/injector";
 import { cyclic, dot2d, int } from "../../../utils/mathutils";
 import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, GRID, GridController, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
 import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
@@ -15,10 +19,6 @@ import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common
 import { LineBuilder } from "../../modules/gl/buffers";
 import { MovingHandle } from "../handle";
 import { BoardInvalidate, COMMIT, Frame, NamedMessage, Render } from "../messages";
-import { createNewSector } from "../../../build/board/mutations/ceateSector";
-import { setFirstWall } from "../../../build/board/mutations/sectors";
-import { splitWall } from "../../../build/board/mutations/walls";
-import { EngineApi } from "../../../build/board/mutations/api";
 
 export type point_3d = [number, number, number];
 export type projector = (x: number, y: number) => [number, number, number];

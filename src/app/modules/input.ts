@@ -1,19 +1,19 @@
-import { Dependency, Module } from "../../utils/injector"
-import { GL } from "../../app/modules/buildartprovider"
-import { bind, get, InputState, postFrame } from "../../utils/input"
 import { Binder, loadBinds } from "../../app/input/keymap"
 import { messageParser } from "../../app/input/messageparser"
+import { GL } from "../../app/modules/buildartprovider"
+import { loadString } from "../../utils/getter"
+import { Module } from "../../utils/injector"
+import { bind, get, InputState, postFrame } from "../../utils/input"
+import { STATE } from "../apis/app"
 import { BUS, MessageHandlerReflective } from "../apis/handler"
 import { Mouse, PostFrame } from "../edit/messages"
-import { STATE } from "../apis/app"
 
-export const KEYBINDS = new Dependency<string>('KeymapConfig');
 const MOUSE = new Mouse(0, 0);
 
 export function InputModule(module: Module) {
   module.execute(async injector => {
     const gl = await injector.getInstance(GL);
-    const keybinds = await injector.getInstance(KEYBINDS);
+    const keybinds = await loadString('builded_binds.txt');
     const bus = await injector.getInstance(BUS);
     const state = await injector.getInstance(STATE);
     const binder = new Binder();

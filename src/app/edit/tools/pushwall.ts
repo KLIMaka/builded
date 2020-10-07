@@ -3,7 +3,7 @@ import { pushWall } from "../../../build/board/mutations/walls";
 import { sectorOfWall } from "../../../build/board/query";
 import { build2gl, createSlopeCalculator, wallNormal, ZSCALE } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
-import { create, Injector, Module } from "../../../utils/injector";
+import { Module } from "../../../utils/injector";
 import { dot2d, int } from "../../../utils/mathutils";
 import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, GRID, GridController, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
 import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";

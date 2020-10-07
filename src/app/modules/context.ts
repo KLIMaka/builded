@@ -30,7 +30,6 @@ import { BUILDERS_FACTORY, DefaultBuildersFactory } from './geometry/common';
 import { BUFFER_FACTORY, DefaultBufferFactory } from './gl/buffers';
 import { BuildGlConstructor, BUILD_GL } from './gl/buildgl';
 import { InfoModule } from './info';
-import { KEYBINDS } from './input';
 import { SwappableViewModule } from './view/view';
 
 async function mapBackupService(module: Module) {
@@ -68,7 +67,6 @@ function newMap(module: Module) {
 export function DefaultSetupModule(module: Module) {
   module.bindInstance(REFERENCE_TRACKER, new BuildReferenceTrackerImpl());
   module.bindInstance(STATE, new StateImpl());
-  module.bind(KEYBINDS, _ => loadString('builded_binds.txt'));
   module.bind(TEXTURES_OVERRIDE, DefaultAdditionalTextures);
   module.bind(GRID, DefaultGridController);
   module.bind(ART, BuildArtProviderConstructor);

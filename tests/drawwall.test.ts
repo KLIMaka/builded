@@ -1,4 +1,4 @@
-import { buildHull, point_3d, Point } from '../src/app/edit/tools/drawwall';
+import { point_3d, buildHull, Point } from '../src/build/board/mutations/drawwall';
 import { cyclic } from '../src/utils/mathutils';
 
 const proj = (x: number, y: number) => <[number, number, number]>[0, 0, x];

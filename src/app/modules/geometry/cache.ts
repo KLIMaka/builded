@@ -1,4 +1,4 @@
-import { create, Dependency, Injector } from '../../../utils/injector';
+import { create, Dependency, Injector, Module } from '../../../utils/injector';
 import { ART, ArtProvider, BOARD, BoardProvider, STATE, State, SCHEDULER, Scheduler, TaskHandle, SchedulerTask } from '../../apis/app';
 import { Builder } from '../../apis/builder';
 import { BUS, MessageHandler, MessageHandlerReflective } from '../../apis/handler';
@@ -194,18 +194,20 @@ export const MASKED_WALL_COLOR = 'maskedWallColor';
 export const INTERSECTOR_WALL_COLOR = 'intersectorWallColor';
 export const SPRITE_COLOR = 'spriteColor';
 
-export async function RenderablesCacheModule(injector: Injector) {
-  injector.bind(RENDERABLES_CACHE_CONTEXT, RenderablesCacheContextConstructor);
-  injector.bind(RENDRABLES_CACHE, RenderablesCacheConstructor);
-  const state = await injector.getInstance(STATE);
-  state.register(WALL_COLOR, [1, 1, 1, 1]);
-  state.register(INTERSECTOR_WALL_COLOR, [1, 0, 0, 1]);
-  state.register(MASKED_WALL_COLOR, [0, 0, 1, 1]);
-  state.register(SPRITE_COLOR, [0, 1, 1, 1]);
+export async function RenderablesCacheModule(module: Module) {
+  module.bind(RENDERABLES_CACHE_CONTEXT, RenderablesCacheContextConstructor);
+  module.bind(RENDRABLES_CACHE, RenderablesCacheConstructor);
+  module.execute(async injector => {
+    const state = await injector.getInstance(STATE);
+    state.register(WALL_COLOR, [1, 1, 1, 1]);
+    state.register(INTERSECTOR_WALL_COLOR, [1, 0, 0, 1]);
+    state.register(MASKED_WALL_COLOR, [0, 0, 1, 1]);
+    state.register(SPRITE_COLOR, [0, 1, 1, 1]);
 
-  const bus = await injector.getInstance(BUS);
-  const cache = await injector.getInstance(RENDRABLES_CACHE);
-  bus.connect(cache);
+    const bus = await injector.getInstance(BUS);
+    const cache = await injector.getInstance(RENDRABLES_CACHE);
+    bus.connect(cache);
+  })
 }
 
 export class RenderablesCacheImpl extends MessageHandlerReflective implements RenderablesCache {

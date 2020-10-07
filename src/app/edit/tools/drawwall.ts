@@ -10,7 +10,7 @@ import { Board } from "../../../build/board/structs";
 import { ANGSCALE, build2gl, createSlopeCalculator, wallNormal, ZSCALE } from "../../../build/utils";
 import { vec2, vec3 } from "../../../libs_js/glmatrix";
 import { Deck } from "../../../utils/collections";
-import { Injector } from "../../../utils/injector";
+import { Injector, Module } from "../../../utils/injector";
 import { cyclic, dot2d, int } from "../../../utils/mathutils";
 import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, GRID, GridController, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
 import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
@@ -350,18 +350,20 @@ class PortalModel {
   }
 }
 
-export async function DrawWallModule(injector: Injector) {
-  const [bus, api, builders, view, board, refs, art, grid] = await Promise.all([
-    injector.getInstance(BUS),
-    injector.getInstance(ENGINE_API),
-    injector.getInstance(BUILDERS_FACTORY),
-    injector.getInstance(VIEW),
-    injector.getInstance(BOARD),
-    injector.getInstance(REFERENCE_TRACKER),
-    injector.getInstance(ART),
-    injector.getInstance(GRID),
-  ]);
-  bus.connect(new DrawWall(builders, api, view, board, refs, bus, art, grid));
+export async function DrawWallModule(module: Module) {
+  module.execute(async injector => {
+    const [bus, api, builders, view, board, refs, art, grid] = await Promise.all([
+      injector.getInstance(BUS),
+      injector.getInstance(ENGINE_API),
+      injector.getInstance(BUILDERS_FACTORY),
+      injector.getInstance(VIEW),
+      injector.getInstance(BOARD),
+      injector.getInstance(REFERENCE_TRACKER),
+      injector.getInstance(ART),
+      injector.getInstance(GRID),
+    ]);
+    bus.connect(new DrawWall(builders, api, view, board, refs, bus, art, grid));
+  });
 }
 
 export class DrawWall extends MessageHandlerReflective {

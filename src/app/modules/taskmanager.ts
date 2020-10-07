@@ -1,4 +1,4 @@
-import { create, Injector } from "../../utils/injector";
+import { create, Injector, Module } from "../../utils/injector";
 import { iter } from "../../utils/iter";
 import { GridModel, renderGrid } from "../../utils/ui/renderers";
 import { div, Element, replaceContent, span, tag } from "../../utils/ui/ui";
@@ -125,9 +125,11 @@ function* task(): SchedulerTask {
   }
 }
 
-export async function TaskManagerModule(injector: Injector) {
-  const bus = await injector.getInstance(BUS);
-  const scheduler = await injector.getInstance(SCHEDULER);
-  bus.connect(namedMessageHandler('show_tasks', () => showTasks(injector)));
-  bus.connect(namedMessageHandler('add_test_task', () => scheduler.addTask(task())));
+export async function TaskManagerModule(module: Module) {
+  module.execute(async injector => {
+    const bus = await injector.getInstance(BUS);
+    const scheduler = await injector.getInstance(SCHEDULER);
+    bus.connect(namedMessageHandler('show_tasks', () => showTasks(injector)));
+    bus.connect(namedMessageHandler('add_test_task', () => scheduler.addTask(task())));
+  });
 }

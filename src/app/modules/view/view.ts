@@ -1,8 +1,8 @@
 import { Entity, Target } from "../../../build/hitscan";
 import { Board } from "../../../build/board/structs";
-import { create, Dependency, Injector } from "../../../utils/injector";
+import { create, Dependency, Injector, Module } from "../../../utils/injector";
 import { int, len2d, tuple2 } from "../../../utils/mathutils";
-import { STATE, State, View, GridController, GRID } from "../../apis/app";
+import { STATE, State, View, GridController, GRID, VIEW } from "../../apis/app";
 import { BUS, Message, MessageHandler } from "../../apis/handler";
 import { Renderable } from "../../apis/renderable";
 import { LoadBoard, NamedMessage } from "../../edit/messages";
@@ -25,29 +25,16 @@ export interface ViewPosition {
   sec: number;
 }
 
-const snapResult: [number, number] = [0, 0];
-export function snapWall(w: number, x: number, y: number, board: Board, grid: GridController) {
-  const wall = board.walls[w];
-  const w1 = nextwall(board, w);
-  const wall1 = board.walls[w1];
-  const dx = wall1.x - wall.x;
-  const dy = wall1.y - wall.y;
-  const repeat = DEFAULT_REPEAT_RATE * wall.xrepeat;
-  const dxt = x - wall.x;
-  const dyt = y - wall.y;
-  const dt = len2d(dxt, dyt) / len2d(dx, dy);
-  const t = grid.snap(dt * repeat) / repeat;
-  const xs = int(wall.x + (t * dx));
-  const ys = int(wall.y + (t * dy));
-  return tuple2(snapResult, xs, ys);
-}
-
 const VIEW_2D = new Dependency<View2d>('View 2d');
 const VIEW_3D = new Dependency<View3d>('View 3d');
 
+export function SwappableViewModule(module: Module) {
+  module.bind(VIEW_2D, View2dConstructor);
+  module.bind(VIEW_3D, View3dConstructor);
+  module.bind(VIEW, SwappableViewConstructor);
+}
+
 export async function SwappableViewConstructor(injector: Injector) {
-  injector.bind(VIEW_2D, View2dConstructor);
-  injector.bind(VIEW_3D, View3dConstructor);
   const bus = await injector.getInstance(BUS);
   const view = await create(injector, SwappableView, GRID, VIEW_2D, VIEW_3D, STATE);
   bus.connect(view);

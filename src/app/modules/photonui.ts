@@ -1,5 +1,5 @@
 import tippy from "tippy.js";
-import { Injector } from "../../utils/injector";
+import { Module } from "../../utils/injector";
 import { div, dragElement, Element, span, tag } from "../../utils/ui/ui";
 import { MenuBuilder, ToolbarBuilder, UI, UiBuilder, Window, WindowBuilder } from "../apis/ui";
 
@@ -246,9 +246,7 @@ class Builder implements UiBuilder {
   menu() { return new PhotonMenuBuilder() }
 }
 
-export function PhotonUiModule(injector: Injector) {
+export function PhotonUiModule(module: Module) {
   document.body.oncontextmenu = () => false;
-  injector.bindInstance(UI, {
-    builder: new Builder()
-  });
+  module.bindInstance(UI, { builder: new Builder() });
 }

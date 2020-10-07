@@ -5,7 +5,7 @@ import { Entity, EntityType, Target } from "../../../build/hitscan";
 import { build2gl } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 import { Deck, isEmpty } from "../../../utils/collections";
-import { create, Dependency, Injector } from "../../../utils/injector";
+import { create, Dependency, Injector, Module } from "../../../utils/injector";
 import { error } from "../../../utils/logger";
 import { detuple0, detuple1 } from "../../../utils/mathutils";
 import { BUS, Message, MessageHandler, MessageHandlerList, MessageHandlerReflective } from "../../apis/handler";
@@ -90,9 +90,11 @@ const target_ = vec3.create();
 const start_ = vec3.create();
 const dir_ = vec3.create();
 
-export async function SelectionModule(injector: Injector) {
-  const bus = await injector.getInstance(BUS);
-  bus.connect(await create(injector, Selection, PICNUM_SELECTOR, RENDRABLES_CACHE, ENTITY_FACTORY));
+export async function SelectionModule(module: Module) {
+  module.execute(async injector => {
+    const bus = await injector.getInstance(BUS);
+    bus.connect(await create(injector, Selection, PICNUM_SELECTOR, RENDRABLES_CACHE, ENTITY_FACTORY));
+  });
 }
 
 export class Selection extends MessageHandlerReflective {

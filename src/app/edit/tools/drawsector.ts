@@ -4,7 +4,7 @@ import { Target } from "../../../build/hitscan";
 import { ZSCALE } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 import { Deck, wrap } from "../../../utils/collections";
-import { create, Injector } from "../../../utils/injector";
+import { create, Injector, Module } from "../../../utils/injector";
 import { int, len2d } from "../../../utils/mathutils";
 import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
 import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
@@ -119,9 +119,11 @@ class Contour {
   }
 }
 
-export async function DrawSectorModule(injector: Injector) {
-  const bus = await injector.getInstance(BUS);
-  bus.connect(await create(injector, DrawSector, BUILDERS_FACTORY, ART, ENGINE_API, VIEW, BOARD, REFERENCE_TRACKER, BUS));
+export async function DrawSectorModule(module: Module) {
+  module.execute(async injector => {
+    const bus = await injector.getInstance(BUS);
+    bus.connect(await create(injector, DrawSector, BUILDERS_FACTORY, ART, ENGINE_API, VIEW, BOARD, REFERENCE_TRACKER, BUS));
+  });
 }
 
 export class DrawSector extends MessageHandlerReflective {

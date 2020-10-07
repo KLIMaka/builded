@@ -7,7 +7,7 @@ import { FileBrowserModule } from './app/modules/fs/manager';
 import { ArtEditorModule } from './app/modules/arteditor';
 import { PhotonUiModule } from './app/modules/photonui';
 import { animate, createContextFromCanvas } from './utils/gl/gl';
-import { RootInjector } from './utils/injector';
+import { RootModule } from './utils/injector';
 import * as INPUT from './utils/input';
 import { addLogAppender, CONSOLE } from './utils/logger';
 
@@ -15,21 +15,23 @@ addLogAppender(CONSOLE);
 const gl = createContextFromCanvas("display", { alpha: false, antialias: true, stencil: true });
 INPUT.bind(<HTMLCanvasElement>gl.canvas);
 
-const injector = new RootInjector();
-injector.bindInstance(GL, gl);
-injector.install(DbFsModule('resources/engines/blood/'));
-injector.install(DefaultSetupModule);
-injector.install(BloodModule);
+const module = new RootModule();
+module.bindInstance(GL, gl);
+module.install(DbFsModule('resources/engines/blood/'));
+module.install(DefaultSetupModule);
+module.install(BloodModule);
 // injector.install(DukeModule);
-injector.install(PhotonUiModule);
-injector.install(FileBrowserModule);
-injector.install(ArtEditorModule);
-injector.start();
-
-MainLoopConstructor(injector).then(mainLoop => {
-  animate(gl, (gl: WebGLRenderingContext, time: number) => {
-    mainLoop.frame(INPUT.get(), time);
-    INPUT.postFrame();
+module.install(PhotonUiModule);
+module.install(FileBrowserModule);
+module.install(ArtEditorModule);
+module.execute(async injector => {
+  MainLoopConstructor(injector).then(mainLoop => {
+    animate(gl, (gl: WebGLRenderingContext, time: number) => {
+      mainLoop.frame(INPUT.get(), time);
+      INPUT.postFrame();
+    });
   });
 });
+module.start();
+
 

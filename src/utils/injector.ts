@@ -1,7 +1,7 @@
 
 export class Dependency<T> { constructor(readonly name: string, readonly multi = false) { } }
 export type InstanceProvider<T> = (injector: Injector) => Promise<T>;
-export type Module = (injector: Injector) => void;
+export type SubModule = (module: Module) => void;
 
 export class CircularDependencyError extends Error {
   constructor(readonly dependencies: string[]) { super() }
@@ -10,11 +10,15 @@ export class CircularDependencyError extends Error {
   stack = super.stack
 }
 
-export interface Injector {
-  getInstance<T>(dependency: Dependency<T>): Promise<T>;
+export interface Module {
   bind<T>(dependency: Dependency<T | T[]>, provider: InstanceProvider<T>): void;
   bindInstance<T>(dependency: Dependency<T>, instance: T): void;
-  install(module: Module): void;
+  install(submodule: SubModule): void;
+  execute(executable: (injector: Injector) => void): void;
+}
+
+export interface Injector {
+  getInstance<T>(dependency: Dependency<T>): Promise<T>;
 }
 
 interface ParentInjector extends Injector {
@@ -25,9 +29,6 @@ class ChildInjector<T> implements ParentInjector {
   constructor(readonly dependency: Dependency<T>, readonly parent: ParentInjector) { }
   getInstanceParent<T>(dependency: Dependency<T>, injector: Injector): Promise<T> { return this.parent.getInstanceParent(dependency, injector) }
   getInstance<T>(dependency: Dependency<T>): Promise<T> { return this.parent.getInstanceParent(dependency, this) }
-  bind<T>(dependency: Dependency<T | T[]>, provider: InstanceProvider<T>): void { this.parent.bind(dependency, provider) }
-  bindInstance<T>(dependency: Dependency<T>, instance: T): void { this.parent.bindInstance(dependency, instance) }
-  install(module: Module): void { this.parent.install(module) }
 }
 
 class DependencyNode {
@@ -74,12 +75,51 @@ class Graph {
   }
 }
 
-
-export class RootInjector implements ParentInjector {
+export class RootModule implements Module {
   private providers = new Map<Dependency<any>, InstanceProvider<any>[]>();
   private promises = new Map<Dependency<any>, Promise<any>>();
-  private modules: ((i: Injector) => void)[] = [];
+  private executables: ((injector: Injector) => void)[] = [];
+
+  public bind<T>(dependency: Dependency<T | T[]>, provider: InstanceProvider<T>): void {
+    let p = this.providers.get(dependency);
+    if (dependency.multi) {
+      if (p == undefined) {
+        p = [];
+        this.providers.set(dependency, p);
+      }
+      p.push(provider);
+    } else {
+      if (p != undefined) throw new Error(`Multiple bindings to dependency ${dependency.name}`);
+      this.providers.set(dependency, [provider]);
+    }
+  }
+
+  public bindInstance<T>(dependency: Dependency<T>, instance: T) {
+    this.promises.set(dependency, Promise.resolve(instance));
+  }
+
+  public install(submodule: SubModule) {
+    submodule(this);
+  }
+
+  execute(executable: (injector: Injector) => void): void {
+    this.executables.push(executable);
+  }
+
+  public start() {
+    const injector = new RootInjector(this.providers, this.promises);
+    for (const e of this.executables) e(injector);
+  }
+}
+
+
+class RootInjector implements ParentInjector {
   private graph: Graph = new Graph();
+
+  constructor(
+    private providers: Map<Dependency<any>, InstanceProvider<any>[]>,
+    private promises: Map<Dependency<any>, Promise<any>>
+  ) { }
 
   private add<T>(dependency: Dependency<T>, injector: Injector) {
     const chain = [dependency.name];
@@ -104,32 +144,6 @@ export class RootInjector implements ParentInjector {
 
   public getInstance<T>(dependency: Dependency<T>): Promise<T> {
     return this.getInstanceParent(dependency, this);
-  }
-
-  public bind<T>(dependency: Dependency<T | T[]>, provider: InstanceProvider<T>): void {
-    let p = this.providers.get(dependency);
-    if (dependency.multi) {
-      if (p == undefined) {
-        p = [];
-        this.providers.set(dependency, p);
-      }
-      p.push(provider);
-    } else {
-      if (p != undefined) throw new Error(`Multiple bindings to dependency ${dependency.name}`);
-      this.providers.set(dependency, [provider]);
-    }
-  }
-
-  public bindInstance<T>(dependency: Dependency<T>, instance: T) {
-    this.promises.set(dependency, Promise.resolve(instance));
-  }
-
-  public install(module: Module) {
-    this.modules.push(module);
-  }
-
-  public start() {
-    for (const m of this.modules) m(this);
   }
 
   private create<T>(dependency: Dependency<T>, parent: ParentInjector) {

@@ -3,7 +3,7 @@ import { pushWall } from "../../../build/board/mutations/walls";
 import { sectorOfWall } from "../../../build/board/query";
 import { build2gl, createSlopeCalculator, wallNormal, ZSCALE } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
-import { create, Injector } from "../../../utils/injector";
+import { create, Injector, Module } from "../../../utils/injector";
 import { dot2d, int } from "../../../utils/mathutils";
 import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, GRID, GridController, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
 import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
@@ -18,18 +18,20 @@ const target_ = vec3.create();
 const start_ = vec3.create();
 const dir_ = vec3.create();
 
-export async function PushWallModule(injector: Injector) {
-  const [bus, api, builders, view, art, board, refs, grid] = await Promise.all([
-    injector.getInstance(BUS),
-    injector.getInstance(ENGINE_API),
-    injector.getInstance(BUILDERS_FACTORY),
-    injector.getInstance(VIEW),
-    injector.getInstance(ART),
-    injector.getInstance(BOARD),
-    injector.getInstance(REFERENCE_TRACKER),
-    injector.getInstance(GRID),
-  ])
-  bus.connect(new PushWall(builders, api, view, art, board, refs, bus, grid));
+export async function PushWallModule(module: Module) {
+  module.execute(async injector => {
+    const [bus, api, builders, view, art, board, refs, grid] = await Promise.all([
+      injector.getInstance(BUS),
+      injector.getInstance(ENGINE_API),
+      injector.getInstance(BUILDERS_FACTORY),
+      injector.getInstance(VIEW),
+      injector.getInstance(ART),
+      injector.getInstance(BOARD),
+      injector.getInstance(REFERENCE_TRACKER),
+      injector.getInstance(GRID),
+    ])
+    bus.connect(new PushWall(builders, api, view, art, board, refs, bus, grid));
+  });
 }
 
 export class PushWall extends MessageHandlerReflective {

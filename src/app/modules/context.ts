@@ -3,7 +3,7 @@ import { Board } from '../../build/board/structs';
 import { Deck } from '../../utils/collections';
 import { loadString } from '../../utils/getter';
 import { IndexedImgLibJsConstructor, INDEXED_IMG_LIB } from '../../utils/imglib';
-import { create, Dependency, Injector } from '../../utils/injector';
+import { create, Dependency, Injector, Module } from '../../utils/injector';
 import { InputState } from '../../utils/input';
 import * as PROFILE from '../../utils/profiler';
 import { ART, BOARD, DEFAULT_BOARD, GRID, REFERENCE_TRACKER, SCHEDULER, State, STATE, STORAGES, View, VIEW } from '../apis/app';
@@ -33,7 +33,7 @@ import { BUILDERS_FACTORY, DefaultBuildersFactory } from './geometry/common';
 import { BUFFER_FACTORY, DefaultBufferFactory } from './gl/buffers';
 import { BuildGlConstructor, BUILD_GL } from './gl/buildgl';
 import { InfoModule } from './info';
-import { SwappableViewConstructor } from './view/view';
+import { SwappableViewConstructor, SwappableViewModule } from './view/view';
 
 export const KEYBINDS = new Dependency<string>('KeymapConfig');
 
@@ -56,46 +56,48 @@ async function mapBackupService(injector: Injector) {
   }
 }
 
-async function newMap(injector: Injector) {
-  const bus = await injector.getInstance(BUS);
-  const defaultBoard = await injector.getInstance(DEFAULT_BOARD);
-  bus.connect(namedMessageHandler('new_board', () => {
-    bus.handle(new LoadBoard(defaultBoard));
-  }));
+function newMap(module: Module) {
+  module.execute(async injector => {
+    const bus = await injector.getInstance(BUS);
+    const defaultBoard = await injector.getInstance(DEFAULT_BOARD);
+    bus.connect(namedMessageHandler('new_board', () => {
+      bus.handle(new LoadBoard(defaultBoard));
+    }));
+  })
 }
 
 
-export function DefaultSetupModule(injector: Injector) {
-  injector.bindInstance(REFERENCE_TRACKER, new BuildReferenceTrackerImpl());
-  injector.bindInstance(STATE, new StateImpl());
-  injector.bind(KEYBINDS, _ => loadString('builded_binds.txt'));
-  injector.bind(TEXTURES_OVERRIDE, DefaultAdditionalTextures);
-  injector.bind(GRID, DefaultGridController);
-  injector.bind(ART, BuildArtProviderConstructor);
-  injector.bind(PICNUM_SELECTOR, SelectorConstructor);
-  injector.bind(VIEW, SwappableViewConstructor);
-  injector.bind(BUILD_GL, BuildGlConstructor);
-  injector.bind(BUFFER_FACTORY, DefaultBufferFactory);
-  injector.bind(BUILDERS_FACTORY, DefaultBuildersFactory);
-  injector.bind(BUS, DefaultMessageBus);
-  injector.bind(BOARD, DefaultBoardProviderConstructor);
-  injector.bind(ENTITY_FACTORY, EntityFactoryConstructor);
-  injector.bind(INDEXED_IMG_LIB, IndexedImgLibJsConstructor);
-  injector.bind(SCHEDULER, DefaultScheduler);
+export function DefaultSetupModule(module: Module) {
+  module.bindInstance(REFERENCE_TRACKER, new BuildReferenceTrackerImpl());
+  module.bindInstance(STATE, new StateImpl());
+  module.bind(KEYBINDS, _ => loadString('builded_binds.txt'));
+  module.bind(TEXTURES_OVERRIDE, DefaultAdditionalTextures);
+  module.bind(GRID, DefaultGridController);
+  module.bind(ART, BuildArtProviderConstructor);
+  module.bind(PICNUM_SELECTOR, SelectorConstructor);
+  module.bind(BUILD_GL, BuildGlConstructor);
+  module.bind(BUFFER_FACTORY, DefaultBufferFactory);
+  module.bind(BUILDERS_FACTORY, DefaultBuildersFactory);
+  module.bind(BUS, DefaultMessageBus);
+  module.bind(BOARD, DefaultBoardProviderConstructor);
+  module.bind(ENTITY_FACTORY, EntityFactoryConstructor);
+  module.bind(INDEXED_IMG_LIB, IndexedImgLibJsConstructor);
+  module.bind(SCHEDULER, DefaultScheduler);
 
-  injector.install(JoinSectorsModule);
-  injector.install(DrawSectorModule);
-  injector.install(DrawWallModule);
-  injector.install(PushWallModule);
-  injector.install(RenderablesCacheModule);
-  injector.install(SelectionModule);
-  injector.install(InfoModule);
-  injector.install(StatusBarModule);
-  injector.install(UtilsModule);
-  injector.install(TaskManagerModule);
+  module.install(SwappableViewModule);
+  module.install(JoinSectorsModule);
+  module.install(DrawSectorModule);
+  module.install(DrawWallModule);
+  module.install(PushWallModule);
+  module.install(RenderablesCacheModule);
+  module.install(SelectionModule);
+  module.install(InfoModule);
+  module.install(StatusBarModule);
+  module.install(UtilsModule);
+  module.install(TaskManagerModule);
 
-  injector.install(newMap);
-  // injector.install(mapBackupService);
+  module.install(newMap);
+  // module.install(mapBackupService);
 }
 
 export function MainLoopConstructor(injector: Injector) {

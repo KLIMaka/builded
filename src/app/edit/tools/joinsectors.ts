@@ -1,12 +1,14 @@
 import { joinSectors } from "../../../build/board/mutations/joinsectors";
-import { create, Injector } from "../../../utils/injector";
+import { create, Module } from "../../../utils/injector";
 import { BOARD, BoardProvider, BuildReferenceTracker, REFERENCE_TRACKER, VIEW, View } from "../../apis/app";
 import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
 import { COMMIT, INVALIDATE_ALL, NamedMessage } from "../messages";
 
-export async function JoinSectorsModule(injector: Injector) {
-  const bus = await injector.getInstance(BUS);
-  bus.connect(await create(injector, JoinSectors, BUS, VIEW, BOARD, REFERENCE_TRACKER));
+export function JoinSectorsModule(module: Module) {
+  module.execute(async injector => {
+    const bus = await injector.getInstance(BUS);
+    bus.connect(await create(injector, JoinSectors, BUS, VIEW, BOARD, REFERENCE_TRACKER));
+  });
 }
 
 export class JoinSectors extends MessageHandlerReflective {

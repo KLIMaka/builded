@@ -1,13 +1,13 @@
 import { EngineApi } from "../../../build/board/mutations/api";
-import { deleteLoop, deleteLoopFull, deleteSectorFull, fillInnerLoop, setFirstWall } from "../../../build/board/mutations/sectors";
 import { addSprite } from "../../../build/board/mutations/internal";
+import { deleteLoop, deleteLoopFull, deleteSectorFull, fillInnerLoop, setFirstWall } from "../../../build/board/mutations/sectors";
 import { splitWall } from "../../../build/board/mutations/walls";
 import { sectorOfWall } from "../../../build/board/query";
 import { Board, WALL_SPRITE } from "../../../build/board/structs";
 import { EntityType } from "../../../build/hitscan";
 import { slope, vec2ang, wallNormal } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
-import { Injector } from "../../../utils/injector";
+import { Module } from "../../../utils/injector";
 import { info } from "../../../utils/logger";
 import { int } from "../../../utils/mathutils";
 import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, GRID, GridController, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
@@ -16,18 +16,20 @@ import { invalidateSectorAndWalls } from "../editutils";
 import { COMMIT, INVALIDATE_ALL, NamedMessage } from "../messages";
 import { PicNumSelector, PICNUM_SELECTOR } from "./selection";
 
-export async function UtilsModule(injector: Injector) {
-  const [board, api, art, view, bus, refs, grid, pics] = await Promise.all([
-    injector.getInstance(BOARD),
-    injector.getInstance(ENGINE_API),
-    injector.getInstance(ART),
-    injector.getInstance(VIEW),
-    injector.getInstance(BUS),
-    injector.getInstance(REFERENCE_TRACKER),
-    injector.getInstance(GRID),
-    injector.getInstance(PICNUM_SELECTOR),
-  ])
-  bus.connect(new Utils(board, api, art, view, bus, refs, grid, pics));
+export async function UtilsModule(module: Module) {
+  module.execute(async injector => {
+    const [board, api, art, view, bus, refs, grid, pics] = await Promise.all([
+      injector.getInstance(BOARD),
+      injector.getInstance(ENGINE_API),
+      injector.getInstance(ART),
+      injector.getInstance(VIEW),
+      injector.getInstance(BUS),
+      injector.getInstance(REFERENCE_TRACKER),
+      injector.getInstance(GRID),
+      injector.getInstance(PICNUM_SELECTOR),
+    ])
+    bus.connect(new Utils(board, api, art, view, bus, refs, grid, pics));
+  });
 }
 
 class Utils extends MessageHandlerReflective {

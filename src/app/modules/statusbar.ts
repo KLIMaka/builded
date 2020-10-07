@@ -1,14 +1,16 @@
 import h from "stage0";
-import { create, Injector } from "../../utils/injector";
+import { create, Module } from "../../utils/injector";
 import * as PROFILE from "../../utils/profiler";
 import { View, VIEW } from "../apis/app";
 import { BUS, MessageHandlerReflective } from "../apis/handler";
 import { PostFrame } from "../edit/messages";
 
 
-export async function StatusBarModule(injector: Injector) {
-  const bus = await injector.getInstance(BUS);
-  bus.connect(await create(injector, Statusbar, VIEW));
+export async function StatusBarModule(module: Module) {
+  module.execute(async injector => {
+    const bus = await injector.getInstance(BUS);
+    bus.connect(await create(injector, Statusbar, VIEW));
+  });
 }
 
 const positionBoxTemplate = h`

@@ -1,22 +1,22 @@
-import { cloneBoard, loadBloodMap, saveBloodMap, cloneSector, cloneSprite, cloneWall, newSector, newSprite, newWall, newBoard } from '../../../build/blood/maploader';
+import { cloneBoard, cloneSector, cloneSprite, cloneWall, loadBloodMap, newBoard, newSector, newSprite, newWall, saveBloodMap } from '../../../build/blood/maploader';
 import { BloodBoard } from '../../../build/blood/structs';
 import { BloodImplementationConstructor } from '../../../build/blood/utils';
+import { EngineApi } from '../../../build/board/mutations/api';
 import { ArtFile, ArtFiles } from '../../../build/formats/art';
 import { RffFile } from '../../../build/formats/rff';
 import { createTexture } from '../../../utils/gl/textures';
-import { Dependency, Injector } from '../../../utils/injector';
+import { Injector, Module } from '../../../utils/injector';
 import { Stream } from '../../../utils/stream';
-import { BuildResources, DEFAULT_BOARD, RESOURCES, BOARD, ENGINE_API } from '../../apis/app';
+import { BOARD, BuildResources, DEFAULT_BOARD, ENGINE_API, RESOURCES } from '../../apis/app';
 import { BUS } from '../../apis/handler';
 import { LoadBoard, namedMessageHandler } from '../../edit/messages';
-import { RAW_PAL, PIC_TAGS, RAW_PLUs } from '../artselector';
+import { PIC_TAGS, RAW_PAL, RAW_PLUs } from '../artselector';
 import { ART_FILES, GL, PARALLAX_TEXTURES } from '../buildartprovider';
 import { FileSystem, FS } from '../fs/fs';
+import { FS_MANAGER } from '../fs/manager';
 import { PALSWAPS, PAL_TEXTURE, PLU_TEXTURE, SHADOWSTEPS } from '../gl/buildgl';
 import { MAP_NAMES, showMapSelection } from '../selectmap';
 import { Implementation_ } from '../view/boardrenderer3d';
-import { FS_MANAGER } from '../fs/manager';
-import { EngineApi } from '../../../build/board/mutations/api';
 
 async function loadArtFiles(injector: Injector): Promise<ArtFiles> {
   const res = await injector.getInstance(RESOURCES);
@@ -93,23 +93,27 @@ function createBoard() {
   return board;
 }
 
-async function mapLoader(injector: Injector) {
-  const bus = await injector.getInstance(BUS);
-  bus.connect(namedMessageHandler('load_map', async () => {
-    const mapName = await showMapSelection(injector);
-    if (!mapName) return;
-    const map = await loadMapImpl(mapName)(injector);
-    bus.handle(new LoadBoard(map));
-  }));
+function mapLoader(module: Module) {
+  module.execute(async injector => {
+    const bus = await injector.getInstance(BUS);
+    bus.connect(namedMessageHandler('load_map', async () => {
+      const mapName = await showMapSelection(injector);
+      if (!mapName) return;
+      const map = await loadMapImpl(mapName)(injector);
+      bus.handle(new LoadBoard(map));
+    }));
+  });
 }
 
-async function mapSaver(injector: Injector) {
-  const bus = await injector.getInstance(BUS);
-  const fsmgr = await injector.getInstance(FS_MANAGER);
-  const board = await injector.getInstance(BOARD);
-  bus.connect(namedMessageHandler('save_map', async () => {
-    fsmgr.write('newboard.map', saveBloodMap(<BloodBoard>board()))
-  }));
+function mapSaver(module: Module) {
+  module.execute(async injector => {
+    const bus = await injector.getInstance(BUS);
+    const fsmgr = await injector.getInstance(FS_MANAGER);
+    const board = await injector.getInstance(BOARD);
+    bus.connect(namedMessageHandler('save_map', async () => {
+      fsmgr.write('newboard.map', saveBloodMap(<BloodBoard>board()))
+    }));
+  });
 }
 
 async function getMapNames(injector: Injector) {
@@ -176,22 +180,22 @@ function engineApi(): EngineApi {
   return { cloneBoard, cloneWall, cloneSprite, cloneSector, newWall, newSector, newSprite, newBoard };
 }
 
-export function BloodModule(injector: Injector) {
-  injector.bindInstance(PARALLAX_TEXTURES, 16);
-  injector.bindInstance(ENGINE_API, engineApi());
-  injector.bindInstance(SHADOWSTEPS, 64);
-  injector.bind(RESOURCES, BloodResources);
-  injector.bind(ART_FILES, loadArtFiles);
-  injector.bind(RAW_PAL, loadPal);
-  injector.bind<Uint8Array[]>(RAW_PLUs, loarRawPlus);
-  injector.bind(PALSWAPS, loadPLUs);
-  injector.bind(PAL_TEXTURE, loadPalTexture);
-  injector.bind(PLU_TEXTURE, loadPluTexture);
-  injector.bind(Implementation_, BloodImplementationConstructor);
-  injector.bind(MAP_NAMES, getMapNames);
-  injector.bind(PIC_TAGS, PicTags);
-  injector.bindInstance(DEFAULT_BOARD, createBoard());
+export function BloodModule(module: Module) {
+  module.bindInstance(PARALLAX_TEXTURES, 16);
+  module.bindInstance(ENGINE_API, engineApi());
+  module.bindInstance(SHADOWSTEPS, 64);
+  module.bind(RESOURCES, BloodResources);
+  module.bind(ART_FILES, loadArtFiles);
+  module.bind(RAW_PAL, loadPal);
+  module.bind<Uint8Array[]>(RAW_PLUs, loarRawPlus);
+  module.bind(PALSWAPS, loadPLUs);
+  module.bind(PAL_TEXTURE, loadPalTexture);
+  module.bind(PLU_TEXTURE, loadPluTexture);
+  module.bind(Implementation_, BloodImplementationConstructor);
+  module.bind(MAP_NAMES, getMapNames);
+  module.bind(PIC_TAGS, PicTags);
+  module.bindInstance(DEFAULT_BOARD, createBoard());
 
-  injector.install(mapLoader);
-  injector.install(mapSaver);
+  module.install(mapLoader);
+  module.install(mapSaver);
 }

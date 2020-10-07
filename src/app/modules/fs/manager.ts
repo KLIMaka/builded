@@ -1,11 +1,11 @@
-import { create, Dependency, Injector } from "../../../utils/injector";
+import { saveAs } from "../../../utils/filesave";
+import { create, Dependency, Injector, Module } from "../../../utils/injector";
 import { iter } from "../../../utils/iter";
-import { GridModel, IconTextRenderer, renderGrid, IconText } from "../../../utils/ui/renderers";
+import { GridModel, IconText, IconTextRenderer, renderGrid } from "../../../utils/ui/renderers";
 import { addDragAndDrop, Element } from "../../../utils/ui/ui";
 import { BUS } from "../../apis/handler";
 import { UI, Ui, Window } from "../../apis/ui";
 import { namedMessageHandler } from "../../edit/messages";
-import { save, saveAs } from "../../../utils/filesave";
 
 export interface FsManager {
   read(name: string): Promise<ArrayBuffer>;
@@ -118,7 +118,9 @@ export async function showFileBrowser(injector: Injector) {
   browser.show();
 }
 
-export async function FileBrowserModule(injector: Injector) {
-  const bus = await injector.getInstance(BUS);
-  bus.connect(namedMessageHandler('show_files', () => showFileBrowser(injector)));
+export async function FileBrowserModule(module: Module) {
+  module.execute(async injector => {
+    const bus = await injector.getInstance(BUS);
+    bus.connect(namedMessageHandler('show_files', () => showFileBrowser(injector)));
+  });
 }

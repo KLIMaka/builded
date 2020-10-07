@@ -15,8 +15,8 @@ import { Renderable } from "../../apis/renderable";
 import { BoardInvalidate, LoadBoard, Mouse } from "../../edit/messages";
 import { BuildGl, BUILD_GL } from "../gl/buildgl";
 import { BoardRenderer2D, Renderer2D } from "./boardrenderer2d";
-import { snapWall, TargetImpl, ViewPosition } from "./view";
-import { inSector, findSector } from "../../../build/board/query";
+import { TargetImpl, ViewPosition } from "./view";
+import { inSector, findSector, snapWall } from "../../../build/board/query";
 
 
 export async function View2dConstructor(injector: Injector) {
@@ -157,7 +157,7 @@ export class View2d extends MessageHandlerReflective implements View {
     }
     const ws = closestWallSegment(board, this.x, this.y, d);
     if (ws != -1) {
-      const [x, y] = snapWall(ws, this.x, this.y, board, this.gridController);
+      const [x, y] = snapWall(board, ws, this.x, this.y, this.gridController);
       target.coords_[0] = x;
       target.coords_[1] = y;
       target.entity_ = new Entity(ws, EntityType.MID_WALL);

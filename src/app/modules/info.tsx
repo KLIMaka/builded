@@ -3,15 +3,17 @@ import { render } from "solid-js/dom";
 import h from "stage0";
 import { Sector, Sprite, Wall } from "../../build/board/structs";
 import { EntityType, isSector, isSprite, isWall } from "../../build/hitscan";
-import { create, Injector } from "../../utils/injector";
+import { create, Module } from "../../utils/injector";
 import { BOARD, BoardProvider, View, VIEW } from "../apis/app";
 import { BUS, MessageHandlerReflective } from "../apis/handler";
 import { BoardInvalidate, Frame } from "../edit/messages";
 
 
-export async function InfoModule(injector: Injector) {
-  const bus = await injector.getInstance(BUS);
-  bus.connect(await create(injector, Info, VIEW, BOARD))
+export async function InfoModule(module: Module) {
+  module.execute(async injector => {
+    const bus = await injector.getInstance(BUS);
+    bus.connect(await create(injector, Info, VIEW, BOARD))
+  });
 }
 
 const rowTemplate = h`<tr><td>#nameNode</td><td>#valueNode</td></tr>`;

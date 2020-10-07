@@ -1,5 +1,5 @@
 import { closestWallInSector, closestWallSegmentInSector } from "../../../build/board/distances";
-import { inSector, findSector, sectorOfWall } from "../../../build/board/query";
+import { inSector, findSector, sectorOfWall, snapWall } from "../../../build/board/query";
 import { Board } from "../../../build/board/structs";
 import { Entity, EntityType, Hitscan, hitscan, Ray, Target } from "../../../build/hitscan";
 import { build2gl, getPlayerStart, gl2build, ZSCALE } from "../../../build/utils";
@@ -16,7 +16,7 @@ import { Renderable } from "../../apis/renderable";
 import { BoardInvalidate, Frame, LoadBoard, Mouse, NamedMessage } from "../../edit/messages";
 import { BuildGl, BUILD_GL } from "../gl/buildgl";
 import { Boardrenderer3D, Renderer3D } from "./boardrenderer3d";
-import { snapWall, TargetImpl, ViewPosition } from "./view";
+import { TargetImpl, ViewPosition } from "./view";
 
 export async function View3dConstructor(injector: Injector) {
   const [renderer, buildgl, board, state, grid, art] = await Promise.all([
@@ -173,7 +173,7 @@ export class View3d extends MessageHandlerReflective implements View {
   }
 
   private snapWall(target: Target, wallId: number, t: TargetImpl) {
-    const [x, y] = snapWall(wallId, target.coords[0], target.coords[1], this.board(), this.gridController);
+    const [x, y] = snapWall(this.board(), wallId, target.coords[0], target.coords[1], this.gridController);
     t.coords_[0] = x;
     t.coords_[1] = y;
     t.coords_[2] = this.gridController.snap(target.coords[2] / ZSCALE) * ZSCALE;

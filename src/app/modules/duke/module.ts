@@ -1,10 +1,9 @@
 import { Board } from "../../../build/board/structs";
+import { cloneBoard, cloneSector, cloneSprite, cloneWall, newBoard, newSector, newSprite, newWall, loadBuildMap, saveBuildMap } from '../../../build/maploader';
 import { ArtFile, ArtFiles } from "../../../build/formats/art";
 import { createPalette, GrpFile, loadPlus, loadShadeTables } from "../../../build/formats/grp";
-import { cloneBoard, loadBuildMap, saveBuildMap } from '../../../build/maploader';
 import { createTexture } from "../../../utils/gl/textures";
-import { Dependency, Injector } from "../../../utils/injector";
-import { BoardManipulator_, DEFAULT_BOARD, BOARD } from "../../apis/app";
+import { Dependency, Injector, Module } from "../../../utils/injector";
 import { BUS } from "../../apis/handler";
 import { LoadBoard, namedMessageHandler } from "../../edit/messages";
 import { PIC_TAGS, RAW_PAL, RAW_PLUs } from "../artselector";
@@ -14,6 +13,9 @@ import { PALSWAPS, PAL_TEXTURE, PLU_TEXTURE, SHADOWSTEPS } from "../gl/buildgl";
 import { MAP_NAMES, showMapSelection } from "../selectmap";
 import { Implementation_, RorLinks } from "../view/boardrenderer3d";
 import { FS_MANAGER } from "../fs/manager";
+import { EngineApi } from "../../../build/board/mutations/api";
+import { BOARD, BuildResources, DEFAULT_BOARD, ENGINE_API, RESOURCES } from "../../apis/app";
+import { Stream } from "../../../utils/stream";
 
 const GRP = new Dependency<GrpFile>('Grp File');
 const SHADOW_TABLE = new Dependency<Uint8Array[]>('Shadow Table');
@@ -66,8 +68,8 @@ async function loadPluTexture(injector: Injector) {
 
 function loadMapImpl(name: string) {
   return async (injector: Injector) => {
-    const grp = await injector.getInstance(GRP);
-    return loadBuildMap(grp.get(name));
+    const res = await injector.getInstance(RESOURCES)
+    return loadBuildMap(new Stream(await res.get(name), true));
   }
 }
 
@@ -99,8 +101,8 @@ async function loadGrp(injector: Injector) {
 }
 
 async function getMapNames(injector: Injector) {
-  const grp = await injector.getInstance(GRP);
-  return () => Promise.resolve(Object.keys(grp.files).filter(f => f.endsWith('.map')));
+  const res = await injector.getInstance(RESOURCES);
+  return () => res.list().then(list => list.filter(f => f.toLowerCase().endsWith('.map')));
 }
 
 async function shadowsteps(injector: Injector) {
@@ -120,42 +122,68 @@ async function PicTags(injector: Injector) {
   }
 }
 
-async function mapLoader(injector: Injector) {
-  const bus = await injector.getInstance(BUS);
-  bus.connect(namedMessageHandler('load_map', async () => {
-    const mapName = await showMapSelection(injector);
-    if (!mapName) return;
-    const map = await loadMapImpl(mapName)(injector);
-    bus.handle(new LoadBoard(map));
-  }));
+async function Resources(injector: Injector): Promise<BuildResources> {
+  const fs = await injector.getInstance(FS);
+  const grp = await injector.getInstance(GRP);
+  return {
+    get: async name => {
+      const file = await fs.get(name);
+      if (file != null) return file;
+      return grp.getArrayBuffer(name);
+    },
+    list: async () => {
+      const files = new Set<string>(Object.keys(grp.files));
+      (await fs.list()).forEach(f => files.add(f));
+      return [...files];
+    }
+  }
 }
 
-async function mapSaver(injector: Injector) {
-  const bus = await injector.getInstance(BUS);
-  const fsmgr = await injector.getInstance(FS_MANAGER);
-  const board = await injector.getInstance(BOARD);
-  bus.connect(namedMessageHandler('save_map', async () => {
-    fsmgr.write('newboard.map', saveBuildMap(board()))
-  }));
+async function mapLoader(module: Module) {
+  module.execute(async injector => {
+    const bus = await injector.getInstance(BUS);
+    bus.connect(namedMessageHandler('load_map', async () => {
+      const mapName = await showMapSelection(injector);
+      if (!mapName) return;
+      const map = await loadMapImpl(mapName)(injector);
+      bus.handle(new LoadBoard(map));
+    }));
+  });
 }
 
-export function DukeModule(injector: Injector) {
-  injector.bindInstance(PARALLAX_TEXTURES, 5);
-  injector.bindInstance(BoardManipulator_, { cloneBoard });
-  injector.bindInstance(Implementation_, DukeImplementation());
-  injector.bind(PALSWAPS, palswaps);
-  injector.bind(SHADOWSTEPS, shadowsteps);
-  injector.bind(GRP, loadGrp);
-  injector.bind(ART_FILES, loadArtFiles);
-  injector.bind(RAW_PAL, loadPal);
-  injector.bind(RAW_PLUs, loadLookups);
-  injector.bind(SHADOW_TABLE, loadShadowTable);
-  injector.bind(PAL_TEXTURE, loadPalTexture);
-  injector.bind(PLU_TEXTURE, loadPluTexture);
-  injector.bind(MAP_NAMES, getMapNames);
-  injector.bind(PIC_TAGS, PicTags);
-  injector.bindInstance(DEFAULT_BOARD, createBoard());
+async function mapSaver(module: Module) {
+  module.execute(async injector => {
+    const bus = await injector.getInstance(BUS);
+    const fsmgr = await injector.getInstance(FS_MANAGER);
+    const board = await injector.getInstance(BOARD);
+    bus.connect(namedMessageHandler('save_map', async () => {
+      fsmgr.write('newboard.map', saveBuildMap(board()))
+    }));
+  });
+}
 
-  injector.install(mapLoader);
-  injector.install(mapSaver);
+function engineApi(): EngineApi {
+  return { cloneBoard, cloneWall, cloneSprite, cloneSector, newWall, newSector, newSprite, newBoard };
+}
+
+export function DukeModule(module: Module) {
+  module.bindInstance(PARALLAX_TEXTURES, 5);
+  module.bindInstance(ENGINE_API, engineApi());
+  module.bindInstance(Implementation_, DukeImplementation());
+  module.bind(PALSWAPS, palswaps);
+  module.bind(SHADOWSTEPS, shadowsteps);
+  module.bind(GRP, loadGrp);
+  module.bind(ART_FILES, loadArtFiles);
+  module.bind(RAW_PAL, loadPal);
+  module.bind<Uint8Array[]>(RAW_PLUs, loadLookups);
+  module.bind<Uint8Array[]>(SHADOW_TABLE, loadShadowTable);
+  module.bind(PAL_TEXTURE, loadPalTexture);
+  module.bind(PLU_TEXTURE, loadPluTexture);
+  module.bind(MAP_NAMES, getMapNames);
+  module.bind(PIC_TAGS, PicTags);
+  module.bindInstance(DEFAULT_BOARD, createBoard());
+  module.bind(RESOURCES, Resources);
+
+  module.install(mapLoader);
+  module.install(mapSaver);
 }

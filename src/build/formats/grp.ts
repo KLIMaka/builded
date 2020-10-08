@@ -4,6 +4,7 @@ export class GrpFile {
   private data: Stream;
   private count: number;
   readonly files: { [index: string]: number } = {};
+  readonly sizes: { [index: string]: number } = {};
 
   constructor(buf: ArrayBuffer) {
     this.data = new Stream(buf, true);
@@ -19,6 +20,7 @@ export class GrpFile {
       const fname = d.readByteString(12);
       const size = d.readUInt();
       this.files[fname.toLowerCase()] = offset;
+      this.sizes[fname.toLowerCase()] = size;
       offset += size;
     }
   }
@@ -28,6 +30,12 @@ export class GrpFile {
     if (off == undefined) return null;
     this.data.setOffset(off);
     return this.data.subView();
+  }
+
+  public getArrayBuffer(fname: string) {
+    const stream = this.get(fname);
+    if (stream == null) return null;
+    return stream.readArrayBuffer(this.sizes[fname.toLowerCase()]);
   }
 }
 

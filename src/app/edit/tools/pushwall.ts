@@ -11,6 +11,7 @@ import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common
 import { LineBuilder } from "../../modules/gl/buffers";
 import { MovingHandle } from "../handle";
 import { COMMIT, Frame, INVALIDATE_ALL, NamedMessage, Render } from "../messages";
+import { DefaultTool, Tool, TOOLS_BUS } from "./toolsbus";
 
 const wallNormal_ = vec3.create();
 const wallNormal1_ = vec3.create();
@@ -20,8 +21,9 @@ const dir_ = vec3.create();
 
 export async function PushWallModule(module: Module) {
   module.execute(async injector => {
-    const [bus, api, builders, view, art, board, refs, grid] = await Promise.all([
+    const [bus, toolsBus, api, builders, view, art, board, refs, grid] = await Promise.all([
       injector.getInstance(BUS),
+      injector.getInstance(TOOLS_BUS),
       injector.getInstance(ENGINE_API),
       injector.getInstance(BUILDERS_FACTORY),
       injector.getInstance(VIEW),
@@ -30,11 +32,11 @@ export async function PushWallModule(module: Module) {
       injector.getInstance(REFERENCE_TRACKER),
       injector.getInstance(GRID),
     ])
-    bus.connect(new PushWall(builders, api, view, art, board, refs, bus, grid));
+    toolsBus.connect(new PushWall(builders, api, view, art, board, refs, bus, grid));
   });
 }
 
-export class PushWall extends MessageHandlerReflective {
+export class PushWall extends DefaultTool {
   private wallId = -1;
   private copy = false;
   private movingHandle = new MovingHandle();
@@ -52,6 +54,7 @@ export class PushWall extends MessageHandlerReflective {
   ) { super(); }
 
   private start(copy: boolean) {
+    this.activate();
     this.copy = copy;
     const target = this.view.snapTarget();
     if (target.entity == null || !target.entity.isWall()) return;
@@ -60,6 +63,7 @@ export class PushWall extends MessageHandlerReflective {
   }
 
   private abort() {
+    this.deactivate();
     this.wallId = -1;
     this.movingHandle.stop();
   }

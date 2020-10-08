@@ -42,12 +42,9 @@ I               insert_sprite
 ENTER           view_mode
 mouse0          print_selected
 CTRL+mouse0     split_wall
-SPACE           draw_wall
-SHIFT+SPACE     draw_rect_wall
-BACKSPACE       undo_draw_wall
-G               draw_point
-H               draw_portal
-B               push_portal
+SPACE           draw
+SHIFT+SPACE     draw_rect
+BACKSPACE       undo_draw
 [               grid+
 ]               grid-
 J               join_sectors

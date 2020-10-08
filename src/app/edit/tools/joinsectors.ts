@@ -1,17 +1,18 @@
 import { joinSectors } from "../../../build/board/mutations/joinsectors";
 import { create, Module } from "../../../utils/injector";
 import { BOARD, BoardProvider, BuildReferenceTracker, REFERENCE_TRACKER, VIEW, View } from "../../apis/app";
-import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
+import { BUS, MessageBus } from "../../apis/handler";
 import { COMMIT, INVALIDATE_ALL, NamedMessage } from "../messages";
+import { DefaultTool, TOOLS_BUS } from "./toolsbus";
 
 export function JoinSectorsModule(module: Module) {
   module.execute(async injector => {
-    const bus = await injector.getInstance(BUS);
+    const bus = await injector.getInstance(TOOLS_BUS);
     bus.connect(await create(injector, JoinSectors, BUS, VIEW, BOARD, REFERENCE_TRACKER));
   });
 }
 
-export class JoinSectors extends MessageHandlerReflective {
+export class JoinSectors extends DefaultTool {
   private sectorId1 = -1;
   private sectorId2 = -1;
 
@@ -27,6 +28,7 @@ export class JoinSectors extends MessageHandlerReflective {
     if (target.entity == null || !target.entity.isSector()) return;
     const sectorId = target.entity.id;
     if (this.sectorId1 == -1) {
+      this.activate();
       this.sectorId1 = sectorId;
     } else if (this.sectorId2 == -1) {
       this.sectorId2 = sectorId;
@@ -40,6 +42,7 @@ export class JoinSectors extends MessageHandlerReflective {
       }
       this.sectorId1 = -1;
       this.sectorId2 = -1;
+      this.deactivate();
     }
   }
 

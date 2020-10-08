@@ -16,6 +16,7 @@ import { DrawWallModule } from '../edit/tools/drawwall';
 import { JoinSectorsModule } from '../edit/tools/joinsectors';
 import { PushWallModule } from '../edit/tools/pushwall';
 import { PICNUM_SELECTOR, SelectionModule } from '../edit/tools/selection';
+import { ToolsBusConstructor, TOOLS_BUS } from '../edit/tools/toolsbus';
 import { UtilsModule } from '../edit/tools/utils';
 import { StatusBarModule } from '../modules/statusbar';
 import { TaskManagerModule } from '../modules/taskmanager';
@@ -75,6 +76,7 @@ export function DefaultSetupModule(module: Module) {
   module.bind(BUFFER_FACTORY, DefaultBufferFactory);
   module.bind(BUILDERS_FACTORY, DefaultBuildersFactory);
   module.bind(BUS, DefaultMessageBus);
+  module.bind(TOOLS_BUS, ToolsBusConstructor);
   module.bind(BOARD, DefaultBoardProviderConstructor);
   module.bind(ENTITY_FACTORY, EntityFactoryConstructor);
   module.bind(INDEXED_IMG_LIB, IndexedImgLibJsConstructor);

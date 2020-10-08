@@ -1,24 +1,25 @@
-import { Board } from "../../../build/board/structs";
+import { closestWallPointDist } from "../../../build/board/distances";
+import { EngineApi } from "../../../build/board/mutations/api";
+import { createNewSector } from "../../../build/board/mutations/ceatesector";
+import { createInnerLoop } from "../../../build/board/mutations/sectors";
 import { splitSector } from "../../../build/board/mutations/splitsector";
+import { findContainingSectorMidPoints, sectorOfWall, wallInSector } from "../../../build/board/query";
+import { Board } from "../../../build/board/structs";
 import { Target } from "../../../build/hitscan";
 import { ZSCALE } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 import { Deck, wrap } from "../../../utils/collections";
-import { create, Injector, Module } from "../../../utils/injector";
+import { create, Module } from "../../../utils/injector";
 import { int, len2d } from "../../../utils/mathutils";
 import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
-import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
+import { BUS, MessageBus } from "../../apis/handler";
 import { Renderables } from "../../apis/renderable";
 import { writeText } from "../../modules/geometry/builders/common";
 import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
+import { LineBuilder, PointSpritesBuilder } from "../../modules/gl/buffers";
 import { getClosestSectorZ } from "../editutils";
 import { BoardInvalidate, COMMIT, Frame, NamedMessage, Render } from "../messages";
-import { PointSpritesBuilder, LineBuilder } from "../../modules/gl/buffers";
-import { closestWallPointDist } from "../../../build/board/distances";
-import { findContainingSectorMidPoints, sectorOfWall, wallInSector } from "../../../build/board/query";
-import { EngineApi } from "../../../build/board/mutations/api";
-import { createNewSector } from "../../../build/board/mutations/ceatesector";
-import { createInnerLoop } from "../../../build/board/mutations/sectors";
+import { DefaultTool, TOOLS_BUS } from "./toolsbus";
 
 class Contour {
   private points: Array<[number, number]> = [];
@@ -121,12 +122,12 @@ class Contour {
 
 export async function DrawSectorModule(module: Module) {
   module.execute(async injector => {
-    const bus = await injector.getInstance(BUS);
+    const bus = await injector.getInstance(TOOLS_BUS);
     bus.connect(await create(injector, DrawSector, BUILDERS_FACTORY, ART, ENGINE_API, VIEW, BOARD, REFERENCE_TRACKER, BUS));
   });
 }
 
-export class DrawSector extends MessageHandlerReflective {
+export class DrawSector extends DefaultTool {
   private points = new Deck<[number, number]>();
   private pointer = vec3.create();
   private isRect = true;
@@ -178,7 +179,7 @@ export class DrawSector extends MessageHandlerReflective {
       vec3.set(this.pointer, x, y, z);
       this.contour.setZ(z / ZSCALE);
       this.contour.updateLastPoint(x, y);
-    } else {
+    } else if (target.entity.isSector() || target.entity.isSprite()) {
       let [x, y,] = target.coords;
       let z = this.getPointerZ(board, target);
       vec3.set(this.pointer, x, y, z);
@@ -198,8 +199,12 @@ export class DrawSector extends MessageHandlerReflective {
   }
 
   private insertPoint(rect: boolean) {
+    this.activate();
     if (this.points.length() == 0) this.isRect = rect;
-    if (this.checkFinish()) return;
+    if (this.checkFinish()) {
+      this.deactivate();
+      return;
+    }
 
     if (this.isRect) {
       for (let i = 0; i < 4; i++) {
@@ -217,10 +222,8 @@ export class DrawSector extends MessageHandlerReflective {
 
     let splitSector = this.isSplitSector(this.pointer[0], this.pointer[1]);
     if (splitSector != -1) {
-      try {
-        this.splitSector(splitSector);
-        return true;
-      } catch (e) { }
+      this.splitSector(splitSector);
+      return true;
     }
     let latsPoint = this.points.get(this.points.length() - 1);
     if (latsPoint[0] == this.pointer[0] && latsPoint[1] == this.pointer[1]) return false;
@@ -243,6 +246,7 @@ export class DrawSector extends MessageHandlerReflective {
       this.points.pop();
       this.contour.popPoint();
     }
+    if (this, this.points.length() == 0) this.deactivate();
     this.contour.updateLastPoint(this.pointer[0], this.pointer[1]);
   }
 
@@ -281,9 +285,9 @@ export class DrawSector extends MessageHandlerReflective {
 
   public NamedMessage(msg: NamedMessage) {
     switch (msg.name) {
-      case 'draw_rect_wall': this.insertPoint(true); return;
-      case 'draw_wall': this.insertPoint(false); return;
-      case 'undo_draw_wall': this.popPoint(); return;
+      case 'draw_rect': this.insertPoint(true); return;
+      case 'draw': this.insertPoint(false); return;
+      case 'undo_draw': this.popPoint(); return;
     }
   }
 

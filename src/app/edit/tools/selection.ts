@@ -17,6 +17,7 @@ import { SectorEnt } from "../sector";
 import { SpriteEnt } from "../sprite";
 import { WallEnt } from "../wall";
 import { WallSegmentsEnt } from "../wallsegment";
+import { DefaultTool, TOOLS_BUS } from "./toolsbus";
 
 export type PicNumCallback = (picnum: number) => void;
 export type PicNumSelector = (cb: PicNumCallback) => void;
@@ -92,12 +93,12 @@ const dir_ = vec3.create();
 
 export async function SelectionModule(module: Module) {
   module.execute(async injector => {
-    const bus = await injector.getInstance(BUS);
+    const bus = await injector.getInstance(TOOLS_BUS);
     bus.connect(await create(injector, Selection, PICNUM_SELECTOR, RENDRABLES_CACHE, ENTITY_FACTORY));
   });
 }
 
-export class Selection extends MessageHandlerReflective {
+export class Selection extends DefaultTool {
   private selection = new MessageHandlerList();
   private highlighted = new MessageHandlerList();
   private valid = true;
@@ -120,6 +121,7 @@ export class Selection extends MessageHandlerReflective {
     if (!handle.isActive()) this.updateSelection();
     if (isEmpty(this.selection.list()) && isEmpty(this.highlighted.list())) return;
     if (this.activeMove()) {
+      this.activate();
       this.updateHandle();
       try {
         this.updateMove();
@@ -213,6 +215,7 @@ export class Selection extends MessageHandlerReflective {
       handle.stop();
       this.handleSelected(END_MOVE);
       this.commit();
+      this.deactivate();
       return;
     }
 

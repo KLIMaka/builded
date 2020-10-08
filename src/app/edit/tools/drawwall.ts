@@ -13,6 +13,7 @@ import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common
 import { LineBuilder } from "../../modules/gl/buffers";
 import { MovingHandle } from "../handle";
 import { BoardInvalidate, COMMIT, Frame, NamedMessage, Render } from "../messages";
+import { DefaultTool, TOOLS_BUS } from "./toolsbus";
 
 class PortalModel {
   private wallId: number;
@@ -129,6 +130,16 @@ class PortalModel {
     this.needToUpdate = true;
   }
 
+  public hasPoints() {
+    return this.points.length != 0;
+  }
+
+  public onLastPoint() {
+    if (this.points.length == 0) return false;
+    const lastPoint = this.points[this.points.length - 1];
+    return vec3.exactEquals(lastPoint, this.pointer);
+  }
+
   private update() {
     if (!this.needToUpdate) return;
     this.updateContour();
@@ -193,8 +204,9 @@ class PortalModel {
 
 export async function DrawWallModule(module: Module) {
   module.execute(async injector => {
-    const [bus, api, builders, view, board, refs, art, grid] = await Promise.all([
+    const [bus, toolsBus, api, builders, view, board, refs, art, grid] = await Promise.all([
       injector.getInstance(BUS),
+      injector.getInstance(TOOLS_BUS),
       injector.getInstance(ENGINE_API),
       injector.getInstance(BUILDERS_FACTORY),
       injector.getInstance(VIEW),
@@ -203,11 +215,11 @@ export async function DrawWallModule(module: Module) {
       injector.getInstance(ART),
       injector.getInstance(GRID),
     ]);
-    bus.connect(new DrawWall(builders, api, view, board, refs, bus, art, grid));
+    toolsBus.connect(new DrawWall(builders, api, view, board, refs, bus, art, grid));
   });
 }
 
-export class DrawWall extends MessageHandlerReflective {
+export class DrawWall extends DefaultTool {
   private wallId = -1;
   private movingHandle = new MovingHandle();
 
@@ -226,6 +238,7 @@ export class DrawWall extends MessageHandlerReflective {
   private start() {
     const target = this.view.snapTarget();
     if (target.entity == null || !target.entity.isWall()) return;
+    this.activate();
     const [x, y, z] = target.coords;
     this.portal.start(this.board(), target.entity.id, x, y, z);
     this.wallId = target.entity.id;
@@ -237,16 +250,28 @@ export class DrawWall extends MessageHandlerReflective {
     this.bus.handle(COMMIT);
     this.bus.handle(new BoardInvalidate(null));
     this.movingHandle.stop();
+    this.deactivate();
+  }
+
+  private abort() {
+    this.wallId = -1;
+    this.movingHandle.stop();
+    this.deactivate();
   }
 
   private insertPoint() {
     if (this.wallId == -1) this.start();
+    else if (this.movingHandle.isActive()) this.stop();
+    else if (this.portal.onLastPoint()) this.pushPortal();
     else this.portal.addPoint();
   }
 
   private popPoint() {
     if (this.wallId == -1) return;
-    else this.portal.popPoint();
+    else {
+      this.portal.popPoint();
+      if (!this.portal.hasPoints()) this.abort();
+    }
   }
 
   private pushPortal() {
@@ -265,10 +290,8 @@ export class DrawWall extends MessageHandlerReflective {
 
   public NamedMessage(msg: NamedMessage) {
     switch (msg.name) {
-      case 'draw_point': this.insertPoint(); return;
-      case 'undo_draw_point': this.popPoint(); return;
-      case 'push_portal': this.pushPortal(); return;
-      case 'draw_portal': this.stop(); return;
+      case 'draw': this.insertPoint(); return;
+      case 'undo_draw': this.popPoint(); return;
     }
   }
 

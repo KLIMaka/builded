@@ -3,15 +3,15 @@ import { pushWall } from "../../../build/board/mutations/walls";
 import { sectorOfWall } from "../../../build/board/query";
 import { build2gl, createSlopeCalculator, wallNormal, ZSCALE } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
-import { Module } from "../../../utils/injector";
+import { create, Module } from "../../../utils/injector";
 import { dot2d, int } from "../../../utils/mathutils";
 import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, GRID, GridController, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
-import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
+import { BUS, MessageBus } from "../../apis/handler";
 import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
 import { LineBuilder } from "../../modules/gl/buffers";
 import { MovingHandle } from "../handle";
 import { COMMIT, Frame, INVALIDATE_ALL, NamedMessage, Render } from "../messages";
-import { DefaultTool, Tool, TOOLS_BUS } from "./toolsbus";
+import { DefaultTool, TOOLS_BUS } from "./toolsbus";
 
 const wallNormal_ = vec3.create();
 const wallNormal1_ = vec3.create();
@@ -21,18 +21,8 @@ const dir_ = vec3.create();
 
 export async function PushWallModule(module: Module) {
   module.execute(async injector => {
-    const [bus, toolsBus, api, builders, view, art, board, refs, grid] = await Promise.all([
-      injector.getInstance(BUS),
-      injector.getInstance(TOOLS_BUS),
-      injector.getInstance(ENGINE_API),
-      injector.getInstance(BUILDERS_FACTORY),
-      injector.getInstance(VIEW),
-      injector.getInstance(ART),
-      injector.getInstance(BOARD),
-      injector.getInstance(REFERENCE_TRACKER),
-      injector.getInstance(GRID),
-    ])
-    toolsBus.connect(new PushWall(builders, api, view, art, board, refs, bus, grid));
+    const toolsBus = await injector.getInstance(TOOLS_BUS);
+    toolsBus.connect(await create(injector, PushWall, BUILDERS_FACTORY, ENGINE_API, VIEW, ART, BOARD, REFERENCE_TRACKER, BUS, GRID));
   });
 }
 

@@ -5,7 +5,7 @@ import { EngineApi } from '../../../build/board/mutations/api';
 import { ArtFile, ArtFiles } from '../../../build/formats/art';
 import { RffFile } from '../../../build/formats/rff';
 import { createTexture } from '../../../utils/gl/textures';
-import { Injector, Module } from '../../../utils/injector';
+import { getInstances, Injector, Module } from '../../../utils/injector';
 import { Stream } from '../../../utils/stream';
 import { BOARD, BuildResources, DEFAULT_BOARD, ENGINE_API, RESOURCES } from '../../apis/app';
 import { BUS } from '../../apis/handler';
@@ -107,9 +107,7 @@ function mapLoader(module: Module) {
 
 function mapSaver(module: Module) {
   module.execute(async injector => {
-    const bus = await injector.getInstance(BUS);
-    const fsmgr = await injector.getInstance(FS_MANAGER);
-    const board = await injector.getInstance(BOARD);
+    const [bus, fsmgr, board] = await getInstances(injector, BUS, FS_MANAGER, BOARD);
     bus.connect(namedMessageHandler('save_map', async () => {
       fsmgr.write('newboard.map', saveBloodMap(<BloodBoard>board()))
     }));

@@ -28,7 +28,7 @@ export class Controller3D {
   }
 
   public getProjectionMatrix(aspect: number): Mat4Array {
-    return mat4.perspective(this.projection, MU.deg2rad(this.fov), aspect, 1, 0x4FFF);
+    return mat4.perspective(this.projection, MU.deg2rad(this.fov), aspect, 1, 0xFFFF);
   }
 
   public getTransformMatrix() {

@@ -156,105 +156,11 @@ class RootInjector implements ParentInjector {
   }
 }
 
-export async function create<T, D1, D2, D3, D4, D5, D6, D7, D8>(i: Injector, ctr: { new(d1: D1, d2?: D2, d3?: D3, d4?: D4, d5?: D5, d6?: D6, d7?: D7, d8?: D8): T },
-  d1: Dependency<D1>, d2?: Dependency<D2>, d3?: Dependency<D3>, d4?: Dependency<D4>, d5?: Dependency<D5>, d6?: Dependency<D6>, d7?: Dependency<D7>, d8?: Dependency<D8>): Promise<T> {
-  if (d8 != undefined) return create8(i, ctr, d1, d2, d3, d4, d5, d6, d7, d8);
-  if (d7 != undefined) return create7(i, ctr, d1, d2, d3, d4, d5, d6, d7);
-  if (d6 != undefined) return create6(i, ctr, d1, d2, d3, d4, d5, d6);
-  if (d5 != undefined) return create5(i, ctr, d1, d2, d3, d4, d5);
-  if (d4 != undefined) return create4(i, ctr, d1, d2, d3, d4);
-  if (d3 != undefined) return create3(i, ctr, d1, d2, d3);
-  if (d2 != undefined) return create2(i, ctr, d1, d2);
-  if (d1 != undefined) return create1(i, ctr, d1);
-  throw new Error('Invalid create usage');
+type Dependencyfy<T> = { [P in keyof T]: Dependency<T[P]> };
+export async function create<U, T extends any[]>(injector: Injector, ctr: { new(...args: T): U }, ...args: Dependencyfy<T>): Promise<U> {
+  return new ctr(...<T>await Promise.all(args.map(a => injector.getInstance(a))));
 }
 
-async function create8<T, D1, D2, D3, D4, D5, D6, D7, D8>(i: Injector, ctr: { new(d1: D1, d2: D2, d3: D3, d4: D4, d5: D5, d6: D6, d7: D7, d8: D8): T },
-  d1: Dependency<D1>, d2: Dependency<D2>, d3: Dependency<D3>, d4: Dependency<D4>, d5: Dependency<D5>, d6: Dependency<D6>, d7: Dependency<D7>, d8: Dependency<D8>): Promise<T> {
-  const [i1, i2, i3, i4, i5, i6, i7, i8] = await Promise.all([
-    i.getInstance(d1),
-    i.getInstance(d2),
-    i.getInstance(d3),
-    i.getInstance(d4),
-    i.getInstance(d5),
-    i.getInstance(d6),
-    i.getInstance(d7),
-    i.getInstance(d8),
-  ]);
-  return new ctr(i1, i2, i3, i4, i5, i6, i7, i8);
-}
-
-async function create7<T, D1, D2, D3, D4, D5, D6, D7>(i: Injector, ctr: { new(d1: D1, d2: D2, d3: D3, d4: D4, d5: D5, d6: D6, d7: D7): T },
-  d1: Dependency<D1>, d2: Dependency<D2>, d3: Dependency<D3>, d4: Dependency<D4>, d5: Dependency<D5>, d6: Dependency<D6>, d7: Dependency<D7>): Promise<T> {
-  const [i1, i2, i3, i4, i5, i6, i7] = await Promise.all([
-    i.getInstance(d1),
-    i.getInstance(d2),
-    i.getInstance(d3),
-    i.getInstance(d4),
-    i.getInstance(d5),
-    i.getInstance(d6),
-    i.getInstance(d7),
-  ]);
-  return new ctr(i1, i2, i3, i4, i5, i6, i7);
-}
-
-async function create6<T, D1, D2, D3, D4, D5, D6>(i: Injector, ctr: { new(d1: D1, d2: D2, d3: D3, d4: D4, d5: D5, d6: D6): T },
-  d1: Dependency<D1>, d2: Dependency<D2>, d3: Dependency<D3>, d4: Dependency<D4>, d5: Dependency<D5>, d6: Dependency<D6>): Promise<T> {
-  const [i1, i2, i3, i4, i5, i6] = await Promise.all([
-    i.getInstance(d1),
-    i.getInstance(d2),
-    i.getInstance(d3),
-    i.getInstance(d4),
-    i.getInstance(d5),
-    i.getInstance(d6),
-  ]);
-  return new ctr(i1, i2, i3, i4, i5, i6);
-}
-
-async function create5<T, D1, D2, D3, D4, D5>(i: Injector, ctr: { new(d1: D1, d2: D2, d3: D3, d4: D4, d5: D5): T },
-  d1: Dependency<D1>, d2: Dependency<D2>, d3: Dependency<D3>, d4: Dependency<D4>, d5: Dependency<D5>): Promise<T> {
-  const [i1, i2, i3, i4, i5] = await Promise.all([
-    i.getInstance(d1),
-    i.getInstance(d2),
-    i.getInstance(d3),
-    i.getInstance(d4),
-    i.getInstance(d5),
-  ]);
-  return new ctr(i1, i2, i3, i4, i5);
-}
-
-async function create4<T, D1, D2, D3, D4>(i: Injector, ctr: { new(d1: D1, d2: D2, d3: D3, d4: D4): T },
-  d1: Dependency<D1>, d2: Dependency<D2>, d3: Dependency<D3>, d4: Dependency<D4>): Promise<T> {
-  const [i1, i2, i3, i4] = await Promise.all([
-    i.getInstance(d1),
-    i.getInstance(d2),
-    i.getInstance(d3),
-    i.getInstance(d4),
-  ]);
-  return new ctr(i1, i2, i3, i4);
-}
-
-async function create3<T, D1, D2, D3>(i: Injector, ctr: { new(d1: D1, d2: D2, d3: D3): T },
-  d1: Dependency<D1>, d2: Dependency<D2>, d3: Dependency<D3>): Promise<T> {
-  const [i1, i2, i3] = await Promise.all([
-    i.getInstance(d1),
-    i.getInstance(d2),
-    i.getInstance(d3),
-  ]);
-  return new ctr(i1, i2, i3);
-}
-
-async function create2<T, D1, D2>(i: Injector, ctr: { new(d1: D1, d2: D2): T },
-  d1: Dependency<D1>, d2: Dependency<D2>): Promise<T> {
-  const [i1, i2] = await Promise.all([
-    i.getInstance(d1),
-    i.getInstance(d2),
-  ]);
-  return new ctr(i1, i2);
-}
-
-async function create1<T, D1>(i: Injector, ctr: { new(d1: D1): T },
-  d1: Dependency<D1>): Promise<T> {
-  const i1 = await i.getInstance(d1);
-  return new ctr(i1);
+export async function getInstances<T extends any[]>(injector: Injector, ...args: Dependencyfy<T>): Promise<T> {
+  return <T>await Promise.all(args.map(a => injector.getInstance(a)));
 }

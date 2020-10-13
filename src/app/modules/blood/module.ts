@@ -7,7 +7,7 @@ import { RffFile } from '../../../build/formats/rff';
 import { createTexture } from '../../../utils/gl/textures';
 import { getInstances, Injector, Module } from '../../../utils/injector';
 import { Stream } from '../../../utils/stream';
-import { BOARD, BuildResources, DEFAULT_BOARD, ENGINE_API, RESOURCES } from '../../apis/app';
+import { BOARD, BuildResources, ENGINE_API, RESOURCES } from '../../apis/app';
 import { BUS } from '../../apis/handler';
 import { LoadBoard, namedMessageHandler } from '../../edit/messages';
 import { PIC_TAGS, RAW_PAL, RAW_PLUs } from '../artselector';
@@ -192,7 +192,6 @@ export function BloodModule(module: Module) {
   module.bind(Implementation_, BloodImplementationConstructor);
   module.bind(MAP_NAMES, getMapNames);
   module.bind(PIC_TAGS, PicTags);
-  module.bindInstance(DEFAULT_BOARD, createBoard());
 
   module.install(mapLoader);
   module.install(mapSaver);

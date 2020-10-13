@@ -100,9 +100,8 @@ export class ArtEditor {
   }
 
   private applyFilter(id: number): boolean {
-    const tags = iter(this.tags.tags(id));
     if (this.filter.startsWith('*')) return (id + '').includes(this.filter.substr(1))
-    return (id + '').startsWith(this.filter) || tags.any(t => t.toLowerCase() == this.filter.toLowerCase());
+    return (id + '').startsWith(this.filter) || iter(this.tags.tags(id)).any(t => t.toLowerCase() == this.filter.toLowerCase());
   }
 
   private pics(): Iterable<number> {

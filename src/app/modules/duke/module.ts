@@ -14,7 +14,7 @@ import { MAP_NAMES, showMapSelection } from "../selectmap";
 import { Implementation_, RorLinks } from "../view/boardrenderer3d";
 import { FS_MANAGER } from "../fs/manager";
 import { EngineApi } from "../../../build/board/mutations/api";
-import { BOARD, BuildResources, DEFAULT_BOARD, ENGINE_API, RESOURCES } from "../../apis/app";
+import { BOARD, BuildResources, ENGINE_API, RESOURCES } from "../../apis/app";
 import { Stream } from "../../../utils/stream";
 
 const GRP = new Dependency<GrpFile>('Grp File');
@@ -71,19 +71,6 @@ function loadMapImpl(name: string) {
     const res = await injector.getInstance(RESOURCES)
     return loadBuildMap(new Stream(await res.get(name), true));
   }
-}
-
-function createBoard() {
-  const board = new Board();
-  board.walls = [];
-  board.sectors = [];
-  board.sprites = [];
-  board.numwalls = 0;
-  board.numsectors = 0;
-  board.numsprites = 0;
-  board.version = 0x0007;
-  board.posx = board.posy = board.posz = board.cursectnum = board.ang = 0;
-  return board;
 }
 
 function DukeImplementation() {
@@ -181,7 +168,6 @@ export function DukeModule(module: Module) {
   module.bind(PLU_TEXTURE, loadPluTexture);
   module.bind(MAP_NAMES, getMapNames);
   module.bind(PIC_TAGS, PicTags);
-  module.bindInstance(DEFAULT_BOARD, createBoard());
   module.bind(RESOURCES, Resources);
 
   module.install(mapLoader);

@@ -1,7 +1,7 @@
 import { Board } from "../../../build/board/structs";
 import { Deck } from "../../../utils/collections";
 import { Injector } from "../../../utils/injector";
-import { BoardProvider, DEFAULT_BOARD, ENGINE_API } from "../../apis/app";
+import { BoardProvider, ENGINE_API } from "../../apis/app";
 import { BUS, MessageHandlerReflective } from "../../apis/handler";
 import { INVALIDATE_ALL, LoadBoard, NamedMessage } from "../../edit/messages";
 
@@ -15,7 +15,7 @@ class History {
 export async function DefaultBoardProviderConstructor(injector: Injector): Promise<BoardProvider> {
   const bus = await injector.getInstance(BUS);
   const api = await injector.getInstance(ENGINE_API);
-  const defaultBoard = await injector.getInstance(DEFAULT_BOARD);
+  const defaultBoard = api.newBoard();
   const history = new History();
   let activeBoard: Board = api.cloneBoard(defaultBoard);
   history.push(api.cloneBoard(defaultBoard));

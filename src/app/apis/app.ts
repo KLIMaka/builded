@@ -36,7 +36,6 @@ export const VIEW = new Dependency<View>('View');
 export const ENGINE_API = new Dependency<EngineApi>("Engine Api");
 export type BoardProvider = () => Board;
 export const BOARD = new Dependency<BoardProvider>('Borad');
-export const DEFAULT_BOARD = new Dependency<Board>('Default Board');
 
 export interface State {
   register<T>(name: string, defaultValue: T): void;

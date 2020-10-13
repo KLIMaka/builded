@@ -1,11 +1,10 @@
 import { SelectorConstructor } from '../../app/modules/artselector';
 import { Board } from '../../build/board/structs';
 import { Deck } from '../../utils/collections';
-import { loadString } from '../../utils/getter';
 import { IndexedImgLibJsConstructor, INDEXED_IMG_LIB } from '../../utils/imglib';
 import { create, Injector, Module } from '../../utils/injector';
 import * as PROFILE from '../../utils/profiler';
-import { ART, BOARD, DEFAULT_BOARD, GRID, REFERENCE_TRACKER, SCHEDULER, STATE, STORAGES, View, VIEW } from '../apis/app';
+import { ART, BOARD, ENGINE_API, GRID, REFERENCE_TRACKER, SCHEDULER, STATE, STORAGES, View, VIEW } from '../apis/app';
 import { BUS, DefaultMessageBus, MessageBus, MessageHandlerReflective } from '../apis/handler';
 import { Renderable } from '../apis/renderable';
 import { DefaultScheduler } from '../apis/scheduler';
@@ -38,7 +37,8 @@ async function mapBackupService(module: Module) {
     const storages = await injector.getInstance(STORAGES);
     const bus = await injector.getInstance(BUS);
     const board = await injector.getInstance(BOARD);
-    const defaultBoard = await injector.getInstance(DEFAULT_BOARD);
+    const api = await injector.getInstance(ENGINE_API);
+    const defaultBoard = api.newBoard();
     const store = await storages('session');
     bus.connect(namedMessageHandler('commit', () => store.set('map_bak', board())));
     bus.connect(namedMessageHandler('new_board', () => {
@@ -57,7 +57,8 @@ async function mapBackupService(module: Module) {
 function newMap(module: Module) {
   module.execute(async injector => {
     const bus = await injector.getInstance(BUS);
-    const defaultBoard = await injector.getInstance(DEFAULT_BOARD);
+    const api = await injector.getInstance(ENGINE_API);
+    const defaultBoard = api.newBoard();
     bus.connect(namedMessageHandler('new_board', () => {
       bus.handle(new LoadBoard(defaultBoard));
     }));

@@ -45,7 +45,7 @@ class Contour {
 
   public updatePoint(idx: number, x: number, y: number) {
     if (idx >= this.size) throw new Error('Invalid point id: ' + idx);
-    let p = this.points[idx];
+    const p = this.points[idx];
     p[0] = x;
     p[1] = y;
   }
@@ -106,7 +106,7 @@ class Contour {
     buff.deallocate();
     if (this.size < 2) return;
     this.length.tex = this.art.get(-2);
-    let size = this.size - 1;
+    const size = this.size - 1;
     const [total, labels] = this.prepareLengthLabels();
     buff.allocate(total * 4, total * 6);
     let off = 0;
@@ -150,12 +150,12 @@ export class DrawSector extends DefaultTool {
     vec3.set(this.pointer, x, y, z);
 
     if (this.isRect) {
-      let fp = this.points.get(0);
-      let dx = x - fp[0];
-      let dy = y - fp[1];
-      let p1 = this.points.get(1);
-      let p2 = this.points.get(2);
-      let p3 = this.points.get(3);
+      const fp = this.points.get(0);
+      const dx = x - fp[0];
+      const dy = y - fp[1];
+      const p1 = this.points.get(1);
+      const p2 = this.points.get(2);
+      const p3 = this.points.get(3);
       p1[0] = fp[0] + dx;
       p2[0] = fp[0] + dx;
       p2[1] = fp[1] + dy;
@@ -170,18 +170,19 @@ export class DrawSector extends DefaultTool {
 
   private predrawUpdate() {
     if (this.points.length() > 0) return false;
-    const target = this.view.snapTarget();
+    const target = this.view.target();
+    const snapTarget = this.view.snapTarget();
     const board = this.board();
-    if (target.entity == null) {
-      const [x, y] = target.coords;
+    if (snapTarget.entity == null) {
+      const [x, y] = snapTarget.coords;
       const [w] = closestWallPointDist(board, x, y);
       const z = w == -1 ? 0 : board.sectors[sectorOfWall(board, w)].ceilingz;
       vec3.set(this.pointer, x, y, z);
       this.contour.setZ(z / ZSCALE);
       this.contour.updateLastPoint(x, y);
-    } else if (target.entity.isSector() || target.entity.isSprite()) {
-      let [x, y,] = target.coords;
-      let z = this.getPointerZ(board, target);
+    } else if (snapTarget.entity.isSector() || snapTarget.entity.isSprite() || (target.entity == null || target.entity.isSector())) {
+      const [x, y,] = snapTarget.coords;
+      const z = this.getPointerZ(board, snapTarget);
       vec3.set(this.pointer, x, y, z);
       this.contour.setZ(z / ZSCALE);
       this.contour.updateLastPoint(x, y);
@@ -190,9 +191,9 @@ export class DrawSector extends DefaultTool {
   }
 
   private isSplitSector(x: number, y: number) {
-    let sectorId = this.findContainingSector();
+    const sectorId = this.findContainingSector();
     if (sectorId == -1) return -1;
-    let fp = this.points.get(0);
+    const fp = this.points.get(0);
     const board = this.board();
     return wallInSector(board, sectorId, fp[0], fp[1]) != -1
       && wallInSector(board, sectorId, x, y) != -1 ? sectorId : -1;
@@ -220,14 +221,14 @@ export class DrawSector extends DefaultTool {
   private checkFinish() {
     if (this.points.length() == 0) return false;
 
-    let splitSector = this.isSplitSector(this.pointer[0], this.pointer[1]);
+    const splitSector = this.isSplitSector(this.pointer[0], this.pointer[1]);
     if (splitSector != -1) {
       this.splitSector(splitSector);
       return true;
     }
-    let latsPoint = this.points.get(this.points.length() - 1);
+    const latsPoint = this.points.get(this.points.length() - 1);
     if (latsPoint[0] == this.pointer[0] && latsPoint[1] == this.pointer[1]) return false;
-    let firstPoint = this.points.get(0);
+    const firstPoint = this.points.get(0);
     if (firstPoint[0] == this.pointer[0] && firstPoint[1] == this.pointer[1] || this.isRect) {
       this.createSector();
       return true;
@@ -252,7 +253,7 @@ export class DrawSector extends DefaultTool {
 
   private getPointerZ(board: Board, target: Target): number {
     if (target.entity.isSector()) return target.coords[2];
-    let sectorId = target.entity.isWall() ? sectorOfWall(board, target.entity.id) : board.sprites[target.entity.id].sectnum;
+    const sectorId = target.entity.isWall() ? sectorOfWall(board, target.entity.id) : board.sprites[target.entity.id].sectnum;
     return getClosestSectorZ(board, sectorId, target.coords[0], target.coords[1], target.coords[2])[1];
   }
 
@@ -262,7 +263,7 @@ export class DrawSector extends DefaultTool {
   }
 
   private createSector() {
-    let sectorId = this.findContainingSector();
+    const sectorId = this.findContainingSector();
     const board = this.board();
     if (sectorId != -1)
       createInnerLoop(board, sectorId, this.points, this.refs, this.api);

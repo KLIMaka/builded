@@ -236,12 +236,13 @@ export class DrawWall extends DefaultTool {
   ) { super() }
 
   private start() {
-    const target = this.view.snapTarget();
-    if (target.entity == null || !target.entity.isWall()) return;
+    const target = this.view.target();
+    const snapTarget = this.view.snapTarget();
+    if (snapTarget.entity == null || !snapTarget.entity.isWall() && target.entity == null || target.entity.isSector()) return;
     this.activate();
-    const [x, y, z] = target.coords;
-    this.portal.start(this.board(), target.entity.id, x, y, z);
-    this.wallId = target.entity.id;
+    const [x, y, z] = snapTarget.coords;
+    this.portal.start(this.board(), snapTarget.entity.id, x, y, z);
+    this.wallId = snapTarget.entity.id;
   }
 
   private stop() {

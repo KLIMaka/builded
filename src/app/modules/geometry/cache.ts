@@ -191,6 +191,7 @@ async function RenderablesCacheConstructor(injector: Injector) {
 
 export const WALL_COLOR = 'wallColor';
 export const MASKED_WALL_COLOR = 'maskedWallColor';
+export const PORTAL_WALL_COLOR = 'portalWallColor';
 export const INTERSECTOR_WALL_COLOR = 'intersectorWallColor';
 export const SPRITE_COLOR = 'spriteColor';
 
@@ -200,8 +201,9 @@ export async function RenderablesCacheModule(module: Module) {
   module.execute(async injector => {
     const state = await injector.getInstance(STATE);
     state.register(WALL_COLOR, [1, 1, 1, 1]);
-    state.register(INTERSECTOR_WALL_COLOR, [1, 0, 0, 1]);
+    state.register(INTERSECTOR_WALL_COLOR, [1, 0, 0, 0]);
     state.register(MASKED_WALL_COLOR, [0, 0, 1, 1]);
+    state.register(PORTAL_WALL_COLOR, [1, 1, 0, 1]);
     state.register(SPRITE_COLOR, [0, 1, 1, 1]);
 
     const bus = await injector.getInstance(BUS);

@@ -71,6 +71,15 @@ export function isOuterLoop(board: Board, wallId: number) {
   return clockwise(map(loopWalls(board, wallId), WALL_MAPPER));
 }
 
+export function loopPointsOrdered(board: Board, sectorId: number): number[] {
+  const loops = [];
+  for (const loopId of loopPoints(board, sectorId)) {
+    if (isOuterLoop(board, loopId)) loops.unshift(loopId)
+    else loops.push(loopId);
+  }
+  return loops;
+}
+
 export function canonicalWall(board: Board, wallId: number): number {
   const canonical = minValue(wallId);
   let w = wallId;

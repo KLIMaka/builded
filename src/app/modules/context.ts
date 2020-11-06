@@ -4,7 +4,7 @@ import { Deck } from '../../utils/collections';
 import { IndexedImgLibJsConstructor, INDEXED_IMG_LIB } from '../../utils/imglib';
 import { create, Injector, Module } from '../../utils/injector';
 import * as PROFILE from '../../utils/profiler';
-import { ART, BOARD, ENGINE_API, GRID, REFERENCE_TRACKER, SCHEDULER, STATE, STORAGES, View, VIEW } from '../apis/app';
+import { ART, BOARD, ENGINE_API, GRID, PORTALS, REFERENCE_TRACKER, SCHEDULER, STATE, STORAGES, View, VIEW } from '../apis/app';
 import { BUS, DefaultMessageBus, MessageBus, MessageHandlerReflective } from '../apis/handler';
 import { Renderable } from '../apis/renderable';
 import { DefaultScheduler } from '../apis/scheduler';
@@ -31,6 +31,7 @@ import { BUFFER_FACTORY, DefaultBufferFactory } from './gl/buffers';
 import { BuildGlConstructor, BUILD_GL } from './gl/buildgl';
 import { InfoModule } from './info';
 import { SwappableViewModule } from './view/view';
+import { DefaultPortalsConstructor } from '../modules/default/portals';
 
 async function mapBackupService(module: Module) {
   module.execute(async injector => {
@@ -82,6 +83,7 @@ export function DefaultSetupModule(module: Module) {
   module.bind(ENTITY_FACTORY, EntityFactoryConstructor);
   module.bind(INDEXED_IMG_LIB, IndexedImgLibJsConstructor);
   module.bind(SCHEDULER, DefaultScheduler);
+  module.bind(PORTALS, DefaultPortalsConstructor);
 
   module.install(SwappableViewModule);
   module.install(JoinSectorsModule);

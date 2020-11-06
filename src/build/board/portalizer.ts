@@ -2,15 +2,7 @@ import { map } from "../../utils/collections";
 import { loopPointsOrdered, loopWalls, sectorWalls } from "../board/loops";
 import { Board } from "../board/structs";
 
-type IdToIds = { [index: number]: number[] };
-function ensure(id2ids: IdToIds, idx: number): number[] {
-  let ids = id2ids[idx];
-  if (ids == undefined) {
-    ids = [];
-    id2ids[idx] = ids;
-  }
-  return ids;
-}
+export type Loop = { readonly looppoint: number, readonly portals: number[][] }
 
 function getPortalsFromLoop(board: Board, loopId: number) {
   let portal = [];
@@ -37,20 +29,6 @@ function getPortalsFromLoop(board: Board, loopId: number) {
   return portals;
 }
 
-export function getPortals(board: Board, sectorId: number) {
-  return map(loopPointsOrdered(board, sectorId), w => [w, getPortalsFromLoop(board, w)]);
-}
-
-function foo(board: Board) {
-  const clusters: IdToIds = {};
-  for (let s = 0; s < board.numsectors; s++) {
-    const connected = new Set<number>();
-    connected.add(s);
-    for (const w of sectorWalls(board, s)) {
-      const wall = board.walls[w];
-      if (wall.nextsector != -1) connected.add(wall.nextsector);
-    }
-    const cluster = [...connected].sort();
-    clusters[s] = cluster;
-  }
+export function getPortals(board: Board, sectorId: number): Generator<Loop> {
+  return map(loopPointsOrdered(board, sectorId), w => <Loop>{ looppoint: w, portals: getPortalsFromLoop(board, w) });
 }

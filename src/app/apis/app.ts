@@ -37,6 +37,11 @@ export const ENGINE_API = new Dependency<EngineApi>("Engine Api");
 export type BoardProvider = () => Board;
 export const BOARD = new Dependency<BoardProvider>('Borad');
 
+export interface Portals {
+  isPortalWall(wallId: number): boolean;
+}
+export const PORTALS = new Dependency<Portals>('Portals');
+
 export interface State {
   register<T>(name: string, defaultValue: T): void;
   set<T>(name: string, value: T): void;

@@ -47,8 +47,8 @@ const wallNormal = vec2.create();
 const mirrorNormal = vec3.create();
 const mirroredTransform = mat4.create();
 const mpos = vec3.create();
-const polyOffsetOn = (bgl: BuildGl) => { bgl.gl.polygonOffset(0, -8) };
-const polyOffsetOff = (bgl: BuildGl) => { bgl.gl.polygonOffset(0, 0) };
+const polyOffsetOn = (bgl: BuildGl) => { bgl.gl.polygonOffset(4, -8) };
+const polyOffsetOff = (bgl: BuildGl) => { bgl.gl.polygonOffset(4, 0) };
 const blendOn = (bgl: BuildGl) => { bgl.gl.enable(WebGLRenderingContext.BLEND) };
 const blendOff = (bgl: BuildGl) => { bgl.gl.disable(WebGLRenderingContext.BLEND) };
 

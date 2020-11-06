@@ -65,6 +65,7 @@ CTRL+D          clear_selection
 ALT+N           new_board
 CTRL+SHIFT+A    show_artedit
 CTRL+ALT+T      show_tasks
+F11             toggle_draw_portals
 
 +W              forward
 +S              backward

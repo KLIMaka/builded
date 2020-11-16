@@ -25,26 +25,26 @@ const BUILD_API: EngineApi = {
 test('getPortals', () => {
   const board = BUILD_API.newBoard();
   createNewSector(board, wrap([[0, 0], [100, 0], [100, 100], [0, 100]]), REFS, BUILD_API);
-  expect([...getPortals(board, 0)]).toStrictEqual([[3, []]]);
+  expect([...getPortals(board, 0)]).toStrictEqual([{ looppoint: 3, portals: [] }]);
 
   createNewSector(board, wrap([[100, 0], [200, 0], [200, 100], [100, 100]]), REFS, BUILD_API);
-  expect([...getPortals(board, 0)]).toStrictEqual([[3, [[1]]]]);
-  expect([...getPortals(board, 1)]).toStrictEqual([[7, [[7]]]]);
+  expect([...getPortals(board, 0)]).toStrictEqual([{ looppoint: 3, portals: [[1]] }]);
+  expect([...getPortals(board, 1)]).toStrictEqual([{ looppoint: 7, portals: [[7]] }]);
 
   splitWall(board, 1, 100, 50, ART_PROVIDER, REFS, BUILD_API.cloneWall);
-  expect([...getPortals(board, 0)]).toStrictEqual([[4, [[1, 2]]]]);
-  expect([...getPortals(board, 1)]).toStrictEqual([[9, [[8, 9]]]]);
+  expect([...getPortals(board, 0)]).toStrictEqual([{ looppoint: 4, portals: [[1, 2]] }]);
+  expect([...getPortals(board, 1)]).toStrictEqual([{ looppoint: 9, portals: [[8, 9]] }]);
 
   createNewSector(board, wrap([[200, 0], [300, 0], [300, 100], [200, 100]]), REFS, BUILD_API);
-  expect([...getPortals(board, 0)]).toStrictEqual([[4, [[1, 2]]]]);
-  expect([...getPortals(board, 1)]).toStrictEqual([[9, [[6], [8, 9]]]]);
-  expect([...getPortals(board, 2)]).toStrictEqual([[13, [[13]]]]);
+  expect([...getPortals(board, 0)]).toStrictEqual([{ looppoint: 4, portals: [[1, 2]] }]);
+  expect([...getPortals(board, 1)]).toStrictEqual([{ looppoint: 9, portals: [[6], [8, 9]] }]);
+  expect([...getPortals(board, 2)]).toStrictEqual([{ looppoint: 13, portals: [[13]] }]);
 
   createInnerLoop(board, 0, [[25, 25], [75, 25], [75, 75], [25, 75]], REFS, BUILD_API);
-  expect([...getPortals(board, 0)]).toStrictEqual([[4, [[1, 2]]], [8, []]]);
+  expect([...getPortals(board, 0)]).toStrictEqual([{ looppoint: 4, portals: [[1, 2]] }, { looppoint: 8, portals: [] }]);
 
   splitWall(board, 8, 25, 35, ART_PROVIDER, REFS, BUILD_API.cloneWall);
   splitWall(board, 9, 25, 65, ART_PROVIDER, REFS, BUILD_API.cloneWall);
   createNewSector(board, wrap([[25, 35], [65, 35], [65, 65], [25, 65]]), REFS, BUILD_API);
-  expect([...getPortals(board, 0)]).toStrictEqual([[4, [[1, 2]]], [10, [[9]]]]);
+  expect([...getPortals(board, 0)]).toStrictEqual([{ looppoint: 4, portals: [[1, 2]] }, { looppoint: 10, portals: [[9]] }]);
 });

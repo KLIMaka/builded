@@ -30,7 +30,7 @@ void main() {
   vec4 epos = P * V * vec4(aPos, 1.0);
   epos /= epos.w;
   vec2 halfscreen = sys.yz / 2.0;
-  vec2 screenPos = round(halfscreen + epos.xy * halfscreen + aNorm.xy);
+  vec2 screenPos = trunc(halfscreen + epos.xy * halfscreen + aNorm.xy);
   vec2 pos = (screenPos - halfscreen) / halfscreen;
   gl_Position = vec4(pos.x, pos.y, epos.z, epos.w);
 #else

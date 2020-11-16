@@ -1,4 +1,5 @@
 import { closestWallPointDist } from "../../../build/board/distances";
+import { sectorWalls } from "../../../build/board/loops";
 import { EngineApi } from "../../../build/board/mutations/api";
 import { createNewSector } from "../../../build/board/mutations/ceatesector";
 import { createInnerLoop } from "../../../build/board/mutations/sectors";
@@ -140,8 +141,12 @@ export class DrawSector extends DefaultTool {
     private board: BoardProvider,
     private refs: BuildReferenceTracker,
     private bus: MessageBus,
-    private contour = new Contour(factory, art)
-  ) { super() }
+    private contour = new Contour(factory, art),
+    private helperPoints = factory.pointSprite('utils')
+  ) {
+    super();
+    this.helperPoints.tex = art.get(-1);
+  }
 
   private update() {
     if (this.predrawUpdate()) return;
@@ -188,6 +193,29 @@ export class DrawSector extends DefaultTool {
       this.contour.updateLastPoint(x, y);
     }
     return true;
+  }
+
+  private getActiveSectorId(board: Board, target: Target) {
+    if (target.entity.isWall()) return sectorOfWall(board, target.entity.id);
+    if (target.entity.isSprite()) return board.sprites[target.entity.id].sectnum;
+    if (target.entity.isSector()) return target.entity.id;
+  }
+
+  private updateHintPoints() {
+    if (!this.isActive()) return;
+    const target = this.view.target();
+    this.helperPoints.needToRebuild();
+    this.helperPoints.buff.deallocate();
+    if (target.entity == null) return;
+    const board = this.board();
+    const sectorId = this.getActiveSectorId(board, target);
+    const points = new PointSpritesBuilder();
+    const z = this.contour.getZ();
+    for (const w of sectorWalls(board, sectorId)) {
+      const wall = board.walls[w];
+      points.add(wall.x, z, wall.y);
+    }
+    points.build(this.helperPoints.buff, 2.5);
   }
 
   private isSplitSector(x: number, y: number) {
@@ -292,6 +320,13 @@ export class DrawSector extends DefaultTool {
     }
   }
 
+  public Render(msg: Render) {
+    msg.consumer(this.contour.getRenderable());
+    if (this.isActive()) {
+      this.updateHintPoints();
+      msg.consumer(this.helperPoints)
+    }
+  }
+
   public Frame(msg: Frame) { this.update() }
-  public Render(msg: Render) { msg.consumer(this.contour.getRenderable()) }
 }

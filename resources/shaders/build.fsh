@@ -31,9 +31,16 @@ const float dith[16] = float[16](
   0.9375, 0.4375, 0.8125, 0.3125
 );
 
-vec2 ditherOffset() {
+float ditherOffset() {
   int idx = int(gl_FragCoord.x) % 4 * 4 + int(gl_FragCoord.y) % 4;
-  return  vec2(dith[idx], dith[15-idx]);
+  return  dith[idx];
+}
+
+float ditherColors(float c1, float c2, float d) {
+  float off = ditherOffset();
+  return c1 > c2 
+    ? off >= d ? c1 : c2 
+    : off >= d ? c2 : c1;
 }
 
 
@@ -108,13 +115,6 @@ vec2 repeat(vec2 tc) {
 #endif
 }
 
-// float mip_map_level(in vec2 tc, vec2 size) {
-//   vec2  dx_vtc = dFdx(tc * size / 4.0);
-//   vec2  dy_vtc = dFdy(tc * size / 4.0);
-//   float delta_max_sqr = max(dot(dx_vtc, dx_vtc), dot(dy_vtc, dy_vtc));
-//   float mml = log2(delta_max_sqr);
-//   return min(max(0.0, mml), log2(max(size.x, size.y)));
-// }
 float mip_map_level(in vec2 tc, vec2 size) {
   vec2  dx_vtc = dFdx(tc * size);
   vec2  dy_vtc = dFdy(tc * size);
@@ -131,24 +131,6 @@ ivec2 irepeat(ivec2 tc, ivec2 size) {
   return m + size * neg;
 #endif
 }
-
-// float ditherSample(int lod, vec2 tc, float off) {
-//   ivec2 isize = textureSize(base, lod);
-//   vec2 size = vec2(isize);
-//   vec2 center = tc * size + 0.5;
-//   vec2 texel = 1.0 / size;
-//   vec2 pixel = (floor(center) / size) - texel / 2.0;
-//   vec2 frac = fract(center);
-//   float C11 = textureGrad(base, repeat(pixel), dFdx(tc), dFdy(tc)).r;
-//   float C21 = textureGrad(base, repeat(pixel + vec2(texel.x, 0)), dFdx(tc), dFdy(tc)).r;
-//   float C12 = textureGrad(base, repeat(pixel + vec2(0, texel.y)), dFdx(tc), dFdy(tc)).r;
-//   float C22 = textureGrad(base, repeat(pixel + vec2(texel.x, texel.y)), dFdx(tc), dFdy(tc)).r;
-
-
-//   float x1 = frac.x < off ? C11 : C21;
-//   float x2 = frac.x < off ? C12 : C22;
-//   return frac.y < off ? x1 : x2;
-// }
 
 float ditherSample(int lod, vec2 tc, float off) {
   ivec2 isize = textureSize(base, lod);
@@ -170,37 +152,30 @@ float ditherSample(int lod, vec2 tc, float off) {
   return frac.y < noise.y ? x1 : x2;
 }
 
-float scale2xSample(float lod, vec2 tc, vec2 off) {
-  ivec2 isize = textureSize(base, int(lod));
-  vec2 size = vec2(isize);
-  vec2 texel = 1.0 / size;
-  vec2 center = tc * size;
-  vec2 pixel = tc;
-  vec2 frac = 0.5 - fract(center);
+float scale2xSample(vec2 tc) {
+  vec2 pixel = repeat(tc);
+  vec2 dx = dFdx(tc);
+  vec2 dy = dFdy(tc);
 
-  float B = textureGrad(base, repeat(pixel + vec2(0.0, +texel.y)), dFdx(tc), dFdy(tc)).r;
-  float D = textureGrad(base, repeat(pixel + vec2(-texel.x, 0.0)), dFdx(tc), dFdy(tc)).r;
-  float E = textureGrad(base, repeat(pixel), dFdx(tc), dFdy(tc)).r;
-  float E1 = textureGrad(base, repeat(pixel), dFdx(tc) / 2.0, dFdy(tc) / 2.0).r;
-  float F = textureGrad(base, repeat(pixel + vec2(+texel.x, 0.0)), dFdx(tc), dFdy(tc)).r;
-  float H = textureGrad(base, repeat(pixel + vec2(0.0, -texel.y)), dFdx(tc), dFdy(tc)).r;
-
+  float ORIG = textureGrad(base, pixel, dx, dy).r;
+  float B = textureGradOffset(base, pixel, dx, dy, ivec2(0, +1)).r;
+  float D = textureGradOffset(base, pixel, dx, dy, ivec2(-1, 0)).r;
+  float F = textureGradOffset(base, pixel, dx, dy, ivec2(+1, 0)).r;
+  float H = textureGradOffset(base, pixel, dx, dy, ivec2(0, -1)).r;
 
   vec4 A = vec4(
-    B == D ? B : E,
-    B == F ? B : E,
-    H == D ? H : E,
-    H == F ? H : E
+    B == D ? B : ORIG,
+    B == F ? B : ORIG,
+    H == D ? H : ORIG,
+    H == F ? H : ORIG
   );
 
-  // float nang = off.x * PI * 2.0;
-  // vec2 noise = vec2(sin(nang), cos(nang));
-  // vec2 noisefrac = frac + noise * 0.5;
-  vec2 noisefrac = frac;
-  float x1 = noisefrac.x < 0.0 ? A.w : A.z;
-  float x2 = noisefrac.x < 0.0 ? A.y : A.x;
-  // return fract(lod) - 0.2 < off.x ? noisefrac.y > 0.0 ? x1 : x2 : E1;
-  return  noisefrac.y > 0.0 ? x1 : x2;
+  vec2 size = vec2(textureSize(base, 0));
+  vec2 frac = floor(2.0 * fract(tc * size));
+  float x1 = frac.x == 0.0 ? A.x : A.y;
+  float x2 = frac.x == 0.0 ? A.z : A.w;
+  float scale2x = frac.y == 0.0 ? x2: x1;
+  return ditherColors(scale2x, ORIG, 0.5);
 }
 
 float getPalIdx(vec2 tc) {
@@ -214,9 +189,7 @@ float getPalIdx(vec2 tc) {
   }
   return result;
 #else
-  // return textureGrad(base, repeat(tc), dFdx(tc), dFdy(tc)).r;
-  // return ditherSample(int(lod), tc, ditherOffset());
-  return scale2xSample(lod, tc, ditherOffset());
+  return lod > 0.0 ? textureGrad(base, repeat(tc), dFdx(tc), dFdy(tc)).r : scale2xSample(tc);
 #endif
 }
 
@@ -224,7 +197,7 @@ vec3 palLookup(vec2 tc) {
   float palIdx = getPalIdx(tc);
   if (palIdx >= trans) discard;
   float lterm = lightOffset() + diffuse() + specular();
-  float lightLevel = clamp(lterm + (fract(lterm) > ditherOffset().x ? 1.0 : 0.0), 1.0 / SHADOWSTEPS, SHADOWSTEPS - 1.0 / SHADOWSTEPS);
+  float lightLevel = clamp(lterm + (fract(lterm) > ditherOffset() ? 1.0 : 0.0), 1.0 / SHADOWSTEPS, SHADOWSTEPS - 1.0 / SHADOWSTEPS);
   float overbright = highlight();
   return sampleColor(palIdx, lightLevel, overbright);
 }

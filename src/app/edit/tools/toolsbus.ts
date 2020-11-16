@@ -17,12 +17,14 @@ export interface Tool extends MessageHandler {
 };
 
 export class DefaultTool extends MessageHandlerReflective implements Tool {
+  private active = false;
   private activateH: (tool: Tool) => void;
   private deactivateH: (tool: Tool) => void;
   activateHandler(handler: (tool: Tool) => void): void { this.activateH = handler }
   deactivateHandler(handler: (tool: Tool) => void): void { this.deactivateH = handler }
-  protected activate() { this.activateH(this) }
-  protected deactivate() { this.deactivateH(this) }
+  protected activate() { this.activateH(this); this.active = true }
+  protected deactivate() { this.deactivateH(this); this.active = false }
+  protected isActive() { return this.active }
 }
 
 class ToolsMessageBus implements MessageHandler {

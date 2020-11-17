@@ -1,49 +1,50 @@
 import { BuildReferenceTracker } from "../../../app/apis/app";
 import { track } from "../../../app/apis/referencetracker";
-import { Deck, map, forEach, enumerate } from "../../../utils/collections";
-import { Wall, Board } from "../structs";
+import { forEach, map, reduce } from "../../../utils/collections";
+import { Board, Wall } from "../structs";
 import { resizeWalls } from "./internal";
 
 export class SectorBuilder {
-  private walls = new Deck<Wall>();
-  private looppoints = new Deck<number>();
+  private currentLoop: Wall[] = [];
+  private walls: Wall[][] = [];
 
-  addWall(wall: Wall): SectorBuilder { this.walls.push(wall); return this }
-  addWalls(walls: Iterable<Wall>): SectorBuilder { this.walls.pushAll(walls); return this }
+  addWall(wall: Wall): SectorBuilder { this.currentLoop.push(wall); return this }
+  addWalls(walls: Iterable<Wall>): SectorBuilder { forEach(walls, w => this.currentLoop.push(w)); return this }
   addLoop(walls: Iterable<Wall>): SectorBuilder { return this.addWalls(walls).loop() }
-  getWalls() { return this.walls }
+  *getWalls() { for (const ws of this.walls) for (const w of ws) yield w; }
+  wallsLength() { let sum = 0; forEach(this.walls, ws => sum += ws.length); return sum; }
 
   loop(): SectorBuilder {
-    if (this.walls.length() == 0 || this.looppoints.top() == this.walls.length()) return this;
-    this.looppoints.push(this.walls.length());
+    if (this.currentLoop.length == 0) return this;
+    this.walls.push(this.currentLoop);
+    this.currentLoop = [];
     return this;
   }
 
   build(board: Board, sectorId: number, refs: BuildReferenceTracker) {
     track(refs.walls, wallRefs => {
-      const nextWallPtrs = [...map(this.walls, w => wallRefs.ref(w.nextwall))];
-      resizeWalls(board, sectorId, this.walls.length(), refs);
-      forEach(enumerate(this.walls), ([w, i]) => w.nextwall = wallRefs.val(nextWallPtrs[i]));
+      const walls = [...this.getWalls()];
+      const nextWallPtrs = [...map(walls, w => wallRefs.ref(w.nextwall))];
+      resizeWalls(board, sectorId, walls.length, refs);
+      for (let i = 0; i < walls.length; i++) walls[i].nextwall = wallRefs.val(nextWallPtrs[i]);
     });
     const sec = board.sectors[sectorId];
-    const loopIter = this.looppoints[Symbol.iterator]();
-    let loopStart = sec.wallptr;
-    let loopEnd = loopIter.next().value;
-    for (let [wall, i] of enumerate(this.walls)) {
-      const w = i + sec.wallptr;
-      board.walls[w] = wall;
-      if (loopEnd == i + 1) {
-        wall.point2 = loopStart;
-        loopStart = w + 1;
-        loopEnd = loopIter.next().value;
-      } else {
+    let ptr = sec.wallptr;
+    for (const ws of this.walls) {
+      const start = ptr;
+      let lastWall = null;
+      for (const wall of ws) {
+        const w = ptr++;
+        lastWall = wall;
+        board.walls[w] = wall;
         wall.point2 = w + 1;
+        if (wall.nextwall != -1) {
+          const nextwall = board.walls[wall.nextwall];
+          nextwall.nextsector = sectorId;
+          nextwall.nextwall = w;
+        }
       }
-      if (wall.nextwall != -1) {
-        const nextwall = board.walls[wall.nextwall];
-        nextwall.nextsector = sectorId;
-        nextwall.nextwall = w;
-      }
+      lastWall.point2 = start;
     }
   }
 }

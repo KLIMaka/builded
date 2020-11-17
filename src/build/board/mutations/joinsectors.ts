@@ -1,21 +1,19 @@
 import { BuildReferenceTracker } from '../../../app/apis/app';
 import { sectorWalls } from '../loops';
 import { SectorBuilder } from '../mutations/sectorbuilder';
-import { isJoinedSectors } from '../query';
+import { isJoinedSectors, sectorOfWall } from '../query';
 import { Board } from '../structs';
+import { EngineApi } from './api';
 import { deleteSector } from './internal';
 
-function fillSectorWalls(board: Board, s: number, set: Set<number>) { for (const w of sectorWalls(board, s)) set.add(w) }
-
-const _wallset = new Set<number>();
 function fillWallSet(board: Board, s1: number, s2: number) {
-  _wallset.clear();
-  fillSectorWalls(board, s1, _wallset);
-  fillSectorWalls(board, s2, _wallset);
-  return _wallset;
+  const wallset = new Set<number>();
+  for (const w of sectorWalls(board, s1)) if (board.walls[w].nextsector != s2) wallset.add(w);
+  for (const w of sectorWalls(board, s2)) if (board.walls[w].nextsector != s1) wallset.add(w);
+  return wallset;
 }
 
-function getJoinedWallsLoops(board: Board, s1: number, s2: number): SectorBuilder {
+function getJoinedWallsLoops(board: Board, s1: number, s2: number, api: EngineApi): SectorBuilder {
   const builder = new SectorBuilder();
   const wallset = fillWallSet(board, s1, s2);
   const values = wallset.values();
@@ -26,24 +24,29 @@ function getJoinedWallsLoops(board: Board, s1: number, s2: number): SectorBuilde
       wallset.delete(w);
       const wall = board.walls[w];
       if (wall.nextsector == s1 || wall.nextsector == s2) {
-        wallset.delete(wall.nextwall);
         w = board.walls[wall.nextwall].point2;
       } else {
-        builder.addWall(wall);
+        builder.addWall(api.cloneWall(wall));
+        if (wall.nextwall != -1) board.walls[wall.nextwall].nextsector = s1;
         w = wall.point2;
       }
+
       if (w == loopstart) {
         builder.loop();
         break;
       }
     }
   }
+  for (const w of sectorWalls(board, s2)) {
+    board.walls[w].nextsector = -1;
+    board.walls[w].nextwall = -1;
+  }
   return builder;
 }
 
-export function joinSectors(board: Board, s1: number, s2: number, refs: BuildReferenceTracker) {
+export function joinSectors(board: Board, s1: number, s2: number, refs: BuildReferenceTracker, api: EngineApi) {
   if (!isJoinedSectors(board, s1, s2)) return -1;
-  getJoinedWallsLoops(board, s1, s2).build(board, s1, refs);
+  getJoinedWallsLoops(board, s1, s2, api).build(board, s1, refs);
   deleteSector(board, s2, refs);
   return 0;
 }

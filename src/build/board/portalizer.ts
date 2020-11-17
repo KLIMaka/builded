@@ -1,5 +1,5 @@
 import { map } from "../../utils/collections";
-import { loopPointsOrdered, loopWalls, sectorWalls } from "../board/loops";
+import { loopPointsOrdered, loopWalls } from "../board/loops";
 import { Board } from "../board/structs";
 
 export type Loop = { readonly looppoint: number, readonly portals: number[][] }

@@ -54,7 +54,7 @@ function splitSectorImpl(board: Board, sectorId: number, firstWall: number, last
     .addWalls(existedWalls)
     .addWalls(createNewWalls(newWalls, [], refWall, board, api.cloneWall))
     .loop();
-  const firstLoopLength = newSectorBuilder.getWalls().length();
+  const firstLoopLength = newSectorBuilder.wallsLength();
 
   for (const lid of loopPoints(board, sectorId)) {
     if (loopStart(board, lid) == start) continue;

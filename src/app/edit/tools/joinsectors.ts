@@ -1,6 +1,7 @@
+import { EngineApi } from "../../../build/board/mutations/api";
 import { joinSectors } from "../../../build/board/mutations/joinsectors";
 import { create, Module } from "../../../utils/injector";
-import { BOARD, BoardProvider, BuildReferenceTracker, REFERENCE_TRACKER, VIEW, View } from "../../apis/app";
+import { BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, REFERENCE_TRACKER, VIEW, View } from "../../apis/app";
 import { BUS, MessageBus } from "../../apis/handler";
 import { COMMIT, INVALIDATE_ALL, NamedMessage } from "../messages";
 import { DefaultTool, TOOLS_BUS } from "./toolsbus";
@@ -8,7 +9,7 @@ import { DefaultTool, TOOLS_BUS } from "./toolsbus";
 export function JoinSectorsModule(module: Module) {
   module.execute(async injector => {
     const bus = await injector.getInstance(TOOLS_BUS);
-    bus.connect(await create(injector, JoinSectors, BUS, VIEW, BOARD, REFERENCE_TRACKER));
+    bus.connect(await create(injector, JoinSectors, BUS, VIEW, BOARD, REFERENCE_TRACKER, ENGINE_API));
   });
 }
 
@@ -21,6 +22,7 @@ export class JoinSectors extends DefaultTool {
     private view: View,
     private board: BoardProvider,
     private refs: BuildReferenceTracker,
+    private api: EngineApi
   ) { super() }
 
   private join() {
@@ -35,7 +37,7 @@ export class JoinSectors extends DefaultTool {
     }
 
     if (this.sectorId1 != -1 && this.sectorId2 != -1) {
-      let result = joinSectors(this.board(), this.sectorId1, this.sectorId2, this.refs);
+      let result = joinSectors(this.board(), this.sectorId1, this.sectorId2, this.refs, this.api);
       if (result == 0) {
         this.bus.handle(COMMIT);
         this.bus.handle(INVALIDATE_ALL);

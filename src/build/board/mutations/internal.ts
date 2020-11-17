@@ -2,6 +2,7 @@ import { BuildReferenceTracker } from "../../../app/apis/app";
 import { Collection, forEach, range, reverse } from "../../../utils/collections";
 import { iter } from "../../../utils/iter";
 import { clockwise } from "../../utils";
+import { sectorWalls } from "../loops";
 import { isValidSectorId, isValidSpriteId } from "../query";
 import { Board, Sector, Sprite } from "../structs";
 
@@ -32,9 +33,7 @@ export function addSector(board: Board, sector: Sector) {
 
 export function deleteSector(board: Board, sectorId: number, refs: BuildReferenceTracker) {
   if (!isValidSectorId(board, sectorId)) throw new Error(`Invalid sectorId: ${sectorId}`);
-  const sector = board.sectors[sectorId];
-  const wallsend = sector.wallptr + sector.wallnum;
-  for (let w = sector.wallptr; w < wallsend; w++) {
+  for (const w of sectorWalls(board, sectorId)) {
     const wall = board.walls[w];
     if (wall.nextwall != -1) {
       const nextwall = board.walls[wall.nextwall];

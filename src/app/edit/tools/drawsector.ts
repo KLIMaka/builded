@@ -14,8 +14,9 @@ import { create, Module } from "../../../utils/injector";
 import { int, len2d } from "../../../utils/mathutils";
 import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
 import { BUS, MessageBus } from "../../apis/handler";
-import { Renderables } from "../../apis/renderable";
+import { NULL_RENDERABLE, Renderable, Renderables } from "../../apis/renderable";
 import { writeText } from "../../modules/geometry/builders/common";
+import { RenderablesCache, RENDRABLES_CACHE } from "../../modules/geometry/cache";
 import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
 import { LineBuilder, PointSpritesBuilder } from "../../modules/gl/buffers";
 import { getClosestSectorZ } from "../editutils";
@@ -124,7 +125,7 @@ class Contour {
 export async function DrawSectorModule(module: Module) {
   module.execute(async injector => {
     const bus = await injector.getInstance(TOOLS_BUS);
-    bus.connect(await create(injector, DrawSector, BUILDERS_FACTORY, ART, ENGINE_API, VIEW, BOARD, REFERENCE_TRACKER, BUS));
+    bus.connect(await create(injector, DrawSector, BUILDERS_FACTORY, ART, ENGINE_API, VIEW, BOARD, REFERENCE_TRACKER, BUS, RENDRABLES_CACHE));
   });
 }
 
@@ -132,6 +133,7 @@ export class DrawSector extends DefaultTool {
   private points = new Deck<[number, number]>();
   private pointer = vec3.create();
   private isRect = true;
+  private sectorOverlay: Renderable;
 
   constructor(
     factory: BuildersFactory,
@@ -141,11 +143,10 @@ export class DrawSector extends DefaultTool {
     private board: BoardProvider,
     private refs: BuildReferenceTracker,
     private bus: MessageBus,
+    private renderables: RenderablesCache,
     private contour = new Contour(factory, art),
-    private helperPoints = factory.pointSprite('utils')
   ) {
     super();
-    this.helperPoints.tex = art.get(-1);
   }
 
   private update() {
@@ -201,21 +202,13 @@ export class DrawSector extends DefaultTool {
     if (target.entity.isSector()) return target.entity.id;
   }
 
-  private updateHintPoints() {
-    if (!this.isActive()) return;
+  private updateOverlay() {
+    if (!this.isActive()) return NULL_RENDERABLE;
     const target = this.view.target();
-    this.helperPoints.needToRebuild();
-    this.helperPoints.buff.deallocate();
-    if (target.entity == null) return;
+    if (target.entity == null) return NULL_RENDERABLE;
     const board = this.board();
     const sectorId = this.getActiveSectorId(board, target);
-    const points = new PointSpritesBuilder();
-    const z = this.contour.getZ();
-    for (const w of sectorWalls(board, sectorId)) {
-      const wall = board.walls[w];
-      points.add(wall.x, z, wall.y);
-    }
-    points.build(this.helperPoints.buff, 2.5);
+    return this.renderables.helpers.sector(sectorId);
   }
 
   private isSplitSector(x: number, y: number) {
@@ -322,10 +315,7 @@ export class DrawSector extends DefaultTool {
 
   public Render(msg: Render) {
     msg.consumer(this.contour.getRenderable());
-    if (this.isActive()) {
-      this.updateHintPoints();
-      msg.consumer(this.helperPoints)
-    }
+    if (this.isActive()) msg.consumer(this.updateOverlay());
   }
 
   public Frame(msg: Frame) { this.update() }

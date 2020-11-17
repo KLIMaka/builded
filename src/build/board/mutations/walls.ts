@@ -124,9 +124,9 @@ export function deleteWall(board: Board, wallId: number, refs: BuildReferenceTra
     const lastWallId = lastwall(board, wallId);
     board.walls[lastWallId].nextwall = wall.nextwall;
     board.walls[wall.nextwall].nextwall = lastWallId;
+    moveWalls(board, wall.nextsector, wall2Id, -1, refs);
     wall.nextwall = -1;
     wall.nextsector = -1;
-    moveWalls(board, wall.nextsector, wall2Id, -1, refs);
     wallId += wallId > wall2Id ? -1 : 0;
   }
   moveWalls(board, sectorId, wallId, -1, refs);

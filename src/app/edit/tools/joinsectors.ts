@@ -1,5 +1,6 @@
 import { EngineApi } from "../../../build/board/mutations/api";
 import { joinSectors } from "../../../build/board/mutations/joinsectors";
+import { isJoinedSectors } from "../../../build/board/query";
 import { create, Module } from "../../../utils/injector";
 import { BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, REFERENCE_TRACKER, VIEW, View } from "../../apis/app";
 import { BUS, MessageBus } from "../../apis/handler";
@@ -36,16 +37,20 @@ export class JoinSectors extends DefaultTool {
       this.sectorId2 = sectorId;
     }
 
+    if (this.sectorId1 != -1 && this.sectorId2 != -1 && !isJoinedSectors(this.board(), this.sectorId1, this.sectorId2)) this.stop();
+
     if (this.sectorId1 != -1 && this.sectorId2 != -1) {
-      let result = joinSectors(this.board(), this.sectorId1, this.sectorId2, this.refs, this.api);
-      if (result == 0) {
-        this.bus.handle(COMMIT);
-        this.bus.handle(INVALIDATE_ALL);
-      }
-      this.sectorId1 = -1;
-      this.sectorId2 = -1;
-      this.deactivate();
+      joinSectors(this.board(), this.sectorId1, this.sectorId2, this.refs, this.api);
+      this.stop();
+      this.bus.handle(COMMIT);
+      this.bus.handle(INVALIDATE_ALL);
     }
+  }
+
+  private stop() {
+    this.sectorId1 = -1;
+    this.sectorId2 = -1;
+    this.deactivate();
   }
 
   public NamedMessage(msg: NamedMessage) {

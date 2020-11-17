@@ -1,7 +1,7 @@
 import { BuildReferenceTracker } from '../../../app/apis/app';
 import { sectorWalls } from '../loops';
 import { SectorBuilder } from '../mutations/sectorbuilder';
-import { isJoinedSectors, sectorOfWall } from '../query';
+import { isJoinedSectors } from '../query';
 import { Board } from '../structs';
 import { EngineApi } from './api';
 import { deleteSector } from './internal';
@@ -16,37 +16,28 @@ function fillWallSet(board: Board, s1: number, s2: number) {
 function getJoinedWallsLoops(board: Board, s1: number, s2: number, api: EngineApi): SectorBuilder {
   const builder = new SectorBuilder();
   const wallset = fillWallSet(board, s1, s2);
-  const values = wallset.values();
-  for (let it = values.next(); !it.done; it = values.next()) {
-    let w = it.value;
-    const loopstart = w;
-    for (; ;) {
+  for (const loopstart of wallset.values()) {
+    let w = loopstart;
+    do {
       wallset.delete(w);
       const wall = board.walls[w];
       if (wall.nextsector == s1 || wall.nextsector == s2) {
         w = board.walls[wall.nextwall].point2;
       } else {
-        builder.addWall(api.cloneWall(wall));
+        builder.addWall(wall);
         if (wall.nextwall != -1) board.walls[wall.nextwall].nextsector = s1;
         w = wall.point2;
       }
-
-      if (w == loopstart) {
-        builder.loop();
-        break;
-      }
-    }
+    } while (w != loopstart)
+    builder.loop();
   }
-  for (const w of sectorWalls(board, s2)) {
-    board.walls[w].nextsector = -1;
-    board.walls[w].nextwall = -1;
-  }
+  const nullWall = api.newWall();
+  for (const w of sectorWalls(board, s2)) board.walls[w] = nullWall;
   return builder;
 }
 
 export function joinSectors(board: Board, s1: number, s2: number, refs: BuildReferenceTracker, api: EngineApi) {
-  if (!isJoinedSectors(board, s1, s2)) return -1;
+  if (!isJoinedSectors(board, s1, s2)) throw new Error(`Sectors ${s1} and ${s2} is not connected`);
   getJoinedWallsLoops(board, s1, s2, api).build(board, s1, refs);
   deleteSector(board, s2, refs);
-  return 0;
 }

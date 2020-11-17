@@ -70,10 +70,6 @@ function splitSectorImpl(board: Board, sectorId: number, firstWall: number, last
     .addWalls(createNewWalls(reversedWoLast, mwalls, refWall, board, api.cloneWall))
     .addWalls(iter(wallsBetween(board, firstWall, lastWall)).map(w => board.walls[w]))
     .loop();
-  // const usedWalls = iter(sectorWalls(board, newSectorId)).map(WALL_MAPPER).collect();
-  // iter(sectorWalls(board, sectorId))
-  //   .filter(w => usedWalls.includes(board.walls[w]))
-  //   .forEach(w => board.walls[w] = null);
   oldSectorBuilder.build(board, sectorId, refs);
   return newSectorId;
 }

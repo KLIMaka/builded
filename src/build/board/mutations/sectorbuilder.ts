@@ -1,6 +1,6 @@
 import { BuildReferenceTracker } from "../../../app/apis/app";
 import { track } from "../../../app/apis/referencetracker";
-import { forEach, map, reduce } from "../../../utils/collections";
+import { forEach, map } from "../../../utils/collections";
 import { Board, Wall } from "../structs";
 import { resizeWalls } from "./internal";
 
@@ -34,8 +34,8 @@ export class SectorBuilder {
       const start = ptr;
       let lastWall = null;
       for (const wall of ws) {
-        const w = ptr++;
         lastWall = wall;
+        const w = ptr++;
         board.walls[w] = wall;
         wall.point2 = w + 1;
         if (wall.nextwall != -1) {

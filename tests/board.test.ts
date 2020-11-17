@@ -61,8 +61,8 @@ test('save_load', () => {
 })
 
 test('save_load Blood', () => {
-  const board = BLOOD_API.cloneBoard(createBoardWSector(BLOOD_API));
-  const buffer = BLOOD.saveBloodMap(<BloodBoard>board);
+  const board = <BloodBoard>BLOOD_API.cloneBoard(createBoardWSector(BLOOD_API));
+  const buffer = BLOOD.saveBloodMap(board);
   expect(BLOOD.loadBloodMap(new Stream(buffer, true))).toStrictEqual(board);
 })
 

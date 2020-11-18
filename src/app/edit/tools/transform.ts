@@ -4,8 +4,8 @@ import { EntityFactory, ENTITY_FACTORY } from "../context";
 import { error } from "../../../utils/logger";
 import { MovingHandle } from "../handle";
 import { Move, StartMove, EndMove, Frame, COMMIT } from "../messages";
-import { SELECTED } from "./selection";
-import { MessageHandler } from "../../apis/handler";
+import { Selected, SELECTED } from "./selection";
+import { MessageHandler, NULL_MESSAGE_HANDLER } from "../../apis/handler";
 import { build2gl } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 
@@ -32,13 +32,19 @@ const dir_ = vec3.create();
 
 export class Transform extends DefaultTool {
   private valid = true;
+  private handler: MessageHandler = NULL_MESSAGE_HANDLER;
 
   constructor(
-    private selected: MessageHandler,
+    private selected: Selected,
     private factory: EntityFactory,
     private ctx = factory.ctx
   ) {
     super();
+
+    ctx.state.register(MOVE_STATE, false);
+    ctx.state.register(MOVE_COPY, false);
+    ctx.state.register(MOVE_VERTICAL, false);
+    ctx.state.register(MOVE_PARALLEL, false);
   }
 
   public Frame(msg: Frame) {
@@ -55,7 +61,7 @@ export class Transform extends DefaultTool {
   }
 
   private isStartMove() {
-    return !handle.isActive() && this.ctx.state.get(MOVE_STATE);// && this.selectedUnderCursor();
+    return !handle.isActive() && this.ctx.state.get(MOVE_STATE);
   }
 
   private activeMove() {
@@ -76,11 +82,12 @@ export class Transform extends DefaultTool {
   private updateMove() {
     if (this.isStartMove()) {
       handle.start(build2gl(target_, this.ctx.view.target().coords));
-      this.selected.handle(START_MOVE);
+      this.handler = this.selected();
+      this.handler.handle(START_MOVE);
     } else if (!this.ctx.state.get(MOVE_STATE)) {
       handle.stop();
       MOVE.dx = MOVE.dy = MOVE.dz = 0;
-      this.selected.handle(END_MOVE);
+      this.handler.handle(END_MOVE);
       this.ctx.bus.handle(COMMIT);
       this.deactivate();
       return;
@@ -91,7 +98,7 @@ export class Transform extends DefaultTool {
       MOVE.dx = handle.dx;
       MOVE.dy = handle.dy;
       MOVE.dz = handle.dz;
-      this.selected.handle(MOVE);
+      this.handler.handle(MOVE);
     }
   }
 }

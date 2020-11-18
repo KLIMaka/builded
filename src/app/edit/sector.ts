@@ -7,7 +7,7 @@ import { Message, MessageHandlerReflective } from "../apis/handler";
 import { EditContext } from "./context";
 import { invalidateSectorAndWalls } from "./editutils";
 import { BoardInvalidate, COMMIT, Highlight, Move, NamedMessage, Palette, PanRepeat, ResetPanRepeat, Rotate, SetPicnum, SetSectorCstat, Shade, StartMove } from "./messages";
-import { MOVE_VERTICAL } from "./tools/selection";
+import { MOVE_VERTICAL } from "./tools/transform";
 
 const resetPanrepeat = new PanRepeat(0, 0, 0, 0, true);
 

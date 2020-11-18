@@ -8,6 +8,8 @@ export interface MessageHandler { handle(message: Message): void; }
 export interface MessageBus extends MessageHandler { connect(handler: MessageHandler): void }
 export const BUS = new Dependency<MessageBus>('Message Bus');
 
+export const NULL_MESSAGE_HANDLER: MessageHandler = { handle: (m) => { } };
+
 export async function DefaultMessageBus(injector: Injector): Promise<MessageBus> {
   const list = new MessageHandlerList();
   return {

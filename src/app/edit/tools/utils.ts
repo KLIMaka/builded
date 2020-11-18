@@ -7,32 +7,26 @@ import { Board, WALL_SPRITE } from "../../../build/board/structs";
 import { EntityType } from "../../../build/hitscan";
 import { slope, vec2ang, wallNormal } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
-import { Module } from "../../../utils/injector";
+import { create, Module } from "../../../utils/injector";
 import { info } from "../../../utils/logger";
 import { int } from "../../../utils/mathutils";
 import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, GRID, GridController, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
 import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
 import { invalidateSectorAndWalls } from "../editutils";
-import { COMMIT, INVALIDATE_ALL, NamedMessage } from "../messages";
-import { PicNumSelector, PICNUM_SELECTOR } from "./selection";
+import { COMMIT, INVALIDATE_ALL, NamedMessage, SetPicnum } from "../messages";
+import { PicNumSelector, PICNUM_SELECTOR, Selected, SELECTED } from "./selection";
+import { DefaultTool, TOOLS_BUS } from "./toolsbus";
 
 export async function UtilsModule(module: Module) {
   module.execute(async injector => {
-    const [board, api, art, view, bus, refs, grid, pics] = await Promise.all([
-      injector.getInstance(BOARD),
-      injector.getInstance(ENGINE_API),
-      injector.getInstance(ART),
-      injector.getInstance(VIEW),
-      injector.getInstance(BUS),
-      injector.getInstance(REFERENCE_TRACKER),
-      injector.getInstance(GRID),
-      injector.getInstance(PICNUM_SELECTOR),
-    ])
-    bus.connect(new Utils(board, api, art, view, bus, refs, grid, pics));
+    const bus = await injector.getInstance(TOOLS_BUS);
+    bus.connect(await create(injector, Utils, BOARD, ENGINE_API, ART, VIEW, BUS, REFERENCE_TRACKER, GRID, PICNUM_SELECTOR, SELECTED));
   });
 }
 
-class Utils extends MessageHandlerReflective {
+const SET_PICNUM = new SetPicnum(-1);
+
+class Utils extends DefaultTool {
   constructor(
     private board: BoardProvider,
     private api: EngineApi,
@@ -41,7 +35,8 @@ class Utils extends MessageHandlerReflective {
     private bus: MessageBus,
     private refs: BuildReferenceTracker,
     private gridController: GridController,
-    private picnumSelector: PicNumSelector
+    private picnumSelector: PicNumSelector,
+    private selected: Selected
   ) { super() }
 
   public NamedMessage(msg: NamedMessage) {
@@ -254,6 +249,16 @@ class Utils extends MessageHandlerReflective {
       sectors.add(nextsector);
     }
     info(pics, sectors, sizes);
+  }
+
+  private setTexture() {
+    const sel = this.selected();
+    this.picnumSelector((picnum: number) => {
+      if (picnum == -1) return;
+      SET_PICNUM.picnum = picnum;
+      sel.handle(SET_PICNUM);
+      this.commit();
+    })
   }
 
   private commit() { this.bus.handle(COMMIT) }

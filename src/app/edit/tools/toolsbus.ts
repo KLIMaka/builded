@@ -1,6 +1,6 @@
 import { forEach } from "../../../utils/collections";
 import { Dependency, Injector } from "../../../utils/injector";
-import { BUS, Message, MessageBus, MessageHandler, MessageHandlerReflective } from "../../apis/handler";
+import { BUS, Message, MessageHandler, MessageHandlerReflective } from "../../apis/handler";
 
 export const TOOLS_BUS = new Dependency<ToolsMessageBus>("ToolsBus");
 

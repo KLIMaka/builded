@@ -9,7 +9,7 @@ import { Message, MessageHandlerReflective } from "../apis/handler";
 import { EditContext } from "./context";
 import { invalidateSectorAndWalls } from "./editutils";
 import { BoardInvalidate, COMMIT, EndMove, Flip, Highlight, Move, NamedMessage, Palette, PanRepeat, SetPicnum, Shade, StartMove } from "./messages";
-import { MOVE_COPY } from "./tools/selection";
+import { MOVE_COPY } from "./tools/transform";
 
 
 export class WallEnt extends MessageHandlerReflective {

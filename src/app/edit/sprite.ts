@@ -7,7 +7,7 @@ import { cyclic, tuple } from "../../utils/mathutils";
 import { Message, MessageHandlerReflective } from "../apis/handler";
 import { EditContext } from "./context";
 import { BoardInvalidate, COMMIT, Flip, Highlight, Move, NamedMessage, Palette, PanRepeat, Rotate, SetPicnum, SetSpriteCstat, Shade, SpriteMode, StartMove } from "./messages";
-import { MOVE_COPY } from "./tools/selection";
+import { MOVE_COPY } from "./tools/transform";
 
 export class SpriteEnt extends MessageHandlerReflective {
 

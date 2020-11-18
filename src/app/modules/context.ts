@@ -15,6 +15,7 @@ import { DrawWallModule } from '../edit/tools/drawwall';
 import { JoinSectorsModule } from '../edit/tools/joinsectors';
 import { PushWallModule } from '../edit/tools/pushwall';
 import { PICNUM_SELECTOR, SelectionModule } from '../edit/tools/selection';
+import { TransformModule } from '../edit/tools/transform';
 import { ToolsBusConstructor, TOOLS_BUS } from '../edit/tools/toolsbus';
 import { UtilsModule } from '../edit/tools/utils';
 import { StatusBarModule } from '../modules/statusbar';
@@ -91,6 +92,7 @@ export function DefaultSetupModule(module: Module) {
   module.install(DrawWallModule);
   module.install(PushWallModule);
   module.install(RenderablesCacheModule);
+  module.install(TransformModule);
   module.install(SelectionModule);
   module.install(InfoModule);
   module.install(StatusBarModule);

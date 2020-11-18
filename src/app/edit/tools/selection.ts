@@ -91,10 +91,26 @@ const target_ = vec3.create();
 const start_ = vec3.create();
 const dir_ = vec3.create();
 
+export interface Selected {
+  handle(m: Message): void,
+  clone(): Selected
+}
+
+export const SELECTED = new Dependency<Selected>('Selected');
+
+const EMPTY_SELECTED: Selected = { handle: (m: Message) => { }, clone: () => EMPTY_SELECTED };
+function getSelected(selection: () => Selection): Selected {
+  if (selection() == null) return EMPTY_SELECTED;
+
+}
+
 export async function SelectionModule(module: Module) {
+  let selection: Selection = null;
+  module.bindInstance(SELECTED, getSelected(() => selection));
   module.execute(async injector => {
     const bus = await injector.getInstance(TOOLS_BUS);
-    bus.connect(await create(injector, Selection, PICNUM_SELECTOR, RENDRABLES_CACHE, ENTITY_FACTORY));
+    selection = await create(injector, Selection, PICNUM_SELECTOR, RENDRABLES_CACHE, ENTITY_FACTORY);
+    bus.connect(selection);
   });
 }
 
@@ -119,17 +135,17 @@ export class Selection extends DefaultTool {
 
   public Frame(msg: Frame) {
     if (!handle.isActive()) this.updateSelection();
-    if (isEmpty(this.selection.list()) && isEmpty(this.highlighted.list())) return;
-    if (this.activeMove()) {
-      this.activate();
-      this.updateHandle();
-      try {
-        this.updateMove();
-      } catch (e) {
-        this.valid = false;
-        error(e);
-      }
-    }
+    // if (isEmpty(this.selection.list()) && isEmpty(this.highlighted.list())) return;
+    // if (this.activeMove()) {
+    //   this.activate();
+    //   this.updateHandle();
+    //   try {
+    //     this.updateMove();
+    //   } catch (e) {
+    //     this.valid = false;
+    //     error(e);
+    //   }
+    // }
   }
 
   private updateSelection() {
@@ -173,7 +189,7 @@ export class Selection extends DefaultTool {
     this.handleSelected(msg);
   }
 
-  private handleSelected(msg: Message) {
+  public handleSelected(msg: Message) {
     this.highlighted.handle(msg);
     this.selection.handle(msg);
   }
@@ -182,7 +198,7 @@ export class Selection extends DefaultTool {
     this.ctx.bus.handle(COMMIT);
   }
 
-  private cloneSelected() {
+  public cloneSelected() {
     const selected = this.highlighted.clone();
     selected.list().pushAll(this.selection.list());
     return selected;

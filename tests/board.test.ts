@@ -79,6 +79,13 @@ test('createNewSector', () => {
   expect(isOuterLoop(board, 0)).toBe(true);
 });
 
+test('cloneSector', () => {
+  const sector = BUILD_API.newSector();
+  const clone = BUILD_API.cloneSector(sector);
+
+  expect(sector.ceilingstat === clone.ceilingstat).toBeFalsy();
+});
+
 test('deleteWall', () => {
   const board = createBoardWSector(BUILD_API);
 
@@ -88,6 +95,26 @@ test('deleteWall', () => {
   expect(walllen(board, 2)).toBeCloseTo(1024 * Math.SQRT2);
   expect(wallRefs.val(wall1)).toBe(0);
   wallRefs.stop();
+})
+
+test('deleteWall1', () => {
+  const board = createBoardWSector(BUILD_API);
+  createInnerLoop(board, 0, wrap([[500, 500], [600, 500], [600, 600], [500, 600]]), REFS, BUILD_API);
+  deleteWall(board, 3, REFS);
+  expect(walllen(board, 2)).toBeCloseTo(1024 * Math.SQRT2);
+  deleteWall(board, 6, REFS);
+  expect(walllen(board, 5)).toBeCloseTo(100 * Math.SQRT2);
+})
+
+test('deleteWall2', () => {
+  const board = createBoardWSector(BUILD_API);
+  createInnerLoop(board, 0, wrap([[500, 500], [600, 500], [600, 600], [500, 600]]), REFS, BUILD_API);
+  createNewSector(board, wrap([[500, 500], [600, 500], [600, 600], [500, 600]]), REFS, BUILD_API);
+  deleteWall(board, 11, REFS);
+  expect([...map([7, 8, 9], w => board.walls[w].point2)]).toStrictEqual([8, 9, 7]);
+  expect([...map([7, 8, 9], w => board.walls[w].nextwall)]).toStrictEqual([5, 4, 6]);
+  expect([...map([4, 5, 6], w => board.walls[w].point2)]).toStrictEqual([5, 6, 4]);
+  expect([...map([4, 5, 6], w => board.walls[w].nextwall)]).toStrictEqual([8, 7, 9]);
 })
 
 test('splitWall', () => {

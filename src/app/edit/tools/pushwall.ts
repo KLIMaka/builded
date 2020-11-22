@@ -10,7 +10,7 @@ import { BUS, MessageBus } from "../../apis/handler";
 import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
 import { LineBuilder } from "../../modules/gl/buffers";
 import { MovingHandle } from "../handle";
-import { COMMIT, Frame, INVALIDATE_ALL, NamedMessage, Render } from "../messages";
+import { Commit, Frame, INVALIDATE_ALL, NamedMessage, Render } from "../messages";
 import { DefaultTool, TOOLS_BUS } from "./toolsbus";
 
 const wallNormal_ = vec3.create();
@@ -60,7 +60,7 @@ export class PushWall extends DefaultTool {
 
   private stop() {
     pushWall(this.board(), this.wallId, this.getDistance(), this.art, this.copy, this.refs, this.api);
-    this.bus.handle(COMMIT);
+    this.bus.handle(new Commit(`Push Wall ${this.wallId}`));
     this.bus.handle(INVALIDATE_ALL);
     this.abort();
   }

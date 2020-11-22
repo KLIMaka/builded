@@ -9,6 +9,7 @@ import { BUS, Message, MessageHandler, MessageHandlerList, MessageHandlerReflect
 import { RenderablesCache, RENDRABLES_CACHE } from "../../modules/geometry/cache";
 import { EntityFactory, ENTITY_FACTORY } from "../context";
 import { Frame, Highlight, NamedMessage, Render } from "../messages";
+import { DefaultTool, TOOLS_BUS } from "./toolsbus";
 
 export type PicNumCallback = (picnum: number) => void;
 export type PicNumSelector = (cb: PicNumCallback) => void;
@@ -71,13 +72,13 @@ export async function SelectionModule(module: Module) {
   let selection: Selection = null;
   module.bindInstance(SELECTED, () => selection == null ? NULL_MESSAGE_HANDLER : selection.cloneSelected());
   module.execute(async injector => {
-    const bus = await injector.getInstance(BUS);
+    const bus = await injector.getInstance(TOOLS_BUS);
     selection = await create(injector, Selection, RENDRABLES_CACHE, ENTITY_FACTORY);
     bus.connect(selection);
   });
 }
 
-export class Selection extends MessageHandlerReflective {
+export class Selection extends DefaultTool {
   private selection = new MessageHandlerList();
   private highlighted = new MessageHandlerList();
 

@@ -20,7 +20,7 @@ import { RenderablesCache, RENDRABLES_CACHE } from "../../modules/geometry/cache
 import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
 import { LineBuilder, PointSpritesBuilder } from "../../modules/gl/buffers";
 import { getClosestSectorZ } from "../editutils";
-import { BoardInvalidate, COMMIT, Frame, NamedMessage, Render } from "../messages";
+import { BoardInvalidate, Commit, Frame, NamedMessage, Render } from "../messages";
 import { DefaultTool, TOOLS_BUS } from "./toolsbus";
 
 class Contour {
@@ -221,6 +221,10 @@ export class DrawSector extends DefaultTool {
   }
 
   private insertPoint(rect: boolean) {
+    if (this.points.length() == 0) {
+      const target = this.view.target();
+      if (target.entity != null && !target.entity.isSector()) return;
+    }
     this.activate();
     if (this.points.length() == 0) this.isRect = rect;
     if (this.checkFinish()) {
@@ -288,8 +292,8 @@ export class DrawSector extends DefaultTool {
     const board = this.board();
     if (sectorId != -1)
       createInnerLoop(board, sectorId, this.points, this.refs, this.api);
-    createNewSector(board, this.points, this.refs, this.api);
-    this.bus.handle(COMMIT);
+    const nsectorId = createNewSector(board, this.points, this.refs, this.api);
+    this.bus.handle(new Commit(`Create Sector ${nsectorId}`));
     this.bus.handle(new BoardInvalidate(null));
     this.points.clear();
     this.contour.clear();
@@ -298,7 +302,7 @@ export class DrawSector extends DefaultTool {
 
   private splitSector(sectorId: number): void {
     splitSector(this.board(), sectorId, wrap([...this.points, <[number, number]>this.pointer]), this.refs, this.api);
-    this.bus.handle(COMMIT);
+    this.bus.handle(new Commit(`Split Sector ${sectorId}`));
     this.bus.handle(new BoardInvalidate(null));
     this.points.clear();
     this.contour.clear();

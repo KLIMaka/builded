@@ -2,7 +2,7 @@ import { EntityType } from "../../../build/hitscan";
 import { create, Module } from "../../../utils/injector";
 import { BOARD, BoardProvider, View, VIEW } from "../../apis/app";
 import { BUS, MessageBus } from "../../apis/handler";
-import { COMMIT, NamedMessage, SetPicnum, Shade } from "../messages";
+import { Commit, NamedMessage, SetPicnum, Shade } from "../messages";
 import { Selected, SELECTED } from "./selection";
 import { DefaultTool, TOOLS_BUS } from "./toolsbus";
 
@@ -27,8 +27,8 @@ export class Clipboard extends DefaultTool {
   public NamedMessage(msg: NamedMessage) {
     switch (msg.name) {
       case 'copy': this.copy(); return;
-      case 'paste_shade': this.selected().handle(SHADE); this.bus.handle(COMMIT); return;
-      case 'paste_picnum': this.selected().handle(PICNUM); this.bus.handle(COMMIT); return;
+      case 'paste_shade': this.selected().handle(SHADE); return;
+      case 'paste_picnum': this.selected().handle(PICNUM); return;
     }
   }
 

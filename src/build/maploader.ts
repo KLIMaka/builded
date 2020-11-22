@@ -297,22 +297,22 @@ export function newBoard() {
 export function cloneSector(sector: Sector): Sector {
   let sectorCopy = new Sector();
   Object.assign(sectorCopy, sector);
-  Object.assign(sectorCopy.floorstat, sector.floorstat);
-  Object.assign(sectorCopy.ceilingstat, sector.ceilingstat);
+  sectorCopy.floorstat = Object.assign(new SectorStats(), sector.floorstat);
+  sectorCopy.ceilingstat = Object.assign(new SectorStats(), sector.ceilingstat);
   return sectorCopy;
 }
 
 export function cloneWall(wall: Wall): Wall {
   let wallCopy = new Wall();
   Object.assign(wallCopy, wall);
-  Object.assign(wallCopy.cstat, wall.cstat);
+  wallCopy.cstat = Object.assign(new WallStats(), wall.cstat);
   return wallCopy;
 }
 
 export function cloneSprite(sprite: Sprite): Sprite {
   let spriteCopy = new Sprite();
   Object.assign(spriteCopy, sprite);
-  Object.assign(spriteCopy.cstat, sprite.cstat);
+  spriteCopy.cstat = Object.assign(new SpriteStats(), sprite.cstat);
   return spriteCopy;
 }
 

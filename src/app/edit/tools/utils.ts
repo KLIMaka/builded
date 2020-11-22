@@ -11,9 +11,9 @@ import { create, Module } from "../../../utils/injector";
 import { info } from "../../../utils/logger";
 import { int } from "../../../utils/mathutils";
 import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, GRID, GridController, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
-import { BUS, MessageBus, MessageHandlerReflective } from "../../apis/handler";
+import { BUS, MessageBus } from "../../apis/handler";
 import { invalidateSectorAndWalls } from "../editutils";
-import { COMMIT, INVALIDATE_ALL, NamedMessage, SetPicnum } from "../messages";
+import { Commit, INVALIDATE_ALL, NamedMessage, SetPicnum } from "../messages";
 import { PicNumSelector, PICNUM_SELECTOR, Selected, SELECTED } from "./selection";
 import { DefaultTool, TOOLS_BUS } from "./toolsbus";
 
@@ -49,6 +49,8 @@ class Utils extends DefaultTool {
       case 'delete_full': this.deleteFull(); return;
       case 'print_usage': this.printPicUsage(); return;
       case 'split_wall': this.splitWall(); return;
+      case 'set_picnum': this.setTexture(); return;
+      case 'print_info': this.print(); return;
     }
   }
 
@@ -83,7 +85,7 @@ class Utils extends DefaultTool {
         sprite.picnum = picnum;
         addSprite(board, sprite);
       }
-      this.commit();
+      this.commit(`Insert Sprite`);
     });
   }
 
@@ -91,7 +93,7 @@ class Utils extends DefaultTool {
     const target = this.view.snapTarget();
     if (target.entity == null || !target.entity.isWall()) return;
     setFirstWall(this.board(), sectorOfWall(this.board(), target.entity.id), target.entity.id, this.refs);
-    this.commit();
+    this.commit(`Set First Wall ${target.entity.id}`);
     this.invalidateAll();
   }
 
@@ -99,7 +101,7 @@ class Utils extends DefaultTool {
     const target = this.view.snapTarget();
     if (target.entity == null || !target.entity.isWall()) return;
     fillInnerLoop(this.board(), target.entity.id, this.refs, this.api);
-    this.commit();
+    this.commit(`Fill Loop ${target.entity.id}`);
     this.invalidateAll();
   }
 
@@ -107,7 +109,7 @@ class Utils extends DefaultTool {
     const target = this.view.snapTarget();
     if (target.entity == null || !target.entity.isWall()) return;
     deleteLoop(this.board(), target.entity.id, this.refs);
-    this.commit();
+    this.commit('Delete');
     this.invalidateAll();
   }
 
@@ -117,7 +119,7 @@ class Utils extends DefaultTool {
     if (target.entity.isWall()) deleteLoopFull(this.board(), target.entity.id, this.refs);
     else if (target.entity.isSector()) deleteSectorFull(this.board(), target.entity.id, this.refs);
     else return;
-    this.commit();
+    this.commit('Delete');
     this.invalidateAll();
   }
 
@@ -129,7 +131,7 @@ class Utils extends DefaultTool {
     const board = this.board();
 
     splitWall(board, id, x, y, this.art, this.refs, this.api.cloneWall);
-    this.commit();
+    this.commit(`Split Wall ${id}`);
     const s = sectorOfWall(board, id);
     invalidateSectorAndWalls(s, board, this.bus);
     const nextsector = board.walls[id].nextsector;
@@ -257,10 +259,9 @@ class Utils extends DefaultTool {
       if (picnum == -1) return;
       SET_PICNUM.picnum = picnum;
       sel.handle(SET_PICNUM);
-      this.commit();
     })
   }
 
-  private commit() { this.bus.handle(COMMIT) }
+  private commit(tag: string) { this.bus.handle(new Commit(tag)) }
   private invalidateAll() { this.bus.handle(INVALIDATE_ALL) }
 }

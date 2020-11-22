@@ -39,7 +39,10 @@ class ToolsMessageBus implements MessageHandler {
   }
 
   private activateTool(tool: Tool) {
-    if (this.activeTool != null && this.activeTool != tool) throw new Error('');
+    if (this.activeTool != null && this.activeTool != tool) {
+      this.activeTool = null;
+      throw new Error('');
+    }
     this.activeTool = tool;
   }
 

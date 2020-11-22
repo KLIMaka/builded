@@ -9,6 +9,7 @@ import { walllen, sectorOfWall, lastwall, isValidWallId, nextwall, isTJunction }
 import { Board, Wall } from "../structs";
 import { DEFAULT_REPEAT_RATE, moveWalls } from "./internal";
 import { EngineApi } from "./api";
+import { track } from "../../../app/apis/referencetracker";
 
 export function fixxrepeat(board: Board, wallId: number, reprate: number = DEFAULT_REPEAT_RATE) {
   const wall = board.walls[wallId];
@@ -90,6 +91,7 @@ export function pushWall(board: Board, wallId: number, len: number, art: ArtInfo
     w1 = splitWall(board, w1, x1, y1, art, refs, api.cloneWall);
     w2 = nextwall(board, w1);
     splitWall(board, w2, x2, y2, art, refs, api.cloneWall);
+    return;
   }
 
   const extent1 = cross2d(x1 - prev1.x, y1 - prev1.y, wall1.x - prev1.x, wall1.y - prev1.y) == 0;
@@ -118,18 +120,27 @@ export function deleteWall(board: Board, wallId: number, refs: BuildReferenceTra
   if (length(loopWalls(board, wallId)) < 4) throw new Error(`Loop of Wall ${wallId} need to have 3 walls at minimum`);
   const sectorId = sectorOfWall(board, wallId);
   const wall = board.walls[wallId];
-  if (wall.nextsector != -1) {
-    if (length(loopWalls(board, wall.nextwall)) < 4) throw new Error(`Loop of Wall ${wall.nextwall} need to have 3 walls minimum`);
-    const wall2Id = board.walls[wall.nextwall].point2;
-    const lastWallId = lastwall(board, wallId);
-    board.walls[lastWallId].nextwall = wall.nextwall;
-    board.walls[wall.nextwall].nextwall = lastWallId;
-    moveWalls(board, wall.nextsector, wall2Id, -1, refs);
-    wall.nextwall = -1;
-    wall.nextsector = -1;
-    wallId += wallId > wall2Id ? -1 : 0;
-  }
-  moveWalls(board, sectorId, wallId, -1, refs);
+  track(refs.walls, wrefs => {
+    const refwall = wrefs.ref(lastwall(board, wallId));
+    if (wall.nextsector != -1) {
+      if (length(loopWalls(board, wall.nextwall)) < 4) throw new Error(`Loop of Wall ${wall.nextwall} need to have 3 walls minimum`);
+      const refnextwall = wrefs.ref(lastwall(board, wall.nextwall));
+      const nextwall = board.walls[wall.nextwall];
+      const wall2Id = nextwall.point2;
+      const lastWallId = lastwall(board, wallId);
+      board.walls[lastWallId].nextwall = wall.nextwall;
+      nextwall.nextwall = lastWallId;
+      if (board.walls[wall2Id].point2 < wall2Id) board.walls[wall2Id - 1].point2 = board.walls[wall2Id].point2;
+      moveWalls(board, wall.nextsector, wall2Id, -1, refs);
+      fixxrepeat(board, wrefs.val(refnextwall));
+      wall.nextwall = -1;
+      wall.nextsector = -1;
+      wallId += wallId > wall2Id ? -1 : 0;
+    }
+    if (wall.point2 < wallId) board.walls[wallId - 1].point2 = wall.point2;
+    moveWalls(board, sectorId, wallId, -1, refs);
+    fixxrepeat(board, wrefs.val(refwall));
+  });
 }
 
 export function mergePoints(board: Board, wallId: number, refs: BuildReferenceTracker) {

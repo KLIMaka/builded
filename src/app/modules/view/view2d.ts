@@ -106,7 +106,7 @@ export class View2d extends MessageHandlerReflective implements View {
   }
 
   private recalcGridSize() {
-    this.gridController.setGridSize((this.control.getUnitsPerPixel() + 0.5) * 32);
+    // this.gridController.setGridSize((this.control.getUnitsPerPixel() + 0.5) * 32);
   }
 
   private invalidateTarget() {

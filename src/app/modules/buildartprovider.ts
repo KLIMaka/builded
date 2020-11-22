@@ -83,7 +83,7 @@ export class BuildArtProvider implements ArtProvider {
     const info = this.arts.getInfo(picnum);
     if (info.h <= 0 || info.w <= 0) return this.get(0);
     const arr = this.axisSwap(info.img, info.h, info.w);
-    tex = createIndexedTexture(this.gl, info.w, info.h, arr, true, this.lib);
+    tex = createIndexedTexture(this.gl, info.w, info.h, arr, false, this.lib);
 
     this.textures[picnum] = tex;
     return tex;

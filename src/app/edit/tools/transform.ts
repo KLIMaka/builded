@@ -3,16 +3,18 @@ import { DefaultTool, TOOLS_BUS } from "./toolsbus";
 import { EntityFactory, ENTITY_FACTORY } from "../context";
 import { error } from "../../../utils/logger";
 import { MovingHandle } from "../handle";
-import { Move, StartMove, EndMove, Frame, COMMIT } from "../messages";
+import { Move, StartMove, EndMove, Frame, Highlight, Render, Commit } from "../messages";
 import { Selected, SELECTED } from "./selection";
 import { MessageHandler, NULL_MESSAGE_HANDLER } from "../../apis/handler";
 import { build2gl } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
+import { detuple0, detuple1 } from "../../../utils/mathutils";
+import { RenderablesCache, RENDRABLES_CACHE } from "../../modules/geometry/cache";
 
 export async function TransformModule(module: Module) {
   module.execute(async injector => {
     const bus = await injector.getInstance(TOOLS_BUS);
-    bus.connect(await create(injector, Transform, SELECTED, ENTITY_FACTORY));
+    bus.connect(await create(injector, Transform, SELECTED, ENTITY_FACTORY, RENDRABLES_CACHE));
   });
 }
 
@@ -26,6 +28,8 @@ export const MOVE_COPY = 'move.copy';
 export const MOVE_VERTICAL = 'move.vertical';
 export const MOVE_PARALLEL = 'move.parallel';
 
+const HIGHLIGHT = new Highlight();
+
 const target_ = vec3.create();
 const start_ = vec3.create();
 const dir_ = vec3.create();
@@ -37,6 +41,7 @@ export class Transform extends DefaultTool {
   constructor(
     private selected: Selected,
     private factory: EntityFactory,
+    private renderables: RenderablesCache,
     private ctx = factory.ctx
   ) {
     super();
@@ -88,7 +93,8 @@ export class Transform extends DefaultTool {
       handle.stop();
       MOVE.dx = MOVE.dy = MOVE.dz = 0;
       this.handler.handle(END_MOVE);
-      this.ctx.bus.handle(COMMIT);
+      this.handler = NULL_MESSAGE_HANDLER;
+      this.ctx.bus.handle(new Commit('Move'));
       this.deactivate();
       return;
     }
@@ -99,6 +105,23 @@ export class Transform extends DefaultTool {
       MOVE.dy = handle.dy;
       MOVE.dz = handle.dz;
       this.handler.handle(MOVE);
+    }
+  }
+
+  public Render(msg: Render) {
+    HIGHLIGHT.set.clear();
+    this.handler.handle(HIGHLIGHT);
+    for (const v of HIGHLIGHT.set.keys()) {
+      const type = detuple0(v);
+      const id = detuple1(v);
+      const rs = this.renderables.helpers;
+      switch (type) {
+        case 0: msg.consumer(rs.sector(id).ceiling); break;
+        case 1: msg.consumer(rs.sector(id).floor); break;
+        case 2: msg.consumer(rs.wall(id)); break;
+        case 3: msg.consumer(rs.wallPoint(id)); break;
+        case 4: msg.consumer(rs.sprite(id)); break;
+      }
     }
   }
 }

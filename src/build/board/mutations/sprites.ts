@@ -53,7 +53,7 @@ export function moveSpriteX(board: Board, spriteId: number, x: number, y: number
   if (sprite.x == x && sprite.y == y && sprite.z == z) return false;
   const tsectorId = findSector(board, x, y, sprite.sectnum);
   const newSectorId = tsectorId == -1 ? sprite.sectnum : tsectorId;
-  const d = grid.getGridSize();
+  const d = grid.getGridSize() / 4;
   const w = findFirst(sectorWalls(board, newSectorId), w => distanceToWallSegment(board, w, x, y) <= d, -1);
   if (w != -1) {
     const ow = selectOrnamentWall(board, newSectorId, w, x, y, sprite.z);

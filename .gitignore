@@ -1,3 +1,4 @@
+debug.log
 .tscache
 .idea
 distr
@@ -8,4 +9,3 @@ package-lock.json
 .vscode
 resources/engines
 coverage
-debug.log

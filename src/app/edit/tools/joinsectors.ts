@@ -4,7 +4,7 @@ import { isJoinedSectors } from "../../../build/board/query";
 import { create, Module } from "../../../utils/injector";
 import { BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, REFERENCE_TRACKER, VIEW, View } from "../../apis/app";
 import { BUS, MessageBus } from "../../apis/handler";
-import { COMMIT, INVALIDATE_ALL, NamedMessage } from "../messages";
+import { Commit, INVALIDATE_ALL, NamedMessage } from "../messages";
 import { DefaultTool, TOOLS_BUS } from "./toolsbus";
 
 export function JoinSectorsModule(module: Module) {
@@ -42,7 +42,7 @@ export class JoinSectors extends DefaultTool {
     if (this.sectorId1 != -1 && this.sectorId2 != -1) {
       joinSectors(this.board(), this.sectorId1, this.sectorId2, this.refs, this.api);
       this.stop();
-      this.bus.handle(COMMIT);
+      this.bus.handle(new Commit(`Join Sectors ${this.sectorId1} + ${this.sectorId2}`));
       this.bus.handle(INVALIDATE_ALL);
     }
   }

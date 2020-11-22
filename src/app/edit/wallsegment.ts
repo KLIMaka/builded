@@ -1,5 +1,5 @@
 import { canonicalWall, connectedWalls } from "../../build/board/loops";
-import { sectorOfWall } from "../../build/board/query";
+import { lastwall, sectorOfWall } from "../../build/board/query";
 import { Board } from "../../build/board/structs";
 import { Entity, EntityType, Target } from "../../build/hitscan";
 import { mat2d, vec2 } from "../../libs_js/glmatrix";
@@ -9,7 +9,7 @@ import { cyclic, int, len2d, tuple } from "../../utils/mathutils";
 import { Message, MessageHandlerReflective } from "../apis/handler";
 import { EditContext } from "./context";
 import { invalidateSectorAndWalls } from "./editutils";
-import { BoardInvalidate, EndMove, Flip, Highlight, Move, Palette, PanRepeat, ResetPanRepeat, Rotate, SetPicnum, SetWallCstat, Shade, StartMove } from "./messages";
+import { BoardInvalidate, Commit, EndMove, Flip, Highlight, Move, Palette, PanRepeat, ResetPanRepeat, Rotate, SetPicnum, SetWallCstat, Shade, StartMove } from "./messages";
 import { fixxrepeat, mergePoints, moveWall } from "../../build/board/mutations/walls"
 
 function getClosestWallByIds(board: Board, target: Target, ids: Iterable<number>): number {
@@ -108,39 +108,39 @@ export class WallSegmentsEnt extends MessageHandlerReflective {
   }
 
   public Rotate(msg: Rotate) {
-    const board = this.ctx.board();
-    const target = this.ctx.view.snapTarget();
-    const [cx, cy] = target.coords;
-    const ang = (msg.da / 128) * (Math.PI / 8);
-    const matrix = mat2d.create();
-    mat2d.translate(matrix, matrix, [cx, cy]);
-    mat2d.rotate(matrix, matrix, ang);
-    mat2d.translate(matrix, matrix, [-cx, -cy]);
-    for (const w of this.canonicalWalls) {
-      const wall = board.walls[w];
-      const [x, y] = vec2.transformMat2d([], [wall.x, wall.y], matrix);
-      moveWall(board, w, int(x), int(y));
-    }
-    this.invalidate();
+    // const board = this.ctx.board();
+    // const target = this.ctx.view.snapTarget();
+    // const [cx, cy] = target.coords;
+    // const ang = (msg.da / 128) * (Math.PI / 8);
+    // const matrix = mat2d.create();
+    // mat2d.translate(matrix, matrix, [cx, cy]);
+    // mat2d.rotate(matrix, matrix, ang);
+    // mat2d.translate(matrix, matrix, [-cx, -cy]);
+    // for (const w of this.canonicalWalls) {
+    //   const wall = board.walls[w];
+    //   const [x, y] = vec2.transformMat2d([], [wall.x, wall.y], matrix);
+    //   moveWall(board, w, int(x), int(y));
+    // }
+    // this.invalidate();
   }
 
   public Highlight(msg: Highlight) {
-    // const board = this.ctx.board();
-    // if (this.active) {
-    //   let cwalls = this.connectedWalls;
-    //   for (let w of cwalls) {
-    //     let s = sectorOfWall(board, w);
-    //     let p = lastwall(board, w);
-    //     msg.set.add(tuple(2, w));
-    //     msg.set.add(tuple(3, w));
-    //     msg.set.add(tuple(2, p));
-    //     msg.set.add(tuple(0, s));
-    //     msg.set.add(tuple(1, s));
-    //   }
-    // } else {
-    const hwalls = this.highlighted;
-    for (const w of hwalls) msg.set.add(tuple(2, w));
-    // }
+    const board = this.ctx.board();
+    if (this.active) {
+      let cwalls = this.connectedWalls;
+      for (let w of cwalls) {
+        let s = sectorOfWall(board, w);
+        let p = lastwall(board, w);
+        msg.set.add(tuple(2, w));
+        // msg.set.add(tuple(3, w));
+        msg.set.add(tuple(2, p));
+        msg.set.add(tuple(0, s));
+        msg.set.add(tuple(1, s));
+      }
+    } else {
+      const hwalls = this.highlighted;
+      for (const w of hwalls) msg.set.add(tuple(2, w));
+    }
   }
 
   public SetPicnum(msg: SetPicnum) {
@@ -149,6 +149,7 @@ export class WallSegmentsEnt extends MessageHandlerReflective {
       wall.picnum = msg.picnum;
       this.invalidateWall(w);
     }
+    this.ctx.bus.handle(new Commit(`Set Walls ${[...this.canonicalWalls]} Picnum`));
   }
 
   public Shade(msg: Shade) {
@@ -159,6 +160,7 @@ export class WallSegmentsEnt extends MessageHandlerReflective {
       if (msg.absolute) wall.shade = msg.value; else wall.shade += msg.value;
       this.invalidateWall(w);
     }
+    this.ctx.bus.handle(new Commit(`Set Walls ${[...this.canonicalWalls]} Shade`, true));
   }
 
   public ResetPanRepeat(msg: ResetPanRepeat) {
@@ -170,6 +172,7 @@ export class WallSegmentsEnt extends MessageHandlerReflective {
       fixxrepeat(this.ctx.board(), w);
       this.invalidateWall(w);
     }
+    this.ctx.bus.handle(new Commit(`Set Walls ${[...this.canonicalWalls]} PanRepeat`, true));
   }
 
   public PanRepeat(msg: PanRepeat) {
@@ -189,6 +192,7 @@ export class WallSegmentsEnt extends MessageHandlerReflective {
       }
       this.invalidateWall(w);
     }
+    this.ctx.bus.handle(new Commit(`Set Walls ${[...this.canonicalWalls]} PanRepeat`, true));
   }
 
   public Palette(msg: Palette) {
@@ -202,6 +206,7 @@ export class WallSegmentsEnt extends MessageHandlerReflective {
       }
       this.invalidateWall(w);
     }
+    this.ctx.bus.handle(new Commit(`Set Walls ${[...this.canonicalWalls]} Palette`, true));
   }
 
   public Flip(msg: Flip) {
@@ -213,6 +218,7 @@ export class WallSegmentsEnt extends MessageHandlerReflective {
       wall.cstat.yflip = (nflip & 2) >> 1;
       this.invalidateWall(w);
     }
+    this.ctx.bus.handle(new Commit(`Flip Walls ${[...this.canonicalWalls]}`, true));
   }
 
   public SetWallCstat(msg: SetWallCstat) {
@@ -223,6 +229,7 @@ export class WallSegmentsEnt extends MessageHandlerReflective {
       wall.cstat[msg.name] = stat ? 0 : 1;
       this.invalidateWall(w);
     }
+    this.ctx.bus.handle(new Commit(`Set Walls ${[...this.canonicalWalls]} Cstat ${msg.name}`, true));
   }
 
   public BoardInvalidate(msg: BoardInvalidate) {

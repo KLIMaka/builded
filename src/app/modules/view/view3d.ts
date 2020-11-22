@@ -10,7 +10,7 @@ import { Injector } from "../../../utils/injector";
 import { NumberInterpolator } from "../../../utils/interpolator";
 import { int } from "../../../utils/mathutils";
 import { DelayedValue } from "../../../utils/timed";
-import { ART, ArtProvider, BOARD, BoardProvider, GRID, GridController, STATE, State, View } from "../../apis/app";
+import { ART, ArtProvider, BOARD, BoardProvider, ENGINE_API, GRID, GridController, STATE, State, View } from "../../apis/app";
 import { MessageHandlerReflective } from "../../apis/handler";
 import { Renderable } from "../../apis/renderable";
 import { BoardInvalidate, Frame, LoadBoard, Mouse, NamedMessage } from "../../edit/messages";
@@ -172,12 +172,12 @@ export class View3d extends MessageHandlerReflective implements View {
     return t;
   }
 
-  private snapWall(target: Target, wallId: number, t: TargetImpl) {
-    const [x, y] = snapWall(this.board(), wallId, target.coords[0], target.coords[1], this.gridController);
+  private snapWall(coords: number[], type: EntityType, wallId: number, t: TargetImpl) {
+    const [x, y] = snapWall(this.board(), wallId, coords[0], coords[1], this.gridController);
     t.coords_[0] = x;
     t.coords_[1] = y;
-    t.coords_[2] = this.gridController.snap(target.coords[2] / ZSCALE) * ZSCALE;
-    t.entity_ = new Entity(wallId, EntityType.MID_WALL);
+    t.coords_[2] = this.gridController.snap(coords[2] / ZSCALE) * ZSCALE;
+    t.entity_ = new Entity(wallId, type);
     return t;
   }
 
@@ -245,17 +245,17 @@ export class View3d extends MessageHandlerReflective implements View {
     const target = this.target();
     if (target.entity == null) return this.copyTarget(target, t);
     // this.updateGridSize();
-    const d = 32;//this.gridController.getGridSize() / 2;
+    const d = this.gridController.getGridSize() / 8;
     const w = this.getClosestWall(target, d);
     if (w != -1) {
       return this.snapWallPoint(target, w, t);
     } else if (target.entity.isSector()) {
       const w = closestWallSegmentInSector(this.board(), target.entity.id, target.coords[0], target.coords[1], d);
-      return w == -1 ? this.snapGrid(target, t) : this.snapWall(target, w, t);
+      return w == -1 ? this.snapGrid(target, t) : this.snapWall(target.coords, target.entity.type == EntityType.FLOOR ? EntityType.LOWER_WALL : EntityType.UPPER_WALL, w, t);
     } else if (target.entity.isSprite()) {
       return this.snapSprite(target, t);
     } else if (target.entity.isWall()) {
-      return this.snapWall(target, target.entity.id, t);
+      return this.snapWall(target.coords, target.entity.type, target.entity.id, t);
     }
   }
 

@@ -21,7 +21,9 @@ let named = {
   39: 'RIGHT',
   40: 'DOWN',
   45: 'INSERT',
-  46: 'DELETE'
+  46: 'DELETE',
+  33: 'PAGE_UP',
+  34: 'PAGE_DOWN',
 };
 
 function mapKeyCode(code: number): string {
@@ -59,7 +61,7 @@ function updateState(keys: { [index: string]: boolean }, e: KeyboardEvent, state
   keys['ALT'] = e.altKey;
   keys['SHIFT'] = e.shiftKey;
   keys['CTRL'] = e.ctrlKey;
-  let key = mapKeyCode(e.keyCode);
+  const key = mapKeyCode(e.keyCode);
   if (key) keys[key] = state;
   keys[e.keyCode] = state;
   keys[e.key] = state;

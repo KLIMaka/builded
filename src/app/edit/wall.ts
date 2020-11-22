@@ -8,7 +8,7 @@ import { cyclic, tuple } from "../../utils/mathutils";
 import { Message, MessageHandlerReflective } from "../apis/handler";
 import { EditContext } from "./context";
 import { invalidateSectorAndWalls } from "./editutils";
-import { BoardInvalidate, COMMIT, EndMove, Flip, Highlight, Move, NamedMessage, Palette, PanRepeat, SetPicnum, Shade, StartMove } from "./messages";
+import { BoardInvalidate, Commit, EndMove, Flip, Highlight, Move, NamedMessage, Palette, PanRepeat, SetPicnum, Shade, StartMove } from "./messages";
 import { MOVE_COPY } from "./tools/transform";
 
 
@@ -77,6 +77,7 @@ export class WallEnt extends MessageHandlerReflective {
   public SetPicnum(msg: SetPicnum) {
     let wall = this.ctx.board().walls[this.wallId];
     wall.picnum = msg.picnum;
+    this.ctx.bus.handle(new Commit(`Set Wall ${this.wallId} Picnum`));
     this.ctx.bus.handle(new BoardInvalidate(new Entity(this.wallId, EntityType.WALL_POINT)));
   }
 
@@ -85,6 +86,7 @@ export class WallEnt extends MessageHandlerReflective {
     let shade = wall.shade;
     if (msg.absolute && shade == msg.value) return;
     if (msg.absolute) wall.shade = msg.value; else wall.shade += msg.value;
+    this.ctx.bus.handle(new Commit(`Set Wall ${this.wallId} Shade`, true));
     this.ctx.bus.handle(new BoardInvalidate(new Entity(this.wallId, EntityType.WALL_POINT)));
   }
 
@@ -102,6 +104,7 @@ export class WallEnt extends MessageHandlerReflective {
       wall.xrepeat += msg.xrepeat;
       wall.yrepeat += msg.yrepeat;
     }
+    this.ctx.bus.handle(new Commit(`Set Wall ${this.wallId} PanRepeat`, true));
     this.ctx.bus.handle(new BoardInvalidate(new Entity(this.wallId, EntityType.WALL_POINT)));
   }
 
@@ -113,6 +116,7 @@ export class WallEnt extends MessageHandlerReflective {
     } else {
       wall.pal = cyclic(wall.pal + msg.value, msg.max);
     }
+    this.ctx.bus.handle(new Commit(`Set Wall ${this.wallId} Palette`, true));
     this.ctx.bus.handle(new BoardInvalidate(new Entity(this.wallId, EntityType.WALL_POINT)));
   }
 
@@ -122,13 +126,14 @@ export class WallEnt extends MessageHandlerReflective {
     let nflip = cyclic(flip + 1, 4);
     wall.cstat.xflip = nflip & 1;
     wall.cstat.yflip = (nflip & 2) >> 1;
+    this.ctx.bus.handle(new Commit(`Flip Wall ${this.wallId}`, true));
     this.ctx.bus.handle(new BoardInvalidate(new Entity(this.wallId, EntityType.WALL_POINT)));
   }
 
   public NamedMessage(msg: NamedMessage) {
     if (msg.name == 'delete') {
       deleteWall(this.ctx.board(), this.wallId, this.ctx.refs);
-      this.ctx.bus.handle(COMMIT);
+      this.ctx.bus.handle(new Commit(`Delete Wall ${this.wallId}`));
       this.ctx.bus.handle(new BoardInvalidate(null));
     }
   }

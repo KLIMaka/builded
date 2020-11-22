@@ -76,7 +76,7 @@ function tryParseMessage(): Collection<Message> {
     case 'wallcstat': return parsdMessages.push(createMessage(SetWallCstat, 'ID', 'BOOLEAN', 'BOOLEAN'));
     case 'sectorcstat': return parsdMessages.push(createMessage(SetSectorCstat, 'ID', 'BOOLEAN', 'BOOLEAN'));
     case 'spritecstat': return parsdMessages.push(createMessage(SetSpriteCstat, 'ID', 'BOOLEAN', 'BOOLEAN'));
-    case 'rotate': return parsdMessages.push(createMessage(Rotate, 'INT'));
+    case 'rotate': return parsdMessages.push(createMessage(Rotate, 'INT', 'BOOLEAN'));
     case 'flip': return parsdMessages.push(new Flip());
     case 'sprite_mode': return parsdMessages.push(new SpriteMode());
     case 'reset_panrepeat': return parsdMessages.push(new ResetPanRepeat());

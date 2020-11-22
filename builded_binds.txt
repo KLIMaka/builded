@@ -16,14 +16,15 @@ CTRL+SHIFT+LEFT msg panrepeat 0 0 -8 0 false
 CTRL+SHIFT+UP   msg panrepeat 0 0 0 8 false
 CTRL+SHIFT+DOWN msg panrepeat 0 0 0 -8 false
 \               msg reset_panrepeat
+CTRL+\          msg rotate 0 true
 O               msg pal 1 15 false
 F               msg flip
 wheelUp         msg shade 1 false
 wheelDown       msg shade -1 false
 SHIFT+wheelUp   msg shade 8 false
 SHIFT+wheelDown msg shade -8 false
-ALT+wheelDown   msg rotate -128
-ALT+wheelUp     msg rotate 128
+ALT+wheelDown   msg rotate -128 false
+ALT+wheelUp     msg rotate 128 false
 K               msg wallcstat swapBottoms true true
 M               msg wallcstat alignBottom true true
 R               msg sprite_mode
@@ -31,6 +32,8 @@ R               msg sectorcstat alignToFirstWall true true
 E               msg sectorcstat doubleSmooshiness true true
 C               msg spritecstat realCenter true true
 
+PAGE_UP         fly
+PAGE_DOWN       fall
 T               push_wall
 SHIFT+T         push_wall_copy
 BACKSPACE       push_wall_stop
@@ -41,7 +44,7 @@ I               insert_sprite
 3               paste_picnum
 ENTER           view_mode
 mouse0          print_selected
-CTRL+mouse0     split_wall
+INSERT          split_wall
 SPACE           draw
 SHIFT+SPACE     draw_rect
 BACKSPACE       undo_draw
@@ -49,6 +52,7 @@ BACKSPACE       undo_draw
 ]               grid-
 J               join_sectors
 CTRL+Z          undo
+CTRL+Y          redo
 DELETE          delete
 ALT+F           set_first_wall
 ALT+J           fill_inner_sector

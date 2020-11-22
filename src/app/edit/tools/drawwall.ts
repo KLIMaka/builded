@@ -12,7 +12,7 @@ import { Renderables } from "../../apis/renderable";
 import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
 import { LineBuilder } from "../../modules/gl/buffers";
 import { MovingHandle } from "../handle";
-import { BoardInvalidate, COMMIT, Frame, NamedMessage, Render } from "../messages";
+import { BoardInvalidate, Commit, Frame, NamedMessage, Render } from "../messages";
 import { DefaultTool, TOOLS_BUS } from "./toolsbus";
 
 class PortalModel {
@@ -247,8 +247,8 @@ export class DrawWall extends DefaultTool {
 
   private stop() {
     this.portal.stop(this.board(), this.art, this.refs, this.api, this.getDistance());
+    this.bus.handle(new Commit(`Draw wall ${this.wallId}`));
     this.wallId = -1;
-    this.bus.handle(COMMIT);
     this.bus.handle(new BoardInvalidate(null));
     this.movingHandle.stop();
     this.deactivate();

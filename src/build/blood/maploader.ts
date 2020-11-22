@@ -1,7 +1,7 @@
 import { range } from '../../utils/collections';
 import { iter } from '../../utils/iter';
 import { array, atomic_array, bits, byte, int, short, Stream, struct, ubyte } from '../../utils/stream';
-import { Header1 } from '../board/structs';
+import { Header1, SectorStats, SpriteStats, WallStats } from '../board/structs';
 import { initSector, initSprite, initWall, sectorStruct, spriteStruct, wallStruct } from '../maploader';
 import { BloodBoard, BloodSector, BloodSprite, BloodWall, SectorExtra, SpriteExtra, WallExtra } from './structs';
 
@@ -443,25 +443,25 @@ export function newSprite() {
 export function cloneSector(sector: BloodSector): BloodSector {
   const sectorCopy = new BloodSector();
   Object.assign(sectorCopy, sector);
-  Object.assign(sectorCopy.floorstat, sector.floorstat);
-  Object.assign(sectorCopy.ceilingstat, sector.ceilingstat);
-  if (sector.extraData) Object.assign(sectorCopy.extraData, sector.extraData);
+  sectorCopy.floorstat = Object.assign(new SectorStats(), sector.floorstat);
+  sectorCopy.ceilingstat = Object.assign(new SectorStats(), sector.ceilingstat);
+  if (sector.extraData) sectorCopy.extraData = Object.assign(new SectorExtra(), sector.extraData);
   return sectorCopy;
 }
 
 export function cloneWall(wall: BloodWall): BloodWall {
   const wallCopy = new BloodWall();
   Object.assign(wallCopy, wall);
-  Object.assign(wallCopy.cstat, wall.cstat);
-  if (wall.extraData) Object.assign(wallCopy.extraData, wall.extraData);
+  wallCopy.cstat = Object.assign(new WallStats(), wall.cstat);
+  if (wall.extraData) wallCopy.extraData = Object.assign(new WallExtra(), wall.extraData);
   return wallCopy;
 }
 
 export function cloneSprite(sprite: BloodSprite): BloodSprite {
   const spriteCopy = new BloodSprite();
   Object.assign(spriteCopy, sprite);
-  Object.assign(spriteCopy.cstat, sprite.cstat);
-  if (sprite.extraData) Object.assign(spriteCopy.extraData, sprite.extraData);
+  spriteCopy.cstat = Object.assign(new SpriteStats(), sprite.cstat);
+  if (sprite.extraData) spriteCopy.extraData = Object.assign(new SpriteExtra(), sprite.extraData);
   return spriteCopy;
 }
 

@@ -20,6 +20,7 @@ export class Entity {
   isSector() { return isSector(this.type) }
   isSprite() { return isSprite(this.type) }
   clone() { return new Entity(this.id, this.type) }
+  equals(ent: Entity) { return ent == null ? false : ent == this ? true : ent.id == this.id && ent.type == this.type }
 }
 
 export interface Target {

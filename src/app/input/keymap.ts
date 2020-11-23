@@ -6,8 +6,9 @@ import { State } from "../apis/app";
 
 type InputHandler = (state: InputState) => boolean;
 
-export function keyPress(key: string): InputHandler { return (state) => state.keysPress[key]; }
-export function key(key: string): InputHandler { return (state) => state.keys[key]; }
+export function keyPress(key: string): InputHandler { return (state) => state.keysPress[key.toUpperCase()]; }
+export function key(key: string): InputHandler { return (state) => state.keys[key.toUpperCase()]; }
+export function notKey(key: string): InputHandler { return (state) => !state.keys[key.toUpperCase()]; }
 export function mouseClick(button: number): InputHandler { return (state) => state.mouseClicks[button]; }
 export function mouseButton(button: number): InputHandler { return (state) => state.mouseButtons[button]; }
 export function combination(lh: InputHandler, rh: InputHandler): InputHandler { return (state) => lh(state) && rh(state) }
@@ -19,7 +20,7 @@ function parseMod(str: string): InputHandler {
   if (str == 'mouse0') return mouseButton(0);
   if (str == 'mouse1') return mouseButton(1);
   if (str == 'mouse2') return mouseButton(2);
-  return key(str.toUpperCase());
+  return key(str);
 }
 
 function parseKey(str: string): InputHandler {
@@ -28,7 +29,7 @@ function parseKey(str: string): InputHandler {
   if (str == 'mouse0') return mouseClick(0);
   if (str == 'mouse1') return mouseClick(1);
   if (str == 'mouse2') return mouseClick(2);
-  return keyPress(str.toUpperCase());
+  return keyPress(str);
 }
 
 function canonizeBind(key: string, mods: string[]) {
@@ -38,9 +39,10 @@ function canonizeBind(key: string, mods: string[]) {
   return [...mods, key].join('+');
 }
 
-function createHandler(key: string, mods: string[]): InputHandler {
-  let handler = parseKey(key);
-  for (let i = 0; i < mods.length; i++) handler = combination(handler, parseMod(mods[i]));
+function createHandler(k: string, mods: string[]): InputHandler {
+  let handler = parseKey(k);
+  for (const mod of ['shift', 'ctrl', 'alt'])
+    handler = combination(handler, mods.includes(mod) ? key(mod) : notKey(mod));
   return handler;
 }
 

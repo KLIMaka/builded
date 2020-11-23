@@ -19,8 +19,10 @@ export async function DefaultBoardProviderConstructor(injector: Injector): Promi
   const defaultBoard = api.newBoard();
   const history = new History();
   const forward = new Deck<Board>();
+  const dt = 5000;
   let activeBoard: Board = api.cloneBoard(defaultBoard);
   let lastTag = '';
+  let lastCommit = performance.now();
   history.push(api.cloneBoard(defaultBoard));
 
   bus.connect(new class extends MessageHandlerReflective {
@@ -46,10 +48,12 @@ export async function DefaultBoardProviderConstructor(injector: Injector): Promi
 
     Commit(msg: Commit) {
       forward.clear();
-      if (msg.merge && msg.tag == lastTag) history.pop();
+      const now = performance.now();
+      if (msg.merge && msg.tag == lastTag && now - lastCommit < dt) history.pop();
       else info(msg.tag);
       history.push(api.cloneBoard(activeBoard));
       lastTag = msg.tag;
+      lastCommit = now;
     }
 
     LoadBoard(msg: LoadBoard) {

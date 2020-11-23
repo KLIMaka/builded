@@ -25,27 +25,101 @@ function createRow(name: string): [Node, (v: any) => void] {
   return [root, update];
 }
 
+function createStaticRow(name: string, value: string): Node {
+  const root = rowTemplate.cloneNode(true);
+  const { nameNode, valueNode } = rowTemplate.collect(root);
+  nameNode.nodeValue = name;
+  valueNode.nodeValue = value;
+  return root;
+}
+
 const rowsTemplate = h`<table class="table-striped" #table><tbody></tbody></table>`;
 function createSprite() {
   const root = rowsTemplate.cloneNode(true);
   const { table } = rowsTemplate.collect(root);
-  const [head, headUpdater] = createRow("Type");
+  const head = createStaticRow("Type", 'Sprite');
   const [id, idUpdater] = createRow("Id");
+  const [pos, posUpdater] = createRow("Position");
   const [picnum, picnumUpdater] = createRow("Picnum");
   const [shade, shadeUpdater] = createRow("Shade");
   const [pal, palUpdater] = createRow("Palette");
   const [offset, offsetUpdater] = createRow("Offset");
   const [repeat, repeatUpdater] = createRow("Repeat");
-  const [z, zUpdater] = createRow("Z");
+  table.appendChild(head);
+  table.appendChild(id);
+  table.appendChild(pos);
+  table.appendChild(picnum);
+  table.appendChild(shade);
+  table.appendChild(pal);
+  table.appendChild(offset);
+  table.appendChild(repeat);
+  return [table,
+    (id: number, s: Sprite) => {
+      idUpdater(id);
+      picnumUpdater(s.picnum);
+      shadeUpdater(s.shade);
+      palUpdater(s.pal);
+      offsetUpdater(`${s.xoffset}, ${s.yoffset}`);
+      repeatUpdater(`${s.xrepeat}, ${s.yrepeat}`);
+      posUpdater(`${s.x}, ${s.y}, ${s.z}`);
+    }];
+}
+
+function createWall() {
+  const root = rowsTemplate.cloneNode(true);
+  const { table } = rowsTemplate.collect(root);
+  const head = createStaticRow("Type", 'Wall');
+  const [id, idUpdater] = createRow("Id");
+  const [pos, posUpdater] = createRow("Position");
+  const [picnum, picnumUpdater] = createRow("Picnum");
+  const [shade, shadeUpdater] = createRow("Shade");
+  const [pal, palUpdater] = createRow("Palette");
+  const [offset, offsetUpdater] = createRow("Offset");
+  const [repeat, repeatUpdater] = createRow("Repeat");
+  table.appendChild(head);
+  table.appendChild(id);
+  table.appendChild(pos);
+  table.appendChild(picnum);
+  table.appendChild(shade);
+  table.appendChild(pal);
+  table.appendChild(offset);
+  table.appendChild(repeat);
+  return [table,
+    (id: number, s: Wall) => {
+      idUpdater(id);
+      posUpdater(`${s.x}, ${s.y}`);
+      picnumUpdater(s.picnum);
+      shadeUpdater(s.shade);
+      palUpdater(s.pal);
+      offsetUpdater(`${s.xpanning}, ${s.ypanning}`);
+      repeatUpdater(`${s.xrepeat}, ${s.yrepeat}`);
+    }];
+}
+
+function createSector() {
+  const root = rowsTemplate.cloneNode(true);
+  const { table } = rowsTemplate.collect(root);
+  const head = createStaticRow("Type", 'Sector');
+  const [id, idUpdater] = createRow("Id");
+  const [picnum, picnumUpdater] = createRow("Picnum");
+  const [shade, shadeUpdater] = createRow("Shade");
+  const [pal, palUpdater] = createRow("Palette");
+  const [offset, offsetUpdater] = createRow("Offset");
   table.appendChild(head);
   table.appendChild(id);
   table.appendChild(picnum);
   table.appendChild(shade);
   table.appendChild(pal);
   table.appendChild(offset);
-  table.appendChild(repeat);
-  table.appendChild(z);
-  headUpdater('Sprite');
+  return [table,
+    (id: number, s: Sector) => {
+      idUpdater(id);
+      picnumUpdater(s.picnum);
+      shadeUpdater(s.shade);
+      palUpdater(s.pal);
+      offsetUpdater(`${s.xpanning}, ${s.ypanning}`);
+      repeatUpdater(`${s.xrepeat}, ${s.yrepeat}`);
+    }];
 }
 
 const Row = (ref: { name: string, value: any }) => {

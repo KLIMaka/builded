@@ -10,7 +10,7 @@ async function getWindow(injector: Injector) {
   if (selectMapNameWindow == null) {
     const input = tag('input').attr('type', 'text').className('form-control');
     const form = tag('form').css('width', '100%').css('padding', '10px').append(input);
-    const okButton = tag('button').className('btn btn-primary pull-right').text('Ok').css('width', '75px').click(() => applyCallback(((<HTMLInputElement>input.elem()).value)));
+    const okButton = tag('button').className('btn btn-default pull-right').text('Ok').css('width', '75px').click(() => applyCallback(((<HTMLInputElement>input.elem()).value)));
     selectMapNameWindow = ui.builder.window().title('Map Name')
       .draggable(true)
       .closeable(true)

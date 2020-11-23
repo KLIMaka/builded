@@ -7,8 +7,8 @@ class PhotonWindow implements Window {
   public onclose: () => void;
   readonly contentElement: HTMLElement;
   readonly winElement: HTMLElement;
-  private currentButtonGroup: Element;
-  private toolbar: Element;
+  readonly toolbar: Element;
+  readonly footerToolbar: Element;
 
   constructor(id: string, title: string, w: number, h: number, draggable = false, centered = true, closeable = true) {
     const titleElem = tag('h1').className('title').text(title);
@@ -20,7 +20,8 @@ class PhotonWindow implements Window {
       const close = span().className('icon icon-record pull-right padded-horizontally red').click(() => this.close());
       titleElem.append(close);
     }
-    const footer = tag('footer').className('toolbar toolbar-footer');
+    const footerToolbar = div('toolbar-actions hidden')
+    const footer = tag('footer').className('toolbar toolbar-footer').append(footerToolbar);
     const content = div('window-content').size(w + 'px', h + 'px');
     const window = div('window-frame')
       .id(id)
@@ -29,6 +30,7 @@ class PhotonWindow implements Window {
       .append(footer);
 
     this.toolbar = toolbar;
+    this.footerToolbar = footerToolbar;
     this.contentElement = content.elem();
     this.winElement = window.elem();
     if (centered) this.winElement.classList.add('fixed-center');
@@ -36,40 +38,55 @@ class PhotonWindow implements Window {
     document.body.appendChild(this.winElement);
   }
 
-  public addToolbarWidget(widget: HTMLElement) {
-    const container = this.currentButtonGroup == null
-      ? this.toolbar
-      : this.currentButtonGroup;
+  public addToolbarWidget(currentGroup: Element, isToolbar: boolean, widget: HTMLElement) {
+    const toolbar = isToolbar ? this.toolbar : this.footerToolbar;
+    const container = currentGroup == null
+      ? toolbar
+      : currentGroup;
     container.appendHtml(widget);
-    this.toolbar.elem().classList.remove('hidden');
+    toolbar.elem().classList.remove('hidden');
   }
 
-  public addToolMenuButton(icon: string, menu: MenuBuilder) {
-    const container = this.currentButtonGroup == null
-      ? this.toolbar
-      : this.currentButtonGroup;
+  public addToolMenuButton(currentGroup: Element, isToolbar: boolean, icon: string, menu: MenuBuilder) {
+    const toolbar = isToolbar ? this.toolbar : this.footerToolbar;
+    const container = currentGroup == null
+      ? toolbar
+      : currentGroup;
     const btn = tag('button').className('btn btn-default btn-dropdown').append(span().className('icon ' + icon));
     container.append(btn);
     menu.build(btn.elem());
-    this.toolbar.elem().classList.remove('hidden');
+    toolbar.elem().classList.remove('hidden');
   }
 
-  public addToolIconButton(icon: string, click: () => void) {
-    const container = this.currentButtonGroup == null
-      ? this.toolbar
-      : this.currentButtonGroup;
+  public addToolIconButton(currentGroup: Element, isToolbar: boolean, icon: string, click: () => void) {
+    const toolbar = isToolbar ? this.toolbar : this.footerToolbar;
+    const container = currentGroup == null
+      ? toolbar
+      : currentGroup;
     container.append(
       tag('button').className('btn btn-default')
         .append(span().className('icon ' + icon))
         .click(click));
-    this.toolbar.elem().classList.remove('hidden');
+    toolbar.elem().classList.remove('hidden');
   }
 
-  public addToolSearch(hint: string, change: (s: string, sugg: HTMLElement) => void) {
+  public addToolButton(currentGroup: Element, isToolbar: boolean, caption: string, click: () => void) {
+    const toolbar = isToolbar ? this.toolbar : this.footerToolbar;
+    const container = currentGroup == null
+      ? toolbar
+      : currentGroup;
+    container.append(
+      tag('button').className('btn btn-default').text(caption)
+        .click(click));
+    toolbar.elem().classList.remove('hidden');
+  }
+
+  public addToolSearch(currentGroup: Element, isToolbar: boolean, hint: string, change: (s: string, sugg: HTMLElement) => void) {
+    const toolbar = isToolbar ? this.toolbar : this.footerToolbar;
     const suggestContainer = div('suggest');
-    const container = this.currentButtonGroup == null
-      ? this.toolbar
-      : this.currentButtonGroup;
+    const container = currentGroup == null
+      ? toolbar
+      : currentGroup;
     const textBox = tag('input').className('toolbar-control')
       .attr('type', 'text')
       .attr('placeholder', hint)
@@ -89,16 +106,14 @@ class PhotonWindow implements Window {
       arrow: false,
       offset: [0, 0]
     });
-    this.toolbar.elem().classList.remove('hidden');
+    toolbar.elem().classList.remove('hidden');
   }
 
-  public startButtonGroup() {
-    this.currentButtonGroup = div('btn-group');
-    this.toolbar.append(this.currentButtonGroup);
-  }
-
-  public endButtonGroup() {
-    this.currentButtonGroup = null;
+  public startButtonGroup(isToolbar: boolean) {
+    const toolbar = isToolbar ? this.toolbar : this.footerToolbar;
+    const group = div('btn-group');
+    toolbar.append(group);
+    return group;
   }
 
   public close() {
@@ -148,29 +163,33 @@ class PhotonWindowBuilder implements WindowBuilder {
   }
 }
 
-interface ToolbarItemBuilder { build(window: PhotonWindow): void }
+interface ToolbarItemBuilder { build(window: PhotonWindow, group: Element): void }
 
 class ToolbarGroupBuilder implements ToolbarItemBuilder {
   items: ToolbarItemBuilder[] = [];
+
+  constructor(private isToolbar: boolean) { }
 
   add(item: ToolbarItemBuilder) {
     this.items.push(item);
   }
 
   build(window: PhotonWindow): void {
-    window.startButtonGroup();
-    for (const i of this.items) i.build(window);
-    window.endButtonGroup();
+    const group = window.startButtonGroup(this.isToolbar);
+    for (const i of this.items) i.build(window, group);
   }
 }
 
 class PhotonToolbarBuilder implements ToolbarBuilder {
   groups: ToolbarItemBuilder[] = [];
   currentGroup: ToolbarGroupBuilder = null;
+  isToolbar = true;
+
+  footer() { this, this.isToolbar = false; return this; }
 
   startGroup(): ToolbarBuilder {
     if (this.currentGroup != null) this.groups.push(this.currentGroup);
-    this.currentGroup = new ToolbarGroupBuilder();
+    this.currentGroup = new ToolbarGroupBuilder(this.isToolbar);
     return this;
   }
 
@@ -185,32 +204,43 @@ class PhotonToolbarBuilder implements ToolbarBuilder {
     else this.currentGroup.add(item);
   }
 
-  button(icon: string, click: () => void): ToolbarBuilder {
-    const item = { build(window: PhotonWindow) { window.addToolIconButton(icon, click) } };
+  button(caption: string, click: () => void): ToolbarBuilder {
+    const isToolbar = this.isToolbar;
+    const item = { build(window: PhotonWindow, group: Element) { window.addToolButton(group, isToolbar, caption, click) } };
+    this.addItem(item);
+    return this;
+  }
+
+  iconButton(icon: string, click: () => void): ToolbarBuilder {
+    const isToolbar = this.isToolbar;
+    const item = { build(window: PhotonWindow, group: Element) { window.addToolIconButton(group, isToolbar, icon, click) } };
     this.addItem(item);
     return this;
   }
 
   menuButton(icon: string, menu: MenuBuilder): ToolbarBuilder {
-    const item = { build(window: PhotonWindow) { window.addToolMenuButton(icon, menu) } };
+    const isToolbar = this.isToolbar;
+    const item = { build(window: PhotonWindow, group: Element) { window.addToolMenuButton(group, isToolbar, icon, menu) } };
     this.addItem(item);
     return this;
   }
 
   search(hint: string, change: (s: string, sugg: HTMLElement) => void): ToolbarBuilder {
-    const item = { build(window: PhotonWindow) { window.addToolSearch(hint, change) } };
+    const isToolbar = this.isToolbar;
+    const item = { build(window: PhotonWindow, group: Element) { window.addToolSearch(group, isToolbar, hint, change) } };
     this.addItem(item);
     return this;
   }
 
   widget(widget: HTMLElement): ToolbarBuilder {
-    const item = { build(window: PhotonWindow) { window.addToolbarWidget(widget) } };
+    const isToolbar = this.isToolbar;
+    const item = { build(window: PhotonWindow, group: Element) { window.addToolbarWidget(group, isToolbar, widget) } };
     this.addItem(item);
     return this;
   }
 
   build(window: PhotonWindow) {
-    for (const group of this.groups) group.build(window);
+    for (const group of this.groups) group.build(window, null);
   }
 }
 

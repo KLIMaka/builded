@@ -57,7 +57,7 @@ function sector(fullLoop: (board: Board, wallId: number) => Iterable<number>, ta
 function wallSegment(fullLoop: (board: Board, wallId: number) => Iterable<number>, factory: EntityFactory, w: number, bottom: boolean) {
   const board = factory.ctx.board();
   if (fullLoop) {
-    const loop = fullLoop(board, w);
+    const loop = [...fullLoop(board, w)];
     list.push(factory.wallSegment(loop, loop, bottom));
   } else {
     const w1 = nextwall(board, w);

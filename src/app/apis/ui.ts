@@ -23,9 +23,11 @@ export interface WindowBuilder {
 }
 
 export interface ToolbarBuilder {
+  footer(): ToolbarBuilder,
   startGroup(): ToolbarBuilder;
   endGroup(): ToolbarBuilder;
-  button(icon: string, click: () => void): ToolbarBuilder;
+  button(caption: string, click: () => void): ToolbarBuilder;
+  iconButton(icon: string, click: () => void): ToolbarBuilder;
   search(hint: string, change: (s: string, sugg: HTMLElement) => void): ToolbarBuilder;
   menuButton(icon: string, menu: MenuBuilder): ToolbarBuilder;
   widget(widget: HTMLElement): ToolbarBuilder;

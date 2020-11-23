@@ -29,9 +29,9 @@ class FileBrowser {
       .size(600, 600)
       .toolbar(ui.builder.toolbar()
         .startGroup()
-        .button('icon-arrows-ccw', () => this.refreshContent())
-        .button('icon-download', () => this.downloadSelected())
-        .button('icon-trash', () => this.deleteSelected())
+        .iconButton('icon-arrows-ccw', () => this.refreshContent())
+        .iconButton('icon-download', () => this.downloadSelected())
+        .iconButton('icon-trash', () => this.deleteSelected())
         .endGroup())
       .build();
 

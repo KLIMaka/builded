@@ -17,6 +17,7 @@ import { FS_MANAGER } from '../fs/manager';
 import { PALSWAPS, PAL_TEXTURE, PLU_TEXTURE, SHADOWSTEPS } from '../gl/buildgl';
 import { MAP_NAMES, showMapSelection } from '../selectmap';
 import { Implementation_ } from '../view/boardrenderer3d';
+import { showMapNameSelection } from '../../modules/default/mapnamedialog';
 
 async function loadArtFiles(injector: Injector): Promise<ArtFiles> {
   const res = await injector.getInstance(RESOURCES);
@@ -80,19 +81,6 @@ function loadMapImpl(name: string) {
   }
 }
 
-function createBoard() {
-  const board = new BloodBoard();
-  board.walls = [];
-  board.sectors = [];
-  board.sprites = [];
-  board.numwalls = 0;
-  board.numsectors = 0;
-  board.numsprites = 0;
-  board.version = 0x0700;
-  board.posx = board.posy = board.posz = board.cursectnum = board.ang = 0;
-  return board;
-}
-
 function mapLoader(module: Module) {
   module.execute(async injector => {
     const bus = await injector.getInstance(BUS);
@@ -106,11 +94,22 @@ function mapLoader(module: Module) {
 }
 
 function mapSaver(module: Module) {
+  let mapName = 'newboard.map';
+  let savedBefore = false;
+
   module.execute(async injector => {
     const [bus, fsmgr, board] = await getInstances(injector, BUS, FS_MANAGER, BOARD);
-    bus.connect(namedMessageHandler('save_map', async () => {
-      fsmgr.write('newboard.map', saveBloodMap(<BloodBoard>board()))
-    }));
+    const saveMap = (name: string) => {
+      if (name != null && name.length != 0) {
+        if (!name.endsWith('.map')) name = name + '.map'
+        fsmgr.write(name, saveBloodMap(<BloodBoard>board()))
+        mapName = name;
+        savedBefore = true;
+      }
+    }
+
+    bus.connect(namedMessageHandler('save_map', async () => saveMap(savedBefore ? mapName : await showMapNameSelection(injector))));
+    bus.connect(namedMessageHandler('save_map_as', async () => saveMap(await showMapNameSelection(injector))));
   });
 }
 

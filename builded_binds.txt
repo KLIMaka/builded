@@ -62,6 +62,7 @@ CTRL+SHIFT+F    show_files
 0               print_info
 F3              load_map
 F2              save_map
+SHIFT+F2        save_map_as
 F4              print_usage
 F9              add_test_task
 SHIFT+mouse0    add_selection

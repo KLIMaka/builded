@@ -10,7 +10,6 @@ export interface Window {
 }
 
 export interface WindowBuilder {
-  id(id: string): WindowBuilder;
   title(title: string): WindowBuilder;
   draggable(draggable: boolean): WindowBuilder;
   centered(centered: boolean): WindowBuilder;
@@ -28,8 +27,6 @@ export interface ToolbarBuilder {
   endGroup(): ToolbarBuilder;
   button(caption: string, click: () => void): ToolbarBuilder;
   iconButton(icon: string, click: () => void): ToolbarBuilder;
-  search(hint: string, change: (s: string, sugg: HTMLElement) => void): ToolbarBuilder;
-  menuButton(icon: string, menu: MenuBuilder): ToolbarBuilder;
   widget(widget: HTMLElement): ToolbarBuilder;
 }
 

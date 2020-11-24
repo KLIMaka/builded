@@ -91,10 +91,10 @@ export class Transform extends DefaultTool {
       this.handler.handle(START_MOVE);
     } else if (!this.ctx.state.get(MOVE_STATE)) {
       handle.stop();
-      MOVE.dx = MOVE.dy = MOVE.dz = 0;
       this.handler.handle(END_MOVE);
       this.handler = NULL_MESSAGE_HANDLER;
-      this.ctx.bus.handle(new Commit('Move'));
+      if (MOVE.dx != 0 || MOVE.dy != 0 || MOVE.dz != 0) this.ctx.bus.handle(new Commit('Move'));
+      MOVE.dx = MOVE.dy = MOVE.dz = 0;
       this.deactivate();
       return;
     }

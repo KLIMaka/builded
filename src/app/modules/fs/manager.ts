@@ -21,7 +21,6 @@ class FileBrowser {
 
   constructor(ui: Ui, private manager: FsManager) {
     this.window = ui.builder.window()
-      .id('fileBrowser')
       .title('Files')
       .draggable(true)
       .closeable(true)

@@ -2,6 +2,7 @@ import tippy from "tippy.js";
 import { MenuBuilder } from "../../app/apis/ui";
 import { iter } from "../iter";
 import { div, Element, replaceContent, span, Table, tag } from "./ui";
+import h from "stage0";
 
 export type ColumnRenderer<T> = (value: T) => Element;
 
@@ -63,13 +64,6 @@ export function sugggestionsMenu(items: Iterable<[string, () => void]>): Suggest
   }
 }
 
-export function renderMenu(items: Iterable<[string, () => void]>) {
-  const menu = div('menu menu-default');
-  for (const [label, click] of items)
-    menu.append(div('menu-item').text(label).click(() => click()));
-  return menu;
-}
-
 export function menuButton(icon: string, menu: MenuBuilder): HTMLElement {
   const btn = tag('button').className('btn btn-default btn-dropdown').append(span().className('icon ' + icon));
   menu.build(btn.elem());
@@ -88,31 +82,32 @@ export interface SuggestionModel {
   select(): void;
 }
 
+const suggestTemplate = h`
+<button class="btn btn-default btn-mini pull-right" #button>
+  <span class="icon icon-search"></span>
+  <input type="text" class="toolbar-control" #input>
+</button>
+`;
+
 export function search(hint: string, change: (s: string) => void): SerachBar {
-  const suggestContainer = div('suggest');
+  const root = suggestTemplate.cloneNode(true);
+  const { button, input } = suggestTemplate.collect(root);
+  const suggestContainer = div('suggest').elem();
   let suggestModel: SuggestionModel = null;
-  const textBox = tag('input')
-    .className('toolbar-control')
-    .attr('type', 'text')
-    .attr('placeholder', hint)
-    .change(s => change(s));
-  const input = <HTMLInputElement>textBox.elem();
+  input.oninput = () => change(input.value);
+  input.placeholder = hint;
   input.addEventListener('keydown', e => {
     if (e.key == 'ArrowDown') suggestModel.shift(1)
     else if (e.key == 'ArrowUp') suggestModel.shift(-1)
     else if (e.key == 'Enter') suggestModel.select()
   });
-  const searchBar =
-    tag('button').className('btn btn-default btn-mini pull-right')
-      .append(span().className('icon icon-search'))
-      .append(textBox)
-      .click(() => { (<HTMLInputElement>textBox.elem()).value = ''; change('') });
+  button.onclick = () => { input.value = ''; change('') };
 
-  const inst = tippy(textBox.elem(), {
+  const inst = tippy(<HTMLElement>input, {
     allowHTML: true,
     placement: 'bottom-start',
     interactive: true,
-    content: suggestContainer.elem(),
+    content: suggestContainer,
     trigger: 'focus',
     arrow: false,
     offset: [0, 0],
@@ -120,12 +115,11 @@ export function search(hint: string, change: (s: string) => void): SerachBar {
   });
 
   return {
-    widget: searchBar.elem(),
+    widget: button,
     setValue(s: string) { input.value = s; inst.hide() },
     updateSuggestions(model: SuggestionModel) {
       suggestModel = model
-      const sugg = suggestContainer.elem();
-      replaceContent(sugg, model.widget);
+      replaceContent(suggestContainer, model.widget);
       inst.show();
     },
   }

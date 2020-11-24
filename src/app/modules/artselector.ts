@@ -75,7 +75,6 @@ export class Selector {
     //   .append(div('pane').css('overflow', 'hidden').appendHtml(canvas));
     this.searchWidget = search('Search', s => { this.updateFilter(s); this.updateSuggestions(s) });
     this.window = ui.builder.window()
-      .id('select_tile')
       .title('Tiles')
       .draggable(true)
       .closeable(true)

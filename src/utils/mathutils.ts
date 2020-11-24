@@ -30,6 +30,17 @@ export function int(x: number) {
   return x | 0;
 }
 
+export function trz(x: number) {
+  x = int(x);
+  if (x == 0) return 32;
+  let count = 0;
+  while ((x & 1) == 0) {
+    x = x >> 1;
+    count++;
+  }
+  return count;
+}
+
 export function ispow2(x: number): boolean {
   return (x & (x - 1)) == 0;
 }

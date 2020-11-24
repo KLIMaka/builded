@@ -50,6 +50,7 @@ SHIFT+SPACE     draw_rect
 BACKSPACE       undo_draw
 [               grid+
 ]               grid-
+Q               adapt_grid
 J               join_sectors
 CTRL+Z          undo
 CTRL+Y          redo

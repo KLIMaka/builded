@@ -5,11 +5,11 @@ import { splitWall } from "../../../build/board/mutations/walls";
 import { sectorOfWall } from "../../../build/board/query";
 import { Board, WALL_SPRITE } from "../../../build/board/structs";
 import { EntityType } from "../../../build/hitscan";
-import { slope, vec2ang, wallNormal } from "../../../build/utils";
+import { slope, vec2ang, wallNormal, ZSCALE } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 import { create, Module } from "../../../utils/injector";
 import { info } from "../../../utils/logger";
-import { int } from "../../../utils/mathutils";
+import { int, trz } from "../../../utils/mathutils";
 import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, GRID, GridController, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
 import { BUS, MessageBus } from "../../apis/handler";
 import { invalidateSectorAndWalls } from "../editutils";
@@ -51,6 +51,26 @@ class Utils extends DefaultTool {
       case 'split_wall': this.splitWall(); return;
       case 'set_picnum': this.setTexture(); return;
       case 'print_info': this.print(); return;
+      case 'adapt_grid': this.adaptGrid(); return;
+    }
+  }
+
+  private adaptGrid() {
+    const board = this.board();
+    const target = this.view.snapTarget();
+    const ent = target.entity;
+    const scale = (...xs: number[]) => Math.min.apply(null, xs.map(x => Math.pow(2, trz(x))));
+    if (ent == null) {
+      this.gridController.setGridSize(1024);
+    } else if (ent.isSprite()) {
+      const sprite = board.sprites[ent.id];
+      this.gridController.setGridSize(scale(sprite.x, sprite.y, sprite.z / ZSCALE));
+    } else if (ent.isSector()) {
+      const sector = board.sectors[ent.id];
+      this.gridController.setGridSize(ent.type == EntityType.CEILING ? scale(sector.ceilingz / ZSCALE) : scale(sector.floorz / ZSCALE));
+    } else if (ent.isWall()) {
+      const wall = board.walls[ent.id];
+      this.gridController.setGridSize(scale(wall.x, wall.y));
     }
   }
 

@@ -8,8 +8,8 @@ export class GridControllerImpl extends MessageHandlerReflective {
   private gridSizeIdx = 6;
 
   public setGridSize(size: number) {
-    if (size < this.gridSizes[0]) this.gridSizeIdx = 0;
-    else if (size > this.gridSizes[this.gridSizes.length - 1]) this.gridSizeIdx = this.gridSizes.length - 1;
+    if (size <= this.gridSizes[0]) this.gridSizeIdx = 0;
+    else if (size >= this.gridSizes[this.gridSizes.length - 1]) this.gridSizeIdx = this.gridSizes.length - 1;
     else {
       for (let i = 0; i < this.gridSizes.length - 2; i++) {
         const i1 = i + 1;

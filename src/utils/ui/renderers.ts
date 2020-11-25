@@ -32,35 +32,32 @@ export async function renderGrid(grid: GridModel): Promise<Element> {
   return table;
 }
 
-export function sugggestionsMenu(items: Iterable<[string, () => void]>): SuggestionModel {
+const EMPTY_SUGGESTIONS: SuggestionModel = {
+  widget: div('hidden').elem(),
+  shift: (d: number) => { },
+  select: () => { }
+}
+
+function sugggestionsMenu(items: Iterable<[string, () => void]>): SuggestionModel {
   const menu = div('menu menu-default');
-  let selected = -1;
+  let selected = 0;
   const options: [Element, () => void][] = [];
   for (const [label, click] of items) {
     const item = div('menu-item').text(label).click(() => click());
     options.push([item, click]);
     menu.append(item);
   }
-  if (options.length != 0) {
-    selected = 0;
-    options[selected][0].elem().classList.add('selected');
+  if (options.length == 0) return EMPTY_SUGGESTIONS;
+  const select = (newSelected: number) => {
+    options[selected][0].elem().classList.remove('selected');
+    options[newSelected][0].elem().classList.add('selected');
+    selected = newSelected;
   }
+  select(0);
   return {
     widget: menu.elem(),
-    shift(d: number) {
-      if (options.length == 0) return;
-      const newSelected = Math.min(Math.max(0, selected + d), options.length - 1);
-      if (newSelected != selected) {
-        options[selected][0].elem().classList.remove('selected');
-        options[newSelected][0].elem().classList.add('selected');
-        selected = newSelected;
-      }
-    },
-
-    select() {
-      if (options.length == 0) return;
-      else options[selected][1]();
-    }
+    shift(d: number) { select(Math.min(Math.max(0, selected + d), options.length - 1)) },
+    select() { options[selected][1]() }
   }
 }
 
@@ -73,10 +70,10 @@ export function menuButton(icon: string, menu: MenuBuilder): HTMLElement {
 export interface SerachBar {
   readonly widget: HTMLElement;
   setValue(s: String): void;
-  updateSuggestions(model: SuggestionModel): void;
+  updateSuggestions(items: Iterable<[string, () => void]>): void;
 }
 
-export interface SuggestionModel {
+interface SuggestionModel {
   readonly widget: HTMLElement,
   shift(d: number): void;
   select(): void;
@@ -88,6 +85,7 @@ const suggestTemplate = h`
   <input type="text" class="toolbar-control" #input>
 </button>
 `;
+
 
 export function search(hint: string, change: (s: string) => void): SerachBar {
   const root = suggestTemplate.cloneNode(true);
@@ -117,9 +115,9 @@ export function search(hint: string, change: (s: string) => void): SerachBar {
   return {
     widget: button,
     setValue(s: string) { input.value = s; inst.hide() },
-    updateSuggestions(model: SuggestionModel) {
-      suggestModel = model
-      replaceContent(suggestContainer, model.widget);
+    updateSuggestions(items: Iterable<[string, () => void]>) {
+      suggestModel = sugggestionsMenu(items);
+      replaceContent(suggestContainer, suggestModel.widget);
       inst.show();
     },
   }

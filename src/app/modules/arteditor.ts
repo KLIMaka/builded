@@ -7,7 +7,7 @@ import { iter } from "../../utils/iter";
 import { int } from "../../utils/mathutils";
 import { resize } from "../../utils/pixelprovider";
 import { DrawPanel, PixelDataProvider } from "../../utils/ui/drawpanel";
-import { menuButton, search, SerachBar, sugggestionsMenu } from "../../utils/ui/renderers";
+import { menuButton, search, SerachBar } from "../../utils/ui/renderers";
 import { div } from "../../utils/ui/ui";
 import { ART } from "../apis/app";
 import { BUS } from "../apis/handler";
@@ -90,7 +90,7 @@ export class ArtEditor {
     const menu = iter(this.tags.allTags())
       .filter(t => t.toLowerCase().startsWith(s.toLowerCase()))
       .map(t => <[string, () => void]>[t, () => { this.searchWidget.setValue(t); this.updateFilter(t) }]);
-    this.searchWidget.updateSuggestions(sugggestionsMenu(menu));
+    this.searchWidget.updateSuggestions(menu);
   }
 
   private updateFilter(s: string) {

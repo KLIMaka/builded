@@ -4,7 +4,7 @@ import { create, Dependency, Injector } from "../../utils/injector";
 import { iter } from "../../utils/iter";
 import { axisSwap, RGBPalPixelProvider } from "../../utils/pixelprovider";
 import { DrawPanel, PixelDataProvider } from "../../utils/ui/drawpanel";
-import { IconTextRenderer, menuButton, renderGrid, search, SerachBar, sugggestionsMenu } from "../../utils/ui/renderers";
+import { IconTextRenderer, menuButton, renderGrid, search, SerachBar } from "../../utils/ui/renderers";
 import { Element } from "../../utils/ui/ui";
 import { ART } from "../apis/app";
 import { Ui, UI, Window } from "../apis/ui";
@@ -92,8 +92,6 @@ export class Selector {
       .build();
 
     this.drawPanel = createDrawPanel(arts, pal, canvas, (id: number) => this.select(id), () => this.pics());
-    this.drawPanel.select(110);
-    this.drawPanel.select(111);
     this.hide();
   }
 
@@ -107,7 +105,7 @@ export class Selector {
     const menu = iter(this.tags.allTags())
       .filter(t => t.toLowerCase().startsWith(s.toLowerCase()))
       .map(t => <[string, () => void]>[t, () => { this.searchWidget.setValue(t); this.updateFilter(t) }]);
-    this.searchWidget.updateSuggestions(sugggestionsMenu(menu));
+    this.searchWidget.updateSuggestions(menu);
   }
 
   private applyFilter(id: number): boolean {

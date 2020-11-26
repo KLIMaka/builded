@@ -33,7 +33,7 @@ export class DrawPanel {
   private selected = new Set<number>();
 
   constructor(
-    private canvas: HTMLCanvasElement,
+    readonly canvas: HTMLCanvasElement,
     private idsProvider: () => Iterable<number>,
     private provider: PixelDataProvider,
     private selectCallback: (id: number) => void,

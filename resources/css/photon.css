@@ -2347,7 +2347,7 @@ td:last-child {
 
 .window-frame {
 	position: absolute;
-	background-color:white;
+	background-color:#ececec;
 	box-shadow: 0 0 10px black;
 	border-radius:6px ;
 	overflow: hidden;
@@ -2361,12 +2361,6 @@ td:last-child {
 	margin-top: 2px;
 }
 
-.fixed-center {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
 
 .centered {
   align-self: center; 
@@ -2411,6 +2405,16 @@ td:last-child {
 .menu-item:hover, .menu-item.selected {
   color: #fff;
   background-image: linear-gradient(to bottom, #116cd6 0%, #1068cc 100%);
+}
+
+.dialog-buttons {
+  float: right;
+  padding: 10px;
+}
+
+.dialog-buttons button {
+  margin-left: 10px;
+  min-width: 70px;
 }
 
 

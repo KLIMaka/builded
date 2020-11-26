@@ -1,14 +1,51 @@
 import h from "stage0";
 import tippy from "tippy.js";
 import { Module } from "../../utils/injector";
-import { div, dragElement, span, tag } from "../../utils/ui/ui";
+import { div, dragElement } from "../../utils/ui/ui";
 import { MenuBuilder, ToolbarBuilder, UI, UiBuilder, Window, WindowBuilder } from "../apis/ui";
 
+const dialogTemplate = h`
+<div class="window-frame hidden" #window>
+  <header class="toolbar toolbar-header">
+  <h1 class="title" #title>#caption_
+    <span class="icon icon-cancel-circled pull-right padded-horizontally red" #close></span>
+  </h1>
+  </header>
+  <div class="window-content" #content></div>
+  <div class="dialog-buttons">
+    <button class="btn btn-default">Cancel</button>
+    <button class="btn btn-primary">OK</button>
+  </div>
+</div>
+`;
+
+export class PhotonDialog implements Window {
+  public onclose: () => void;
+  readonly contentElement: HTMLElement;
+  readonly winElement: HTMLElement;
+
+  constructor(caption: string) {
+    const root = <HTMLElement>dialogTemplate.cloneNode(true);
+    const { window, title, caption_, close, content } = dialogTemplate.collect(root);
+    caption_.nodeValue = caption;
+    this.winElement = window;
+    this.contentElement = content;
+    dragElement(title, this.winElement);
+    document.body.appendChild(root);
+  }
+
+  hide() { this.winElement.classList.add('hidden') }
+  show() { this.winElement.classList.remove('hidden') }
+
+  setPosition(x: string | number, y: string | number): void {
+  }
+}
+
 const windowTemplate = h`
-<div class="window-frame fixed-center hidden" #window>
+<div class="window-frame hidden" #window>
   <header class="toolbar toolbar-header">
     <h1 class="title" #title>#caption
-      <span class="icon icon-record pull-right padded-horizontally red hidden" #close></span>
+      <span class="icon icon-cancel-circled pull-right padded-horizontally red hidden" #close></span>
     </h1>
     <div class="toolbar-actions hidden" #toolbar></div>
   </header>
@@ -27,7 +64,7 @@ class PhotonWindow implements Window {
   readonly toolbar: HTMLElement;
   readonly footerToolbar: HTMLElement;
 
-  constructor(c: string, w: number, h: number, draggable = false, centered = true, closeable = true) {
+  constructor(c: string, private w: number, private h: number, private centered = true, closeable = true) {
     const root = <HTMLElement>windowTemplate.cloneNode(true);
     const { window, title, caption, close, toolbar, footer, content } = windowTemplate.collect(root);
 
@@ -44,8 +81,7 @@ class PhotonWindow implements Window {
     this.toolbar = toolbar;
     this.footerToolbar = footer;
 
-    if (centered) this.winElement.classList.add('fixed-center');
-    if (draggable) dragElement(title, this.winElement);
+    dragElement(title, this.winElement);
     document.body.appendChild(root);
   }
 
@@ -68,8 +104,12 @@ class PhotonWindow implements Window {
     if (this.onclose) this.onclose();
   }
 
-  show() { this.winElement.classList.remove('hidden') }
   hide() { this.winElement.classList.add('hidden') }
+
+  show() {
+    if (this.centered) this.setPosition((document.body.clientWidth - this.w) / 2, (document.body.clientHeight - this.h) / 2);
+    this.winElement.classList.remove('hidden')
+  }
 
   setPosition(x: string | number, y: string | number): void {
     const actualX = typeof x == 'number' ? x + 'px' : x;
@@ -100,7 +140,7 @@ class PhotonWindowBuilder implements WindowBuilder {
   public content(content: HTMLElement) { this._content = content; return this; }
 
   public build() {
-    const win = new PhotonWindow(this._title, this._w, this._h, this._draggable, this._centered, this._closeable);
+    const win = new PhotonWindow(this._title, this._w, this._h, this._centered, this._closeable);
     win.onclose = this._onclose;
     if (this._toolbar) this._toolbar.build(win);
     if (this._content) win.contentElement.appendChild(this._content);

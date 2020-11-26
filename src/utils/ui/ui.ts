@@ -289,3 +289,26 @@ export function replaceContent(root: HTMLElement, newchild: HTMLElement) {
   if (child) root.replaceChild(newchild, child);
   else root.appendChild(newchild);
 }
+
+export type DragController = (dx: number, dy: number, dscale: number) => void;
+
+export function addDragController(elem: HTMLElement, controller: DragController) {
+  elem.addEventListener('wheel', e => {
+    if (e.deltaY > 0) controller(0, 0, 0.9);
+    if (e.deltaY < 0) controller(0, 0, 1.1);
+  });
+  let isDrag = false;
+  let oldx = 0;
+  let oldy = 0;
+  elem.addEventListener('mousemove', e => {
+    if (isDrag) {
+      const dx = e.x - oldx;
+      const dy = e.y - oldy;
+      if (dx != 0 || dy != 0) controller(dx, dy, 1);
+    }
+    oldx = e.x;
+    oldy = e.y;
+  });
+  elem.addEventListener('mousedown', e => isDrag = true);
+  elem.addEventListener('mouseup', e => isDrag = false);
+}

@@ -8,7 +8,7 @@ import { int } from "../../utils/mathutils";
 import { resize } from "../../utils/pixelprovider";
 import { DrawPanel, PixelDataProvider } from "../../utils/ui/drawpanel";
 import { menuButton, search } from "../../utils/ui/renderers";
-import { div } from "../../utils/ui/ui";
+import { addDragController, div } from "../../utils/ui/ui";
 import { ART } from "../apis/app";
 import { BUS } from "../apis/handler";
 import { Ui, UI, Window } from "../apis/ui";
@@ -19,8 +19,9 @@ import { PicTags, PIC_TAGS, RAW_PAL, RAW_PLUs } from "./artselector";
 function createDrawPanel(arts: ArtInfoProvider, pal: Uint8Array, plu: (x: number) => number, canvas: HTMLCanvasElement, cb: PicNumCallback, iter: () => Iterable<number>) {
   const provider = new PixelDataProvider(1024 * 10, (i: number) => {
     const info = arts.getInfo(i);
-    if (info == null) return null;
-    return new ArtPixelProvider(info, pal, plu);
+    return info == null
+      ? null
+      : new ArtPixelProvider(info, pal, plu);
   });
   return new DrawPanel(canvas, iter, provider, cb);
 }
@@ -54,10 +55,7 @@ export class ArtEditor {
     private plus: Uint8Array[],
     private tags: PicTags) {
 
-    const browserCanvas = document.createElement('canvas');
-    browserCanvas.width = 640;
-    browserCanvas.height = 192;
-    browserCanvas.style.display = 'block';
+    this.drawPanel = createDrawPanel(arts, pal, this.pluProvider, this.createBrowser(), (id: number) => this.select(id), () => this.pics());
     this.view = this.createView();
     this.window = ui.builder.window()
       .title('ART Edit')
@@ -67,14 +65,12 @@ export class ArtEditor {
       .size(640, 640)
       .content(div('')
         .appendHtml(this.view)
-        .appendHtml(browserCanvas)
+        .appendHtml(this.drawPanel.canvas)
         .elem())
       .toolbar(ui.builder.toolbar()
         .widget(this.createPalSelectingMenu())
         .widget(search('Search', s => this.oracle(s))))
       .build();
-
-    this.drawPanel = createDrawPanel(arts, pal, this.pluProvider, browserCanvas, (id: number) => this.select(id), () => this.pics());
     this.window.hide();
   }
 
@@ -98,11 +94,19 @@ export class ArtEditor {
 
   private applyFilter(id: number): boolean {
     if (this.filter.startsWith('*')) return (id + '').includes(this.filter.substr(1))
-    return (id + '').startsWith(this.filter) || iter(this.tags.tags(id)).any(t => t.toLowerCase() == this.filter.toLowerCase());
+    return (id + '').startsWith(this.filter) || iter(this.tags.tags(id)).any(t => t.toLowerCase().includes(this.filter.toLowerCase()));
   }
 
   private pics(): Iterable<number> {
     return iter(range(0, 10 * 1024)).filter(i => this.applyFilter(i));
+  }
+
+  private createBrowser(): HTMLCanvasElement {
+    const browserCanvas = document.createElement('canvas');
+    browserCanvas.width = 640;
+    browserCanvas.height = 192;
+    browserCanvas.style.display = 'block';
+    return browserCanvas;
   }
 
   private createView(): HTMLCanvasElement {
@@ -110,29 +114,12 @@ export class ArtEditor {
     canvas.width = 640;
     canvas.height = 640 - 192;
     canvas.style.display = 'block';
-    canvas.addEventListener('wheel', e => {
-      if (e.deltaY > 0) this.scale *= 0.9;
-      if (e.deltaY < 0) this.scale *= 1.1;
+    addDragController(canvas, (dx, dy, dscale) => {
+      this.centerX += dx;
+      this.centerY += dy;
+      this.scale *= dscale;
       this.updateView(false);
     });
-    let isDrag = false;
-    let oldx = 0;
-    let oldy = 0;
-    canvas.addEventListener('mousemove', e => {
-      if (isDrag) {
-        const dx = e.x - oldx;
-        const dy = e.y - oldy;
-        if (dx != 0 || dy != 0) {
-          this.centerX += dx;
-          this.centerY += dy;
-          this.updateView(false);
-        }
-      }
-      oldx = e.x;
-      oldy = e.y;
-    });
-    canvas.addEventListener('mousedown', e => isDrag = true);
-    canvas.addEventListener('mouseup', e => isDrag = false);
     return canvas;
   }
 

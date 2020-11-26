@@ -33,6 +33,50 @@ export async function renderGrid(grid: GridModel): Promise<Element> {
   return table;
 }
 
+export function menuButton(icon: string, menu: MenuBuilder): HTMLElement {
+  const btn = tag('button').className('btn btn-default btn-dropdown').append(span().className('icon ' + icon));
+  menu.build(btn.elem());
+  return btn.elem();
+}
+
+interface SuggestionModel {
+  readonly widget: HTMLElement,
+  shift(d: number): void;
+  select(): void;
+}
+
+const suggestTemplate = h`
+<button class="btn btn-default btn-mini pull-right" #button>
+  <span class="icon icon-search"></span>
+  <input type="text" class="toolbar-control" #input>
+</button>
+`;
+
+export type Oracle<T> = (s: string) => Iterable<T>;
+
+export function search(hint: string, oracle: Oracle<string>): HTMLElement {
+  const root = suggestTemplate.cloneNode(true);
+  const { button, input } = suggestTemplate.collect(root);
+  const suggestContainer = div('suggest').elem();
+  let suggestModel: SuggestionModel = null;
+  const suggestions = menu(input, suggestContainer);
+  const update = (items: Iterable<string>) => {
+    suggestModel = sugggestionsMenu(map(items, (i: string) => <[string, () => void]>[i, () => { input.value = i; oracle(i); suggestions.hide() }]));
+    replaceContent(suggestContainer, suggestModel.widget);
+    suggestions.show();
+  }
+  input.oninput = () => update(oracle(input.value));
+  input.placeholder = hint;
+  input.addEventListener('keydown', e => {
+    if (e.key == 'ArrowDown') suggestModel.shift(1)
+    else if (e.key == 'ArrowUp') suggestModel.shift(-1)
+    else if (e.key == 'Enter') suggestModel.select()
+    else if (e.key == 'Escape') suggestions.hide()
+  });
+  button.onclick = () => { input.value = ''; update(oracle('')) };
+  return button;
+}
+
 const EMPTY_SUGGESTIONS: SuggestionModel = {
   widget: div('hidden').elem(),
   shift: (d: number) => { },
@@ -62,33 +106,8 @@ function sugggestionsMenu(items: Iterable<[string, () => void]>): SuggestionMode
   }
 }
 
-export function menuButton(icon: string, menu: MenuBuilder): HTMLElement {
-  const btn = tag('button').className('btn btn-default btn-dropdown').append(span().className('icon ' + icon));
-  menu.build(btn.elem());
-  return btn.elem();
-}
-
-interface SuggestionModel {
-  readonly widget: HTMLElement,
-  shift(d: number): void;
-  select(): void;
-}
-
-const suggestTemplate = h`
-<button class="btn btn-default btn-mini pull-right" #button>
-  <span class="icon icon-search"></span>
-  <input type="text" class="toolbar-control" #input>
-</button>
-`;
-
-export type Oracle<T> = (s: string) => Iterable<T>;
-
-export function search(hint: string, oracle: Oracle<string>): HTMLElement {
-  const root = suggestTemplate.cloneNode(true);
-  const { button, input } = suggestTemplate.collect(root);
-  const suggestContainer = div('suggest').elem();
-  let suggestModel: SuggestionModel = null;
-  const inst = tippy(<HTMLElement>input, {
+function menu(input: HTMLElement, suggestContainer: HTMLElement) {
+  return tippy(input, {
     allowHTML: true,
     placement: 'bottom-start',
     interactive: true,
@@ -98,18 +117,4 @@ export function search(hint: string, oracle: Oracle<string>): HTMLElement {
     offset: [0, 0],
     appendTo: document.body
   });
-  const update = (items: Iterable<string>) => {
-    suggestModel = sugggestionsMenu(map(items, (i: string) => <[string, () => void]>[i, () => { input.value = i; oracle(i); inst.hide() }]));
-    replaceContent(suggestContainer, suggestModel.widget);
-    inst.show();
-  }
-  input.oninput = () => update(oracle(input.value));
-  input.placeholder = hint;
-  input.addEventListener('keydown', e => {
-    if (e.key == 'ArrowDown') suggestModel.shift(1)
-    else if (e.key == 'ArrowUp') suggestModel.shift(-1)
-    else if (e.key == 'Enter') suggestModel.select()
-  });
-  button.onclick = () => { input.value = ''; update(oracle('')) };
-  return button;
 }

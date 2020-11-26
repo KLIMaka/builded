@@ -3,6 +3,7 @@ import { MenuBuilder } from "../../app/apis/ui";
 import { iter } from "../iter";
 import { div, Element, replaceContent, span, Table, tag } from "./ui";
 import h from "stage0";
+import { map } from "../collections";
 
 export type ColumnRenderer<T> = (value: T) => Element;
 
@@ -15,7 +16,7 @@ export interface GridModel {
 export type IconText = { text: string, icon: string, style: string };
 
 export function IconTextRenderer(value: IconText): Element {
-  const text = span().className('icon-text').text(value.text);
+  const text = span().className('icon-text').text(value.text).css('margin-left', '5px');
   if (value.style != null) text.className(value.style);
   if (value.icon != null) text.append(span().className('icon pull-left ' + value.icon));
   return text;
@@ -67,12 +68,6 @@ export function menuButton(icon: string, menu: MenuBuilder): HTMLElement {
   return btn.elem();
 }
 
-export interface SerachBar {
-  readonly widget: HTMLElement;
-  setValue(s: String): void;
-  updateSuggestions(items: Iterable<[string, () => void]>): void;
-}
-
 interface SuggestionModel {
   readonly widget: HTMLElement,
   shift(d: number): void;
@@ -86,21 +81,13 @@ const suggestTemplate = h`
 </button>
 `;
 
+export type Oracle<T> = (s: string) => Iterable<T>;
 
-export function search(hint: string, change: (s: string) => void): SerachBar {
+export function search(hint: string, oracle: Oracle<string>): HTMLElement {
   const root = suggestTemplate.cloneNode(true);
   const { button, input } = suggestTemplate.collect(root);
   const suggestContainer = div('suggest').elem();
   let suggestModel: SuggestionModel = null;
-  input.oninput = () => change(input.value);
-  input.placeholder = hint;
-  input.addEventListener('keydown', e => {
-    if (e.key == 'ArrowDown') suggestModel.shift(1)
-    else if (e.key == 'ArrowUp') suggestModel.shift(-1)
-    else if (e.key == 'Enter') suggestModel.select()
-  });
-  button.onclick = () => { input.value = ''; change('') };
-
   const inst = tippy(<HTMLElement>input, {
     allowHTML: true,
     placement: 'bottom-start',
@@ -111,14 +98,18 @@ export function search(hint: string, change: (s: string) => void): SerachBar {
     offset: [0, 0],
     appendTo: document.body
   });
-
-  return {
-    widget: button,
-    setValue(s: string) { input.value = s; inst.hide() },
-    updateSuggestions(items: Iterable<[string, () => void]>) {
-      suggestModel = sugggestionsMenu(items);
-      replaceContent(suggestContainer, suggestModel.widget);
-      inst.show();
-    },
+  const update = (items: Iterable<string>) => {
+    suggestModel = sugggestionsMenu(map(items, (i: string) => <[string, () => void]>[i, () => { input.value = i; oracle(i); inst.hide() }]));
+    replaceContent(suggestContainer, suggestModel.widget);
+    inst.show();
   }
+  input.oninput = () => update(oracle(input.value));
+  input.placeholder = hint;
+  input.addEventListener('keydown', e => {
+    if (e.key == 'ArrowDown') suggestModel.shift(1)
+    else if (e.key == 'ArrowUp') suggestModel.shift(-1)
+    else if (e.key == 'Enter') suggestModel.select()
+  });
+  button.onclick = () => { input.value = ''; update(oracle('')) };
+  return button;
 }

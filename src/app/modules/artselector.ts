@@ -4,7 +4,7 @@ import { create, Dependency, Injector } from "../../utils/injector";
 import { iter } from "../../utils/iter";
 import { axisSwap, RGBPalPixelProvider } from "../../utils/pixelprovider";
 import { DrawPanel, PixelDataProvider } from "../../utils/ui/drawpanel";
-import { IconTextRenderer, menuButton, renderGrid, search, SerachBar } from "../../utils/ui/renderers";
+import { IconTextRenderer, menuButton, renderGrid, search } from "../../utils/ui/renderers";
 import { Element } from "../../utils/ui/ui";
 import { ART } from "../apis/app";
 import { Ui, UI, Window } from "../apis/ui";
@@ -60,7 +60,6 @@ export class Selector {
   private drawPanel: DrawPanel;
   private cb: PicNumCallback;
   private filter = "";
-  private searchWidget: SerachBar;
   // private selectedTags: string[] = [];
 
   constructor(private ui: Ui, arts: ArtInfoProvider, pal: Uint8Array, private tags: PicTags) {
@@ -73,7 +72,6 @@ export class Selector {
     // const paneGroup = div('pane-group')
     //   .append(gridPanel)
     //   .append(div('pane').css('overflow', 'hidden').appendHtml(canvas));
-    this.searchWidget = search('Search', s => { this.updateFilter(s); this.updateSuggestions(s) });
     this.window = ui.builder.window()
       .title('Tiles')
       .draggable(true)
@@ -85,7 +83,7 @@ export class Selector {
           .item('32', () => { this.drawPanel.setCellSize(32, 32) })
           .item('64', () => { this.drawPanel.setCellSize(64, 64) })
           .item('128', () => { this.drawPanel.setCellSize(128, 128) })))
-        .widget(this.searchWidget.widget)
+        .widget(search('Search', s => this.oracle(s)))
       )
       .onclose(() => this.select(-1))
       .content(canvas)
@@ -101,11 +99,10 @@ export class Selector {
     this.drawPanel.draw();
   }
 
-  private updateSuggestions(s: string) {
-    const menu = iter(this.tags.allTags())
-      .filter(t => t.toLowerCase().startsWith(s.toLowerCase()))
-      .map(t => <[string, () => void]>[t, () => { this.searchWidget.setValue(t); this.updateFilter(t) }]);
-    this.searchWidget.updateSuggestions(menu);
+  private oracle(s: string) {
+    this.updateFilter(s);
+    return iter(this.tags.allTags())
+      .filter(t => t.toLowerCase().startsWith(s.toLowerCase()));
   }
 
   private applyFilter(id: number): boolean {

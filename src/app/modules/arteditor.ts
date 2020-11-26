@@ -7,7 +7,7 @@ import { iter } from "../../utils/iter";
 import { int } from "../../utils/mathutils";
 import { resize } from "../../utils/pixelprovider";
 import { DrawPanel, PixelDataProvider } from "../../utils/ui/drawpanel";
-import { menuButton, search, SerachBar } from "../../utils/ui/renderers";
+import { menuButton, search } from "../../utils/ui/renderers";
 import { div } from "../../utils/ui/ui";
 import { ART } from "../apis/app";
 import { BUS } from "../apis/handler";
@@ -38,7 +38,6 @@ export class ArtEditor {
   private drawPanel: DrawPanel;
   private filter = "";
   private view: HTMLCanvasElement;
-  private searchWidget: SerachBar;
   private currentId = -1;
   private centerX = 320;
   private centerY = 320;
@@ -55,7 +54,6 @@ export class ArtEditor {
     private plus: Uint8Array[],
     private tags: PicTags) {
 
-    this.searchWidget = search('Search', s => { this.updateFilter(s); this.updateSuggestions(s) });
     const browserCanvas = document.createElement('canvas');
     browserCanvas.width = 640;
     browserCanvas.height = 192;
@@ -73,7 +71,7 @@ export class ArtEditor {
         .elem())
       .toolbar(ui.builder.toolbar()
         .widget(this.createPalSelectingMenu())
-        .widget(this.searchWidget.widget))
+        .widget(search('Search', s => this.oracle(s))))
       .build();
 
     this.drawPanel = createDrawPanel(arts, pal, this.pluProvider, browserCanvas, (id: number) => this.select(id), () => this.pics());
@@ -86,11 +84,10 @@ export class ArtEditor {
     return menuButton('icon-adjust', menu);
   }
 
-  private updateSuggestions(s: string) {
-    const menu = iter(this.tags.allTags())
-      .filter(t => t.toLowerCase().startsWith(s.toLowerCase()))
-      .map(t => <[string, () => void]>[t, () => { this.searchWidget.setValue(t); this.updateFilter(t) }]);
-    this.searchWidget.updateSuggestions(menu);
+  private oracle(s: string) {
+    this.updateFilter(s);
+    return iter(this.tags.allTags())
+      .filter(t => t.toLowerCase().startsWith(s.toLowerCase()));
   }
 
   private updateFilter(s: string) {

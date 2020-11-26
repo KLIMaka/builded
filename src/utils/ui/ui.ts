@@ -312,3 +312,10 @@ export function addDragController(elem: HTMLElement, controller: DragController)
   elem.addEventListener('mousedown', e => isDrag = true);
   elem.addEventListener('mouseup', e => isDrag = false);
 }
+
+export function center(parent: HTMLElement, child: HTMLElement, width: number, height: number) {
+  const winH = parent.clientHeight;
+  const winW = parent.clientWidth;
+  child.style.top = (winH - height) / 2 + 'px';
+  child.style.left = (winW - width) / 2 + 'px';
+}

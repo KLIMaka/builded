@@ -9,13 +9,14 @@ let applyCallback: (name: string) => void;
 async function getWindow(injector: Injector) {
   const ui = await injector.getInstance(UI);
   if (selectMapNameWindow == null) {
-    const input = tag('input').attr('type', 'text').className('form-control').css('width', '300px');
-    const form = tag('form').css('padding', '10px')
-      .append(div('form-group')
-        .append(tag('label').text('Name: '))
-        .append(input));
+    const input = tag('input')
+      .attr('type', 'text')
+      .attr('placeholder', 'Map Name')
+      .className('form-control')
+      .css('width', '300px');
+    const form = tag('form').css('padding', '10px 10px 5px 10px').append(input);
 
-    selectMapNameWindow = new PhotonDialog('Map Name');
+    selectMapNameWindow = new PhotonDialog('Save As');
     selectMapNameWindow.contentElement.appendChild(form.elem());
   }
   return selectMapNameWindow;

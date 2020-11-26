@@ -1,7 +1,7 @@
 import h from "stage0";
 import tippy from "tippy.js";
 import { Module } from "../../utils/injector";
-import { div, dragElement } from "../../utils/ui/ui";
+import { center, div, dragElement } from "../../utils/ui/ui";
 import { MenuBuilder, ToolbarBuilder, UI, UiBuilder, Window, WindowBuilder } from "../apis/ui";
 
 const dialogTemplate = h`
@@ -31,6 +31,7 @@ export class PhotonDialog implements Window {
     this.winElement = window;
     this.contentElement = content;
     dragElement(title, this.winElement);
+    center(document.body, this.winElement, 300, 100);
     document.body.appendChild(root);
   }
 

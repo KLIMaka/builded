@@ -15,11 +15,12 @@ export class ArtPixelProvider extends AbstractPixelProvider {
 
   public putToDst(x: number, y: number, dst: Uint8Array, dstoff: number, blend: BlendFunc): void {
     const img = this.info.img;
-    const idx = this.plu(img[y + x * this.info.h]);
-    if (idx == 255) {
+    const orig = img[y + x * this.info.h];
+    if (orig == 255) {
       blend(dst, dstoff, this.trans, 0);
       return;
     }
+    const idx = this.plu(orig);
     const paloff = idx * 3;
     this.palTmp[0] = this.pal[paloff];
     this.palTmp[1] = this.pal[paloff + 1];

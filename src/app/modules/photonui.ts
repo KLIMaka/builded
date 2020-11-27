@@ -8,25 +8,28 @@ const dialogTemplate = h`
 <div class="window-frame hidden" #window>
   <header class="toolbar toolbar-header">
   <h1 class="title" #title>#caption_
-    <span class="icon icon-cancel-circled pull-right padded-horizontally red" #close></span>
+    <span class="icon icon-record pull-right padded-horizontally red" #close></span>
   </h1>
   </header>
   <div class="window-content" #content></div>
   <div class="dialog-buttons">
-    <button class="btn btn-default">Cancel</button>
-    <button class="btn btn-primary">OK</button>
+    <button class="btn btn-default" #cancel>Cancel</button>
+    <button class="btn btn-primary" #ok>OK</button>
   </div>
 </div>
 `;
 
 export class PhotonDialog implements Window {
-  public onclose: () => void;
+  public onclose = () => { };
+  public onok = () => { };
   readonly contentElement: HTMLElement;
   readonly winElement: HTMLElement;
 
   constructor(caption: string) {
     const root = <HTMLElement>dialogTemplate.cloneNode(true);
-    const { window, title, caption_, close, content } = dialogTemplate.collect(root);
+    const { window, title, caption_, close, content, ok, cancel } = dialogTemplate.collect(root);
+    close.onclick = cancel.onclick = _ => this.close();
+    ok.onclick = () => this.onok();
     caption_.nodeValue = caption;
     this.winElement = window;
     this.contentElement = content;
@@ -38,15 +41,19 @@ export class PhotonDialog implements Window {
   hide() { this.winElement.classList.add('hidden') }
   show() { this.winElement.classList.remove('hidden') }
 
-  setPosition(x: string | number, y: string | number): void {
+  public close() {
+    this.hide();
+    this.onclose();
   }
+
+  setPosition(x: string | number, y: string | number): void { }
 }
 
 const windowTemplate = h`
 <div class="window-frame hidden" #window>
   <header class="toolbar toolbar-header">
     <h1 class="title" #title>#caption
-      <span class="icon icon-cancel-circled pull-right padded-horizontally red hidden" #close></span>
+      <span class="icon icon-record pull-right padded-horizontally red hidden" #close></span>
     </h1>
     <div class="toolbar-actions hidden" #toolbar></div>
   </header>

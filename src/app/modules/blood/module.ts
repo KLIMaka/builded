@@ -10,7 +10,7 @@ import { Stream } from '../../../utils/stream';
 import { BOARD, BuildResources, ENGINE_API, RESOURCES } from '../../apis/app';
 import { BUS } from '../../apis/handler';
 import { LoadBoard, namedMessageHandler } from '../../edit/messages';
-import { PIC_TAGS, RAW_PAL, RAW_PLUs } from '../artselector';
+import { Palette, PIC_TAGS, RAW_PAL, RAW_PLUs } from '../artselector';
 import { ART_FILES, GL, PARALLAX_TEXTURES } from '../buildartprovider';
 import { FileSystem, FS } from '../fs/fs';
 import { FS_MANAGER } from '../fs/manager';
@@ -18,6 +18,8 @@ import { PALSWAPS, PAL_TEXTURE, PLU_TEXTURE, SHADOWSTEPS } from '../gl/buildgl';
 import { MAP_NAMES, showMapSelection } from '../selectmap';
 import { Implementation_ } from '../view/boardrenderer3d';
 import { showMapNameSelection } from '../../modules/default/mapnamedialog';
+import { enumerate, map } from '../../../utils/collections';
+import { iter } from '../../../utils/iter';
 
 async function loadArtFiles(injector: Injector): Promise<ArtFiles> {
   const res = await injector.getInstance(RESOURCES);
@@ -43,34 +45,15 @@ async function loadPalTexture(injector: Injector) {
 
 async function loarRawPlus(injector: Injector) {
   const res = await injector.getInstance(RESOURCES)
-  const plus = await Promise.all([
-    res.get('NORMAL.PLU'),
-    res.get('SATURATE.PLU'),
-    res.get('BEAST.PLU'),
-    res.get('TOMMY.PLU'),
-    res.get('SPIDER3.PLU'),
-    res.get('GRAY.PLU'),
-    res.get('GRAYISH.PLU'),
-    res.get('SPIDER1.PLU'),
-    res.get('SPIDER2.PLU'),
-    res.get('FLAME.PLU'),
-    res.get('COLD.PLU'),
-    res.get('P1.PLU'),
-    res.get('P2.PLU'),
-    res.get('P3.PLU'),
-    res.get('P4.PLU'),
-  ]);
-  return plus.filter(p => p != null).map(p => new Uint8Array(p));
+  const palettes = ['NORMAL', 'SATURATE', 'BEAST', 'TOMMY', 'SPIDER3', 'GRAY', 'GRAYISH', 'SPIDER1', 'SPIDER2', 'FLAME', 'COLD', 'P1', 'P2', 'P3', 'P4'];
+  const plus = await Promise.all(palettes.map(p => res.get(p + '.PLU')));
+  return iter(enumerate(plus)).filter(([p, i]) => p != null).map(([p, i]) => <Palette>{ name: palettes[i], plu: new Uint8Array(p) }).collect();
 }
 
 async function loadPluTexture(injector: Injector) {
-  const [plus, gl, shadowsteps] = await Promise.all([
-    injector.getInstance(RAW_PLUs),
-    injector.getInstance(GL),
-    injector.getInstance(SHADOWSTEPS)]);
+  const [plus, gl, shadowsteps] = await getInstances(injector, RAW_PLUs, GL, SHADOWSTEPS);
   const tex = new Uint8Array(256 * shadowsteps * plus.length);
-  let i = 0;
-  for (const plu of plus) tex.set(plu, 256 * shadowsteps * i++);
+  for (const [plu, i] of enumerate(plus)) tex.set(plu.plu, 256 * shadowsteps * i);
   return createTexture(256, shadowsteps * plus.length, gl, { filter: gl.NEAREST }, tex, gl.LUMINANCE)
 }
 
@@ -108,8 +91,8 @@ function mapSaver(module: Module) {
       }
     }
 
-    bus.connect(namedMessageHandler('save_map', async () => saveMap(savedBefore ? mapName : await showMapNameSelection(injector))));
-    bus.connect(namedMessageHandler('save_map_as', async () => saveMap(await showMapNameSelection(injector))));
+    bus.connect(namedMessageHandler('save_map', async () => saveMap(savedBefore ? mapName : await showMapNameSelection(injector, mapName))));
+    bus.connect(namedMessageHandler('save_map_as', async () => saveMap(await showMapNameSelection(injector, mapName))));
   });
 }
 
@@ -184,7 +167,7 @@ export function BloodModule(module: Module) {
   module.bind(RESOURCES, BloodResources);
   module.bind(ART_FILES, loadArtFiles);
   module.bind(RAW_PAL, loadPal);
-  module.bind<Uint8Array[]>(RAW_PLUs, loarRawPlus);
+  module.bind<Palette[]>(RAW_PLUs, loarRawPlus);
   module.bind(PALSWAPS, loadPLUs);
   module.bind(PAL_TEXTURE, loadPalTexture);
   module.bind(PLU_TEXTURE, loadPluTexture);

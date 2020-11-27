@@ -39,6 +39,22 @@ export function menuButton(icon: string, menu: MenuBuilder): HTMLElement {
   return btn.elem();
 }
 
+export function widgetButton(icon: string, widget: HTMLElement): HTMLElement {
+  const btn = tag('button').className('btn btn-default btn-dropdown').append(span().className('icon ' + icon)).elem();
+  tippy(btn, {
+    content: widget,
+    allowHTML: true,
+    placement: 'bottom-start',
+    trigger: 'click',
+    interactive: true,
+    arrow: false,
+    offset: [0, 0],
+    duration: 100,
+    appendTo: document.body
+  });
+  return btn;
+}
+
 interface SuggestionModel {
   readonly widget: HTMLElement,
   shift(d: number): void;

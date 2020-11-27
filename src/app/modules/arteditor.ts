@@ -1,6 +1,8 @@
+import h from "stage0";
+import tippy from "tippy.js";
 import { ArtPixelProvider } from "../../build/artpixelprovider";
 import { animate, ArtInfoProvider } from "../../build/formats/art";
-import { range } from "../../utils/collections";
+import { enumerate, range } from "../../utils/collections";
 import { drawToCanvas } from "../../utils/imgutils";
 import { create, Module } from "../../utils/injector";
 import { iter } from "../../utils/iter";
@@ -8,13 +10,14 @@ import { int } from "../../utils/mathutils";
 import { resize } from "../../utils/pixelprovider";
 import { DrawPanel, PixelDataProvider } from "../../utils/ui/drawpanel";
 import { menuButton, search } from "../../utils/ui/renderers";
-import { addDragController, div } from "../../utils/ui/ui";
+import { addDragController, div, tag } from "../../utils/ui/ui";
 import { ART } from "../apis/app";
 import { BUS } from "../apis/handler";
 import { Ui, UI, Window } from "../apis/ui";
 import { namedMessageHandler } from "../edit/messages";
 import { PicNumCallback } from "../edit/tools/selection";
-import { PicTags, PIC_TAGS, RAW_PAL, RAW_PLUs } from "./artselector";
+import { Palette, PicTags, PIC_TAGS, RAW_PAL, RAW_PLUs } from "./artselector";
+import { SHADOWSTEPS } from "./gl/buildgl";
 
 function createDrawPanel(arts: ArtInfoProvider, pal: Uint8Array, plu: (x: number) => number, canvas: HTMLCanvasElement, cb: PicNumCallback, iter: () => Iterable<number>) {
   const provider = new PixelDataProvider(1024 * 10, (i: number) => {
@@ -29,7 +32,7 @@ function createDrawPanel(arts: ArtInfoProvider, pal: Uint8Array, plu: (x: number
 export async function ArtEditorModule(module: Module) {
   module.execute(async injector => {
     const bus = await injector.getInstance(BUS);
-    const editor = await create(injector, ArtEditor, UI, ART, RAW_PAL, RAW_PLUs, PIC_TAGS);
+    const editor = await create(injector, ArtEditor, UI, ART, RAW_PAL, RAW_PLUs, PIC_TAGS, SHADOWSTEPS);
     bus.connect(namedMessageHandler('show_artedit', () => editor.show()));
   });
 }
@@ -43,17 +46,19 @@ export class ArtEditor {
   private centerX = 320;
   private centerY = 320;
   private frame = 0;
-  private animation = -1;
+  private animationHandle = -1;
   private scale = 2.0;
   private currentPlu = 0;
-  private pluProvider = (x: number) => this.plus[this.currentPlu][x];
+  private currentShadow = 0;
+  private pluProvider = (x: number) => this.plus[this.currentPlu].plu[this.currentShadow * 256 + x];
 
   constructor(
     private ui: Ui,
     private arts: ArtInfoProvider,
     private pal: Uint8Array,
-    private plus: Uint8Array[],
-    private tags: PicTags) {
+    private plus: Palette[],
+    private tags: PicTags,
+    private shadowsteps: number) {
 
     this.drawPanel = createDrawPanel(arts, pal, this.pluProvider, this.createBrowser(), (id: number) => this.select(id), () => this.pics());
     this.view = this.createView();
@@ -68,7 +73,10 @@ export class ArtEditor {
         .appendHtml(this.drawPanel.canvas)
         .elem())
       .toolbar(ui.builder.toolbar()
+        .startGroup()
         .widget(this.createPalSelectingMenu())
+        .widget(this.createShadowLevels())
+        .endGroup()
         .widget(search('Search', s => this.oracle(s))))
       .build();
     this.window.hide();
@@ -76,8 +84,43 @@ export class ArtEditor {
 
   private createPalSelectingMenu() {
     const menu = this.ui.builder.menu();
-    iter(range(0, this.plus.length)).forEach(i => menu.item(i + '', () => { this.currentPlu = i; this.redraw() }))
+    iter(enumerate(this.plus)).forEach(([plu, i]) => menu.item(plu.name, () => { this.currentPlu = i; this.redraw() }))
     return menuButton('icon-adjust', menu);
+  }
+
+  private createShadowLevels() {
+    const widgetTemplate = h`<div class="popup-widget">
+      <label>Shadow Level</label>
+      <input type="range" min="0" value="0" style="vertical-align: middle; margin-right:10px" #range>
+      <input type="number" min="0" value="0" step="1" class="input-widget" #box>
+    </div>`;
+    const buttonTemplate = h`<button class="btn btn-default btn-dropdown">Shadow 0</button>`;
+    const widget = <HTMLElement>widgetTemplate.cloneNode(true);
+    const { range, box } = widgetTemplate.collect(widget);
+    const btn = <HTMLElement>buttonTemplate.cloneNode(true);
+    tippy(btn, {
+      content: widget,
+      allowHTML: true,
+      placement: 'bottom-start',
+      trigger: 'click',
+      interactive: true,
+      arrow: false,
+      offset: [0, 0],
+      duration: 100,
+      appendTo: document.body
+    });
+    const setShadow = (shadow: number) => {
+      this.currentShadow = shadow;
+      range.value = shadow;
+      box.value = shadow;
+      btn.textContent = `Shadow ${shadow}`;
+      this.redraw();
+    }
+    range.max = this.shadowsteps;
+    box.max = this.shadowsteps;
+    range.oninput = () => setShadow(range.value);
+    box.oninput = () => setShadow(box.value);
+    return btn;
   }
 
   private oracle(s: string) {
@@ -93,8 +136,9 @@ export class ArtEditor {
   }
 
   private applyFilter(id: number): boolean {
-    if (this.filter.startsWith('*')) return (id + '').includes(this.filter.substr(1))
-    return (id + '').startsWith(this.filter) || iter(this.tags.tags(id)).any(t => t.toLowerCase().includes(this.filter.toLowerCase()));
+    const filter = this.filter.toLowerCase();
+    if (filter.startsWith('*')) return (id + '').includes(filter.substr(1))
+    return (id + '').startsWith(filter) || iter(this.tags.tags(id)).any(t => t.toLowerCase().includes(filter));
   }
 
   private pics(): Iterable<number> {
@@ -127,7 +171,7 @@ export class ArtEditor {
     this.drawPanel.deselectAll();
     this.drawPanel.select(id);
     const info = this.arts.getInfo(id);
-    if (info != null && info.attrs.frames) iter(range(0, info.attrs.frames + 1)).forEach(i => this.drawPanel.select(id + i));
+    if (info != null && info.attrs.frames > 0) iter(range(0, info.attrs.frames + 1)).forEach(i => this.drawPanel.select(id + i));
     this.drawPanel.draw();
     this.currentId = id;
     this.resetAnimation();
@@ -135,8 +179,8 @@ export class ArtEditor {
   }
 
   private resetAnimation() {
-    window.clearTimeout(this.animation);
-    this.animation = -1;
+    window.clearTimeout(this.animationHandle);
+    this.animationHandle = -1;
     this.frame = 0;
   }
 
@@ -158,7 +202,7 @@ export class ArtEditor {
 
     if (anim && (mainInfo.attrs.frames | 0) != 0) {
       this.frame++;
-      this.animation = window.setTimeout(() => this.updateView(), mainInfo.attrs.speed * 50);
+      this.animationHandle = window.setTimeout(() => this.updateView(), mainInfo.attrs.speed * 50);
     }
   }
 

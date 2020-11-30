@@ -4,6 +4,9 @@ import { FileSystem, UrlFs, FS } from "./fs";
 import { FS_MANAGER, FsManager } from "./manager";
 import { MOUNTS, MountableFs } from "./mount";
 import { StorageDbConstructor } from "../db";
+import { BUS } from "../../apis/handler";
+import { namedMessageHandler } from "../../edit/messages";
+import { createLocalFs } from "./local";
 
 function createDb(name: string) {
   let db: Storage = null;
@@ -38,12 +41,26 @@ async function StorageFsManager(injector: Injector): Promise<FsManager> {
   }
 }
 
+const mounts: FileSystem[] = [];
+async function Mounts() {
+  return () => mounts;
+}
+
 export function DbFsModule(rom: string = null) {
   return (module: Module) => {
     module.bind(STORAGES, StorageDbConstructor);
     module.bind(FS, MountableFs);
-    module.bind<FileSystem>(MOUNTS, StorageFs);
-    if (rom != null) module.bind<FileSystem>(MOUNTS, UrlFs(rom));
+    module.bind(MOUNTS, Mounts);
     module.bind(FS_MANAGER, StorageFsManager);
+
+    module.execute(async injector => {
+      if (rom != null) mounts.push(await UrlFs(rom)(injector));
+      mounts.push(await StorageFs(injector))
+
+      const bus = await injector.getInstance(BUS);
+      bus.connect(namedMessageHandler('add_mount', async () => {
+        mounts.push(await createLocalFs())
+      }));
+    });
   }
 }

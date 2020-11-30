@@ -1,14 +1,14 @@
 import { Dependency, Injector } from "../../../utils/injector";
 import { FileSystem } from "./fs";
 
-export const MOUNTS = new Dependency<FileSystem[]>("Mounts", true);
+export const MOUNTS = new Dependency<() => FileSystem[]>("Mounts", false);
 
 
 export async function MountableFs(injector: Injector): Promise<FileSystem> {
   return {
     get: async name => {
       const mounts = await injector.getInstance(MOUNTS);
-      for (const mount of mounts) {
+      for (const mount of mounts()) {
         const file = await mount.get(name);
         if (file) return file;
       }
@@ -17,7 +17,7 @@ export async function MountableFs(injector: Injector): Promise<FileSystem> {
     list: async () => {
       const mounts = await injector.getInstance(MOUNTS);
       const files = new Set<string>();
-      for (const mount of mounts) {
+      for (const mount of mounts()) {
         const list = await mount.list();
         list.forEach(f => files.add(f));
       }

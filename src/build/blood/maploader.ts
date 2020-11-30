@@ -1,9 +1,10 @@
 import { range } from '../../utils/collections';
 import { iter } from '../../utils/iter';
-import { array, atomic_array, bits, byte, int, short, Stream, struct, ubyte } from '../../utils/stream';
+import { array, atomic_array, bits, byte, int, short, Stream, struct, ubyte, string, uint, ushort } from '../../utils/stream';
 import { Header1, SectorStats, SpriteStats, WallStats } from '../board/structs';
 import { initSector, initSprite, initWall, sectorStruct, spriteStruct, wallStruct } from '../maploader';
 import { BloodBoard, BloodSector, BloodSprite, BloodWall, SectorExtra, SpriteExtra, WallExtra } from './structs';
+import { buf } from "crc-32";
 
 
 function decryptBuffer(buffer: Uint8Array, size: number, key: number) {
@@ -18,6 +19,10 @@ function createStream(arr: Uint8Array) {
   return new Stream(arr.buffer, true);
 }
 
+function crc(buff: ArrayBuffer) {
+  return buf(new Uint8Array(buff, 0, buff.byteLength - 4));
+}
+
 const header1Struct = struct(Header1)
   .field('startX', int)
   .field('startY', int)
@@ -26,7 +31,16 @@ const header1Struct = struct(Header1)
   .field('startSec', short)
   .field('unk', short);
 
-const header2Struct = array(ubyte, 9);
+class Header2 {
+  public visibility: number;
+  public songId: number;
+  public parallaxtype: number;
+}
+
+const header2Struct = struct(Header2)
+  .field("visibility", int)
+  .field("songId", uint)
+  .field("parallaxtype", ubyte);
 
 class Header3 {
   public mapRevisions: number;
@@ -40,6 +54,21 @@ const header3Struct = struct(Header3)
   .field('numSectors', short)
   .field('numWalls', short)
   .field('numSprites', short);
+
+class Copyright {
+  public text: string;
+  public padd: string;
+  public xsec: number;
+  public xwal: number;
+  public xspr: number;
+}
+
+const copyrightStruct = struct(Copyright)
+  .field('text', string(64))
+  .field('xspr', uint)
+  .field('xwal', uint)
+  .field('xsec', uint)
+  .field('padd', string(52));
 
 const sectorExtraStruct = struct(SectorExtra)
   .field('reference', bits(-14))
@@ -215,6 +244,20 @@ const spriteExtraStruct = struct(SpriteExtra)
   .field('aiTimer', bits(16))
   .field('ai', bits(32));
 
+const COPYRIGHT = {
+  text: "Copyright 1997 Monolith Productions.  All Rights Reserved",
+  xsec: sectorExtraStruct.size,
+  xwal: wallExtraStruct.size,
+  xspr: spriteExtraStruct.size,
+  padd: ""
+}
+
+const HEADER2: Header2 = {
+  songId: 0,
+  visibility: 800,
+  parallaxtype: 1
+}
+
 const sectorReader = atomic_array(ubyte, sectorStruct.size);
 function readSectors(header3: Header3, stream: Stream): BloodSector[] {
   const dec = ((header3.mapRevisions * sectorStruct.size) & 0xFF);
@@ -231,7 +274,7 @@ function readSectors(header3: Header3, stream: Stream): BloodSector[] {
 }
 
 const wallReader = atomic_array(ubyte, wallStruct.size);
-function readWalls(header3: any, stream: Stream): BloodWall[] {
+function readWalls(header3: Header3, stream: Stream): BloodWall[] {
   const dec = (((header3.mapRevisions * sectorStruct.size) | 0x4d) & 0xFF);
   const walls = [];
   for (let i = 0; i < header3.numWalls; i++) {
@@ -246,7 +289,7 @@ function readWalls(header3: any, stream: Stream): BloodWall[] {
 }
 
 const spriteReader = atomic_array(ubyte, spriteStruct.size);
-function readSprites(header3: any, stream: Stream): BloodSprite[] {
+function readSprites(header3: Header3, stream: Stream): BloodSprite[] {
   const dec = (((header3.mapRevisions * spriteStruct.size) | 0x4d) & 0xFF);
   const sprites = [];
   for (let i = 0; i < header3.numSprites; i++) {
@@ -283,11 +326,15 @@ export function loadBloodMap(stream: Stream): BloodBoard {
   let buf = atomic_array(ubyte, header1Struct.size).read(stream);
   decryptBuffer(buf, header1Struct.size, 0x4d);
   const header1 = header1Struct.read(createStream(buf));
-  stream.skip(header2Struct.size);
+  buf = atomic_array(ubyte, header2Struct.size).read(stream);
+  decryptBuffer(buf, header2Struct.size, 0x5f);
+  const header2 = header2Struct.read(createStream(buf));
   buf = atomic_array(ubyte, header3Struct.size).read(stream);
   decryptBuffer(buf, header3Struct.size, 0x68);
   const header3 = header3Struct.read(createStream(buf));
-  stream.skip(128 + (1 << header1.unk) * 2);
+  buf = atomic_array(ubyte, 128).read(stream);
+  decryptBuffer(buf, 128, header3.numWalls);
+  stream.skip((1 << header1.unk) * 2);
 
   const sectors = readSectors(header3, stream);
   const walls = readWalls(header3, stream);
@@ -302,7 +349,7 @@ function getSize(board: BloodBoard): number {
   const extraSectors = iter(range(0, board.numsectors)).filter(s => hasExtra(board.sectors[s].extra)).collect().length;
   const extraWalls = iter(range(0, board.numwalls)).filter(w => hasExtra(board.walls[w].extra)).collect().length;
   const extraSprites = iter(range(0, board.numsprites)).filter(s => hasExtra(board.sprites[s].extra)).collect().length;
-  return 128 + 2 + 6 +
+  return 4 + 128 + 2 + 6 +
     header1Struct.size +
     header2Struct.size +
     header3Struct.size +
@@ -329,7 +376,9 @@ export function saveBloodMap(board: BloodBoard): ArrayBuffer {
   encryptBuffer(tmpArray, header1Struct.size, 0x4d);
   atomic_array(ubyte, header1Struct.size).write(stream, tmpArray);
 
-  tmpArray.fill(0, 0, header2Struct.size);
+  tmpStream.setOffset(0);
+  header2Struct.write(tmpStream, HEADER2);
+  encryptBuffer(tmpArray, header2Struct.size, 0x5f);
   atomic_array(ubyte, header2Struct.size).write(stream, tmpArray);
 
   const header3 = createHeader3(board);
@@ -338,22 +387,28 @@ export function saveBloodMap(board: BloodBoard): ArrayBuffer {
   encryptBuffer(tmpArray, header3Struct.size, 0x68);
   atomic_array(ubyte, header3Struct.size).write(stream, tmpArray);
 
-  tmpArray.fill(0, 0, 128 + 2);
-  atomic_array(ubyte, 128 + 2).write(stream, tmpArray);
+  tmpStream.setOffset(0);
+  copyrightStruct.write(tmpStream, COPYRIGHT);
+  encryptBuffer(tmpArray, copyrightStruct.size, board.numwalls);
+  atomic_array(ubyte, 128).write(stream, tmpArray);
+  ushort.write(stream, 0);
 
   writeSectors(board, tmpStream, tmpArray, stream);
   writeWalls(board, tmpStream, tmpArray, stream);
   writeSprites(board, tmpStream, tmpArray, stream);
 
+  uint.write(stream, crc(buffer));
+
   return buffer;
 }
 
 function writeSprites(board: BloodBoard, tmpStream: Stream, tmpArray: Uint8Array, stream: Stream) {
+  const dec = (sectorStruct.size | 0x4d) & 0xFF;
   for (let i = 0; i < board.numsprites; i++) {
     const sprite = board.sprites[i];
     tmpStream.setOffset(0);
     spriteStruct.write(tmpStream, sprite);
-    encryptBuffer(tmpArray, spriteStruct.size, 0x4d);
+    encryptBuffer(tmpArray, spriteStruct.size, dec);
     atomic_array(ubyte, spriteStruct.size).write(stream, tmpArray);
     if (sprite.extra != 0 && sprite.extra != 65535)
       spriteExtraStruct.write(stream, sprite.extraData);
@@ -361,11 +416,12 @@ function writeSprites(board: BloodBoard, tmpStream: Stream, tmpArray: Uint8Array
 }
 
 function writeWalls(board: BloodBoard, tmpStream: Stream, tmpArray: Uint8Array, stream: Stream) {
+  const dec = (sectorStruct.size | 0x4d) & 0xFF;
   for (let i = 0; i < board.numwalls; i++) {
     const wall = board.walls[i];
     tmpStream.setOffset(0);
     wallStruct.write(tmpStream, wall);
-    encryptBuffer(tmpArray, wallStruct.size, 0x4d);
+    encryptBuffer(tmpArray, wallStruct.size, dec);
     atomic_array(ubyte, wallStruct.size).write(stream, tmpArray);
     if (wall.extra != 0 && wall.extra != 65535)
       wallExtraStruct.write(stream, wall.extraData);
@@ -373,13 +429,14 @@ function writeWalls(board: BloodBoard, tmpStream: Stream, tmpArray: Uint8Array, 
 }
 
 function writeSectors(board: BloodBoard, tmpStream: Stream, tmpArray: Uint8Array, stream: Stream) {
+  const dec = sectorStruct.size & 0xFF;
   for (let i = 0; i < board.numsectors; i++) {
     const sector = board.sectors[i];
     sector.ceilingstat.slopped = 1;
     sector.floorstat.slopped = 1;
     tmpStream.setOffset(0);
     sectorStruct.write(tmpStream, sector);
-    encryptBuffer(tmpArray, sectorStruct.size, 0);
+    encryptBuffer(tmpArray, sectorStruct.size, dec);
     atomic_array(ubyte, sectorStruct.size).write(stream, tmpArray);
     if (sector.extra != 0 && sector.extra != 65535)
       sectorExtraStruct.write(stream, sector.extraData);
@@ -388,7 +445,7 @@ function writeSectors(board: BloodBoard, tmpStream: Stream, tmpArray: Uint8Array
 
 function createHeader3(board: BloodBoard) {
   const header3 = new Header3();
-  header3.mapRevisions = 0;
+  header3.mapRevisions = 1;
   header3.numSectors = board.numsectors;
   header3.numWalls = board.numwalls;
   header3.numSprites = board.numsprites;

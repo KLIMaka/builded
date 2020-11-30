@@ -3,7 +3,7 @@ import { rect } from "../../utils/collections";
 import { Texture } from "../../utils/gl/drawstruct";
 import { createTexture, TextureImpl } from "../../utils/gl/textures";
 import { IndexedImgLib, INDEXED_IMG_LIB } from "../../utils/imglib";
-import { Dependency, Injector } from "../../utils/injector";
+import { create, Dependency, Injector } from "../../utils/injector";
 import { warning } from "../../utils/logger";
 import { int } from "../../utils/mathutils";
 import { ArtProvider } from "../apis/app";
@@ -22,19 +22,6 @@ export function createIndexedTexture(gl: WebGLRenderingContext, w: number, h: nu
   return tex;
 }
 
-// function addMipMaps(gl: WebGLRenderingContext, w: number, h: number, arr: Uint8Array, tex: TextureImpl, lib: IndexedImgLib) {
-//   let div = 2;
-//   let level = 1;
-//   while (int(w / div) >= 1 || int(h / div) >= 1) {
-//     const dw = Math.max(1, int(w / div));
-//     const dh = Math.max(1, int(h / div));
-//     const mip = lib.resize(dw, dh, w, h, arr);
-//     tex.mip(gl, level, dw, dh, mip);
-//     div *= 2;
-//     level++;
-//   }
-// }
-
 function addMipMaps(gl: WebGLRenderingContext, w: number, h: number, arr: Uint8Array, tex: TextureImpl, lib: IndexedImgLib) {
   let level = 1;
   while (w >= 1 || h >= 1) {
@@ -52,13 +39,7 @@ function addMipMaps(gl: WebGLRenderingContext, w: number, h: number, arr: Uint8A
 }
 
 export async function BuildArtProviderConstructor(injector: Injector) {
-  const [art, util, gl, parallax, lib] = await Promise.all([
-    injector.getInstance(ART_FILES),
-    injector.getInstance(TEXTURES_OVERRIDE),
-    injector.getInstance(GL),
-    injector.getInstance(PARALLAX_TEXTURES),
-    injector.getInstance(INDEXED_IMG_LIB)]);
-  return new BuildArtProvider(art, util, gl, parallax, lib);
+  return await create(injector, BuildArtProvider, ART_FILES, TEXTURES_OVERRIDE, GL, PARALLAX_TEXTURES, INDEXED_IMG_LIB);
 }
 
 export class BuildArtProvider implements ArtProvider {
@@ -108,7 +89,7 @@ export class BuildArtProvider implements ArtProvider {
     const w = infos[0].w;
     const h = infos[0].h;
     const merged = this.mergeParallax(w, h, axisSwapped);
-    tex = createIndexedTexture(this.gl, w * this.parallaxPics, h, merged, true, this.lib);
+    tex = createIndexedTexture(this.gl, w * this.parallaxPics, h, merged, false, this.lib);
 
     this.parallaxTextures[picnum] = tex;
     return tex;

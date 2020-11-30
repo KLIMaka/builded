@@ -4,12 +4,15 @@ import { BloodImplementationConstructor } from '../../../build/blood/utils';
 import { EngineApi } from '../../../build/board/mutations/api';
 import { ArtFile, ArtFiles } from '../../../build/formats/art';
 import { RffFile } from '../../../build/formats/rff';
+import { enumerate } from '../../../utils/collections';
 import { createTexture } from '../../../utils/gl/textures';
 import { getInstances, Injector, Module } from '../../../utils/injector';
+import { iter } from '../../../utils/iter';
 import { Stream } from '../../../utils/stream';
 import { BOARD, BuildResources, ENGINE_API, RESOURCES } from '../../apis/app';
 import { BUS } from '../../apis/handler';
 import { LoadBoard, namedMessageHandler } from '../../edit/messages';
+import { showMapNameSelection } from '../../modules/default/mapnamedialog';
 import { Palette, PIC_TAGS, RAW_PAL, RAW_PLUs } from '../artselector';
 import { ART_FILES, GL, PARALLAX_TEXTURES } from '../buildartprovider';
 import { FileSystem, FS } from '../fs/fs';
@@ -17,9 +20,6 @@ import { FS_MANAGER } from '../fs/manager';
 import { PALSWAPS, PAL_TEXTURE, PLU_TEXTURE, SHADOWSTEPS } from '../gl/buildgl';
 import { MAP_NAMES, showMapSelection } from '../selectmap';
 import { Implementation_ } from '../view/boardrenderer3d';
-import { showMapNameSelection } from '../../modules/default/mapnamedialog';
-import { enumerate, map } from '../../../utils/collections';
-import { iter } from '../../../utils/iter';
 
 async function loadArtFiles(injector: Injector): Promise<ArtFiles> {
   const res = await injector.getInstance(RESOURCES);

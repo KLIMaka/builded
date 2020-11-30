@@ -86,7 +86,9 @@ float highlight() {
 
 float palLightOffset(float lightLevel) {
 #ifdef PAL_LIGHTING
-  return (tcps.z + (lightLevel) / SHADOWSTEPS) / PALSWAPS;
+  // float palswap = clamp(length(wpos.xz - eyepos.xz) / (6.0 * 1024.0), 0.0, 1.0) > ditherOffset() ? 0.0 : 9.0;
+  float palswap = 0.0;
+  return (tcps.z + palswap + (lightLevel) / SHADOWSTEPS) / PALSWAPS;
 #else
   return (tcps.z + 0.5 / SHADOWSTEPS) / PALSWAPS ;
 #endif

@@ -15,6 +15,12 @@ export interface FsManager {
 }
 export const FS_MANAGER = new Dependency<FsManager>('FileSystem Manager');
 
+export interface FsManagers {
+  list(): string[];
+  get(name: string): FsManager;
+  add(name: string, manager: FsManager): void;
+}
+
 class FileBrowser {
   private window: Window;
   private selected = new Set<string>();

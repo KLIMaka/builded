@@ -1,5 +1,5 @@
 
-export const save = (function () {
+export const saveAs2 = (function () {
   const a = document.createElement("a");
   document.body.appendChild(a);
   a.style.display = 'none';
@@ -14,14 +14,17 @@ export const save = (function () {
 }());
 
 export async function saveAs(buffer: ArrayBuffer, fileName: string) {
-  const opts = {
-    type: 'save-file',
-    accepts: [{
-      description: 'BUILD Map',
-      extensions: ['map'],
-    }],
+  const options = {
+    types: [
+      {
+        description: 'BUILD Map',
+        accept: {
+          '*/octet-stream': ['.map'],
+        },
+      },
+    ],
   };
-  const handle = await window['chooseFileSystemEntries'](opts);
+  const handle = await window.showSaveFilePicker(options);
   const writable = await handle.createWritable();
   await writable.write(buffer);
   await writable.close();

@@ -10,7 +10,7 @@
     "build": "npm run build:types && npm run build:js",
     "build:types": "tsc --noEmit",
     "build:js": "webpack",
-    "dev": "webpack-dev-server --inline --hot"
+    "dev": "webpack-dev-server"
   },
   "repository": {
     "type": "git",

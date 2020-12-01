@@ -87,8 +87,8 @@ export class Statusbar extends MessageHandlerReflective {
   public PostFrame(msg: PostFrame) {
     const view = this.view;
     const profile = PROFILE.get(null);
-    const draws = profile.counts['drawsRequested'] ?? 0;
-    const skips = profile.counts['drawsMerged'] ?? 0;
+    const draws = profile.counts['drawsRequested'] || 0;
+    const skips = profile.counts['drawsMerged'] || 0;
     this.updaters.posUpdate(view.x, view.y);
     this.updaters.sectorUpdate(view.sec);
     this.updaters.fpsUpdate((1000 / profile.time).toFixed(0));

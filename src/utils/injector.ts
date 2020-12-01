@@ -1,5 +1,6 @@
+import { enumerate } from "./collections";
 
-export class Dependency<T> { constructor(readonly name: string, readonly multi = false) { } }
+export class Dependency<T> { constructor(readonly name: string) { } }
 export type InstanceProvider<T> = (injector: Injector) => Promise<T>;
 export type SubModule = (module: Module) => void;
 
@@ -11,7 +12,7 @@ export class CircularDependencyError extends Error {
 }
 
 export interface Module {
-  bind<T>(dependency: Dependency<T | T[]>, provider: InstanceProvider<T>): void;
+  bind<T>(dependency: Dependency<T>, provider: InstanceProvider<T>): void;
   bindInstance<T>(dependency: Dependency<T>, instance: T): void;
   install(submodule: SubModule): void;
   execute(executable: (injector: Injector) => void): void;
@@ -31,67 +32,57 @@ class ChildInjector<T> implements ParentInjector {
   getInstance<T>(dependency: Dependency<T>): Promise<T> { return this.parent.getInstanceParent(dependency, this) }
 }
 
-class DependencyNode {
-  readonly dependencies = new Set<DependencyNode>();
-  constructor(readonly label: string) { };
-}
-
 class Graph {
-  private nodes = new Map<string, DependencyNode>();
+  private nodes = new Map<string, Set<string>>();
 
   private ensureNode(label: string) {
-    let node = this.nodes.get(label);
-    if (node == undefined) {
-      node = new DependencyNode(label);
-      this.nodes.set(label, node);
+    let deps = this.nodes.get(label);
+    if (deps == undefined) {
+      deps = new Set();
+      this.nodes.set(label, deps);
     }
-    return node;
+    return deps;
   }
 
   public add(o: string, i: string) {
-    this.ensureNode(o).dependencies.add(this.ensureNode(i));
+    this.ensureNode(o)
+    this.ensureNode(i).add(o);
   }
 
   public checkCycles() {
     const colors = new Map<string, string>();
-    const paint = function (node: DependencyNode) {
-      colors.set(node.label, 'gray');
-      for (const child of node.dependencies) {
-        const c = colors.get(child.label);
+    const nodes = this.nodes;
+    const paint = function (node: string) {
+      colors.set(node, 'gray');
+      for (const child of nodes.get(node)) {
+        const c = colors.get(child);
         if (c == undefined) {
           try { paint(child) } catch (e) {
-            if (e instanceof CircularDependencyError) e.dependencies.unshift(child.label);
+            if (e instanceof CircularDependencyError) e.dependencies.unshift(child);
             throw e;
           }
         }
-        else if (c == 'gray') throw new CircularDependencyError([child.label]);
+        else if (c == 'gray') throw new CircularDependencyError([child]);
       }
-      colors.set(node.label, 'black');
+      colors.set(node, 'black');
     }
-    for (const [label, node] of this.nodes) {
-      if (colors.has(label)) continue;
+    for (const node of this.nodes.keys()) {
+      if (colors.has(node)) continue;
       paint(node);
     }
   }
 }
 
-export class RootModule implements Module {
-  private providers = new Map<Dependency<any>, InstanceProvider<any>[]>();
+export class App implements Module {
+  private providers = new Map<Dependency<any>, InstanceProvider<any>>();
   private promises = new Map<Dependency<any>, Promise<any>>();
   private executables: ((injector: Injector) => void)[] = [];
+  private executableDeps: Dependency<any>[][] = [];
 
-  public bind<T>(dependency: Dependency<T | T[]>, provider: InstanceProvider<T>): void {
+  public bind<T>(dependency: Dependency<T>, provider: InstanceProvider<T>): void {
     let p = this.providers.get(dependency);
-    if (dependency.multi) {
-      if (p == undefined) {
-        p = [];
-        this.providers.set(dependency, p);
-      }
-      p.push(provider);
-    } else {
-      if (p != undefined) throw new Error(`Multiple bindings to dependency ${dependency.name}`);
-      this.providers.set(dependency, [provider]);
-    }
+    if (p != undefined) throw new Error(`Multiple bindings to dependency ${dependency.name}`);
+    this.providers.set(dependency, provider);
   }
 
   public bindInstance<T>(dependency: Dependency<T>, instance: T) {
@@ -102,22 +93,35 @@ export class RootModule implements Module {
     submodule(this);
   }
 
-  execute(executable: (injector: Injector) => void): void {
+  public execute(executable: (injector: Injector) => void): void {
     this.executables.push(executable);
   }
 
   public start() {
     const injector = new RootInjector(this.providers, this.promises);
-    for (const e of this.executables) e(injector);
+    for (const [e, i] of enumerate(this.executables)) {
+      injector.providerCounter = dep => this.addExecutableDependency(i, dep);
+      e(injector);
+    };
+  }
+
+  private addExecutableDependency(i: number, dep: Dependency<any>) {
+    let deps = this.executableDeps[i];
+    if (deps == undefined) {
+      deps = [];
+      this.executableDeps[i] = deps;
+    }
+    deps.push(dep);
   }
 }
 
 
 class RootInjector implements ParentInjector {
   private graph: Graph = new Graph();
+  providerCounter: (dep: Dependency<any>) => void = dep => { };
 
   constructor(
-    private providers: Map<Dependency<any>, InstanceProvider<any>[]>,
+    private providers: Map<Dependency<any>, InstanceProvider<any>>,
     private promises: Map<Dependency<any>, Promise<any>>
   ) { }
 
@@ -143,6 +147,7 @@ class RootInjector implements ParentInjector {
   }
 
   public getInstance<T>(dependency: Dependency<T>): Promise<T> {
+    this.providerCounter(dependency);
     return this.getInstanceParent(dependency, this);
   }
 
@@ -150,9 +155,7 @@ class RootInjector implements ParentInjector {
     const provider = this.providers.get(dependency);
     if (provider == null) throw new Error(`No provider bound to ${dependency.name}`);
     const injector = new ChildInjector(dependency, parent);
-    return dependency.multi
-      ? Promise.all(provider.map(p => p(injector)))
-      : provider[0](injector);
+    return provider(injector);
   }
 }
 

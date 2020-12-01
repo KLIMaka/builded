@@ -1,7 +1,7 @@
 import { Dependency, Injector } from "../../../utils/injector";
 import { FileSystem } from "./fs";
 
-export const MOUNTS = new Dependency<() => FileSystem[]>("Mounts", false);
+export const MOUNTS = new Dependency<() => FileSystem[]>("Mounts");
 
 
 export async function MountableFs(injector: Injector): Promise<FileSystem> {

@@ -2,6 +2,7 @@ import { enumerate } from "./collections";
 
 export class Dependency<T> { constructor(readonly name: string) { } }
 export type InstanceProvider<T> = (injector: Injector) => Promise<T>;
+export type Executable = (injector: Injector) => Promise<void>;
 export type SubModule = (module: Module) => void;
 
 export class CircularDependencyError extends Error {
@@ -15,7 +16,7 @@ export interface Module {
   bind<T>(dependency: Dependency<T>, provider: InstanceProvider<T>): void;
   bindInstance<T>(dependency: Dependency<T>, instance: T): void;
   install(submodule: SubModule): void;
-  execute(executable: (injector: Injector) => void): void;
+  execute(executable: Executable): void;
 }
 
 export interface Injector {
@@ -76,8 +77,7 @@ class Graph {
 export class App implements Module {
   private providers = new Map<Dependency<any>, InstanceProvider<any>>();
   private promises = new Map<Dependency<any>, Promise<any>>();
-  private executables: ((injector: Injector) => void)[] = [];
-  private executableDeps: Dependency<any>[][] = [];
+  private executables: Executable[] = [];
 
   public bind<T>(dependency: Dependency<T>, provider: InstanceProvider<T>): void {
     let p = this.providers.get(dependency);
@@ -93,32 +93,21 @@ export class App implements Module {
     submodule(this);
   }
 
-  public execute(executable: (injector: Injector) => void): void {
+  public execute(executable: Executable): void {
     this.executables.push(executable);
   }
 
-  public start() {
+  public async start() {
     const injector = new RootInjector(this.providers, this.promises);
-    for (const [e, i] of enumerate(this.executables)) {
-      injector.providerCounter = dep => this.addExecutableDependency(i, dep);
-      e(injector);
-    };
-  }
-
-  private addExecutableDependency(i: number, dep: Dependency<any>) {
-    let deps = this.executableDeps[i];
-    if (deps == undefined) {
-      deps = [];
-      this.executableDeps[i] = deps;
-    }
-    deps.push(dep);
+    const results = [];
+    for (const e of this.executables) results.push(e(injector));
+    await Promise.all(results);
   }
 }
 
 
 class RootInjector implements ParentInjector {
   private graph: Graph = new Graph();
-  providerCounter: (dep: Dependency<any>) => void = dep => { };
 
   constructor(
     private providers: Map<Dependency<any>, InstanceProvider<any>>,
@@ -147,7 +136,6 @@ class RootInjector implements ParentInjector {
   }
 
   public getInstance<T>(dependency: Dependency<T>): Promise<T> {
-    this.providerCounter(dependency);
     return this.getInstanceParent(dependency, this);
   }
 

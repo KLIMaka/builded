@@ -39,7 +39,7 @@ async function loadPLUs(injector: Injector) {
 }
 
 async function loadPalTexture(injector: Injector) {
-  const [pal, gl] = await Promise.all([injector.getInstance(RAW_PAL), injector.getInstance(GL)]);
+  const [pal, gl] = await getInstances(injector, RAW_PAL, GL);
   return createTexture(256, 1, gl, { filter: gl.NEAREST }, pal, gl.RGB, 3);
 }
 

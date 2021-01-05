@@ -168,3 +168,15 @@ export function productValue<T>(start: T, f: (lh: T, rh: T) => T) {
 export function minValue(start: number) {
   return productValue(start, (lh, rh) => Math.min(rh, lh));
 }
+
+export function memoize<T, U>(f: (t: T) => U) {
+  const cache = new Map<T, U>();
+  return (t: T) => {
+    let cached = cache.get(t);
+    if (cached == undefined) {
+      cached = f(t);
+      cache.set(t, cached);
+    }
+    return cached;
+  }
+}

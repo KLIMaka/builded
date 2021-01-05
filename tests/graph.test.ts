@@ -20,19 +20,32 @@ test('graph', () => {
   expect(graph.nodes).toStrictEqual(build().node('a', ['b']).node('b', []).get());
 
   graph.remove('a');
-  expect(graph.nodes).toStrictEqual(build().get());
+  expect(graph.nodes).toStrictEqual(build().node('b', []).get());
 
   graph.add('a', 'b');
   graph.add('a', 'c');
   graph.add('c', 'd');
   graph.add('b', 'd');
   graph.remove('a');
-  expect(graph.nodes).toStrictEqual(build().get());
+  expect(graph.nodes).toStrictEqual(build().node('b', ['d']).node('c', ['d']).node('d', []).get());
 
   graph.add('a', 'b');
   graph.add('a', 'c');
-  graph.add('c', 'd');
-  graph.add('b', 'd');
   graph.add('d', 'a');
   expect(graph.findCycle()).toStrictEqual(['d', 'a', 'b']);
+});
+
+test('order', () => {
+  const graph = new DirecredGraph<string>();
+  graph.add('a', 'd');
+  graph.add('a', 'e');
+  graph.add('b', 'd');
+  graph.add('d', 'e');
+  graph.add('c', 'e');
+  graph.add('f', 'd');
+  graph.add('g', 'h');
+  graph.add('d', 'x');
+
+  expect(['a', 'b', 'c', 'd', 'e', 'f'].map(e => graph.order(e))).toStrictEqual([2, 2, 1, 1, 0, 2]);
+  expect(graph.orderedSet('e')).toStrictEqual(['e', 'd', 'c', 'a', 'b', 'f']);
 });

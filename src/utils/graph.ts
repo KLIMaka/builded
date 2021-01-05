@@ -1,15 +1,17 @@
+import { forEach } from './collections';
 import { iter } from './iter';
+import { memoize } from './mathutils';
 
 export class DirecredGraph<T> {
-  public nodes = new Map<T, Set<T>>();
+  readonly nodes = new Map<T, Set<T>>();
 
   private ensureNode(label: T) {
-    let deps = this.nodes.get(label);
-    if (deps == undefined) {
-      deps = new Set();
-      this.nodes.set(label, deps);
+    let links = this.nodes.get(label);
+    if (links == undefined) {
+      links = new Set();
+      this.nodes.set(label, links);
     }
-    return deps;
+    return links;
   }
 
   public add(from: T, to: T) {
@@ -17,18 +19,37 @@ export class DirecredGraph<T> {
     this.ensureNode(from).add(to);
   }
 
+  public addChain(chain: T[]) {
+    for (let i = 0; i < chain.length - 1; i++)
+      this.add(chain[i], chain[i + 1]);
+  }
+
   public remove(n: T) {
-    iter(this.nodes.get(n))
-      .filter(d => iter(this.nodes)
-        .filter(([k, v]) => k != n && v.has(d))
-        .isEmpty())
-      .forEach(d => this.remove(d));
-    iter(this.nodes).forEach(([_, v]) => v.delete(n));
+    forEach(this.nodes.entries(), e => e[1].delete(n));
     this.nodes.delete(n);
   }
 
+  public order(node: T): number {
+    const links = this.nodes.get(node);
+    if (links.size == 0) return 0;
+    let maxorder = 0;
+    for (const l of links) maxorder = Math.max(this.order(l), maxorder);
+    return maxorder + 1;
+  }
+
+  public orderedSet(node: T) {
+    const result = new Set<T>();
+    result.add(node);
+    for (const n of result) {
+      for (const nn of iter(this.nodes.entries()).filter(e => e[1].has(n)).map(e => e[0]))
+        if (!result.has(nn)) result.add(nn);
+    }
+    const order = memoize((n: T) => this.order(n));
+    return [...result].sort((l, r) => order(l) - order(r));
+  }
+
   public findCycle(): T[] {
-    const colors = new Map<T, string>();
+    const colors = new Map<T, 'black' | 'gray'>();
     const nodes = this.nodes;
     const paint = function (node: T): T[] {
       colors.set(node, 'gray');

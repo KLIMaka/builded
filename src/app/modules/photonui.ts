@@ -1,6 +1,6 @@
 import h from "stage0";
 import tippy from "tippy.js";
-import { Module } from "../../utils/injector";
+import { instance, Module } from "../../utils/injector";
 import { center, div, dragElement } from "../../utils/ui/ui";
 import { MenuBuilder, ToolbarBuilder, UI, UiBuilder, Window, WindowBuilder } from "../apis/ui";
 
@@ -276,5 +276,5 @@ class Builder implements UiBuilder {
 
 export function PhotonUiModule(module: Module) {
   document.body.oncontextmenu = () => false;
-  module.bindInstance(UI, { builder: new Builder() });
+  module.bind(UI, instance({ builder: new Builder() }));
 }

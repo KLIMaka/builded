@@ -1,6 +1,6 @@
 import { mat4, vec4 } from "../../../libs_js/glmatrix";
 import { Texture } from "../../../utils/gl/drawstruct";
-import { Dependency, Injector } from "../../../utils/injector";
+import { Dependency, Injector, provider } from "../../../utils/injector";
 import { GRID, GridController } from "../../apis/app";
 import { DrawCallConsumer } from "../../apis/renderable";
 import { BUFFER_FACTORY, BuildBuffer } from "../gl/buffers";
@@ -16,7 +16,7 @@ export interface BuildersFactory {
 }
 export const BUILDERS_FACTORY = new Dependency<BuildersFactory>('Builder Factory');
 
-export async function DefaultBuildersFactory(injector: Injector) {
+export const DefaultBuildersFactory = provider(async (injector: Injector) => {
   const bufferFactory = await injector.getInstance(BUFFER_FACTORY);
   const buildgl = await injector.getInstance(BUILD_GL);
   const grid = await injector.getInstance(GRID);
@@ -34,7 +34,7 @@ export async function DefaultBuildersFactory(injector: Injector) {
     pointSprite: (hint: string) => new PointSpriteBuilder(pointspriteSetup(), bufferFactory.get('pointsprite-' + hint)),
     wireframe: (hint: string) => new WireframeBuilder(wireframeSetup(), bufferFactory.get('wireframe-' + hint))
   }
-}
+});
 
 export enum Type {
   SURFACE,

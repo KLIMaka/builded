@@ -10,6 +10,7 @@ export type SubModule = (module: Module) => void;
 const STOP = async (i: Injector) => { };
 export function provider<T>(start: InstanceProvider<T>): Plugin<T> { return { start, stop: STOP } }
 export function instance<T>(value: T): Plugin<T> { return provider(async i => value) }
+export function plugin(name: string) { return new Dependency(name, true) }
 
 export interface Module {
   bind<T>(dependency: Dependency<T>, provider: Plugin<T>): void;

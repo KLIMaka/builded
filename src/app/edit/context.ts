@@ -1,6 +1,6 @@
 import { EngineApi } from "../../build/board/mutations/api";
 import { Entity } from "../../build/hitscan";
-import { Dependency, Injector } from "../../utils/injector";
+import { Dependency, Injector, provider } from "../../utils/injector";
 import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, REFERENCE_TRACKER, State, STATE, View, VIEW, GridController, GRID, ENGINE_API } from "../apis/app";
 import { BUS, MessageBus } from "../apis/handler";
 import { SectorEnt } from "./sector";
@@ -43,8 +43,8 @@ export class EntityFactory {
 }
 export const ENTITY_FACTORY = new Dependency<EntityFactory>('Entity Factory');
 
-export async function EntityFactoryConstructor(injector: Injector): Promise<EntityFactory> {
+export const EntityFactoryConstructor = provider(async (injector: Injector) => {
   const ctx = await EditContextConstructor(injector);
   return new EntityFactory(ctx);
-}
+});
 

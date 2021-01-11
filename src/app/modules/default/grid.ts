@@ -1,4 +1,4 @@
-import { MessageHandlerReflective, BUS } from "../../apis/handler";
+import { MessageHandlerReflective, BUS, BusPlugin, Handle } from "../../apis/handler";
 import { cyclic } from "../../../utils/mathutils";
 import { NamedMessage } from "../../edit/messages";
 import { Injector } from "../../../utils/injector";
@@ -34,9 +34,18 @@ export class GridControllerImpl extends MessageHandlerReflective {
   }
 }
 
-export async function DefaultGridController(injector: Injector) {
-  const bus = await injector.getInstance(BUS);
-  const grid = new GridControllerImpl();
-  bus.connect(grid);
-  return grid;
-}
+export const DefaultGridController = (() => {
+  let handle: Handle;
+  return {
+    start: async (injector: Injector) => {
+      const bus = await injector.getInstance(BUS);
+      const grid = new GridControllerImpl();
+      handle = bus.connect(grid);
+      return grid;
+    },
+    stop: async (injector: Injector) => {
+      const bus = await injector.getInstance(BUS);
+      bus.disconnect(handle);
+    },
+  }
+})();

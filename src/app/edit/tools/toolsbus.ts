@@ -1,15 +1,24 @@
 import { forEach } from "../../../utils/collections";
 import { Dependency, Injector } from "../../../utils/injector";
-import { BUS, Message, MessageHandler, MessageHandlerReflective } from "../../apis/handler";
+import { BUS, Handle, Message, MessageHandler, MessageHandlerReflective } from "../../apis/handler";
 
 export const TOOLS_BUS = new Dependency<ToolsMessageBus>("ToolsBus");
 
-export async function ToolsBusConstructor(injector: Injector) {
-  const bus = await injector.getInstance(BUS);
-  const toolsBus = new ToolsMessageBus();
-  bus.connect(toolsBus);
-  return toolsBus;
-}
+export const ToolsBusConstructor = (() => {
+  let handle: Handle;
+  return {
+    start: async (injector: Injector) => {
+      const bus = await injector.getInstance(BUS);
+      const toolsBus = new ToolsMessageBus();
+      handle = bus.connect(toolsBus);
+      return toolsBus;
+    },
+    stop: async (injector: Injector) => {
+      const bus = await injector.getInstance(BUS);
+      bus.disconnect(handle);
+    }
+  }
+})();
 
 export interface Tool extends MessageHandler {
   activateHandler(handler: (tool: Tool) => void): void;

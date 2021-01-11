@@ -1,4 +1,4 @@
-import { Injector } from "../../utils/injector";
+import { Injector, provider } from "../../utils/injector";
 import { Storage, Storages } from "../apis/app";
 
 class Db implements Storage {
@@ -74,9 +74,9 @@ class Db implements Storage {
   }
 }
 
-export async function StorageDbConstructor(injector: Injector): Promise<Storages> {
+export const StorageDbConstructor = provider(async (injector: Injector) => {
   const storages: { [index: string]: Storage } = {}
-  return async name => {
+  return async (name: string) => {
     let storage = storages[name];
     if (storage == undefined) {
       storage = new Db(name);
@@ -84,4 +84,4 @@ export async function StorageDbConstructor(injector: Injector): Promise<Storages
     }
     return storage;
   }
-}
+});

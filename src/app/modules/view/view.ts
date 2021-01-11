@@ -1,15 +1,11 @@
 import { Entity, Target } from "../../../build/hitscan";
-import { Board } from "../../../build/board/structs";
-import { create, Dependency, Injector, Module } from "../../../utils/injector";
-import { int, len2d, tuple2 } from "../../../utils/mathutils";
-import { STATE, State, View, GridController, GRID, VIEW } from "../../apis/app";
-import { BUS, Message, MessageHandler } from "../../apis/handler";
+import { create, Dependency, Injector, Module, Plugin } from "../../../utils/injector";
+import { GRID, GridController, STATE, State, View, VIEW } from "../../apis/app";
+import { BUS, Handle, Message, MessageHandler } from "../../apis/handler";
 import { Renderable } from "../../apis/renderable";
 import { LoadBoard, NamedMessage } from "../../edit/messages";
 import { View2d, View2dConstructor } from "./view2d";
 import { View3d, View3dConstructor } from "./view3d";
-import { nextwall } from "../../../build/board/query";
-import { DEFAULT_REPEAT_RATE } from "../../../build/board/mutations/internal";
 
 export class TargetImpl implements Target {
   public coords_: [number, number, number] = [0, 0, 0];
@@ -31,14 +27,23 @@ const VIEW_3D = new Dependency<View3d>('View 3d');
 export function SwappableViewModule(module: Module) {
   module.bind(VIEW_2D, View2dConstructor);
   module.bind(VIEW_3D, View3dConstructor);
-  module.bind(VIEW, SwappableViewConstructor);
+  module.bind(VIEW, SwappableViewConstructor());
 }
 
-export async function SwappableViewConstructor(injector: Injector) {
-  const bus = await injector.getInstance(BUS);
-  const view = await create(injector, SwappableView, GRID, VIEW_2D, VIEW_3D, STATE);
-  bus.connect(view);
-  return view;
+function SwappableViewConstructor(): Plugin<View> {
+  let handle: Handle = 0;
+  return {
+    start: async (injector: Injector) => {
+      const bus = await injector.getInstance(BUS);
+      const view = await create(injector, SwappableView, GRID, VIEW_2D, VIEW_3D, STATE);
+      handle = bus.connect(view);
+      return view;
+    },
+    stop: async (injector: Injector) => {
+      const bus = await injector.getInstance(BUS);
+      bus.disconnect(handle);
+    }
+  }
 }
 
 export class SwappableView implements View, MessageHandler {

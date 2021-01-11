@@ -1,4 +1,4 @@
-import { Dependency, Injector } from "./injector";
+import { Dependency, Injector, provider } from "./injector";
 import { RAW_PAL } from "../app/modules/artselector";
 // import init, { ImgLib } from "../libs_js/wasm_lib";
 import { convertPal, rgb2xyz, xyz2lab, resizeIndexed, findLab } from "./color";
@@ -29,7 +29,7 @@ export const INDEXED_IMG_LIB = new Dependency<IndexedImgLib>('IndexedImgLib');
 //   }
 // }
 
-export async function IndexedImgLibJsConstructor(injector: Injector): Promise<IndexedImgLib> {
+export const IndexedImgLibJsConstructor = provider(async (injector: Injector) => {
   const pal = [...await injector.getInstance(RAW_PAL)];
   const xyzpal = convertPal(pal, rgb2xyz);
   const labpal = convertPal(xyzpal, xyz2lab);
@@ -51,4 +51,4 @@ export async function IndexedImgLibJsConstructor(injector: Injector): Promise<In
       return resizeIndexed(dstw, dsth, srcw, srch, src, pal, labpal);
     }
   }
-}
+});

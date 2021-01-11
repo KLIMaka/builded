@@ -1,11 +1,12 @@
-import { Board } from "../../../build/board/structs";
 import { closestSpriteInSector, closestWallPoint, closestWallSegment } from "../../../build/board/distances";
+import { findSector, inSector, snapWall } from "../../../build/board/query";
+import { Board } from "../../../build/board/structs";
 import { Entity, EntityType, Hitscan, hitscan, Ray, Target } from "../../../build/hitscan";
 import { getPlayerStart, ZSCALE } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 import { CachedValue } from "../../../utils/cachedvalue";
 import { Controller2D } from "../../../utils/camera/controller2d";
-import { Injector } from "../../../utils/injector";
+import { provider } from "../../../utils/injector";
 import { NumberInterpolator } from "../../../utils/interpolator";
 import { int, len2d } from "../../../utils/mathutils";
 import { DelayedValue } from "../../../utils/timed";
@@ -16,10 +17,9 @@ import { BoardInvalidate, LoadBoard, Mouse } from "../../edit/messages";
 import { BuildGl, BUILD_GL } from "../gl/buildgl";
 import { BoardRenderer2D, Renderer2D } from "./boardrenderer2d";
 import { TargetImpl, ViewPosition } from "./view";
-import { inSector, findSector, snapWall } from "../../../build/board/query";
 
 
-export async function View2dConstructor(injector: Injector) {
+export const View2dConstructor = provider(async injector => {
   const [renderer, grid, bgl, board, art, state] = await Promise.all([
     Renderer2D(injector),
     injector.getInstance(GRID),
@@ -29,7 +29,7 @@ export async function View2dConstructor(injector: Injector) {
     injector.getInstance(STATE),
   ]);
   return new View2d(renderer, grid, bgl, board, art, state);
-}
+});
 
 export class View2d extends MessageHandlerReflective implements View {
   private position: ViewPosition;

@@ -1,17 +1,16 @@
 import h from "stage0";
 import { Sector, Sprite, Wall } from "../../build/board/structs";
 import { Entity, EntityType } from "../../build/hitscan";
-import { create, Module } from "../../utils/injector";
+import { create, Module, plugin } from "../../utils/injector";
 import { BOARD, BoardProvider, View, VIEW } from "../apis/app";
-import { BUS, MessageHandlerReflective } from "../apis/handler";
+import { BusPlugin, MessageHandlerReflective } from "../apis/handler";
 import { BoardInvalidate, Frame } from "../edit/messages";
 
 
 export async function InfoModule(module: Module) {
-  module.execute(async injector => {
-    const bus = await injector.getInstance(BUS);
-    bus.connect(await create(injector, Info, VIEW, BOARD))
-  });
+  module.bind(plugin('Info'), new BusPlugin(async (injector, connect) => {
+    connect(await create(injector, Info, VIEW, BOARD))
+  }));
 }
 
 const rowTemplate = h`<tr><td>#nameNode</td><td>#valueNode</td></tr>`;

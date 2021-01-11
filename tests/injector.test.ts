@@ -106,13 +106,14 @@ test('test', async done => {
   const B = new Dependency<number>('B');
   const OP = new Dependency<number>('OP');
 
-  let ref_op = 54;
+  let ref_a = 42;
   let ref_b = 12;
+  let ref_op = ref_a + ref_b;
 
   app.bind(A, {
     start: async i => {
       log.push('A+');
-      return 42;
+      return ref_a;
     },
     stop: async i => {
       log.push('A-');
@@ -163,7 +164,7 @@ test('test', async done => {
     start: async i => {
       log.push('Main2+');
       const a = await i.getInstance(A);
-      expect(a).toEqual(42);
+      expect(a).toEqual(ref_a);
     },
     stop: async i => {
       log.push('Main2-');
@@ -174,7 +175,7 @@ test('test', async done => {
   expect(log).toStrictEqual(['Main+', 'OP+', 'A+', 'B+', 'Main1+', 'Main2+']);
 
   ref_b = 11;
-  ref_op = 53;
+  ref_op = ref_a + ref_b;
 
   await app.replaceInstance(B, {
     start: async i => {

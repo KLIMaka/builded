@@ -1,16 +1,16 @@
 import { closestWallInSector, closestWallSegmentInSector } from "../../../build/board/distances";
-import { inSector, findSector, sectorOfWall, snapWall } from "../../../build/board/query";
+import { findSector, inSector, sectorOfWall, snapWall } from "../../../build/board/query";
 import { Board } from "../../../build/board/structs";
 import { Entity, EntityType, Hitscan, hitscan, Ray, Target } from "../../../build/hitscan";
 import { build2gl, getPlayerStart, gl2build, ZSCALE } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 import { CachedValue } from "../../../utils/cachedvalue";
 import { Controller3D } from "../../../utils/camera/controller3d";
-import { Injector } from "../../../utils/injector";
+import { provider } from "../../../utils/injector";
 import { NumberInterpolator } from "../../../utils/interpolator";
 import { int } from "../../../utils/mathutils";
 import { DelayedValue } from "../../../utils/timed";
-import { ART, ArtProvider, BOARD, BoardProvider, ENGINE_API, GRID, GridController, STATE, State, View } from "../../apis/app";
+import { ART, ArtProvider, BOARD, BoardProvider, GRID, GridController, STATE, State, View } from "../../apis/app";
 import { MessageHandlerReflective } from "../../apis/handler";
 import { Renderable } from "../../apis/renderable";
 import { BoardInvalidate, Frame, LoadBoard, Mouse, NamedMessage } from "../../edit/messages";
@@ -18,7 +18,7 @@ import { BuildGl, BUILD_GL } from "../gl/buildgl";
 import { Boardrenderer3D, Renderer3D } from "./boardrenderer3d";
 import { TargetImpl, ViewPosition } from "./view";
 
-export async function View3dConstructor(injector: Injector) {
+export const View3dConstructor = provider(async injector => {
   const [renderer, buildgl, board, state, grid, art] = await Promise.all([
     Renderer3D(injector),
     injector.getInstance(BUILD_GL),
@@ -28,7 +28,7 @@ export async function View3dConstructor(injector: Injector) {
     injector.getInstance(ART),
   ]);
   return new View3d(renderer, buildgl, board, state, grid, art);
-}
+});
 
 export class View3d extends MessageHandlerReflective implements View {
   private position: ViewPosition;

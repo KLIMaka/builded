@@ -3,10 +3,10 @@ import { pushWall } from "../../../build/board/mutations/walls";
 import { sectorOfWall } from "../../../build/board/query";
 import { build2gl, createSlopeCalculator, wallNormal, ZSCALE } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
-import { create, Module } from "../../../utils/injector";
+import { create, Module, plugin } from "../../../utils/injector";
 import { dot2d, int } from "../../../utils/mathutils";
 import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, GRID, GridController, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
-import { BUS, MessageBus } from "../../apis/handler";
+import { BUS, BusPlugin, MessageBus } from "../../apis/handler";
 import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
 import { LineBuilder } from "../../modules/gl/buffers";
 import { MovingHandle } from "../handle";
@@ -20,10 +20,9 @@ const start_ = vec3.create();
 const dir_ = vec3.create();
 
 export async function PushWallModule(module: Module) {
-  module.execute(async injector => {
-    const toolsBus = await injector.getInstance(TOOLS_BUS);
-    toolsBus.connect(await create(injector, PushWall, BUILDERS_FACTORY, ENGINE_API, VIEW, ART, BOARD, REFERENCE_TRACKER, BUS, GRID));
-  });
+  module.bind(plugin('PushWall'), new BusPlugin(async (injector, connect) => {
+    connect(await create(injector, PushWall, BUILDERS_FACTORY, ENGINE_API, VIEW, ART, BOARD, REFERENCE_TRACKER, BUS, GRID));
+  }, TOOLS_BUS));
 }
 
 export class PushWall extends DefaultTool {

@@ -1,6 +1,6 @@
 import { ArtInfoProvider } from "../../build/formats/art";
 import { range } from "../../utils/collections";
-import { create, Dependency, Injector } from "../../utils/injector";
+import { create, Dependency, Injector, provider } from "../../utils/injector";
 import { iter } from "../../utils/iter";
 import { axisSwap, RGBPalPixelProvider } from "../../utils/pixelprovider";
 import { DrawPanel, PixelDataProvider } from "../../utils/ui/drawpanel";
@@ -30,10 +30,10 @@ export const RAW_PAL = new Dependency<Uint8Array>('RawPal');
 export const RAW_PLUs = new Dependency<Palette[]>('Raw PLUs');
 export const PIC_TAGS = new Dependency<PicTags>('Tags');
 
-export async function SelectorConstructor(injector: Injector) {
+export const SelectorConstructor = provider(async (injector: Injector) => {
   const selector = await create(injector, Selector, UI, ART, RAW_PAL, PIC_TAGS);
   return (cb: PicNumCallback) => selector.modal(cb);
-}
+});
 
 function createTagsGridModel(tags: PicTags) {
   const selected = new Set<string>();

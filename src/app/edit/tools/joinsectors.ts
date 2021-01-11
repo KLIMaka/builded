@@ -1,17 +1,16 @@
 import { EngineApi } from "../../../build/board/mutations/api";
 import { joinSectors } from "../../../build/board/mutations/joinsectors";
 import { isJoinedSectors } from "../../../build/board/query";
-import { create, Module } from "../../../utils/injector";
+import { create, Module, plugin } from "../../../utils/injector";
 import { BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, REFERENCE_TRACKER, VIEW, View } from "../../apis/app";
-import { BUS, MessageBus } from "../../apis/handler";
+import { BUS, BusPlugin, MessageBus } from "../../apis/handler";
 import { Commit, INVALIDATE_ALL, NamedMessage } from "../messages";
 import { DefaultTool, TOOLS_BUS } from "./toolsbus";
 
 export function JoinSectorsModule(module: Module) {
-  module.execute(async injector => {
-    const bus = await injector.getInstance(TOOLS_BUS);
-    bus.connect(await create(injector, JoinSectors, BUS, VIEW, BOARD, REFERENCE_TRACKER, ENGINE_API));
-  });
+  module.bind(plugin('JoinSectors'), new BusPlugin(async (injector, connect) => {
+    connect(await create(injector, JoinSectors, BUS, VIEW, BOARD, REFERENCE_TRACKER, ENGINE_API));
+  }, TOOLS_BUS));
 }
 
 export class JoinSectors extends DefaultTool {

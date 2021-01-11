@@ -1,6 +1,6 @@
 import { Buffer, BufferBuilder, Pointer } from '../../../utils/gl/buffergl';
 import { IndexBuffer, VertexBuffer } from '../../../utils/gl/drawstruct';
-import { Dependency, Injector } from '../../../utils/injector';
+import { Dependency, Injector, provider } from '../../../utils/injector';
 import { GL } from '../buildartprovider';
 
 export interface GenericBuildBuffer {
@@ -28,10 +28,10 @@ export interface BuildBufferFactory {
 }
 export const BUFFER_FACTORY = new Dependency<BuildBufferFactory>('Build Buffer Factory');
 
-export async function DefaultBufferFactory(injector: Injector) {
+export const DefaultBufferFactory = provider(async (injector: Injector) => {
   const gl = await injector.getInstance(GL);
   return new BuildBufferFactoryImpl(gl);
-}
+});
 
 export class PointSpritesBuilder {
   private sprites: [number, number, number][] = [];

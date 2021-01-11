@@ -3,14 +3,23 @@ import { Injector } from '../../utils/injector';
 import { iter } from '../../utils/iter';
 import { PostFrame } from '../edit/messages';
 import { ScheddulerHandler, Scheduler, SchedulerTask, TaskHandle } from './app';
-import { BUS, MessageHandlerReflective } from './handler';
+import { BUS, Handle, MessageHandlerReflective } from './handler';
 
-export async function DefaultScheduler(injector: Injector) {
-  const bus = await injector.getInstance(BUS);
-  const scheduler = new SchedulerImpl();
-  bus.connect(scheduler);
-  return scheduler;
-}
+export const DefaultScheduler = (() => {
+  let handle: Handle;
+  return {
+    start: async (injector: Injector) => {
+      const bus = await injector.getInstance(BUS);
+      const scheduler = new SchedulerImpl();
+      bus.connect(scheduler);
+      return scheduler;
+    },
+    stop: async (injector: Injector) => {
+      const bus = await injector.getInstance(BUS);
+      bus.disconnect(handle);
+    },
+  }
+})();
 
 class TaskHandleImpl implements TaskHandle {
   constructor(

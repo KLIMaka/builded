@@ -10,10 +10,10 @@ import { Target } from "../../../build/hitscan";
 import { ZSCALE } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 import { Deck, wrap } from "../../../utils/collections";
-import { create, Module } from "../../../utils/injector";
+import { create, Module, plugin } from "../../../utils/injector";
 import { int, len2d } from "../../../utils/mathutils";
 import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
-import { BUS, MessageBus } from "../../apis/handler";
+import { BUS, BusPlugin, MessageBus } from "../../apis/handler";
 import { NULL_RENDERABLE, Renderable, Renderables } from "../../apis/renderable";
 import { writeText } from "../../modules/geometry/builders/common";
 import { RenderablesCache, RENDRABLES_CACHE } from "../../modules/geometry/cache";
@@ -123,10 +123,9 @@ class Contour {
 }
 
 export async function DrawSectorModule(module: Module) {
-  module.execute(async injector => {
-    const bus = await injector.getInstance(TOOLS_BUS);
-    bus.connect(await create(injector, DrawSector, BUILDERS_FACTORY, ART, ENGINE_API, VIEW, BOARD, REFERENCE_TRACKER, BUS, RENDRABLES_CACHE));
-  });
+  module.bind(plugin('DrawSector'), new BusPlugin(async (injector, connect) => {
+    connect(await create(injector, DrawSector, BUILDERS_FACTORY, ART, ENGINE_API, VIEW, BOARD, REFERENCE_TRACKER, BUS, RENDRABLES_CACHE));
+  }, TOOLS_BUS));
 }
 
 export class DrawSector extends DefaultTool {

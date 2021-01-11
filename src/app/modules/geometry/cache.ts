@@ -1,7 +1,7 @@
-import { create, Dependency, Injector, Module } from '../../../utils/injector';
+import { create, Dependency, getInstances, Injector, Module, plugin, provider } from '../../../utils/injector';
 import { ART, ArtProvider, BOARD, BoardProvider, STATE, State, SCHEDULER, Scheduler, TaskHandle, SchedulerTask, PORTALS, Portals } from '../../apis/app';
 import { Builder } from '../../apis/builder';
-import { BUS, MessageHandler, MessageHandlerReflective } from '../../apis/handler';
+import { BUS, BusPlugin, MessageHandler, MessageHandlerReflective } from '../../apis/handler';
 import { BuildRenderableProvider, ClusterRenderable, SectorRenderable, WallRenderable, Renderable } from '../../apis/renderable';
 import { BoardInvalidate, NamedMessage, LoadBoard } from '../../edit/messages';
 import { SectorBuilder, updateSector } from './builders/sector';
@@ -176,20 +176,14 @@ export class RenderablesCacheContext {
   readonly portals: Portals;
 }
 const RENDERABLES_CACHE_CONTEXT = new Dependency<RenderablesCacheContext>('RenderablesCacheContext');
-async function RenderablesCacheContextConstructor(injector: Injector): Promise<RenderablesCacheContext> {
-  const [board, art, factory, state, portals] = await Promise.all([
-    injector.getInstance(BOARD),
-    injector.getInstance(ART),
-    injector.getInstance(BUILDERS_FACTORY),
-    injector.getInstance(STATE),
-    injector.getInstance(PORTALS)
-  ]);
+const RenderablesCacheContextConstructor = provider(async injector => {
+  const [board, art, factory, state, portals] = await getInstances(injector, BOARD, ART, BUILDERS_FACTORY, STATE, PORTALS);
   return { board, art, factory, state, portals }
-}
+});
 
-async function RenderablesCacheConstructor(injector: Injector) {
+const RenderablesCacheConstructor = provider(async injector => {
   return create(injector, RenderablesCacheImpl, RENDERABLES_CACHE_CONTEXT, SCHEDULER);
-}
+});
 
 export const WALL_COLOR = 'wallColor';
 export const MASKED_WALL_COLOR = 'maskedWallColor';
@@ -200,7 +194,7 @@ export const PORTAL_WALL_COLOR = 'portalWallColor';
 export async function RenderablesCacheModule(module: Module) {
   module.bind(RENDERABLES_CACHE_CONTEXT, RenderablesCacheContextConstructor);
   module.bind(RENDRABLES_CACHE, RenderablesCacheConstructor);
-  module.execute(async injector => {
+  module.bind(plugin('CacheBus'), new BusPlugin(async (injector, connect) => {
     const state = await injector.getInstance(STATE);
     state.register(WALL_COLOR, [1, 1, 1, 1]);
     state.register(INTERSECTOR_WALL_COLOR, [1, 0, 0, 1]);
@@ -208,10 +202,8 @@ export async function RenderablesCacheModule(module: Module) {
     state.register(PORTAL_WALL_COLOR, [1, 0, 0, 1]);
     state.register(SPRITE_COLOR, [0, 1, 1, 1]);
 
-    const bus = await injector.getInstance(BUS);
-    const cache = await injector.getInstance(RENDRABLES_CACHE);
-    bus.connect(cache);
-  })
+    connect(await injector.getInstance(RENDRABLES_CACHE));
+  }));
 }
 
 export class RenderablesCacheImpl extends MessageHandlerReflective implements RenderablesCache {

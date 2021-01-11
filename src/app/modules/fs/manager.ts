@@ -1,9 +1,9 @@
 import { saveAs } from "../../../utils/filesave";
-import { create, Dependency, Injector, Module } from "../../../utils/injector";
+import { create, Dependency, Injector, Module, plugin } from "../../../utils/injector";
 import { iter } from "../../../utils/iter";
 import { GridModel, IconText, IconTextRenderer, renderGrid } from "../../../utils/ui/renderers";
 import { addDragAndDrop, Element } from "../../../utils/ui/ui";
-import { BUS } from "../../apis/handler";
+import { BUS, BusPlugin } from "../../apis/handler";
 import { UI, Ui, Window } from "../../apis/ui";
 import { namedMessageHandler } from "../../edit/messages";
 
@@ -112,20 +112,9 @@ class FileBrowser {
   }
 }
 
-let browser: FileBrowser;
-async function getFileBrowser(injector: Injector) {
-  if (browser == null) browser = await create(injector, FileBrowser, UI, FS_MANAGER);
-  return browser;
-}
-
-export async function showFileBrowser(injector: Injector) {
-  const browser = await getFileBrowser(injector);
-  browser.show();
-}
-
 export async function FileBrowserModule(module: Module) {
-  module.execute(async injector => {
-    const bus = await injector.getInstance(BUS);
-    bus.connect(namedMessageHandler('show_files', () => showFileBrowser(injector)));
-  });
+  module.bind(plugin('FileBrowser'), new BusPlugin(async (injector, connect) => {
+    const browser = await create(injector, FileBrowser, UI, FS_MANAGER);
+    connect(namedMessageHandler('show_files', browser.show));
+  }));
 }

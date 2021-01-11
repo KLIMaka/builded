@@ -1,21 +1,20 @@
-import { create, Module } from "../../../utils/injector";
+import { create, Module, plugin } from "../../../utils/injector";
 import { DefaultTool, TOOLS_BUS } from "./toolsbus";
 import { EntityFactory, ENTITY_FACTORY } from "../context";
 import { error } from "../../../utils/logger";
 import { MovingHandle } from "../handle";
 import { Move, StartMove, EndMove, Frame, Highlight, Render, Commit } from "../messages";
 import { Selected, SELECTED } from "./selection";
-import { MessageHandler, NULL_MESSAGE_HANDLER } from "../../apis/handler";
+import { BusPlugin, MessageHandler, NULL_MESSAGE_HANDLER } from "../../apis/handler";
 import { build2gl } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 import { detuple0, detuple1 } from "../../../utils/mathutils";
 import { RenderablesCache, RENDRABLES_CACHE } from "../../modules/geometry/cache";
 
 export async function TransformModule(module: Module) {
-  module.execute(async injector => {
-    const bus = await injector.getInstance(TOOLS_BUS);
-    bus.connect(await create(injector, Transform, SELECTED, ENTITY_FACTORY, RENDRABLES_CACHE));
-  });
+  module.bind(plugin('Transform'), new BusPlugin(async (injector, connect) => {
+    connect(await create(injector, Transform, SELECTED, ENTITY_FACTORY, RENDRABLES_CACHE));
+  }, TOOLS_BUS));
 }
 
 const handle = new MovingHandle();

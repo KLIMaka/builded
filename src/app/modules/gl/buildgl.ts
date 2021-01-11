@@ -2,7 +2,7 @@ import { mat4, Mat4Array, vec3, Vec3Array, vec4 } from '../../../libs_js/glmatri
 import { Texture } from '../../../utils/gl/drawstruct';
 import { createShader } from '../../../utils/gl/shaders';
 import { Profile, State } from '../../../utils/gl/stategl';
-import { Dependency, Injector } from '../../../utils/injector';
+import { Dependency, getInstances, Injector, provider } from '../../../utils/injector';
 import { info } from '../../../utils/logger';
 import * as PROFILER from '../../../utils/profiler';
 import { Renderable } from '../../apis/renderable';
@@ -14,17 +14,11 @@ export const SHADOWSTEPS = new Dependency<number>('Shadowsteps');
 export const PALSWAPS = new Dependency<number>('Palswaps');
 export const BUILD_GL = new Dependency<BuildGl>('BuildGL');
 
-export function BuildGlConstructor(injector: Injector): Promise<BuildGl> {
-  return new Promise(resolve => Promise.all([
-    injector.getInstance(GL),
-    injector.getInstance(PAL_TEXTURE),
-    injector.getInstance(PLU_TEXTURE),
-    injector.getInstance(PALSWAPS),
-    injector.getInstance(SHADOWSTEPS),
-  ]).then(([gl, pal, plus, plaswaps, shadowsteps]) => {
+export const BuildGlConstructor = provider(async (injector: Injector) => {
+  return new Promise<BuildGl>(resolve => getInstances(injector, GL, PAL_TEXTURE, PLU_TEXTURE, PALSWAPS, SHADOWSTEPS).then(([gl, pal, plus, plaswaps, shadowsteps]) => {
     const buildgl = new BuildGl(plaswaps, shadowsteps, gl, pal, plus, () => resolve(buildgl))
   }));
-}
+});
 
 const SHADER_NAME = 'resources/shaders/build';
 const inv = mat4.create();

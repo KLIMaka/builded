@@ -3,7 +3,7 @@ import { RorLink, RorLinks } from "../../app/modules/view/boardrenderer3d";
 import { Injector } from "../../utils/injector";
 import { Sprite } from "../board/structs";
 import { BloodBoard } from "./structs";
-import { BUS, MessageHandlerReflective } from "../../app/apis/handler";
+import { BUS, Handle, MessageHandlerReflective } from "../../app/apis/handler";
 import { LoadBoard } from "../../app/edit/messages";
 
 export const MIRROR_PIC = 504;
@@ -16,20 +16,29 @@ function isLowerLink(spr: Sprite) {
   return spr.lotag == 12 || spr.lotag == 6 || spr.lotag == 10 || spr.lotag == 14;
 }
 
-export async function BloodImplementationConstructor(injector: Injector) {
-  const board = await injector.getInstance(BOARD);
-  const bus = await injector.getInstance(BUS);
-  let rorLinks = loadRorLinks(<BloodBoard>board());
-  bus.connect(new class extends MessageHandlerReflective {
-    LoadBoard(msg: LoadBoard) {
-      rorLinks = loadRorLinks(<BloodBoard>msg.board);
-    }
-  })
+export const BloodImplementationConstructor = (() => {
+  let handle: Handle;
   return {
-    rorLinks: () => rorLinks,
-    isMirrorPic(picnum: number) { return picnum == MIRROR_PIC },
+    start: async (injector: Injector) => {
+      const board = await injector.getInstance(BOARD);
+      const bus = await injector.getInstance(BUS);
+      let rorLinks = loadRorLinks(<BloodBoard>board());
+      handle = bus.connect(new class extends MessageHandlerReflective {
+        LoadBoard(msg: LoadBoard) {
+          rorLinks = loadRorLinks(<BloodBoard>msg.board);
+        }
+      })
+      return {
+        rorLinks: () => rorLinks,
+        isMirrorPic(picnum: number) { return picnum == MIRROR_PIC },
+      }
+    },
+    stop: async (injector: Injector) => {
+      const bus = await injector.getInstance(BUS);
+      bus.disconnect(handle);
+    },
   }
-}
+})();
 
 export function loadRorLinks(board: BloodBoard): RorLinks {
   const linkRegistry = {};

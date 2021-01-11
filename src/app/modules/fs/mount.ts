@@ -1,12 +1,12 @@
-import { Dependency, Injector } from "../../../utils/injector";
+import { Dependency, Injector, provider } from "../../../utils/injector";
 import { FileSystem } from "./fs";
 
 export const MOUNTS = new Dependency<() => FileSystem[]>("Mounts");
 
 
-export async function MountableFs(injector: Injector): Promise<FileSystem> {
+export const MountableFs = provider(async (injector: Injector) => {
   return {
-    get: async name => {
+    get: async (name: string) => {
       const mounts = await injector.getInstance(MOUNTS);
       for (const mount of mounts()) {
         const file = await mount.get(name);
@@ -24,4 +24,4 @@ export async function MountableFs(injector: Injector): Promise<FileSystem> {
       return [...files];
     },
   }
-}
+});

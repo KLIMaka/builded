@@ -2,14 +2,14 @@ import { SelectorConstructor } from '../../app/modules/artselector';
 import { Board } from '../../build/board/structs';
 import { Deck } from '../../utils/collections';
 import { IndexedImgLibJsConstructor, INDEXED_IMG_LIB } from '../../utils/imglib';
-import { create, Injector, Module } from '../../utils/injector';
+import { create, Injector, instance, Module, plugin } from '../../utils/injector';
 import * as PROFILE from '../../utils/profiler';
 import { ART, BOARD, ENGINE_API, GRID, PORTALS, REFERENCE_TRACKER, SCHEDULER, STATE, STORAGES, View, VIEW } from '../apis/app';
-import { BUS, DefaultMessageBus, MessageBus, MessageHandlerReflective } from '../apis/handler';
+import { BUS, BusPlugin, DefaultMessageBus, MessageBus, MessageHandlerReflective } from '../apis/handler';
 import { Renderable } from '../apis/renderable';
 import { DefaultScheduler } from '../apis/scheduler';
 import { EntityFactoryConstructor, ENTITY_FACTORY } from '../edit/context';
-import { Frame, LoadBoard, namedMessageHandler, PostFrame, Render } from '../edit/messages';
+import { Frame, LoadBoard, namedMessageHandler, PostFrame, PreFrame, Render } from '../edit/messages';
 import { DrawSectorModule } from '../edit/tools/drawsector';
 import { DrawWallModule } from '../edit/tools/drawwall';
 import { JoinSectorsModule } from '../edit/tools/joinsectors';
@@ -36,15 +36,15 @@ import { SwappableViewModule } from './view/view';
 import { DefaultPortalsConstructor } from '../modules/default/portals';
 
 async function mapBackupService(module: Module) {
-  module.execute(async injector => {
+  module.bind(plugin('MapBackupService'), new BusPlugin(async (injector, connect) => {
     const storages = await injector.getInstance(STORAGES);
     const bus = await injector.getInstance(BUS);
     const board = await injector.getInstance(BOARD);
     const api = await injector.getInstance(ENGINE_API);
     const defaultBoard = api.newBoard();
     const store = await storages('session');
-    bus.connect(namedMessageHandler('commit', () => store.set('map_bak', board())));
-    bus.connect(namedMessageHandler('new_board', () => {
+    connect(namedMessageHandler('commit', () => store.set('map_bak', board())));
+    connect(namedMessageHandler('new_board', () => {
       bus.handle(new LoadBoard(defaultBoard));
       store.set('map_bak', defaultBoard);
     }));
@@ -54,24 +54,24 @@ async function mapBackupService(module: Module) {
       const bus = await injector.getInstance(BUS);
       bus.handle(new LoadBoard(map));
     }
-  });
+  }));
 }
 
 function newMap(module: Module) {
-  module.execute(async injector => {
+  module.bind(plugin('NewMap'), new BusPlugin(async (injector, connect) => {
     const bus = await injector.getInstance(BUS);
     const api = await injector.getInstance(ENGINE_API);
     const defaultBoard = api.newBoard();
-    bus.connect(namedMessageHandler('new_board', () => {
+    connect(namedMessageHandler('new_board', () => {
       bus.handle(new LoadBoard(defaultBoard));
     }));
-  })
+  }));
 }
 
 
 export function DefaultSetupModule(module: Module) {
-  module.bindInstance(REFERENCE_TRACKER, new BuildReferenceTrackerImpl());
-  module.bindInstance(STATE, new StateImpl());
+  module.bind(REFERENCE_TRACKER, instance(new BuildReferenceTrackerImpl()));
+  module.bind(STATE, instance(new StateImpl()));
   module.bind(TEXTURES_OVERRIDE, DefaultAdditionalTextures);
   module.bind(GRID, DefaultGridController);
   module.bind(ART, BuildArtProviderConstructor);
@@ -79,7 +79,7 @@ export function DefaultSetupModule(module: Module) {
   module.bind(BUILD_GL, BuildGlConstructor);
   module.bind(BUFFER_FACTORY, DefaultBufferFactory);
   module.bind(BUILDERS_FACTORY, DefaultBuildersFactory);
-  module.bind(BUS, DefaultMessageBus);
+  module.bind(BUS, instance(DefaultMessageBus()));
   module.bind(TOOLS_BUS, ToolsBusConstructor);
   module.bind(BOARD, DefaultBoardProviderConstructor);
   module.bind(ENTITY_FACTORY, EntityFactoryConstructor);
@@ -119,6 +119,7 @@ function createTools() {
 }
 
 const FRAME = new Frame(0);
+const PREFRAME = new PreFrame();
 const POSTFRAME = new PostFrame();
 const tools = createTools();
 const RENDER = new Render(tools.consumer);
@@ -142,6 +143,7 @@ export class MainLoop extends MessageHandlerReflective {
 
   frame(dt: number) {
     PROFILE.start();
+    this.bus.handle(PREFRAME);
     FRAME.dt = dt;
     this.bus.handle(FRAME);
     this.drawTools();

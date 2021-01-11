@@ -1,9 +1,9 @@
-import { create, Injector, Module } from "../../utils/injector";
+import { create, getInstances, Injector, Module, plugin } from "../../utils/injector";
 import { iter } from "../../utils/iter";
 import { GridModel, renderGrid } from "../../utils/ui/renderers";
 import { div, Element, replaceContent, span, tag } from "../../utils/ui/ui";
 import { ScheddulerHandler, Scheduler, SCHEDULER, SchedulerTask, TaskHandle } from "../apis/app";
-import { BUS } from "../apis/handler";
+import { BUS, Handle } from "../apis/handler";
 import { UI, Ui, Window } from "../apis/ui";
 import { namedMessageHandler } from "../edit/messages";
 
@@ -105,17 +105,6 @@ class TaskManager implements ScheddulerHandler {
   }
 }
 
-let manager: TaskManager;
-async function getTaskManager(injector: Injector) {
-  if (manager == null) manager = await create(injector, TaskManager, UI, SCHEDULER);
-  return manager;
-}
-
-export async function showTasks(injector: Injector) {
-  const browser = await getTaskManager(injector);
-  browser.show();
-}
-
 function* task(): SchedulerTask {
   let handler = yield;
   for (let i = 0; i < 100; i++) {
@@ -126,10 +115,20 @@ function* task(): SchedulerTask {
 }
 
 export async function TaskManagerModule(module: Module) {
-  module.execute(async injector => {
-    const bus = await injector.getInstance(BUS);
-    const scheduler = await injector.getInstance(SCHEDULER);
-    bus.connect(namedMessageHandler('show_tasks', () => showTasks(injector)));
-    bus.connect(namedMessageHandler('add_test_task', () => scheduler.addTask(task())));
+  let showTasksHandle: Handle;
+  let addTaskTestHandle: Handle;
+  let manager: TaskManager;
+  module.bind(plugin('TaskManager'), {
+    start: async injector => {
+      const [bus, scheduler, ui] = await getInstances(injector, BUS, SCHEDULER, UI);
+      manager = new TaskManager(ui, scheduler);
+      showTasksHandle = bus.connect(namedMessageHandler('show_tasks', () => manager.show()));
+      addTaskTestHandle = bus.connect(namedMessageHandler('add_test_task', () => scheduler.addTask(task())));
+    },
+    stop: async injector => {
+      const bus = await injector.getInstance(BUS);
+      bus.disconnect(showTasksHandle);
+      bus.disconnect(addTaskTestHandle);
+    }
   });
 }

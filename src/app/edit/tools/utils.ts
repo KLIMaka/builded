@@ -7,21 +7,20 @@ import { Board, WALL_SPRITE } from "../../../build/board/structs";
 import { EntityType } from "../../../build/hitscan";
 import { slope, vec2ang, wallNormal, ZSCALE } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
-import { create, Module } from "../../../utils/injector";
+import { create, Module, plugin } from "../../../utils/injector";
 import { info } from "../../../utils/logger";
 import { int, trz } from "../../../utils/mathutils";
 import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, GRID, GridController, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
-import { BUS, MessageBus } from "../../apis/handler";
+import { BUS, BusPlugin, MessageBus } from "../../apis/handler";
 import { invalidateSectorAndWalls } from "../editutils";
 import { Commit, INVALIDATE_ALL, NamedMessage, SetPicnum } from "../messages";
 import { PicNumSelector, PICNUM_SELECTOR, Selected, SELECTED } from "./selection";
 import { DefaultTool, TOOLS_BUS } from "./toolsbus";
 
 export async function UtilsModule(module: Module) {
-  module.execute(async injector => {
-    const bus = await injector.getInstance(TOOLS_BUS);
-    bus.connect(await create(injector, Utils, BOARD, ENGINE_API, ART, VIEW, BUS, REFERENCE_TRACKER, GRID, PICNUM_SELECTOR, SELECTED));
-  });
+  module.bind(plugin('Utils'), new BusPlugin(async (injector, connect) => {
+    connect(await create(injector, Utils, BOARD, ENGINE_API, ART, VIEW, BUS, REFERENCE_TRACKER, GRID, PICNUM_SELECTOR, SELECTED));
+  }, TOOLS_BUS));
 }
 
 const SET_PICNUM = new SetPicnum(-1);

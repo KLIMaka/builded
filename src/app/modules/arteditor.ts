@@ -4,7 +4,7 @@ import { ArtPixelProvider } from "../../build/artpixelprovider";
 import { animate, ArtInfoProvider } from "../../build/formats/art";
 import { enumerate, range } from "../../utils/collections";
 import { drawToCanvas } from "../../utils/imgutils";
-import { create, Module } from "../../utils/injector";
+import { create, Module, plugin } from "../../utils/injector";
 import { iter } from "../../utils/iter";
 import { int } from "../../utils/mathutils";
 import { resize } from "../../utils/pixelprovider";
@@ -12,7 +12,7 @@ import { DrawPanel, PixelDataProvider } from "../../utils/ui/drawpanel";
 import { menuButton, search } from "../../utils/ui/renderers";
 import { addDragController, div, tag } from "../../utils/ui/ui";
 import { ART } from "../apis/app";
-import { BUS } from "../apis/handler";
+import { BUS, BusPlugin } from "../apis/handler";
 import { Ui, UI, Window } from "../apis/ui";
 import { namedMessageHandler } from "../edit/messages";
 import { PicNumCallback } from "../edit/tools/selection";
@@ -30,11 +30,10 @@ function createDrawPanel(arts: ArtInfoProvider, pal: Uint8Array, plu: (x: number
 }
 
 export async function ArtEditorModule(module: Module) {
-  module.execute(async injector => {
-    const bus = await injector.getInstance(BUS);
+  module.bind(plugin('ArtEditor'), new BusPlugin(async (injector, connect) => {
     const editor = await create(injector, ArtEditor, UI, ART, RAW_PAL, RAW_PLUs, PIC_TAGS, SHADOWSTEPS);
-    bus.connect(namedMessageHandler('show_artedit', () => editor.show()));
-  });
+    connect(namedMessageHandler('show_artedit', () => editor.show()));
+  }));
 }
 
 export class ArtEditor {

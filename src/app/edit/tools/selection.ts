@@ -3,9 +3,9 @@ import { nextwall } from "../../../build/board/query";
 import { Board } from "../../../build/board/structs";
 import { Entity, EntityType, Target } from "../../../build/hitscan";
 import { Deck } from "../../../utils/collections";
-import { create, Dependency, Module } from "../../../utils/injector";
+import { create, Dependency, instance, Module, plugin } from "../../../utils/injector";
 import { detuple0, detuple1 } from "../../../utils/mathutils";
-import { BUS, Message, MessageHandler, MessageHandlerList, MessageHandlerReflective, NULL_MESSAGE_HANDLER } from "../../apis/handler";
+import { BUS, BusPlugin, Message, MessageHandler, MessageHandlerList, MessageHandlerReflective, NULL_MESSAGE_HANDLER } from "../../apis/handler";
 import { RenderablesCache, RENDRABLES_CACHE } from "../../modules/geometry/cache";
 import { EntityFactory, ENTITY_FACTORY } from "../context";
 import { Frame, Highlight, NamedMessage, Render } from "../messages";
@@ -70,12 +70,11 @@ export const SELECTED = new Dependency<Selected>('Selected');
 
 export async function SelectionModule(module: Module) {
   let selection: Selection = null;
-  module.bindInstance(SELECTED, () => selection == null ? NULL_MESSAGE_HANDLER : selection.cloneSelected());
-  module.execute(async injector => {
-    const bus = await injector.getInstance(TOOLS_BUS);
+  module.bind(SELECTED, instance(() => selection == null ? NULL_MESSAGE_HANDLER : selection.cloneSelected()));
+  module.bind(plugin('Selection'), new BusPlugin(async (injector, connect) => {
     selection = await create(injector, Selection, RENDRABLES_CACHE, ENTITY_FACTORY);
-    bus.connect(selection);
-  });
+    connect(selection);
+  }, TOOLS_BUS));
 }
 
 export class Selection extends DefaultTool {

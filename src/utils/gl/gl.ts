@@ -1,16 +1,16 @@
 
 export function createContextFromCanvas(id: string, opts = {}): WebGLRenderingContext {
-  let canvas = <HTMLCanvasElement>document.getElementById(id);
-  let gl = <WebGLRenderingContext>canvas.getContext('webgl2', opts);
+  const canvas = <HTMLCanvasElement>document.getElementById(id);
+  const gl = <WebGLRenderingContext>canvas.getContext('webgl2', opts);
   return gl;
 }
 
 export function createContext(w: number, h: number, opts = {}): WebGLRenderingContext {
-  let canvas: HTMLCanvasElement = document.createElement('canvas');
+  const canvas: HTMLCanvasElement = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;
   canvas.id = 'gl';
-  let gl = <WebGLRenderingContext>canvas.getContext('webgl2', opts);
+  const gl = <WebGLRenderingContext>canvas.getContext('webgl2', opts);
 
   document.body.appendChild(canvas);
   document.body.style.overflow = 'hidden';
@@ -19,10 +19,10 @@ export function createContext(w: number, h: number, opts = {}): WebGLRenderingCo
 }
 
 function resize(gl: WebGLRenderingContext) {
-  let canvas = <HTMLCanvasElement>gl.canvas;
+  const canvas = <HTMLCanvasElement>gl.canvas;
 
-  let displayWidth = canvas.clientWidth;
-  let displayHeight = canvas.clientHeight;
+  const displayWidth = canvas.clientWidth;
+  const displayHeight = canvas.clientHeight;
 
   if (canvas.width != displayWidth || canvas.height != displayHeight) {
 
@@ -38,7 +38,7 @@ export function animate(gl: WebGLRenderingContext, callback: (gl: WebGLRendering
 
   function update() {
     resize(gl);
-    let now = new Date().getTime();
+    const now = new Date().getTime();
     callback(gl, (now - time) / 1000);
     requestAnimationFrame(update);
     time = now;
@@ -47,7 +47,7 @@ export function animate(gl: WebGLRenderingContext, callback: (gl: WebGLRendering
   update();
 }
 
-let pixel = new Uint8Array(4);
+const pixel = new Uint8Array(4);
 export function readId(gl: WebGLRenderingContext, x: number, y: number): number {
   gl.readPixels(x, gl.drawingBufferHeight - y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
   return pixel[0] | pixel[1] << 8 | pixel[2] << 16 /*| pixel[3]<<24*/;

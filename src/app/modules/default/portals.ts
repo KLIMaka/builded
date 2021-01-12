@@ -2,7 +2,7 @@ import { getPortals } from "../../../build/board/portalizer";
 import { Board } from "../../../build/board/structs";
 import { range } from "../../../utils/collections";
 import { Injector } from "../../../utils/injector";
-import { BOARD, Portals, STATE } from "../../apis/app";
+import { BOARD, STATE } from "../../apis/app";
 import { BUS, Handle, MessageHandlerReflective } from "../../apis/handler";
 import { BoardInvalidate, INVALIDATE_ALL, NamedMessage } from "../../edit/messages";
 import { INTERSECTOR_WALL_COLOR, PORTAL_WALL_COLOR } from "../geometry/cache";

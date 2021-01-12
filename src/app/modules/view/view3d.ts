@@ -207,44 +207,9 @@ export class View3d extends MessageHandlerReflective implements View {
     return t;
   }
 
-  private minScale(x: number) {
-    let scale = 1;
-    x = int(x);
-    while ((x & 1) == 0 && scale <= 1024) {
-      x >>= 1;
-      scale <<= 1;
-    }
-    return scale;
-  }
-
-  private updateGridSize() {
-    if (this.state.get('move')) return;
-    const target = this.target();
-    if (target.entity == null) return;
-    const board = this.board();
-    const d = 64;
-    const w = this.getClosestWall(target, d);
-    if (w != -1) {
-      const wall = board.walls[w];
-      const scale = Math.min(this.minScale(wall.x), this.minScale(wall.y), this.gridController.getGridSize());
-      this.gridController.setGridSize(scale);
-    } else if (target.entity.isSprite()) {
-      const sprite = board.sprites[target.entity.id];
-      const scale = Math.min(this.minScale(sprite.x), this.minScale(sprite.y), this.gridController.getGridSize());
-      this.gridController.setGridSize(scale);
-      // } else if (target.entity.isWall()) {
-      //   const [x, y] = snapWall(target.entity.id, target.coords[0], target.coords[1], board, this.gridController);
-      //   const scale = Math.min(this.minScale(x), this.minScale(y), this.gridController.getGridSize());
-      //   this.gridController.setGridSize(scale);
-    } /*else if (target.entity.isSector()) {
-      this.gridController.setGridSize(512)
-    }*/
-  }
-
   private updateSnapTarget(t: TargetImpl): Target {
     const target = this.target();
     if (target.entity == null) return this.copyTarget(target, t);
-    // this.updateGridSize();
     const d = this.gridController.getGridSize() / 8;
     const w = this.getClosestWall(target, d);
     if (w != -1) {

@@ -1,6 +1,6 @@
 import { Bitvec } from "../src/utils/bitvec"
 
-test('', () => {
+test('bitvec', () => {
   const bitvec = new Bitvec(1);
 
   bitvec.set(0, true);

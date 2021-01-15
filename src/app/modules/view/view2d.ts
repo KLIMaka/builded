@@ -99,15 +99,12 @@ export class View2d extends MessageHandlerReflective implements View {
     this.renderer.draw(this, campos, dist, this.control);
 
     const state = this.state;
-    if (state.get('zoom+')) { this.upp.set(this.upp.get() / 1.3); this.recalcGridSize(); }
-    if (state.get('zoom-')) { this.upp.set(this.upp.get() * 1.3); this.recalcGridSize(); }
+    if (state.get('zoom+')) this.upp.set(this.upp.get() / 1.3)
+    if (state.get('zoom-')) this.upp.set(this.upp.get() * 1.3)
 
     this.control.setUnitsPerPixel(this.upp.get());
   }
 
-  private recalcGridSize() {
-    // this.gridController.setGridSize((this.control.getUnitsPerPixel() + 0.5) * 32);
-  }
 
   private invalidateTarget() {
     this.snapTargetValue.invalidate();
@@ -135,39 +132,37 @@ export class View2d extends MessageHandlerReflective implements View {
     return hit;
   }
 
+  private updateTarget(target: TargetImpl, x: number, y: number, z: number, ent: Entity) {
+    target.coords_[0] = x;
+    target.coords_[1] = y;
+    target.coords_[2] = z;
+    target.entity_ = ent;
+    return target;
+  }
+
   private updateSnapTarget(target: TargetImpl) {
     const board = this.board();
-    const d = this.gridController.getGridSize() / 2;
+    const d = this.gridController.getGridSize() / 4;
     const s = closestSpriteInSector(board, this.sec, this.x, this.y, d);
     if (s != -1) {
       const sprite = board.sprites[s];
-      target.coords_[0] = sprite.x
-      target.coords_[1] = sprite.y;
-      target.coords_[2] = sprite.z;
-      target.entity_ = new Entity(s, EntityType.SPRITE);
-      return target;
+      return this.updateTarget(target, sprite.x, sprite.y, sprite.z, new Entity(s, EntityType.SPRITE));
     }
     const w = closestWallPoint(board, this.x, this.y, d);
     if (w != -1) {
       const wall = board.walls[w];
-      target.coords_[0] = wall.x
-      target.coords_[1] = wall.y;
-      target.entity_ = new Entity(w, EntityType.WALL_POINT);
-      return target;
+      return this.updateTarget(target, wall.x, wall.y, 0, new Entity(w, EntityType.WALL_POINT));
     }
     const ws = closestWallSegment(board, this.x, this.y, d);
     if (ws != -1) {
       const [x, y] = snapWall(board, ws, this.x, this.y, this.gridController);
-      target.coords_[0] = x;
-      target.coords_[1] = y;
-      target.entity_ = new Entity(ws, EntityType.MID_WALL);
-      return target;
+      return this.updateTarget(target, x, y, 0, new Entity(ws, EntityType.MID_WALL));
     }
-    target.coords_[0] = this.gridController.snap(this.x);
-    target.coords_[1] = this.gridController.snap(this.y);
+    const x = this.gridController.snap(this.x);
+    const y = this.gridController.snap(this.y);
     const sectorId = findSector(board, this.x, this.y, this.sec);
-    target.entity_ = sectorId == -1 ? null : new Entity(sectorId, EntityType.FLOOR);
-    return target;
+    const ent = sectorId == -1 ? null : new Entity(sectorId, EntityType.FLOOR);
+    return this.updateTarget(target, x, y, 0, ent);
   }
 
   private updateDir(ray: Ray): Ray {

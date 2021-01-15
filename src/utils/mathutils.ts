@@ -1,7 +1,7 @@
-export var radsInDeg = 180 / Math.PI;
-export var degInRad = Math.PI / 180;
-export var PI2 = Math.PI * 2;
-export var EPS = 1e-9;
+export const radsInDeg = 180 / Math.PI;
+export const degInRad = Math.PI / 180;
+export const PI2 = Math.PI * 2;
+export const EPS = 1e-9;
 
 export function eq(lh: number, rh: number) {
   return Math.abs(lh - rh) < EPS;
@@ -66,15 +66,15 @@ export function len2d(x: number, y: number) {
 }
 
 export function lenPointToLine(px: number, py: number, l1x: number, l1y: number, l2x: number, l2y: number) {
-  let ldx = l2x - l1x;
-  let ldy = l2y - l1y;
-  let pdx = px - l1x;
-  let pdy = py - l1y;
-  let dot = dot2d(ldx, ldy, pdx, pdy);
+  const ldx = l2x - l1x;
+  const ldy = l2y - l1y;
+  const pdx = px - l1x;
+  const pdy = py - l1y;
+  const dot = dot2d(ldx, ldy, pdx, pdy);
   if (dot <= 0) return len2d(pdx, pdy);
-  let llensqr = sqrLen2d(ldx, ldy);
+  const llensqr = sqrLen2d(ldx, ldy);
   if (dot >= llensqr) return len2d(px - l2x, py - l2y);
-  let t = dot / llensqr;
+  const t = dot / llensqr;
   return len2d(px - (l1x + ldx * t), py - (l1y + ldy * t));
 }
 
@@ -106,10 +106,6 @@ export function arcsIntersects(a1s: number, a1e: number, a2s: number, a2e: numbe
 export function cyclic(x: number, max: number): number {
   const mod = x % max;
   return x >= 0 ? mod : mod == 0 ? max - 1 : max + mod;
-}
-
-export function reverse(x: number, max: number) {
-  return max - x;
 }
 
 export function ubyte2byte(n: number) {

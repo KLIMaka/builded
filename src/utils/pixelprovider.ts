@@ -2,7 +2,7 @@ import * as  MU from './mathutils';
 
 export type BlendFunc = (dst: Uint8Array, dstoff: number, src: Uint8Array, srcoff: number) => void;
 
-export var BlendNormal = (dst: Uint8Array, dstoff: number, src: Uint8Array, srcoff: number) => {
+export const BlendNormal = (dst: Uint8Array, dstoff: number, src: Uint8Array, srcoff: number) => {
   // dst.set(src.slice(srcoff, srcoff+4), dstoff);
   dst[dstoff] = src[srcoff];
   dst[dstoff + 1] = src[srcoff + 1];
@@ -10,9 +10,9 @@ export var BlendNormal = (dst: Uint8Array, dstoff: number, src: Uint8Array, srco
   dst[dstoff + 3] = src[srcoff + 3];
 }
 
-export var BlendAlpha = (dst: Uint8Array, dstoff: number, src: Uint8Array, srcoff: number) => {
-  var a = src[srcoff + 3] / 255;
-  var _a = 1 - a;
+export const BlendAlpha = (dst: Uint8Array, dstoff: number, src: Uint8Array, srcoff: number) => {
+  const a = src[srcoff + 3] / 255;
+  const _a = 1 - a;
   dst[dstoff] = src[srcoff] * a + dst[dstoff] * _a;
   dst[dstoff + 1] = src[srcoff + 1] * a + dst[dstoff + 1] * _a;
   dst[dstoff + 2] = src[srcoff + 2] * a + dst[dstoff + 2] * _a;
@@ -37,7 +37,7 @@ export class AbstractPixelProvider implements PixelProvider {
   public putToDst(x: number, y: number, dst: Uint8Array, dstoff: number, blend: BlendFunc): void { }
 
   public getPixel(x: number, y: number): Uint8Array {
-    var dst = new Uint8Array(4);
+    const dst = new Uint8Array(4);
     this.putToDst(x, y, dst, 0, BlendNormal);
     return dst;
   }
@@ -51,9 +51,9 @@ export class AbstractPixelProvider implements PixelProvider {
   }
 
   public render(dst: Uint8Array, blend: BlendFunc = BlendNormal): void {
-    var off = 0;
-    for (var y = 0; y < this.h; y++) {
-      for (var x = 0; x < this.w; x++) {
+    let off = 0;
+    for (let y = 0; y < this.h; y++) {
+      for (let x = 0; x < this.w; x++) {
         this.putToDst(x, y, dst, off, blend);
         off += 4;
       }
@@ -81,7 +81,7 @@ export class RGBAArrayPixelProvider extends AbstractPixelProvider {
   }
 
   public putToDst(x: number, y: number, dst: Uint8Array, dstoff: number, blend: BlendFunc): void {
-    var w = this.getWidth();
+    const w = this.getWidth();
     blend(dst, dstoff, this.arr, (x + y * w) * 4)
   }
 }
@@ -104,13 +104,13 @@ export class RGBPalPixelProvider extends AbstractPixelProvider {
   }
 
   public putToDst(x: number, y: number, dst: Uint8Array, dstoff: number, blend: BlendFunc): void {
-    var w = this.getWidth();
-    var idx = this.arr[x + y * w];
+    const w = this.getWidth();
+    const idx = this.arr[x + y * w];
     if (idx == this.shadow) {
       blend(dst, dstoff, this.shadowColor, 0);
       return;
     }
-    var paloff = idx * 3;
+    const paloff = idx * 3;
     // this.palTmp.set(this.pal.slice(paloff, paloff + 3));
     this.palTmp[0] = this.pal[paloff];
     this.palTmp[1] = this.pal[paloff + 1];
@@ -140,8 +140,8 @@ export class RectPixelProvider extends AbstractPixelProvider {
   }
 
   public putToDst(x: number, y: number, dst: Uint8Array, dstoff: number, blend: BlendFunc): void {
-    var nx = this.sx + x;
-    var ny = this.sy + y;
+    const nx = this.sx + x;
+    const ny = this.sy + y;
     if (nx < 0 || ny < 0 || nx >= this.origw || ny >= this.origh)
       blend(dst, dstoff, this.paddColor, 0);
     else
@@ -197,8 +197,8 @@ export class OffsetPixelProvider extends AbstractPixelProvider {
   }
 
   public putToDst(x: number, y: number, dst: Uint8Array, dstoff: number, blend: BlendFunc): void {
-    var rx = x - this.xo;
-    var ry = y - this.yo;
+    const rx = x - this.xo;
+    const ry = y - this.yo;
     if (rx < 0 || ry < 0 || rx >= this.provider.getWidth() || ry >= this.provider.getHeight())
       blend(dst, dstoff, this.paddColor, 0);
     else
@@ -233,8 +233,8 @@ export function rect(provider: PixelProvider, sx: number, sy: number, ex: number
 }
 
 export function center(provider: PixelProvider, w: number, h: number, paddColod: Uint8Array = new Uint8Array([0, 0, 0, 0])) {
-  var dw = MU.int((provider.getWidth() - w) / 2);
-  var dh = MU.int((provider.getHeight() - h) / 2);
+  const dw = MU.int((provider.getWidth() - w) / 2);
+  const dh = MU.int((provider.getHeight() - h) / 2);
   return rect(provider, dw, dh, w + dw, h + dh);
 
 }
@@ -249,14 +249,14 @@ export function fit(w: number, h: number, provider: PixelProvider, paddColor: Ui
   if (provider.getHeight() == h && provider.getWidth() == w)
     return provider;
   if (provider.getWidth() <= w && provider.getHeight() <= h) {
-    var sx = MU.int((provider.getWidth() - w) / 2);
-    var sy = MU.int((provider.getHeight() - h) / 2);
+    const sx = MU.int((provider.getWidth() - w) / 2);
+    const sy = MU.int((provider.getHeight() - h) / 2);
     return rect(provider, sx, sy, w + sx, h + sy, paddColor);
   } else {
-    var aspect = provider.getWidth() / provider.getHeight();
-    var nw = provider.getWidth();
-    var nh = provider.getHeight();
-    var r = false;
+    const aspect = provider.getWidth() / provider.getHeight();
+    let nw = provider.getWidth();
+    let nh = provider.getHeight();
+    let r = false;
     if (nw > w) {
       nw = w;
       nh = MU.int(nw / aspect);
@@ -268,8 +268,8 @@ export function fit(w: number, h: number, provider: PixelProvider, paddColor: Ui
       r = true;
     }
     if (r) {
-      var sx = MU.int((nw - w) / 2);
-      var sy = MU.int((nh - h) / 2);
+      const sx = MU.int((nw - w) / 2);
+      const sy = MU.int((nh - h) / 2);
       return rect(resize(provider, nw, nh), sx, sy, w + sx, h + sy, paddColor);
     } else {
       return resize(provider, w, h);

@@ -7,6 +7,7 @@ import { FileSystem, FS, UrlFs } from "./fs";
 import { createLocalFs } from "./local";
 import { FS_MANAGER } from "./manager";
 import { MountableFs, MOUNTS } from "./mount";
+import { LocalFsProvider } from "./localmanager";
 
 function createDb(name: string) {
   let db: Storage = null;
@@ -45,8 +46,8 @@ const mounts: FileSystem[] = [];
 export function DbFsModule(rom: string = null) {
   return (module: Module) => {
     module.bind(STORAGES, StorageDbConstructor);
-    module.bind(FS, MountableFs);
-    module.bind(MOUNTS, instance(() => mounts));
+    module.bind(FS, LocalFsProvider);
+    // module.bind(MOUNTS, instance(() => mounts));
     module.bind(FS_MANAGER, StorageFsManager);
 
     module.bind(plugin('FileSystem'), new BusPlugin(async (injector, connect) => {
@@ -54,7 +55,7 @@ export function DbFsModule(rom: string = null) {
       mounts.push(await StorageFs(injector))
 
       connect(namedMessageHandler('add_mount', async () => {
-        mounts.push(await createLocalFs())
+        mounts.push(await createLocalFs(await window.showDirectoryPicker()))
       }));
     }));
   }

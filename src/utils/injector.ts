@@ -48,12 +48,7 @@ export class App implements Module {
 
   public async start() {
     this.injector = new RootInjector(this.plugins);
-    const voidPlugins = iter(this.plugins.entries()).filter(e => e[0].isVoid).map(e => this.injector.getInstance(e[0])).collect();
-    await Promise.all(voidPlugins);
-  }
-
-  public async replaceInstance<T>(dependency: Dependency<T>, provider: Plugin<T>): Promise<void> {
-    await this.injector.replaceInstance(dependency, provider);
+    await Promise.all(iter(this.plugins.entries()).filter(e => e[0].isVoid).map(e => this.injector.getInstance(e[0])).collect());
   }
 }
 

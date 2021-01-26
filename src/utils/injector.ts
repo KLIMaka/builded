@@ -21,6 +21,11 @@ export interface Injector {
   getInstance<T>(dependency: Dependency<T>): Promise<T>;
 }
 
+export interface Runtime {
+  stop(): Promise<void>;
+  replaceInstance<T>(dependency: Dependency<T>, provider: Plugin<T>): Promise<void>;
+}
+
 interface ParentInjector extends Injector {
   getInstanceParent<T>(dependency: Dependency<T>, injector: Injector): Promise<T>;
 }
@@ -34,7 +39,6 @@ class ChildInjector<T> implements ParentInjector {
 
 export class App implements Module {
   private plugins = new Map<Dependency<any>, Plugin<any>>();
-  private injector: RootInjector;
 
   public bind<T>(dependency: Dependency<T>, plugin: Plugin<T>): void {
     const p = this.plugins.get(dependency);
@@ -46,9 +50,10 @@ export class App implements Module {
     submodule(this);
   }
 
-  public async start() {
-    this.injector = new RootInjector(this.plugins);
-    await Promise.all(iter(this.plugins.entries()).filter(e => e[0].isVoid).map(e => this.injector.getInstance(e[0])).collect());
+  public async start(): Promise<Runtime> {
+    const injector = new RootInjector(this.plugins);
+    await Promise.all(iter(this.plugins.entries()).filter(e => e[0].isVoid).map(e => injector.getInstance(e[0])).collect());
+    return injector;
   }
 }
 
@@ -62,11 +67,16 @@ function getDependencyChain(dependency: Dependency<any>, injector: Injector) {
   return chain;
 }
 
-class RootInjector implements ParentInjector {
+class RootInjector implements ParentInjector, Runtime {
   private graph = new DirecredGraph<Dependency<any>>();
   private instances = new Map<Dependency<any>, Promise<any>>();
 
   constructor(private providers: Map<Dependency<any>, Plugin<any>>) { }
+
+
+  async stop(): Promise<void> {
+    await Promise.all([...map(this.graph.orderedAll(), d => this.providers.get(d).stop(this))]);
+  }
 
   private add<T>(dependency: Dependency<T>, injector: Injector) {
     this.graph.addChain(getDependencyChain(dependency, injector));
@@ -89,7 +99,7 @@ class RootInjector implements ParentInjector {
   }
 
   public async replaceInstance<T>(dependency: Dependency<T>, provider: Plugin<T>): Promise<void> {
-    const toStop = this.graph.orderedSet(dependency);
+    const toStop = this.graph.orderedTo(dependency);
     await Promise.all([...map(toStop, d => this.providers.get(d).stop(this))]);
     forEach(toStop, d => { this.graph.remove(d); this.instances.delete(d) });
     this.providers.set(dependency, provider);

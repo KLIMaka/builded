@@ -37,15 +37,18 @@ export class DirecredGraph<T> {
     return maxorder + 1;
   }
 
-  public orderedSet(node: T) {
+  public orderedTo(node: T) {
     const result = new Set<T>();
     result.add(node);
-    for (const n of result) {
-      for (const nn of iter(this.nodes.entries()).filter(e => e[1].has(n)).map(e => e[0]))
-        if (!result.has(nn)) result.add(nn);
-    }
+    for (const n of result)
+      iter(this.nodes.entries()).filter(e => e[1].has(n)).map(e => e[0]).forEach(e => result.add(e));
     const order = memoize((n: T) => this.order(n));
-    return [...result].sort((l, r) => order(l) - order(r));
+    return [...result].sort((l, r) => order(r) - order(l));
+  }
+
+  public orderedAll() {
+    const order = memoize((n: T) => this.order(n));
+    return [...this.nodes.keys()].sort((l, r) => order(r) - order(l));
   }
 
   public findCycle(): T[] {

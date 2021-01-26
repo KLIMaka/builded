@@ -47,5 +47,6 @@ test('order', () => {
   graph.add('d', 'x');
 
   expect(['a', 'b', 'c', 'd', 'e', 'f'].map(e => graph.order(e))).toStrictEqual([2, 2, 1, 1, 0, 2]);
-  expect(graph.orderedSet('e')).toStrictEqual(['e', 'd', 'c', 'a', 'b', 'f']);
+  expect(graph.orderedTo('e')).toStrictEqual(['a', 'b', 'f', 'd', 'c', 'e']);
+  expect(graph.orderedAll()).toStrictEqual(['a', 'b', 'f', 'd', 'c', 'g', 'e', 'h', 'x']);
 });

@@ -71,10 +71,10 @@ test('injector test', async done => {
       c.foo(2);
     }
   });
-  await app.start();
+  const runtime = await app.start();
 
   expected = 43;
-  await app.replaceInstance(B, provider(async i => { return { foo: arg => arg + 1 } }));
+  await runtime.replaceInstance(B, provider(async i => { return { foo: arg => arg + 1 } }));
   done();
 });
 
@@ -170,24 +170,28 @@ test('test', async done => {
       log.push('Main2-');
     }
   });
-  await app.start();
+  const runtime = await app.start();
 
   expect(log).toStrictEqual(['Main+', 'OP+', 'A+', 'B+', 'Main1+', 'Main2+']);
 
   ref_b = 11;
   ref_op = ref_a + ref_b;
 
-  await app.replaceInstance(B, {
+  log.splice(0, log.length);
+  await runtime.replaceInstance(B, {
     start: async i => {
-      log.push('B+');
+      log.push('nB+');
       return ref_b;
     },
     stop: async i => {
-      log.push('B-');
+      log.push('nB-');
     }
   });
+  expect(log).toStrictEqual(['Main-', 'OP-', 'Main1-', 'B-', 'Main+', 'OP+', 'nB+', 'Main1+']);
 
-  expect(log).toStrictEqual(['Main+', 'OP+', 'A+', 'B+', 'Main1+', 'Main2+', 'B-', 'OP-', 'Main1-', 'Main-', 'Main1+', 'B+', 'Main+', 'OP+']);
+  log.splice(0, log.length);
+  await runtime.stop();
+  expect(log).toStrictEqual(['Main-', 'Main2-', 'OP-', 'Main1-', 'A-', 'nB-']);
 
   done();
 });

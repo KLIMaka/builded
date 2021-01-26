@@ -21,7 +21,7 @@ export interface Injector {
   getInstance<T>(dependency: Dependency<T>): Promise<T>;
 }
 
-export interface Runtime {
+export interface Runtime extends Injector {
   stop(): Promise<void>;
   replaceInstance<T>(dependency: Dependency<T>, provider: Plugin<T>): Promise<void>;
 }
@@ -67,12 +67,15 @@ function getDependencyChain(dependency: Dependency<any>, injector: Injector) {
   return chain;
 }
 
+export const RUNTIME = new Dependency<Runtime>('Runtime');
+
 class RootInjector implements ParentInjector, Runtime {
   private graph = new DirecredGraph<Dependency<any>>();
   private instances = new Map<Dependency<any>, Promise<any>>();
 
-  constructor(private providers: Map<Dependency<any>, Plugin<any>>) { }
-
+  constructor(private providers: Map<Dependency<any>, Plugin<any>>) {
+    this.instances.set(RUNTIME, Promise.resolve(this));
+  }
 
   async stop(): Promise<void> {
     await Promise.all([...map(this.graph.orderedAll(), d => this.providers.get(d).stop(this))]);

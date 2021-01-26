@@ -5,7 +5,7 @@ export class StateImpl implements State {
 
   register<T>(name: string, defaultValue: T): void {
     const prevState = this.state[name];
-    if (prevState != undefined) throw new Error(`Redefining state ${name}`);
+    // if (prevState != undefined) throw new Error(`Redefining state ${name}`);
     this.state[name] = defaultValue;
   }
 

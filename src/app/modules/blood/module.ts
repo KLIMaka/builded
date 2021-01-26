@@ -13,7 +13,7 @@ import { BOARD, ENGINE_API, RESOURCES } from '../../apis/app';
 import { BUS, BusPlugin } from '../../apis/handler';
 import { LoadBoard, namedMessageHandler } from '../../edit/messages';
 import { showMapNameSelection } from '../../modules/default/mapnamedialog';
-import { Palette, PIC_TAGS, RAW_PAL, RAW_PLUs } from '../artselector';
+import { Palette, PicTags, PIC_TAGS, RAW_PAL, RAW_PLUs } from '../artselector';
 import { ART_FILES, GL, PARALLAX_TEXTURES } from '../buildartprovider';
 import { FileSystem, FS } from '../fs/fs';
 import { FS_MANAGER } from '../fs/manager';
@@ -21,7 +21,7 @@ import { PALSWAPS, PAL_TEXTURE, PLU_TEXTURE, SHADOWSTEPS } from '../gl/buildgl';
 import { MAP_NAMES, showMapSelection } from '../selectmap';
 import { Implementation_ } from '../view/boardrenderer3d';
 
-const loadArtFiles = provider(async (injector: Injector): Promise<ArtFiles> => {
+const artFiles = provider(async (injector: Injector): Promise<ArtFiles> => {
   const res = await injector.getInstance(RESOURCES);
   const arts: ArtFile[] = [];
   for (let a = 0; a < 100; a++) {
@@ -34,23 +34,23 @@ const loadArtFiles = provider(async (injector: Injector): Promise<ArtFiles> => {
   return new ArtFiles(arts);
 });
 
-const loadPLUs = provider(async (injector: Injector) => {
+const PLUs = provider(async (injector: Injector) => {
   return (await injector.getInstance(RAW_PLUs)).length;
 });
 
-const loadPalTexture = provider(async (injector: Injector) => {
+const palTexture = provider(async (injector: Injector) => {
   const [pal, gl] = await getInstances(injector, RAW_PAL, GL);
   return createTexture(256, 1, gl, { filter: gl.NEAREST }, pal, gl.RGB, 3);
 });
 
-const loarRawPlus = provider(async (injector: Injector) => {
+const rawPlus = provider(async (injector: Injector) => {
   const res = await injector.getInstance(RESOURCES)
   const palettes = ['NORMAL', 'SATURATE', 'BEAST', 'TOMMY', 'SPIDER3', 'GRAY', 'GRAYISH', 'SPIDER1', 'SPIDER2', 'FLAME', 'COLD', 'P1', 'P2', 'P3', 'P4'];
   const plus = await Promise.all(palettes.map(p => res.get(p + '.PLU')));
   return iter(enumerate(plus)).filter(([p, i]) => p != null).map(([p, i]) => <Palette>{ name: palettes[i], plu: new Uint8Array(p) }).collect();
 });
 
-const loadPluTexture = provider(async (injector: Injector) => {
+const pluTexture = provider(async (injector: Injector) => {
   const [plus, gl, shadowsteps] = await getInstances(injector, RAW_PLUs, GL, SHADOWSTEPS);
   const tex = new Uint8Array(256 * shadowsteps * plus.length);
   for (const [plu, i] of enumerate(plus)) tex.set(plu.plu, 256 * shadowsteps * i);
@@ -96,7 +96,7 @@ function mapSaver(module: Module) {
   }));
 }
 
-const getMapNames = provider(async (injector: Injector) => {
+const mapNames = provider(async (injector: Injector) => {
   const res = await injector.getInstance(RESOURCES);
   return () => res.list().then(list => list.filter(f => f.toLowerCase().endsWith('.map')));
 });
@@ -121,7 +121,7 @@ async function loadRffFs(injector: Injector): Promise<FileSystem> {
     }
 }
 
-const loadPal = provider(async (injector: Injector) => {
+const pal = provider(async (injector: Injector) => {
   const res = await injector.getInstance(RESOURCES);
   return new Uint8Array(await res.get('BLOOD.PAL'));
 });
@@ -129,7 +129,7 @@ const loadPal = provider(async (injector: Injector) => {
 const BloodResources = provider(async (injector: Injector) => {
   const fs = await injector.getInstance(FS);
   const rfffs = await loadRffFs(injector);
-  return {
+  return <FileSystem>{
     get: async name => {
       const file = await fs.get(name);
       if (file != null) return file;
@@ -143,18 +143,25 @@ const BloodResources = provider(async (injector: Injector) => {
   }
 });
 
-const PicTags = provider(async (injector: Injector) => {
+const picTags = provider(async (injector: Injector) => {
   const fs = await injector.getInstance(FS);
-  const surface = new Uint8Array(await fs.get('SURFACE.DAT'));
+  const surfaceDat = await fs.get('SURFACE.DAT');
+  if (surfaceDat == null) return <PicTags>{ allTags: () => [], tags: id => [] }
+  return loadTags(surfaceDat);
+});
+
+function loadTags(surfaceDat: ArrayBuffer) {
+  const surface = new Uint8Array(surfaceDat);
   const tags = ['None', 'Stone', 'Metal', 'Wood', 'Flesh', 'Water', 'Dirt', 'Clay', 'Snow', 'Ice', 'Leaves', 'Cloth', 'Plant', 'Goo', 'Lava'];
-  return {
-    allTags() { return tags },
-    tags(id: number) {
-      if (surface.length <= id) return []
+  return <PicTags>{
+    allTags: () => tags,
+    tags: id => {
+      if (surface.length <= id)
+        return [];
       return [tags[surface[id]]];
     }
-  }
-});
+  };
+}
 
 function engineApi(): EngineApi {
   return { cloneBoard, cloneWall, cloneSprite, cloneSector, newWall, newSector, newSprite, newBoard };
@@ -165,15 +172,15 @@ export function BloodModule(module: Module) {
   module.bind(ENGINE_API, instance(engineApi()));
   module.bind(SHADOWSTEPS, instance(64));
   module.bind(RESOURCES, BloodResources);
-  module.bind(ART_FILES, loadArtFiles);
-  module.bind(RAW_PAL, loadPal);
-  module.bind(RAW_PLUs, loarRawPlus);
-  module.bind(PALSWAPS, loadPLUs);
-  module.bind(PAL_TEXTURE, loadPalTexture);
-  module.bind(PLU_TEXTURE, loadPluTexture);
+  module.bind(ART_FILES, artFiles);
+  module.bind(RAW_PAL, pal);
+  module.bind(RAW_PLUs, rawPlus);
+  module.bind(PALSWAPS, PLUs);
+  module.bind(PAL_TEXTURE, palTexture);
+  module.bind(PLU_TEXTURE, pluTexture);
   module.bind(Implementation_, BloodImplementationConstructor);
-  module.bind(MAP_NAMES, getMapNames);
-  module.bind(PIC_TAGS, PicTags);
+  module.bind(MAP_NAMES, mapNames);
+  module.bind(PIC_TAGS, picTags);
 
   module.install(mapLoader);
   module.install(mapSaver);

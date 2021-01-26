@@ -1,4 +1,4 @@
-import { Injector, instance, Module, plugin, provider } from "../../../utils/injector";
+import { Injector, instance, Module, plugin, provider, RUNTIME } from "../../../utils/injector";
 import { Storage, STORAGES } from "../../apis/app";
 import { BusPlugin } from "../../apis/handler";
 import { namedMessageHandler } from "../../edit/messages";
@@ -42,20 +42,23 @@ const StorageFsManager = provider(async (injector: Injector) => {
   }
 });
 
-const mounts: FileSystem[] = [];
+const RomFs = (rom: string) => provider(async (injector: Injector) => {
+  return rom == null ? [] : [await UrlFs(rom)(injector)];
+});
+
 export function DbFsModule(rom: string = null) {
   return (module: Module) => {
     module.bind(STORAGES, StorageDbConstructor);
-    module.bind(FS, LocalFsProvider);
-    // module.bind(MOUNTS, instance(() => mounts));
+    module.bind(FS, MountableFs);
+    module.bind(MOUNTS, RomFs(rom));
     module.bind(FS_MANAGER, StorageFsManager);
 
     module.bind(plugin('FileSystem'), new BusPlugin(async (injector, connect) => {
-      if (rom != null) mounts.push(await UrlFs(rom)(injector));
-      mounts.push(await StorageFs(injector))
-
       connect(namedMessageHandler('add_mount', async () => {
-        mounts.push(await createLocalFs(await window.showDirectoryPicker()))
+        const mounts = await injector.getInstance(MOUNTS);
+        const newFs = await createLocalFs(await window.showDirectoryPicker());
+        const runtime = await injector.getInstance(RUNTIME);
+        runtime.replaceInstance(MOUNTS, instance([newFs, ...mounts]));
       }));
     }));
   }

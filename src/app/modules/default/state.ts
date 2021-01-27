@@ -3,10 +3,15 @@ import { State } from "../../apis/app";
 export class StateImpl implements State {
   private state: { [index: string]: any } = {};
 
-  register<T>(name: string, defaultValue: T): void {
+  register<T>(name: string, defaultValue: T): string {
     const prevState = this.state[name];
-    // if (prevState != undefined) throw new Error(`Redefining state ${name}`);
+    if (prevState != undefined) throw new Error(`Redefining state ${name}`);
     this.state[name] = defaultValue;
+    return name;
+  }
+
+  unregister(name: string): void {
+    delete this.state[name];
   }
 
   set<T>(name: string, value: T): void {

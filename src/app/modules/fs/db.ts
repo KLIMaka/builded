@@ -7,7 +7,6 @@ import { FileSystem, FS, UrlFs } from "./fs";
 import { createLocalFs } from "./local";
 import { FS_MANAGER } from "./manager";
 import { MountableFs, MOUNTS } from "./mount";
-import { LocalFsProvider } from "./localmanager";
 
 function createDb(name: string) {
   let db: Storage = null;

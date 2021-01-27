@@ -135,7 +135,7 @@ class BuildBufferFactoryImpl implements BuildBufferFactory {
       .addVertexBuffer(this.gl, this.gl.FLOAT, 3)
       .addVertexBuffer(this.gl, this.gl.FLOAT, 3)
       .addVertexBuffer(this.gl, this.gl.FLOAT, 4));
-    let buffers = this.buffers.get(hint);
+    const buffers = this.buffers.get(hint);
     buffers.push(buffer);
     return buffer;
   }

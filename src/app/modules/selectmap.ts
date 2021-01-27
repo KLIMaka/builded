@@ -1,5 +1,5 @@
 import { Dependency, Injector } from "../../utils/injector";
-import { span, Table } from "../../utils/ui/ui";
+import { replaceContent, span, Table } from "../../utils/ui/ui";
 import { UI, Window } from "../apis/ui";
 
 export const MAP_NAMES = new Dependency<() => Promise<string[]>>('MapNames');
@@ -29,9 +29,7 @@ export function showMapSelection(injector: Injector): Promise<string> {
       win.hide();
       resolve(map);
     }));
-    const lastTable = win.contentElement.firstChild;
-    if (lastTable) win.contentElement.removeChild(lastTable);
-    win.contentElement.appendChild(table.elem());
+    replaceContent(win.contentElement, table.elem());
     win.show();
   })
 }

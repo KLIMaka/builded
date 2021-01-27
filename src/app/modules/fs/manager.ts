@@ -1,9 +1,9 @@
 import { saveAs } from "../../../utils/filesave";
-import { create, Dependency, Module, plugin } from "../../../utils/injector";
+import { create, Dependency, lifecycle, Module, plugin } from "../../../utils/injector";
 import { iter } from "../../../utils/iter";
-import { IconText, IconTextRenderer, renderGrid } from "../../../utils/ui/renderers";
+import { GridModel, IconText, IconTextRenderer, renderGrid } from "../../../utils/ui/renderers";
 import { addDragAndDrop, Element, replaceContent } from "../../../utils/ui/ui";
-import { BusPlugin } from "../../apis/handler";
+import { BUS, busDisconnector, BusPlugin } from "../../apis/handler";
 import { UI, Ui, Window } from "../../apis/ui";
 import { namedMessageHandler } from "../../edit/messages";
 
@@ -21,7 +21,9 @@ export interface FsManagers {
   add(name: string, manager: FsManager): void;
 }
 
-class FileBrowser {
+const columns = [IconTextRenderer];
+
+class FileBrowser implements GridModel {
   private window: Window;
   private selected = new Set<string>();
   private dragAndDropHandler = (e: DragEvent) => {
@@ -36,16 +38,6 @@ class FileBrowser {
       }
     }
   }
-  private gridModel = (() => {
-    const columns = [IconTextRenderer];
-    const item = (f: string) => { return { text: f, icon: this.getIcon(f), style: this.selected.has(f) ? "selected" : "" } };
-    const self = this;
-    return {
-      async rows() { return iter(await self.manager.list()).map(f => [item(f)]) },
-      columns() { return columns },
-      onClick(row: [IconText], rowElement: Element) { self.toggleItem(rowElement.elem(), row[0].text) }
-    }
-  })();
 
   constructor(ui: Ui, private manager: FsManager) {
     this.window = ui.builder.window()
@@ -66,8 +58,16 @@ class FileBrowser {
     addDragAndDrop(win, this.dragAndDropHandler);
   }
 
+  public async stop() {
+    document.removeChild(this.window.winElement);
+  }
+
+  async rows() { return iter(await this.manager.list()).map(f => [{ text: f, icon: this.getIcon(f), style: this.selected.has(f) ? "selected" : "" }]) }
+  columns() { return columns }
+  onClick(row: [IconText], rowElement: Element) { this.toggleItem(rowElement.elem(), row[0].text) }
+
   private async refreshContent() {
-    const table = await renderGrid(this.gridModel);
+    const table = await renderGrid(this);
     replaceContent(this.window.contentElement, table.elem());
   }
 
@@ -106,8 +106,10 @@ class FileBrowser {
 }
 
 export async function FileBrowserModule(module: Module) {
-  module.bind(plugin('FileBrowser'), new BusPlugin(async (injector, connect) => {
+  module.bind(plugin('FileBrowser'), lifecycle(async (injector, lifecycle) => {
+    const bus = await injector.getInstance(BUS);
     const browser = await create(injector, FileBrowser, UI, FS_MANAGER);
-    connect(namedMessageHandler('show_files', () => browser.show()));
+    lifecycle(browser, b => b.stop())
+    lifecycle(bus.connect(namedMessageHandler('show_files', () => browser.show())), busDisconnector(bus));
   }));
 }

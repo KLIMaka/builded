@@ -3,9 +3,10 @@ import { nextwall } from "../../../build/board/query";
 import { Board } from "../../../build/board/structs";
 import { Entity, EntityType, Target } from "../../../build/hitscan";
 import { Deck } from "../../../utils/collections";
-import { create, Dependency, instance, Module, plugin } from "../../../utils/injector";
+import { create, Dependency, getInstances, instance, lifecycle, Module, plugin } from "../../../utils/injector";
 import { detuple0, detuple1 } from "../../../utils/mathutils";
-import { BUS, BusPlugin, Message, MessageHandler, MessageHandlerList, MessageHandlerReflective, NULL_MESSAGE_HANDLER } from "../../apis/handler";
+import { STATE } from "../../apis/app";
+import { busDisconnector, Message, MessageHandler, MessageHandlerList, NULL_MESSAGE_HANDLER } from "../../apis/handler";
 import { RenderablesCache, RENDRABLES_CACHE } from "../../modules/geometry/cache";
 import { EntityFactory, ENTITY_FACTORY } from "../context";
 import { Frame, Highlight, NamedMessage, Render } from "../messages";
@@ -71,10 +72,14 @@ export const SELECTED = new Dependency<Selected>('Selected');
 export async function SelectionModule(module: Module) {
   let selection: Selection = null;
   module.bind(SELECTED, instance(() => selection == null ? NULL_MESSAGE_HANDLER : selection.cloneSelected()));
-  module.bind(plugin('Selection'), new BusPlugin(async (injector, connect) => {
+  module.bind(plugin('Selection'), lifecycle(async (injector, lifecycle) => {
+    const [bus, state] = await getInstances(injector, TOOLS_BUS, STATE);
+    const stateCleaner = async (s: string) => state.unregister(s);
+    lifecycle(state.register(LOOP_STATE, false), stateCleaner);
+    lifecycle(state.register(FULL_LOOP_STATE, false), stateCleaner);
     selection = await create(injector, Selection, RENDRABLES_CACHE, ENTITY_FACTORY);
-    connect(selection);
-  }, TOOLS_BUS));
+    lifecycle(bus.connect(selection), busDisconnector(bus));
+  }));
 }
 
 export class Selection extends DefaultTool {
@@ -84,11 +89,7 @@ export class Selection extends DefaultTool {
   constructor(
     private renderables: RenderablesCache,
     private factory: EntityFactory,
-    private ctx = factory.ctx) {
-    super();
-    this.ctx.state.register(LOOP_STATE, false);
-    this.ctx.state.register(FULL_LOOP_STATE, false);
-  }
+    private ctx = factory.ctx) { super() }
 
   public Frame(msg: Frame) {
     this.updateSelection();

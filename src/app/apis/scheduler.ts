@@ -49,8 +49,9 @@ class SchedulerImpl extends MessageHandlerReflective implements Scheduler {
     return handle;
   }
 
-  addHandler(handler: ScheddulerHandler): void {
+  addHandler(handler: ScheddulerHandler): ScheddulerHandler {
     this.handlers.push(handler);
+    return handler;
   }
 
   removeHandler(handler: ScheddulerHandler): void {

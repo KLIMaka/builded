@@ -39,27 +39,25 @@ export class Buffer {
   private needUpdate = true;
 
   constructor(gl: WebGLRenderingContext, builder: BufferBuilder, readonly blockSize = 1024) {
-    let vtxSize = builder.size;
-    let idxSize = vtxSize * 2;
+    const vtxSize = builder.size;
+    const idxSize = vtxSize * 2;
     this.vtxBuffers = builder.vtxBuffers;
     this.idxBuffer = createIndexBuffer(gl, gl.UNSIGNED_SHORT, idxSize);
 
     this.vtxBag = createController(vtxSize, (place: Place, noffset: number) => {
       for (const v of this.vtxBuffers) {
-        let buff = <any>v.getData();
-        let spacing = v.getSpacing();
+        const buff = <any>v.getData();
+        const spacing = v.getSpacing();
         buff.set(buff.subarray(place.offset * spacing, (place.offset + place.size) * spacing), noffset * spacing);
       }
-      let ptr = <Place>place.data;
-      let offdiff = noffset - place.offset;
-      let idxData = <Uint16Array>this.idxBuffer.getData();
-      for (let i = 0; i < ptr.size; i++) {
-        idxData[ptr.offset + i] += offdiff;
-      }
+      const ptr = <Place>place.data;
+      const offdiff = noffset - place.offset;
+      const idxData = <Uint16Array>this.idxBuffer.getData();
+      for (let i = 0; i < ptr.size; i++) idxData[ptr.offset + i] += offdiff;
     });
 
     this.idxBag = createController(idxSize, (place: Place, noffset: number) => {
-      let idxData = <Uint16Array>this.idxBuffer.getData();
+      const idxData = <Uint16Array>this.idxBuffer.getData();
       idxData.set(idxData.subarray(place.offset, place.offset + place.size), noffset);
     });
 
@@ -75,9 +73,9 @@ export class Buffer {
   }
 
   public allocate(vtxs: number, idxs: number): Pointer {
-    let vtx = this.vtxBag.get(vtxs);
+    const vtx = this.vtxBag.get(vtxs);
     if (vtx == null) return null;
-    let idx = this.idxBag.get(idxs);
+    const idx = this.idxBag.get(idxs);
     if (idx == null) {
       this.vtxBag.put(vtx);
       return null;
@@ -94,39 +92,33 @@ export class Buffer {
   }
 
   public writeVertex(ptr: Pointer, idx: number, off: number, vdata: number[]) {
-    let buff = this.vtxBuffers[idx];
-    let offset = (ptr.vtx.offset + off) * buff.getSpacing();
-    let data = <any>buff.getData();
-    for (let i = 0; i < vdata.length; i++) {
-      data[offset + i] = vdata[i];
-    }
+    const buff = this.vtxBuffers[idx];
+    const offset = (ptr.vtx.offset + off) * buff.getSpacing();
+    const data = <any>buff.getData();
+    for (let i = 0; i < vdata.length; i++) data[offset + i] = vdata[i];
     this.vtxRegions[idx].push([offset / buff.getSpacing(), Math.ceil(vdata.length / buff.getSpacing())]);
     this.needUpdate = true;
   }
 
   public writeIndex(ptr: Pointer, off: number, idata: number[]) {
-    let buff = this.idxBuffer;
-    let offset = ptr.idx.offset + off;
-    let vtxoff = ptr.vtx.offset;
-    let data = <any>buff.getData();
-    for (let i = 0; i < idata.length; i++) {
-      data[offset + i] = idata[i] + vtxoff;
-    }
+    const buff = this.idxBuffer;
+    const offset = ptr.idx.offset + off;
+    const vtxoff = ptr.vtx.offset;
+    const data = <any>buff.getData();
+    for (let i = 0; i < idata.length; i++) data[offset + i] = idata[i] + vtxoff;
     this.idxRegions.push([offset, idata.length]);
     this.needUpdate = true;
   }
 
 
   private mergeRegions(regions: Region[], i: number): [number, Region] {
-    let region = regions[i];
+    const region = regions[i];
     for (; ;) {
-      if (i + 1 >= regions.length)
-        break;
-      let currentend = region[0] + region[1];
-      let nextstart = regions[i + 1][0];
-      let diff = nextstart - currentend;
-      if (diff < 0 || diff > this.blockSize)
-        break;
+      if (i + 1 >= regions.length) break;
+      const currentend = region[0] + region[1];
+      const nextstart = regions[i + 1][0];
+      const diff = nextstart - currentend;
+      if (diff < 0 || diff > this.blockSize) break;
       region[1] += regions[++i][1] + diff;
     }
     return [i, region];
@@ -134,7 +126,7 @@ export class Buffer {
 
   private updateBuffer(gl: WebGLRenderingContext, buffer: Updatable, regions: Region[]): boolean {
     for (let i = 0; i < regions.length; i++) {
-      let [ii, region] = this.mergeRegions(regions, i);
+      const [ii, region] = this.mergeRegions(regions, i);
       i = ii;
       // PROFILE.get(null).inc('traffic', region[1]);
       // PROFILE.get(null).inc('updates');
@@ -146,8 +138,7 @@ export class Buffer {
   public update(gl: WebGLRenderingContext) {
     if (!this.needUpdate) return;
     for (let v = 0; v < this.vtxBuffers.length; v++) {
-      if (this.vtxRegions[v].length == 0)
-        continue;
+      if (this.vtxRegions[v].length == 0) continue;
       this.updateBuffer(gl, this.vtxBuffers[v], this.vtxRegions[v]);
       this.vtxRegions[v] = [];
     }

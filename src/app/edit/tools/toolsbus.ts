@@ -1,6 +1,6 @@
-import { forEach } from "../../../utils/collections";
+import { any, findFirst, forEach } from "../../../utils/collections";
 import { Dependency, Injector } from "../../../utils/injector";
-import { BUS, Handle, Message, MessageHandler, MessageHandlerReflective } from "../../apis/handler";
+import { BUS, Handle, Message, MessageBus, MessageHandler, MessageHandlerReflective } from "../../apis/handler";
 
 export const TOOLS_BUS = new Dependency<ToolsMessageBus>("ToolsBus");
 
@@ -36,15 +36,24 @@ export class DefaultTool extends MessageHandlerReflective implements Tool {
   protected isActive() { return this.active }
 }
 
-class ToolsMessageBus implements MessageHandler {
-  private tools: Tool[] = [];
+class ToolsMessageBus implements MessageBus {
   private activeTool: Tool = null;
+  private lastHandle = 1;
+  private tools = new Map<number, Tool>();
 
-  public connect(tool: Tool) {
-    if (this.tools.indexOf(tool) != -1) throw new Error(`Tool ${tool} already bound`);
-    this.tools.push(tool);
+  connect(tool: Tool): Handle {
+    if (any(this.tools.values(), t => t == tool)) throw new Error(`Tool ${tool} already bound`);
+    this.tools.set(this.lastHandle, tool);
     tool.activateHandler(tool => this.activateTool(tool));
     tool.deactivateHandler(tool => this.deactivateTool(tool));
+    return this.lastHandle++;
+  }
+
+  disconnect(handle: Handle): void {
+    const id = <number>handle;
+    const tool = this.tools.get(id);
+    if (tool == this.activeTool) throw new Error();
+    this.tools.delete(id);
   }
 
   private activateTool(tool: Tool) {
@@ -62,6 +71,6 @@ class ToolsMessageBus implements MessageHandler {
 
   handle(message: Message): void {
     if (this.activeTool != null) this.activeTool.handle(message);
-    else forEach(this.tools, t => t.handle(message));
+    else forEach(this.tools.values(), t => t.handle(message));
   }
 }

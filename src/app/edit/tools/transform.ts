@@ -1,20 +1,28 @@
-import { create, Module, plugin } from "../../../utils/injector";
-import { DefaultTool, TOOLS_BUS } from "./toolsbus";
-import { EntityFactory, ENTITY_FACTORY } from "../context";
-import { error } from "../../../utils/logger";
-import { MovingHandle } from "../handle";
-import { Move, StartMove, EndMove, Frame, Highlight, Render, Commit } from "../messages";
-import { Selected, SELECTED } from "./selection";
-import { BusPlugin, MessageHandler, NULL_MESSAGE_HANDLER } from "../../apis/handler";
 import { build2gl } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
+import { create, getInstances, lifecycle, Module, plugin } from "../../../utils/injector";
+import { error } from "../../../utils/logger";
 import { detuple0, detuple1 } from "../../../utils/mathutils";
+import { STATE } from "../../apis/app";
+import { busDisconnector, MessageHandler, NULL_MESSAGE_HANDLER } from "../../apis/handler";
 import { RenderablesCache, RENDRABLES_CACHE } from "../../modules/geometry/cache";
+import { EntityFactory, ENTITY_FACTORY } from "../context";
+import { MovingHandle } from "../handle";
+import { Commit, EndMove, Frame, Highlight, Move, Render, StartMove } from "../messages";
+import { Selected, SELECTED } from "./selection";
+import { DefaultTool, TOOLS_BUS } from "./toolsbus";
 
 export async function TransformModule(module: Module) {
-  module.bind(plugin('Transform'), new BusPlugin(async (injector, connect) => {
-    connect(await create(injector, Transform, SELECTED, ENTITY_FACTORY, RENDRABLES_CACHE));
-  }, TOOLS_BUS));
+  module.bind(plugin('Transform'), lifecycle(async (injector, lifecycle) => {
+    const [bus, state] = await getInstances(injector, TOOLS_BUS, STATE);
+    const stateCleaner = async (s: string) => state.unregister(s);
+    lifecycle(state.register(MOVE_STATE, false), stateCleaner);
+    lifecycle(state.register(MOVE_COPY, false), stateCleaner);
+    lifecycle(state.register(MOVE_VERTICAL, false), stateCleaner);
+    lifecycle(state.register(MOVE_PARALLEL, false), stateCleaner);
+    const transform = await create(injector, Transform, SELECTED, ENTITY_FACTORY, RENDRABLES_CACHE);
+    lifecycle(bus.connect(transform), busDisconnector(bus));
+  }));
 }
 
 const handle = new MovingHandle();
@@ -42,14 +50,7 @@ export class Transform extends DefaultTool {
     private factory: EntityFactory,
     private renderables: RenderablesCache,
     private ctx = factory.ctx
-  ) {
-    super();
-
-    ctx.state.register(MOVE_STATE, false);
-    ctx.state.register(MOVE_COPY, false);
-    ctx.state.register(MOVE_VERTICAL, false);
-    ctx.state.register(MOVE_PARALLEL, false);
-  }
+  ) { super() }
 
   public Frame(msg: Frame) {
     if (this.activeMove()) {

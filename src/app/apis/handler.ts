@@ -1,6 +1,5 @@
-import { buildHull } from "../../build/board/mutations/drawwall";
 import { Deck } from "../../utils/collections";
-import { Dependency, Injector, InstanceProvider, Plugin, provider } from "../../utils/injector";
+import { Dependency, Injector, Plugin } from "../../utils/injector";
 import { error } from "../../utils/logger";
 
 export interface Message { }
@@ -18,13 +17,11 @@ export const NULL_MESSAGE_HANDLER: MessageHandler = { handle: (m) => { } };
 export function DefaultMessageBus() {
   let lastHandle = 1;
   const handlers = new Map<number, MessageHandler>();
-  return {
+  return <MessageBus>{
+    disconnect: h => handlers.delete(<number>h),
     connect: h => {
       handlers.set(lastHandle, h);
       return lastHandle++;
-    },
-    disconnect: h => {
-      handlers.delete(<number>h);
     },
     handle: msg => {
       try {
@@ -83,4 +80,8 @@ export class BusPlugin implements Plugin<void> {
     for (const h of this.handles) bus.disconnect(h);
     this.handles = [];
   }
+}
+
+export function busDisconnector(bus: MessageBus) {
+  return async (v: Handle) => bus.disconnect(v);
 }

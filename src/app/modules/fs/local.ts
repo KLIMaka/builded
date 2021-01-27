@@ -1,7 +1,12 @@
 import { FileSystem } from "./fs";
 
-function tryGetFile(handle: FileSystemDirectoryHandle, file: string) {
-  return new Promise<FileSystemFileHandle>(resolve => handle.getFileHandle(file).then(resolve).catch(() => resolve(null)));
+async function tryGetFile(handle: FileSystemDirectoryHandle, file: string) {
+  try {
+    return await handle.getFileHandle(file);
+  } catch (e) {
+    if (e.name == 'NotFoundError') return null;
+    throw e;
+  }
 }
 
 export async function createLocalFs(handle: FileSystemDirectoryHandle): Promise<FileSystem> {

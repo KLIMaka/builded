@@ -43,7 +43,8 @@ export interface Portals {
 export const PORTALS = new Dependency<Portals>('Portals');
 
 export interface State {
-  register<T>(name: string, defaultValue: T): void;
+  register<T>(name: string, defaultValue: T): string;
+  unregister(name: string): void;
   set<T>(name: string, value: T): void;
   get<T>(name: string): T;
   has(name: string): boolean;
@@ -92,7 +93,7 @@ export interface ScheddulerHandler {
 
 export interface Scheduler {
   addTask(task: SchedulerTask): TaskHandle;
-  addHandler(handler: ScheddulerHandler): void;
+  addHandler(handler: ScheddulerHandler): ScheddulerHandler;
   removeHandler(handler: ScheddulerHandler): void;
   currentTasks(): Iterable<TaskHandle>;
 }

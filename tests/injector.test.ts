@@ -88,14 +88,14 @@ test('ciclic', async done => {
   }));
   app.bind(C, new CProvider());
   app.bind(new Dependency('main', true), provider(async i => {
-    try {
-      const a = await i.getInstance(A)
-    } catch (e) {
-      expect(e).toStrictEqual(new Error('Found cycle: B,A'));
-    }
+    const a = await i.getInstance(A)
   }));
 
-  await app.start();
+  try {
+    await app.start();
+  } catch (e) {
+    expect(e).toStrictEqual(new Error('Found cycle: B,A'));
+  }
   done();
 });
 

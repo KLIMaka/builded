@@ -1,7 +1,7 @@
-import { create, Dependency, getInstances, Injector, Module, plugin, provider } from '../../../utils/injector';
+import { create, Dependency, getInstances, Injector, lifecycle, Module, plugin, provider } from '../../../utils/injector';
 import { ART, ArtProvider, BOARD, BoardProvider, STATE, State, SCHEDULER, Scheduler, TaskHandle, SchedulerTask, PORTALS, Portals } from '../../apis/app';
 import { Builder } from '../../apis/builder';
-import { BUS, BusPlugin, MessageHandler, MessageHandlerReflective } from '../../apis/handler';
+import { BUS, busDisconnector, BusPlugin, MessageHandler, MessageHandlerReflective } from '../../apis/handler';
 import { BuildRenderableProvider, ClusterRenderable, SectorRenderable, WallRenderable, Renderable } from '../../apis/renderable';
 import { BoardInvalidate, NamedMessage, LoadBoard } from '../../edit/messages';
 import { SectorBuilder, updateSector } from './builders/sector';
@@ -181,8 +181,10 @@ const RenderablesCacheContextConstructor = provider(async injector => {
   return { board, art, factory, state, portals }
 });
 
-const RenderablesCacheConstructor = provider(async injector => {
-  return create(injector, RenderablesCacheImpl, RENDERABLES_CACHE_CONTEXT, SCHEDULER);
+const RenderablesCacheConstructor = lifecycle(async (injector, lifecycle) => {
+  const cache = await create(injector, RenderablesCacheImpl, RENDERABLES_CACHE_CONTEXT, SCHEDULER);
+  lifecycle(cache, async c => c.stop());
+  return cache;
 });
 
 export const WALL_COLOR = 'wallColor';
@@ -194,15 +196,15 @@ export const PORTAL_WALL_COLOR = 'portalWallColor';
 export async function RenderablesCacheModule(module: Module) {
   module.bind(RENDERABLES_CACHE_CONTEXT, RenderablesCacheContextConstructor);
   module.bind(RENDRABLES_CACHE, RenderablesCacheConstructor);
-  module.bind(plugin('CacheBus'), new BusPlugin(async (injector, connect) => {
-    const state = await injector.getInstance(STATE);
-    state.register(WALL_COLOR, [1, 1, 1, 1]);
-    state.register(INTERSECTOR_WALL_COLOR, [1, 0, 0, 1]);
-    state.register(MASKED_WALL_COLOR, [0, 0, 1, 1]);
-    state.register(PORTAL_WALL_COLOR, [1, 0, 0, 1]);
-    state.register(SPRITE_COLOR, [0, 1, 1, 1]);
-
-    connect(await injector.getInstance(RENDRABLES_CACHE));
+  module.bind(plugin('CacheBus'), lifecycle(async (injector, lifecycle) => {
+    const [bus, state] = await getInstances(injector, BUS, STATE);
+    const stateCleaner = async (s: string) => state.unregister(s);
+    lifecycle(state.register(WALL_COLOR, [1, 1, 1, 1]), stateCleaner);
+    lifecycle(state.register(INTERSECTOR_WALL_COLOR, [1, 0, 0, 1]), stateCleaner);
+    lifecycle(state.register(MASKED_WALL_COLOR, [0, 0, 1, 1]), stateCleaner);
+    lifecycle(state.register(PORTAL_WALL_COLOR, [1, 0, 0, 1]), stateCleaner);
+    lifecycle(state.register(SPRITE_COLOR, [0, 1, 1, 1]), stateCleaner);
+    lifecycle(bus.connect(await injector.getInstance(RENDRABLES_CACHE)), busDisconnector(bus));
   }));
 }
 
@@ -224,6 +226,10 @@ export class RenderablesCacheImpl extends MessageHandlerReflective implements Re
     this.topdown = new CachedTopDownBuildRenderableProvider(ctx);
     this.selected = new CachedSelectedRenderableProvider(ctx, this.geometry);
     this.launchPrebuild();
+  }
+
+  public stop() {
+    if (this.preloadTask != null) this.preloadTask.stop();
   }
 
   private launchPrebuild() {

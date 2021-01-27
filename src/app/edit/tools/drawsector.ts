@@ -1,5 +1,4 @@
 import { closestWallPointDist } from "../../../build/board/distances";
-import { sectorWalls } from "../../../build/board/loops";
 import { EngineApi } from "../../../build/board/mutations/api";
 import { createNewSector } from "../../../build/board/mutations/ceatesector";
 import { createInnerLoop } from "../../../build/board/mutations/sectors";
@@ -10,10 +9,10 @@ import { Target } from "../../../build/hitscan";
 import { ZSCALE } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 import { Deck, wrap } from "../../../utils/collections";
-import { create, Module, plugin } from "../../../utils/injector";
+import { create, lifecycle, Module, plugin } from "../../../utils/injector";
 import { int, len2d } from "../../../utils/mathutils";
 import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
-import { BUS, BusPlugin, MessageBus } from "../../apis/handler";
+import { BUS, busDisconnector, MessageBus } from "../../apis/handler";
 import { NULL_RENDERABLE, Renderable, Renderables } from "../../apis/renderable";
 import { writeText } from "../../modules/geometry/builders/common";
 import { RenderablesCache, RENDRABLES_CACHE } from "../../modules/geometry/cache";
@@ -123,9 +122,11 @@ class Contour {
 }
 
 export async function DrawSectorModule(module: Module) {
-  module.bind(plugin('DrawSector'), new BusPlugin(async (injector, connect) => {
-    connect(await create(injector, DrawSector, BUILDERS_FACTORY, ART, ENGINE_API, VIEW, BOARD, REFERENCE_TRACKER, BUS, RENDRABLES_CACHE));
-  }, TOOLS_BUS));
+  module.bind(plugin('DrawSector'), lifecycle(async (injector, lifecycle) => {
+    const bus = await injector.getInstance(TOOLS_BUS);
+    const drawSector = await create(injector, DrawSector, BUILDERS_FACTORY, ART, ENGINE_API, VIEW, BOARD, REFERENCE_TRACKER, BUS, RENDRABLES_CACHE);
+    lifecycle(bus.connect(drawSector), busDisconnector(bus));
+  }));
 }
 
 export class DrawSector extends DefaultTool {

@@ -1,4 +1,4 @@
-import { forEach, map } from "./collections";
+import { map } from "./collections";
 import { DirecredGraph } from "./graph";
 import { iter } from "./iter";
 
@@ -11,6 +11,17 @@ const STOP = async (i: Injector) => { };
 export function provider<T>(start: InstanceProvider<T>): Plugin<T> { return { start, stop: STOP } }
 export function instance<T>(value: T): Plugin<T> { return provider(async i => value) }
 export function plugin(name: string) { return new Dependency(name, true) }
+
+
+export type Lifecycle = <T>(value: T, cleaner: (value: T) => Promise<void>) => T;
+export function lifecycle<T>(start: (i: Injector, lifecycle: Lifecycle) => Promise<T>): Plugin<T> {
+  const cleaners: [any, (v: any) => Promise<void>][] = [];
+  const lifecycle = <T1>(value: T1, cleaner: (value: T1) => Promise<void>) => { cleaners.push([value, cleaner]); return value }
+  return {
+    async start(i: Injector) { return start(i, lifecycle) },
+    async stop(i: Injector) { await Promise.all(iter(cleaners.reverse()).map(c => c[1](c[0])).collect()) }
+  }
+}
 
 export interface Module {
   bind<T>(dependency: Dependency<T>, provider: Plugin<T>): void;
@@ -52,8 +63,15 @@ export class App implements Module {
 
   public async start(): Promise<Runtime> {
     const injector = new RootInjector(this.plugins);
-    await Promise.all(iter(this.plugins.entries()).filter(e => e[0].isVoid).map(e => injector.getInstance(e[0])).collect());
-    return injector;
+    try {
+      const start = performance.now();
+      await Promise.all(iter(this.plugins.entries()).filter(e => e[0].isVoid).map(e => injector.getInstance(e[0])).collect());
+      console.info(`App started in ${(performance.now() - start).toFixed(2)}ms`);
+      return injector;
+    } catch (e) {
+      console.error(`Error while starting App. ${e}`);
+      throw e;
+    }
   }
 }
 
@@ -78,7 +96,7 @@ class RootInjector implements ParentInjector, Runtime {
   }
 
   async stop(): Promise<void> {
-    await Promise.all([...map(this.graph.orderedAll(), d => this.providers.get(d).stop(this))]);
+    await Promise.all([...map(this.graph.orderedAll(), d => this.stopInstance(d))]);
   }
 
   private add<T>(dependency: Dependency<T>, injector: Injector) {
@@ -103,17 +121,37 @@ class RootInjector implements ParentInjector, Runtime {
 
   public async replaceInstance<T>(dependency: Dependency<T>, provider: Plugin<T>): Promise<void> {
     const toStop = this.graph.orderedTo(dependency);
-    await Promise.all([...map(toStop, d => this.providers.get(d).stop(this))]);
-    forEach(toStop, d => { this.graph.remove(d); this.instances.delete(d) });
+    await Promise.all([...map(toStop, d => this.stopInstance(d))]);
     this.providers.set(dependency, provider);
     await Promise.all(iter(toStop).filter(d => d.isVoid).map(d => this.getInstance(d)).collect());
   }
 
-  private create<T>(dependency: Dependency<T>, parent: ParentInjector) {
+  private async create<T>(dependency: Dependency<T>, parent: ParentInjector) {
     const provider = this.providers.get(dependency);
     if (provider == null) throw new Error(`No provider bound to ${dependency.name}`);
     const injector = new ChildInjector(dependency, parent);
-    return provider.start(injector);
+    try {
+      const start = performance.now();
+      const instance = await provider.start(injector);
+      console.info(`${dependency.name} started in ${(performance.now() - start).toFixed(2)}ms`);
+      return instance;
+    } catch (error) {
+      console.error(`Error while creating ${dependency.name}. ${error}`);
+      throw error;
+    }
+  }
+
+  private async stopInstance<T>(dependency: Dependency<T>) {
+    try {
+      const start = performance.now();
+      await this.providers.get(dependency).stop(this);
+      this.graph.remove(dependency);
+      this.instances.delete(dependency);
+      console.info(`${dependency.name} stopped in ${(performance.now() - start).toFixed(2)}ms`);
+    } catch (error) {
+      console.error(`Error while stopping ${dependency.name}. ${error}`);
+      throw error;
+    }
   }
 }
 

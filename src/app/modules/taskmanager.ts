@@ -1,9 +1,9 @@
-import { create, getInstances, Injector, Module, plugin } from "../../utils/injector";
+import { getInstances, lifecycle, Module, plugin } from "../../utils/injector";
 import { iter } from "../../utils/iter";
 import { GridModel, renderGrid } from "../../utils/ui/renderers";
 import { div, Element, replaceContent, span, tag } from "../../utils/ui/ui";
-import { ScheddulerHandler, Scheduler, SCHEDULER, SchedulerTask, TaskHandle } from "../apis/app";
-import { BUS, Handle } from "../apis/handler";
+import { ScheddulerHandler, SCHEDULER, SchedulerTask, TaskHandle } from "../apis/app";
+import { BUS, busDisconnector } from "../apis/handler";
 import { UI, Ui, Window } from "../apis/ui";
 import { namedMessageHandler } from "../edit/messages";
 
@@ -38,8 +38,9 @@ function TaskWidgetRenderer(w: TaskWidget): Element {
   });
   return div('task').append(cancel).append(container);
 }
+const columns = [TaskWidgetRenderer];
 
-class TaskManager implements ScheddulerHandler {
+class TaskManager implements ScheddulerHandler, GridModel {
   private tasks: TaskHandle[] = [];
   private taskWidgets: TaskWidget[] = [];
   private window: Window;
@@ -47,7 +48,7 @@ class TaskManager implements ScheddulerHandler {
 
   constructor(
     ui: Ui,
-    scheduler: Scheduler
+    currentTasks: Iterable<TaskHandle>
   ) {
     this.window = ui.builder.window()
       .title('Tasks')
@@ -57,8 +58,7 @@ class TaskManager implements ScheddulerHandler {
       .size(600, 600)
       .build();
     this.window.onclose = () => this.active = false;
-    scheduler.addHandler(this);
-    for (const task of scheduler.currentTasks()) this.onTaskAdd(task);
+    for (const task of currentTasks) this.onTaskAdd(task);
   }
 
   onTaskAdd(task: TaskHandle): void {
@@ -82,20 +82,13 @@ class TaskManager implements ScheddulerHandler {
     if (idx != -1) this.taskWidgets[idx].update();
   }
 
-  private gridModel = this.createGridModel();
-  private createGridModel(): GridModel {
-    const columns = [TaskWidgetRenderer];
-    const self = this;
-    return {
-      async rows() { return iter(self.taskWidgets).map(f => [f]) },
-      columns() { return columns },
-      onClick(row: any[], rowElement: Element) { }
-    }
-  }
+  async rows() { return iter(this.taskWidgets).map(f => [f]) }
+  columns() { return columns }
+  onClick(row: any[], rowElement: Element) { }
 
   private async refreshGrid() {
     if (!this.active) return;
-    replaceContent(this.window.contentElement, (await renderGrid(this.gridModel)).elem());
+    replaceContent(this.window.contentElement, (await renderGrid(this)).elem());
   }
 
   public async show() {
@@ -115,20 +108,12 @@ function* task(): SchedulerTask {
 }
 
 export async function TaskManagerModule(module: Module) {
-  let showTasksHandle: Handle;
-  let addTaskTestHandle: Handle;
-  let manager: TaskManager;
-  module.bind(plugin('TaskManager'), {
-    start: async injector => {
-      const [bus, scheduler, ui] = await getInstances(injector, BUS, SCHEDULER, UI);
-      manager = new TaskManager(ui, scheduler);
-      showTasksHandle = bus.connect(namedMessageHandler('show_tasks', () => manager.show()));
-      addTaskTestHandle = bus.connect(namedMessageHandler('add_test_task', () => scheduler.addTask(task())));
-    },
-    stop: async injector => {
-      const bus = await injector.getInstance(BUS);
-      bus.disconnect(showTasksHandle);
-      bus.disconnect(addTaskTestHandle);
-    }
-  });
+  module.bind(plugin('TaskManager'), lifecycle(async (injector, lifecycle) => {
+    const [bus, scheduler, ui] = await getInstances(injector, BUS, SCHEDULER, UI);
+    const busDisconnect = busDisconnector(bus);
+    const manager = new TaskManager(ui, scheduler.currentTasks());
+    lifecycle(scheduler.addHandler(manager), async v => scheduler.removeHandler(v));
+    lifecycle(bus.connect(namedMessageHandler('show_tasks', () => manager.show())), busDisconnect);
+    lifecycle(bus.connect(namedMessageHandler('add_test_task', () => scheduler.addTask(task()))), busDisconnect);
+  }));
 }

@@ -6,11 +6,11 @@ import { ArtFile, ArtFiles } from '../../../build/formats/art';
 import { RffFile } from '../../../build/formats/rff';
 import { enumerate } from '../../../utils/collections';
 import { createTexture } from '../../../utils/gl/textures';
-import { getInstances, Injector, instance, Module, plugin, provider } from '../../../utils/injector';
+import { getInstances, Injector, instance, lifecycle, Module, plugin, provider } from '../../../utils/injector';
 import { iter } from '../../../utils/iter';
 import { Stream } from '../../../utils/stream';
 import { BOARD, ENGINE_API, RESOURCES } from '../../apis/app';
-import { BUS, BusPlugin } from '../../apis/handler';
+import { BUS, busDisconnector, BusPlugin } from '../../apis/handler';
 import { LoadBoard, namedMessageHandler } from '../../edit/messages';
 import { showMapNameSelection } from '../../modules/default/mapnamedialog';
 import { Palette, PicTags, PIC_TAGS, RAW_PAL, RAW_PLUs } from '../artselector';
@@ -65,23 +65,22 @@ function loadMapImpl(name: string) {
 }
 
 function mapLoader(module: Module) {
-  module.bind(plugin('MapLoader'), new BusPlugin(async (injector, connect) => {
+  module.bind(plugin('MapLoader'), lifecycle(async (injector, lifecycle) => {
     const bus = await injector.getInstance(BUS);
-    connect(namedMessageHandler('load_map', async () => {
+    lifecycle(bus.connect(namedMessageHandler('load_map', async () => {
       const mapName = await showMapSelection(injector);
       if (!mapName) return;
       const map = await loadMapImpl(mapName)(injector);
       bus.handle(new LoadBoard(map));
-    }));
+    })), busDisconnector(bus));
   }));
 }
 
 function mapSaver(module: Module) {
-  let mapName = 'newboard.map';
-  let savedBefore = false;
-
-  module.bind(plugin('MapSaver'), new BusPlugin(async (injector, connect) => {
-    const [fsmgr, board] = await getInstances(injector, FS_MANAGER, BOARD);
+  module.bind(plugin('MapSaver'), lifecycle(async (injector, lifecycle) => {
+    let mapName = 'newboard.map';
+    let savedBefore = false;
+    const [fsmgr, board, bus] = await getInstances(injector, FS_MANAGER, BOARD, BUS);
     const saveMap = (name: string) => {
       if (name != null && name.length != 0) {
         if (!name.endsWith('.map')) name = name + '.map'
@@ -91,8 +90,8 @@ function mapSaver(module: Module) {
       }
     }
 
-    connect(namedMessageHandler('save_map', async () => saveMap(savedBefore ? mapName : await showMapNameSelection(injector, mapName))));
-    connect(namedMessageHandler('save_map_as', async () => saveMap(await showMapNameSelection(injector, mapName))));
+    lifecycle(bus.connect(namedMessageHandler('save_map', async () => saveMap(savedBefore ? mapName : await showMapNameSelection(injector, mapName)))), busDisconnector(bus));
+    lifecycle(bus.connect(namedMessageHandler('save_map_as', async () => saveMap(await showMapNameSelection(injector, mapName)))), busDisconnector(bus));
   }));
 }
 

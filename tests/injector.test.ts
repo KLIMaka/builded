@@ -78,7 +78,7 @@ test('injector test', async done => {
   done();
 });
 
-test('ciclic', async done => {
+test('cyclic', async done => {
   expect.assertions(1);
   const app = new App();
   app.bind(A, new AProvider());

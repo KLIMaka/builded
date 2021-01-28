@@ -6,7 +6,7 @@ import { getPlayerStart, ZSCALE } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 import { CachedValue } from "../../../utils/cachedvalue";
 import { Controller2D } from "../../../utils/camera/controller2d";
-import { provider } from "../../../utils/injector";
+import { getInstances, lifecycle } from "../../../utils/injector";
 import { NumberInterpolator } from "../../../utils/interpolator";
 import { int, len2d } from "../../../utils/mathutils";
 import { DelayedValue } from "../../../utils/timed";
@@ -19,16 +19,13 @@ import { BoardRenderer2D, Renderer2D } from "./boardrenderer2d";
 import { TargetImpl, ViewPosition } from "./view";
 
 
-export const View2dConstructor = provider(async injector => {
-  const [renderer, grid, bgl, board, art, state] = await Promise.all([
-    Renderer2D(injector),
-    injector.getInstance(GRID),
-    injector.getInstance(BUILD_GL),
-    injector.getInstance(BOARD),
-    injector.getInstance(ART),
-    injector.getInstance(STATE),
-  ]);
-  return new View2d(renderer, grid, bgl, board, art, state);
+export const View2dConstructor = lifecycle(async (injector, lifecycle) => {
+  const [grid, bgl, board, art, state] = await getInstances(injector, GRID, BUILD_GL, BOARD, ART, STATE);
+  const renderer = await Renderer2D(injector);
+  lifecycle(state.register('zoom+', false), async s => state.unregister(s))
+  lifecycle(state.register('zoom-', false), async s => state.unregister(s))
+  const view = new View2d(renderer, grid, bgl, board, art, state);
+  return view;
 });
 
 export class View2d extends MessageHandlerReflective implements View {
@@ -49,10 +46,6 @@ export class View2d extends MessageHandlerReflective implements View {
     private state: State
   ) {
     super();
-
-    state.register('zoom+', false);
-    state.register('zoom-', false);
-
     this.loadBoard(board());
   }
 

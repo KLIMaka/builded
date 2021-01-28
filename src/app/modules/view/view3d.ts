@@ -6,7 +6,7 @@ import { build2gl, getPlayerStart, gl2build, ZSCALE } from "../../../build/utils
 import { vec3 } from "../../../libs_js/glmatrix";
 import { CachedValue } from "../../../utils/cachedvalue";
 import { Controller3D } from "../../../utils/camera/controller3d";
-import { provider } from "../../../utils/injector";
+import { getInstances, lifecycle, provider } from "../../../utils/injector";
 import { NumberInterpolator } from "../../../utils/interpolator";
 import { int } from "../../../utils/mathutils";
 import { DelayedValue } from "../../../utils/timed";
@@ -18,16 +18,17 @@ import { BuildGl, BUILD_GL } from "../gl/buildgl";
 import { Boardrenderer3D, Renderer3D } from "./boardrenderer3d";
 import { TargetImpl, ViewPosition } from "./view";
 
-export const View3dConstructor = provider(async injector => {
-  const [renderer, buildgl, board, state, grid, art] = await Promise.all([
-    Renderer3D(injector),
-    injector.getInstance(BUILD_GL),
-    injector.getInstance(BOARD),
-    injector.getInstance(STATE),
-    injector.getInstance(GRID),
-    injector.getInstance(ART),
-  ]);
-  return new View3d(renderer, buildgl, board, state, grid, art);
+export const View3dConstructor = lifecycle(async (injector, lifecycle) => {
+  const [buildgl, board, state, grid, art] = await getInstances(injector, BUILD_GL, BOARD, STATE, GRID, ART);
+  const renderer = await Renderer3D(injector);
+  const view = new View3d(renderer, buildgl, board, state, grid, art);
+  const stateCleaner = async (s: string) => state.unregister(s);
+  lifecycle(state.register('forward', false), stateCleaner);
+  lifecycle(state.register('backward', false), stateCleaner);
+  lifecycle(state.register('strafe_left', false), stateCleaner);
+  lifecycle(state.register('strafe_right', false), stateCleaner);
+  lifecycle(state.register('camera_speed', 8000), stateCleaner);
+  return view;
 });
 
 export class View3d extends MessageHandlerReflective implements View {
@@ -55,12 +56,6 @@ export class View3d extends MessageHandlerReflective implements View {
 
     this.aspect = this.buildgl.gl.drawingBufferWidth / this.buildgl.gl.drawingBufferHeight;
     this.control.setFov(90);
-
-    state.register('forward', false);
-    state.register('backward', false);
-    state.register('strafe_left', false);
-    state.register('strafe_right', false);
-    state.register('camera_speed', 8000);
 
     this.loadBoard(board());
   }

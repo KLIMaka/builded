@@ -1,6 +1,6 @@
-import { Injector, instance, Module, plugin, provider, RUNTIME } from "../../../utils/injector";
+import { Injector, instance, lifecycle, Module, plugin, provider, RUNTIME } from "../../../utils/injector";
 import { Storage, STORAGES } from "../../apis/app";
-import { BusPlugin } from "../../apis/handler";
+import { BUS, busDisconnector, BusPlugin } from "../../apis/handler";
 import { namedMessageHandler } from "../../edit/messages";
 import { StorageDbConstructor } from "../db";
 import { FileSystem, FS, UrlFs } from "./fs";
@@ -52,13 +52,14 @@ export function DbFsModule(rom: string = null) {
     module.bind(MOUNTS, RomFs(rom));
     module.bind(FS_MANAGER, StorageFsManager);
 
-    module.bind(plugin('FileSystem'), new BusPlugin(async (injector, connect) => {
-      connect(namedMessageHandler('add_mount', async () => {
+    module.bind(plugin('FileSystem'), lifecycle(async (injector, lifecycle) => {
+      const bus = await injector.getInstance(BUS);
+      lifecycle(bus.connect(namedMessageHandler('add_mount', async () => {
         const mounts = await injector.getInstance(MOUNTS);
         const newFs = await createLocalFs(await window.showDirectoryPicker());
         const runtime = await injector.getInstance(RUNTIME);
         runtime.replaceInstance(MOUNTS, instance([newFs, ...mounts]));
-      }));
+      })), busDisconnector(bus));
     }));
   }
 }

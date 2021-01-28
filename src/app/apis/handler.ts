@@ -1,5 +1,5 @@
 import { Deck } from "../../utils/collections";
-import { Dependency, Injector, Plugin } from "../../utils/injector";
+import { Dependency } from "../../utils/injector";
 import { error } from "../../utils/logger";
 
 export interface Message { }
@@ -35,7 +35,7 @@ export function DefaultMessageBus() {
 
 const messageBox: [Message] = [null];
 export function handleReflective(obj: Object, message: Message) {
-  let name = message.constructor.name;
+  const name = message.constructor.name;
   let handler = obj[name];
   if (handler != undefined) {
     messageBox[0] = message;
@@ -46,9 +46,7 @@ export function handleReflective(obj: Object, message: Message) {
 }
 
 export function handleCollection(handlers: Iterable<MessageHandler>, message: Message) {
-  for (const h of handlers) {
-    h.handle(message);
-  }
+  for (const h of handlers) h.handle(message);
 }
 
 export class MessageHandlerReflective {
@@ -57,29 +55,10 @@ export class MessageHandlerReflective {
 }
 
 export class MessageHandlerList implements MessageHandler {
-  constructor(
-    private handlers: Deck<MessageHandler> = new Deck<MessageHandler>()
-  ) { }
-
+  constructor(private handlers: Deck<MessageHandler> = new Deck<MessageHandler>()) { }
   handle(message: Message) { handleCollection(this.handlers, message); }
   list(): Deck<MessageHandler> { return this.handlers; }
   clone(): MessageHandlerList { return new MessageHandlerList(this.handlers.clone()); }
-}
-
-export class BusPlugin implements Plugin<void> {
-  private handles: Handle[] = [];
-  constructor(private provider: (injector: Injector, handleProvider: (handler: MessageHandler) => void) => void, private bus = BUS) { }
-
-  async start(injector: Injector): Promise<void> {
-    const bus = await injector.getInstance(this.bus);
-    this.provider(injector, (handler: MessageHandler) => this.handles.push(bus.connect(handler)));
-  }
-
-  async stop(injector: Injector) {
-    const bus = await injector.getInstance(BUS);
-    for (const h of this.handles) bus.disconnect(h);
-    this.handles = [];
-  }
 }
 
 export function busDisconnector(bus: MessageBus) {

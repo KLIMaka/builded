@@ -1,15 +1,17 @@
 import h from "stage0";
 import { Sector, Sprite, Wall } from "../../build/board/structs";
 import { Entity, EntityType } from "../../build/hitscan";
-import { create, Module, plugin } from "../../utils/injector";
+import { create, lifecycle, Module, plugin } from "../../utils/injector";
 import { BOARD, BoardProvider, View, VIEW } from "../apis/app";
-import { BusPlugin, MessageHandlerReflective } from "../apis/handler";
+import { BUS, busDisconnector, MessageHandlerReflective } from "../apis/handler";
 import { BoardInvalidate, Frame } from "../edit/messages";
 
 
 export async function InfoModule(module: Module) {
-  module.bind(plugin('Info'), new BusPlugin(async (injector, connect) => {
-    connect(await create(injector, Info, VIEW, BOARD))
+  module.bind(plugin('Info'), lifecycle(async (injector, lifecycle) => {
+    const bus = await injector.getInstance(BUS);
+    const info = await create(injector, Info, VIEW, BOARD);
+    lifecycle(bus.connect(info), busDisconnector(bus));
   }));
 }
 

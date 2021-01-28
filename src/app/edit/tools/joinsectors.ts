@@ -1,16 +1,18 @@
 import { EngineApi } from "../../../build/board/mutations/api";
 import { joinSectors } from "../../../build/board/mutations/joinsectors";
 import { isJoinedSectors } from "../../../build/board/query";
-import { create, Module, plugin } from "../../../utils/injector";
+import { create, lifecycle, Module, plugin } from "../../../utils/injector";
 import { BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, REFERENCE_TRACKER, VIEW, View } from "../../apis/app";
-import { BUS, BusPlugin, MessageBus } from "../../apis/handler";
+import { BUS, busDisconnector, MessageBus } from "../../apis/handler";
 import { Commit, INVALIDATE_ALL, NamedMessage } from "../messages";
 import { DefaultTool, TOOLS_BUS } from "./toolsbus";
 
 export function JoinSectorsModule(module: Module) {
-  module.bind(plugin('JoinSectors'), new BusPlugin(async (injector, connect) => {
-    connect(await create(injector, JoinSectors, BUS, VIEW, BOARD, REFERENCE_TRACKER, ENGINE_API));
-  }, TOOLS_BUS));
+  module.bind(plugin('JoinSectors'), lifecycle(async (injector, lifecycle) => {
+    const bus = await injector.getInstance(TOOLS_BUS);
+    const joinSectors = await create(injector, JoinSectors, BUS, VIEW, BOARD, REFERENCE_TRACKER, ENGINE_API);
+    lifecycle(bus.connect(joinSectors), busDisconnector(bus));
+  }));
 }
 
 export class JoinSectors extends DefaultTool {

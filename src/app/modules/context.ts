@@ -2,10 +2,10 @@ import { SelectorConstructor } from '../../app/modules/artselector';
 import { Board } from '../../build/board/structs';
 import { Deck } from '../../utils/collections';
 import { IndexedImgLibJsConstructor, INDEXED_IMG_LIB } from '../../utils/imglib';
-import { create, Injector, instance, Module, plugin } from '../../utils/injector';
+import { create, getInstances, Injector, instance, lifecycle, Module, plugin } from '../../utils/injector';
 import * as PROFILE from '../../utils/profiler';
 import { ART, BOARD, ENGINE_API, GRID, PORTALS, REFERENCE_TRACKER, SCHEDULER, STATE, STORAGES, View, VIEW } from '../apis/app';
-import { BUS, BusPlugin, DefaultMessageBus, MessageBus, MessageHandlerReflective } from '../apis/handler';
+import { BUS, busDisconnector, BusPlugin, DefaultMessageBus, MessageBus, MessageHandlerReflective } from '../apis/handler';
 import { Renderable } from '../apis/renderable';
 import { DefaultScheduler } from '../apis/scheduler';
 import { EntityFactoryConstructor, ENTITY_FACTORY } from '../edit/context';
@@ -36,18 +36,15 @@ import { SwappableViewModule } from './view/view';
 import { DefaultPortalsConstructor } from '../modules/default/portals';
 
 async function mapBackupService(module: Module) {
-  module.bind(plugin('MapBackupService'), new BusPlugin(async (injector, connect) => {
-    const storages = await injector.getInstance(STORAGES);
-    const bus = await injector.getInstance(BUS);
-    const board = await injector.getInstance(BOARD);
-    const api = await injector.getInstance(ENGINE_API);
+  module.bind(plugin('MapBackupService'), lifecycle(async (injector, lifecycle) => {
+    const [storages, bus, board, api] = await getInstances(injector, STORAGES, BUS, BOARD, ENGINE_API)
     const defaultBoard = api.newBoard();
     const store = await storages('session');
-    connect(namedMessageHandler('commit', () => store.set('map_bak', board())));
-    connect(namedMessageHandler('new_board', () => {
+    lifecycle(bus.connect(namedMessageHandler('commit', () => store.set('map_bak', board()))), busDisconnector(bus));
+    lifecycle(bus.connect(namedMessageHandler('new_board', () => {
       bus.handle(new LoadBoard(defaultBoard));
       store.set('map_bak', defaultBoard);
-    }));
+    })), busDisconnector(bus));
 
     const map = <Board>await store.get('map_bak');
     if (map) {
@@ -58,13 +55,12 @@ async function mapBackupService(module: Module) {
 }
 
 function newMap(module: Module) {
-  module.bind(plugin('NewMap'), new BusPlugin(async (injector, connect) => {
-    const bus = await injector.getInstance(BUS);
-    const api = await injector.getInstance(ENGINE_API);
+  module.bind(plugin('NewMap'), lifecycle(async (injector, lifecycle) => {
+    const [bus, api] = await getInstances(injector, BUS, ENGINE_API);
     const defaultBoard = api.newBoard();
-    connect(namedMessageHandler('new_board', () => {
+    lifecycle(bus.connect(namedMessageHandler('new_board', () => {
       bus.handle(new LoadBoard(defaultBoard));
-    }));
+    })), busDisconnector(bus));
   }));
 }
 

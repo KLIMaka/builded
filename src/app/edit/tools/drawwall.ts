@@ -4,10 +4,10 @@ import { sectorOfWall } from "../../../build/board/query";
 import { Board } from "../../../build/board/structs";
 import { build2gl, createSlopeCalculator, wallNormal, ZSCALE } from "../../../build/utils";
 import { vec2, vec3 } from "../../../libs_js/glmatrix";
-import { getInstances, Module, plugin } from "../../../utils/injector";
+import { create, getInstances, lifecycle, Module, plugin } from "../../../utils/injector";
 import { dot2d } from "../../../utils/mathutils";
 import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, GRID, GridController, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
-import { BUS, BusPlugin, MessageBus, MessageHandlerReflective } from "../../apis/handler";
+import { BUS, busDisconnector, BusPlugin, MessageBus, MessageHandlerReflective } from "../../apis/handler";
 import { Renderables } from "../../apis/renderable";
 import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
 import { LineBuilder } from "../../modules/gl/buffers";
@@ -203,10 +203,11 @@ class PortalModel {
 }
 
 export async function DrawWallModule(module: Module) {
-  module.bind(plugin('DrawWall'), new BusPlugin(async (injector, connect) => {
-    const [bus, api, builders, view, board, refs, art, grid] = await getInstances(injector, BUS, ENGINE_API, BUILDERS_FACTORY, VIEW, BOARD, REFERENCE_TRACKER, ART, GRID,);
-    connect(new DrawWall(builders, api, view, board, refs, bus, art, grid));
-  }, TOOLS_BUS));
+  module.bind(plugin('DrawWall'), lifecycle(async (injector, lifecycle) => {
+    const [bus] = await getInstances(injector, TOOLS_BUS);
+    const drawwall = await create(injector, DrawWall, BUS, ENGINE_API, BUILDERS_FACTORY, VIEW, BOARD, REFERENCE_TRACKER, ART, GRID);
+    lifecycle(bus.connect(drawwall), busDisconnector(bus));
+  }));
 }
 
 export class DrawWall extends DefaultTool {

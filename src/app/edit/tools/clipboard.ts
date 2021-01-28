@@ -1,15 +1,17 @@
 import { EntityType } from "../../../build/hitscan";
-import { create, Module, plugin } from "../../../utils/injector";
+import { create, lifecycle, Module, plugin } from "../../../utils/injector";
 import { BOARD, BoardProvider, View, VIEW } from "../../apis/app";
-import { BUS, BusPlugin, MessageBus } from "../../apis/handler";
-import { Commit, NamedMessage, SetPicnum, Shade } from "../messages";
+import { busDisconnector } from "../../apis/handler";
+import { NamedMessage, SetPicnum, Shade } from "../messages";
 import { Selected, SELECTED } from "./selection";
 import { DefaultTool, TOOLS_BUS } from "./toolsbus";
 
 export async function ClipboardModule(module: Module) {
-  module.bind(plugin('Clipboard'), new BusPlugin(async (injector, connect) => {
-    connect(await create(injector, Clipboard, BOARD, VIEW, SELECTED));
-  }, TOOLS_BUS));
+  module.bind(plugin('Clipboard'), lifecycle(async (injector, lifecycle) => {
+    const bus = await injector.getInstance(TOOLS_BUS);
+    const clipboard = await create(injector, Clipboard, BOARD, VIEW, SELECTED);
+    lifecycle(bus.connect(clipboard), busDisconnector(bus));
+  }));
 }
 
 const PICNUM = new SetPicnum(0);

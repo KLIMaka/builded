@@ -10,7 +10,7 @@ import { getInstances, Injector, instance, lifecycle, Module, plugin, provider }
 import { iter } from '../../../utils/iter';
 import { Stream } from '../../../utils/stream';
 import { BOARD, ENGINE_API, RESOURCES } from '../../apis/app';
-import { BUS, busDisconnector, BusPlugin } from '../../apis/handler';
+import { BUS, busDisconnector } from '../../apis/handler';
 import { LoadBoard, namedMessageHandler } from '../../edit/messages';
 import { showMapNameSelection } from '../../modules/default/mapnamedialog';
 import { Palette, PicTags, PIC_TAGS, RAW_PAL, RAW_PLUs } from '../artselector';
@@ -38,9 +38,9 @@ const PLUs = provider(async (injector: Injector) => {
   return (await injector.getInstance(RAW_PLUs)).length;
 });
 
-const palTexture = provider(async (injector: Injector) => {
+const palTexture = lifecycle(async (injector, lifecycle) => {
   const [pal, gl] = await getInstances(injector, RAW_PAL, GL);
-  return createTexture(256, 1, gl, { filter: gl.NEAREST }, pal, gl.RGB, 3);
+  return lifecycle(createTexture(256, 1, gl, { filter: gl.NEAREST }, pal, gl.RGB, 3), async t => t.destroy(gl));
 });
 
 const rawPlus = provider(async (injector: Injector) => {
@@ -50,11 +50,11 @@ const rawPlus = provider(async (injector: Injector) => {
   return iter(enumerate(plus)).filter(([p, i]) => p != null).map(([p, i]) => <Palette>{ name: palettes[i], plu: new Uint8Array(p) }).collect();
 });
 
-const pluTexture = provider(async (injector: Injector) => {
+const pluTexture = lifecycle(async (injector, lifecycle) => {
   const [plus, gl, shadowsteps] = await getInstances(injector, RAW_PLUs, GL, SHADOWSTEPS);
   const tex = new Uint8Array(256 * shadowsteps * plus.length);
   for (const [plu, i] of enumerate(plus)) tex.set(plu.plu, 256 * shadowsteps * i);
-  return createTexture(256, shadowsteps * plus.length, gl, { filter: gl.NEAREST }, tex, gl.LUMINANCE)
+  return lifecycle(createTexture(256, shadowsteps * plus.length, gl, { filter: gl.NEAREST }, tex, gl.LUMINANCE), async t => t.destroy(gl));
 });
 
 function loadMapImpl(name: string) {

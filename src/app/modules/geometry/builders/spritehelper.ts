@@ -34,8 +34,8 @@ function genQuadWireframe(coords: number[], normals: number[], builder: Wirefram
 }
 
 function fillbuffersForWallSpriteWireframe(x: number, y: number, z: number, xo: number, yo: number, hw: number, hh: number, ang: number, builder: WireframeBuilder) {
-  let dx = Math.sin(ang) * hw;
-  let dy = Math.cos(ang) * hw;
+  const dx = Math.sin(ang) * hw;
+  const dy = Math.cos(ang) * hw;
   genQuadWireframe([
     x - dx, y - dy, z - hh + yo,
     x + dx, y + dy, z - hh + yo,
@@ -45,10 +45,10 @@ function fillbuffersForWallSpriteWireframe(x: number, y: number, z: number, xo: 
 }
 
 function fillbuffersForFloorSpriteWireframe(x: number, y: number, z: number, xo: number, yo: number, hw: number, hh: number, ang: number, builder: WireframeBuilder) {
-  let dwx = Math.sin(ang) * hw;
-  let dwy = Math.cos(ang) * hw;
-  let dhx = Math.sin(ang + Math.PI / 2) * hh;
-  let dhy = Math.cos(ang + Math.PI / 2) * hh;
+  const dwx = Math.sin(ang) * hw;
+  const dwy = Math.cos(ang) * hw;
+  const dhx = Math.sin(ang + Math.PI / 2) * hh;
+  const dhy = Math.cos(ang + Math.PI / 2) * hh;
   genQuadWireframe([
     x - dwx - dhx, y - dwy - dhy, z,
     x + dwx - dhx, y + dwy - dhy, z,
@@ -74,17 +74,16 @@ function fillBuffersForFaceSpriteWireframe(x: number, y: number, z: number, xo: 
 function updateSpriteWireframe(ctx: RenderablesCacheContext, sprId: number, builder: WireframeBuilder): WireframeBuilder {
   const board = ctx.board();
   vec4.set(builder.color, 1, 1, 1, -100);
-  let spr = board.sprites[sprId];
-  if (spr.picnum == 0 || spr.cstat.invisible)
-    return builder;
+  const spr = board.sprites[sprId];
+  if (spr.picnum == 0 || spr.cstat.invisible) return builder;
 
-  let x = spr.x; let y = spr.y; let z = spr.z / ZSCALE;
-  let info = ctx.art.getInfo(spr.picnum);
-  let w = (info.w * spr.xrepeat) / 4; let hw = w >> 1;
-  let h = (info.h * spr.yrepeat) / 4; let hh = h >> 1;
-  let ang = spriteAngle(spr.ang);
-  let xo = (info.attrs.xoff * spr.xrepeat) / 4;
-  let yo = (info.attrs.yoff * spr.yrepeat) / 4 + (spr.cstat.realCenter ? 0 : hh);
+  const x = spr.x; const y = spr.y; const z = spr.z / ZSCALE;
+  const info = ctx.art.getInfo(spr.picnum);
+  const w = (info.w * spr.xrepeat) / 4; const hw = w >> 1;
+  const h = (info.h * spr.yrepeat) / 4; const hh = h >> 1;
+  const ang = spriteAngle(spr.ang);
+  const xo = (info.attrs.xoff * spr.xrepeat) / 4;
+  const yo = (info.attrs.yoff * spr.yrepeat) / 4 + (spr.cstat.realCenter ? 0 : hh);
 
   if (spr.cstat.type == FACE_SPRITE) {
     builder.type = Type.FACE;
@@ -101,16 +100,16 @@ function updateSpriteWireframe(ctx: RenderablesCacheContext, sprId: number, buil
 
 function updateSpriteAngle(ctx: RenderablesCacheContext, spriteId: number, renderable: WireframeBuilder): WireframeBuilder {
   renderable.mode = WebGLRenderingContext.TRIANGLES;
-  let buff = renderable.buff;
+  const buff = renderable.buff;
   const board = ctx.board();
   buff.allocate(3, 6);
-  let spr = board.sprites[spriteId];
-  let x = spr.x, y = spr.y, z = spr.z / ZSCALE;
-  let ang = spriteAngle(spr.ang);
-  let size = 128;
-  let vec1 = ang2vec(ang);
+  const spr = board.sprites[spriteId];
+  const x = spr.x, y = spr.y, z = spr.z / ZSCALE;
+  const ang = spriteAngle(spr.ang);
+  const size = 128;
+  const vec1 = ang2vec(ang);
   vec3.scale(vec1, vec1, size);
-  let vec2 = ang2vec(ang + Math.PI / 2);
+  const vec2 = ang2vec(ang + Math.PI / 2);
   vec3.scale(vec2, vec2, size / 4);
   buff.writePos(0, x + vec1[0], z, y + vec1[2]);
   buff.writePos(1, x + vec2[0], z, y + vec2[2]);

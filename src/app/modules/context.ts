@@ -5,7 +5,7 @@ import { IndexedImgLibJsConstructor, INDEXED_IMG_LIB } from '../../utils/imglib'
 import { create, getInstances, Injector, instance, lifecycle, Module, plugin } from '../../utils/injector';
 import * as PROFILE from '../../utils/profiler';
 import { ART, BOARD, ENGINE_API, GRID, PORTALS, REFERENCE_TRACKER, SCHEDULER, STATE, STORAGES, View, VIEW } from '../apis/app';
-import { BUS, busDisconnector, BusPlugin, DefaultMessageBus, MessageBus, MessageHandlerReflective } from '../apis/handler';
+import { BUS, busDisconnector, DefaultMessageBus, MessageBus, MessageHandlerReflective } from '../apis/handler';
 import { Renderable } from '../apis/renderable';
 import { DefaultScheduler } from '../apis/scheduler';
 import { EntityFactoryConstructor, ENTITY_FACTORY } from '../edit/context';
@@ -35,7 +35,7 @@ import { InfoModule } from './info';
 import { SwappableViewModule } from './view/view';
 import { DefaultPortalsConstructor } from '../modules/default/portals';
 
-async function mapBackupService(module: Module) {
+function mapBackupService(module: Module) {
   module.bind(plugin('MapBackupService'), lifecycle(async (injector, lifecycle) => {
     const [storages, bus, board, api] = await getInstances(injector, STORAGES, BUS, BOARD, ENGINE_API)
     const defaultBoard = api.newBoard();

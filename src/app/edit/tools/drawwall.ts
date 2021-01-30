@@ -7,7 +7,7 @@ import { vec2, vec3 } from "../../../libs_js/glmatrix";
 import { create, getInstances, lifecycle, Module, plugin } from "../../../utils/injector";
 import { dot2d } from "../../../utils/mathutils";
 import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, GRID, GridController, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
-import { BUS, busDisconnector, BusPlugin, MessageBus, MessageHandlerReflective } from "../../apis/handler";
+import { BUS, busDisconnector, MessageBus } from "../../apis/handler";
 import { Renderables } from "../../apis/renderable";
 import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
 import { LineBuilder } from "../../modules/gl/buffers";
@@ -205,7 +205,7 @@ class PortalModel {
 export async function DrawWallModule(module: Module) {
   module.bind(plugin('DrawWall'), lifecycle(async (injector, lifecycle) => {
     const [bus] = await getInstances(injector, TOOLS_BUS);
-    const drawwall = await create(injector, DrawWall, BUS, ENGINE_API, BUILDERS_FACTORY, VIEW, BOARD, REFERENCE_TRACKER, ART, GRID);
+    const drawwall = await create(injector, DrawWall, BUILDERS_FACTORY, ENGINE_API, VIEW, BOARD, REFERENCE_TRACKER, BUS, ART, GRID);
     lifecycle(bus.connect(drawwall), busDisconnector(bus));
   }));
 }

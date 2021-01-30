@@ -52,13 +52,13 @@ export class Buffer {
       }
       const ptr = <Place>place.data;
       const offdiff = noffset - place.offset;
-      const idxData = <Uint16Array>this.idxBuffer.getData();
-      for (let i = 0; i < ptr.size; i++) idxData[ptr.offset + i] += offdiff;
+      const buff = <Uint16Array>this.idxBuffer.getData();
+      for (let i = 0; i < ptr.size; i++) buff[ptr.offset + i] += offdiff;
     });
 
     this.idxBag = createController(idxSize, (place: Place, noffset: number) => {
-      const idxData = <Uint16Array>this.idxBuffer.getData();
-      idxData.set(idxData.subarray(place.offset, place.offset + place.size), noffset);
+      const buff = <Uint16Array>this.idxBuffer.getData();
+      buff.set(buff.subarray(place.offset, place.offset + place.size), noffset);
     });
 
     for (let i = 0; i < this.vtxBuffers.length; i++) this.vtxRegions.push([]);

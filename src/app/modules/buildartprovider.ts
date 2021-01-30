@@ -3,7 +3,7 @@ import { rect } from "../../utils/collections";
 import { Texture } from "../../utils/gl/drawstruct";
 import { createTexture, TextureImpl } from "../../utils/gl/textures";
 import { IndexedImgLib, INDEXED_IMG_LIB } from "../../utils/imglib";
-import { create, Dependency, Injector, provider } from "../../utils/injector";
+import { create, Dependency, lifecycle } from "../../utils/injector";
 import { warning } from "../../utils/logger";
 import { int } from "../../utils/mathutils";
 import { ArtProvider } from "../apis/app";
@@ -38,8 +38,8 @@ function addMipMaps(gl: WebGLRenderingContext, w: number, h: number, arr: Uint8A
   }
 }
 
-export const BuildArtProviderConstructor = provider(async (injector: Injector) => {
-  return await create(injector, BuildArtProvider, ART_FILES, TEXTURES_OVERRIDE, GL, PARALLAX_TEXTURES, INDEXED_IMG_LIB);
+export const BuildArtProviderConstructor = lifecycle(async (injector, lifecycle) => {
+  return lifecycle(await create(injector, BuildArtProvider, ART_FILES, TEXTURES_OVERRIDE, GL, PARALLAX_TEXTURES, INDEXED_IMG_LIB), async p => p.stop());
 });
 
 export class BuildArtProvider implements ArtProvider {
@@ -53,6 +53,11 @@ export class BuildArtProvider implements ArtProvider {
     private gl: WebGLRenderingContext,
     private parallaxPics: number,
     private lib: IndexedImgLib) {
+  }
+
+  public stop() {
+    this.textures.forEach(t => t.destroy(this.gl));
+    this.parallaxTextures.forEach(t => t.destroy(this.gl));
   }
 
   public get(picnum: number): Texture {

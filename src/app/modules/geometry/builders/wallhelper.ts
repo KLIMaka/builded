@@ -33,7 +33,7 @@ export class WallHelperBuilder extends Builders implements WallRenderable {
 
 function genQuadWireframe(coords: number[], normals: number[], buff: BuildBuffer) {
   buff.allocate(4, 8);
-  let [x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4] = coords;
+  const [x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4] = coords;
   buff.writePos(0, x1, z1, y1);
   buff.writePos(1, x2, z2, y2);
   buff.writePos(2, x3, z3, y3);
@@ -52,10 +52,10 @@ function genQuadWireframe(coords: number[], normals: number[], buff: BuildBuffer
 
 function getWallCoords(x1: number, y1: number, x2: number, y2: number,
   slope: any, nextslope: any, heinum: number, nextheinum: number, z: number, nextz: number, check: boolean, line = false): number[] {
-  let z1 = (slope(x1, y1, heinum) + z) / ZSCALE;
-  let z2 = (slope(x2, y2, heinum) + z) / ZSCALE;
-  let z3 = (nextslope(x2, y2, nextheinum) + nextz) / ZSCALE;
-  let z4 = (nextslope(x1, y1, nextheinum) + nextz) / ZSCALE;
+  const z1 = (slope(x1, y1, heinum) + z) / ZSCALE;
+  const z2 = (slope(x2, y2, heinum) + z) / ZSCALE;
+  const z3 = (nextslope(x2, y2, nextheinum) + nextz) / ZSCALE;
+  const z4 = (nextslope(x1, y1, nextheinum) + nextz) / ZSCALE;
   if (check) {
     if (line && z4 > z1 && z3 > z2) return null;
     if (!line && z4 >= z1 && z3 >= z2) return null;
@@ -66,18 +66,18 @@ function getWallCoords(x1: number, y1: number, x2: number, y2: number,
 function getMaskedWallCoords(x1: number, y1: number, x2: number, y2: number, slope: any, nextslope: any,
   ceilheinum: number, ceilnextheinum: number, ceilz: number, ceilnextz: number,
   floorheinum: number, floornextheinum: number, floorz: number, floornextz: number): number[] {
-  let currz1 = (slope(x1, y1, ceilheinum) + ceilz) / ZSCALE;
-  let currz2 = (slope(x2, y2, ceilheinum) + ceilz) / ZSCALE;
-  let currz3 = (slope(x2, y2, floorheinum) + floorz) / ZSCALE;
-  let currz4 = (slope(x1, y1, floorheinum) + floorz) / ZSCALE;
-  let nextz1 = (nextslope(x1, y1, ceilnextheinum) + ceilnextz) / ZSCALE;
-  let nextz2 = (nextslope(x2, y2, ceilnextheinum) + ceilnextz) / ZSCALE;
-  let nextz3 = (nextslope(x2, y2, floornextheinum) + floornextz) / ZSCALE;
-  let nextz4 = (nextslope(x1, y1, floornextheinum) + floornextz) / ZSCALE;
-  let z1 = Math.min(currz1, nextz1);
-  let z2 = Math.min(currz2, nextz2);
-  let z3 = Math.max(currz3, nextz3);
-  let z4 = Math.max(currz4, nextz4);
+  const currz1 = (slope(x1, y1, ceilheinum) + ceilz) / ZSCALE;
+  const currz2 = (slope(x2, y2, ceilheinum) + ceilz) / ZSCALE;
+  const currz3 = (slope(x2, y2, floorheinum) + floorz) / ZSCALE;
+  const currz4 = (slope(x1, y1, floorheinum) + floorz) / ZSCALE;
+  const nextz1 = (nextslope(x1, y1, ceilnextheinum) + ceilnextz) / ZSCALE;
+  const nextz2 = (nextslope(x2, y2, ceilnextheinum) + ceilnextz) / ZSCALE;
+  const nextz3 = (nextslope(x2, y2, floornextheinum) + floornextz) / ZSCALE;
+  const nextz4 = (nextslope(x1, y1, floornextheinum) + floornextz) / ZSCALE;
+  const z1 = Math.min(currz1, nextz1);
+  const z2 = Math.min(currz2, nextz2);
+  const z3 = Math.max(currz3, nextz3);
+  const z4 = Math.max(currz4, nextz4);
   return [x1, y1, z1, x2, y2, z2, x2, y2, z3, x1, y1, z4];
 }
 

@@ -5,7 +5,7 @@ export class Place {
 }
 
 export class Bag {
-  private holes: List<Place>;
+  readonly holes: List<Place>;
 
   constructor(readonly size: number) {
     this.reset();
@@ -101,13 +101,13 @@ export class BagController {
   }
 
   public get(size: number): Place {
-    let offset = this.bag.get(size);
+    const offset = this.bag.get(size);
     // if (offset == null) {
     //   this.optimize();
     //   offset = this.bag.get(size);
     // }
     if (offset == null) return null;
-    let result = new Place(offset, size);
+    const result = new Place(offset, size);
     this.places[offset] = result;
     return result;
   }
@@ -118,14 +118,14 @@ export class BagController {
   }
 
   public optimize() {
-    let places = this.places;
-    let keys = Object.keys(places);
+    const places = this.places;
+    const keys = Object.keys(places);
     this.places = {};
     this.bag.reset();
     let offset = 0;
     for (let i = 0; i < keys.length; i++) {
-      let key = keys[i];
-      let place = places[key];
+      const key = keys[i];
+      const place = places[key];
       this.places[offset] = place;
       if (place.offset == offset)
         continue;

@@ -16,6 +16,7 @@ export class VertexBufferImpl implements VertexBuffer {
   getNormalized(): boolean { return this.normalized }
   getStride(): number { return this.stride }
   getOffset(): number { return this.offset }
+  destroy(gl: WebGLRenderingContext) { gl.deleteBuffer(this.buffer) }
 }
 
 
@@ -27,6 +28,7 @@ class IndexBufferImpl implements IndexBuffer {
 
   getBuffer(): WebGLBuffer { return this.buffer }
   getType(): number { return this.type }
+  destroy(gl: WebGLRenderingContext) { gl.deleteBuffer(this.buffer) }
 }
 
 export function genIndexBuffer(gl: WebGLRenderingContext, count: number, pattern: number[]): IndexBuffer {

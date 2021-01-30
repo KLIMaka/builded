@@ -56,6 +56,10 @@ export class ShaderImpl implements Shader {
   public getSamplers(): Definition[] {
     return this.definitions.samplers;
   }
+
+  public destroy(gl: WebGLRenderingContext): void {
+    gl.deleteProgram(this.program);
+  }
 }
 
 export async function createShader(gl: WebGLRenderingContext, name: string, defines: string[] = []): Promise<Shader> {

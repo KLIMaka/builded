@@ -69,7 +69,7 @@ export class App implements Module {
       console.info(`App started in ${(performance.now() - start).toFixed(2)}ms`);
       return injector;
     } catch (e) {
-      console.error(`Error while starting App. ${e}`);
+      console.error(`Error while starting App. ${e}\n${e.stack}`);
       throw e;
     }
   }
@@ -136,7 +136,7 @@ class RootInjector implements ParentInjector, Runtime {
       console.info(`${dependency.name} started in ${(performance.now() - start).toFixed(2)}ms`);
       return instance;
     } catch (error) {
-      console.error(`Error while creating ${dependency.name}. ${error}`);
+      console.error(`Error while creating ${dependency.name}. ${error}\n${error.stack}`);
       throw error;
     }
   }
@@ -149,7 +149,7 @@ class RootInjector implements ParentInjector, Runtime {
       this.instances.delete(dependency);
       console.info(`${dependency.name} stopped in ${(performance.now() - start).toFixed(2)}ms`);
     } catch (error) {
-      console.error(`Error while stopping ${dependency.name}. ${error}`);
+      console.error(`Error while stopping ${dependency.name}. ${error}\n${error.stack}`);
       throw error;
     }
   }

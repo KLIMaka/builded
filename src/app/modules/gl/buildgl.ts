@@ -1,8 +1,8 @@
 import { mat4, Mat4Array, vec3, Vec3Array, vec4 } from '../../../libs_js/glmatrix';
-import { Texture } from '../../../utils/gl/drawstruct';
+import { Shader, Texture } from '../../../utils/gl/drawstruct';
 import { createShader } from '../../../utils/gl/shaders';
 import { Profile, State } from '../../../utils/gl/stategl';
-import { Dependency, getInstances, Injector, provider } from '../../../utils/injector';
+import { Dependency, getInstances, lifecycle } from '../../../utils/injector';
 import { info } from '../../../utils/logger';
 import * as PROFILER from '../../../utils/profiler';
 import { Renderable } from '../../apis/renderable';
@@ -14,41 +14,36 @@ export const SHADOWSTEPS = new Dependency<number>('Shadowsteps');
 export const PALSWAPS = new Dependency<number>('Palswaps');
 export const BUILD_GL = new Dependency<BuildGl>('BuildGL');
 
-export const BuildGlConstructor = provider(async (injector: Injector) => {
-  return new Promise<BuildGl>(resolve => getInstances(injector, GL, PAL_TEXTURE, PLU_TEXTURE, PALSWAPS, SHADOWSTEPS).then(([gl, pal, plus, plaswaps, shadowsteps]) => {
-    const buildgl = new BuildGl(plaswaps, shadowsteps, gl, pal, plus, () => resolve(buildgl))
-  }));
+export const BuildGlConstructor = lifecycle(async (injector, lifecycle) => {
+  const [gl, pal, plus, palswaps, shadowsteps] = await getInstances(injector, GL, PAL_TEXTURE, PLU_TEXTURE, PALSWAPS, SHADOWSTEPS);
+  const defs = ['PALSWAPS (' + palswaps + '.0)', 'SHADOWSTEPS (' + shadowsteps + '.0)', 'PAL_LIGHTING'/*, 'DITHERING'*/];
+  const SHADER_NAME = 'resources/shaders/build';
+  const state = new State()
+  const shaderCleaner = async (s: Shader) => s.destroy(gl);
+  state.registerShader('baseShader', lifecycle(await createShader(gl, SHADER_NAME, [...defs]), shaderCleaner));
+  state.registerShader('spriteShader', lifecycle(await createShader(gl, SHADER_NAME, [...defs, 'SPRITE']), shaderCleaner));
+  state.registerShader('baseFlatShader', lifecycle(await createShader(gl, SHADER_NAME, [...defs, 'FLAT']), shaderCleaner));
+  state.registerShader('spriteFlatShader', lifecycle(await createShader(gl, SHADER_NAME, [...defs, 'SPRITE', 'FLAT']), shaderCleaner));
+  state.registerShader('parallax', lifecycle(await createShader(gl, SHADER_NAME, [...defs, 'PARALLAX']), shaderCleaner));
+  state.registerShader('grid', lifecycle(await createShader(gl, SHADER_NAME, [...defs, 'GRID']), shaderCleaner));
+  state.registerShader('spriteFaceShader', lifecycle(await createShader(gl, SHADER_NAME, [...defs, 'SPRITE_FACE']), shaderCleaner));
+  state.setTexture('pal', pal);
+  state.setTexture('plu', plus);
+  return new BuildGl(state, gl);
 });
 
-const SHADER_NAME = 'resources/shaders/build';
 const inv = mat4.create();
 const pos = vec3.create();
 const clipPlane = vec4.create();
 
 export class BuildGl {
-  readonly state = new State();
 
-  constructor(palswaps: number, shadowsteps: number, readonly gl: WebGLRenderingContext, pal: Texture, plus: Texture, cb: () => void) {
+  constructor(readonly state: State, readonly gl: WebGLRenderingContext) {
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.enable(gl.CULL_FACE);
     gl.enable(gl.DEPTH_TEST);
     gl.enable(gl.POLYGON_OFFSET_FILL);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-
-    const defs = ['PALSWAPS (' + palswaps + '.0)', 'SHADOWSTEPS (' + shadowsteps + '.0)', 'PAL_LIGHTING'/*, 'DITHERING'*/]
-    Promise.all([
-      createShader(gl, SHADER_NAME, [...defs]).then(shader => this.state.registerShader('baseShader', shader)),
-      createShader(gl, SHADER_NAME, [...defs, 'SPRITE']).then(shader => this.state.registerShader('spriteShader', shader)),
-      createShader(gl, SHADER_NAME, [...defs, 'FLAT']).then(shader => this.state.registerShader('baseFlatShader', shader)),
-      createShader(gl, SHADER_NAME, [...defs, 'SPRITE', 'FLAT']).then(shader => this.state.registerShader('spriteFlatShader', shader)),
-      createShader(gl, SHADER_NAME, [...defs, 'PARALLAX']).then(shader => this.state.registerShader('parallax', shader)),
-      createShader(gl, SHADER_NAME, [...defs, 'GRID']).then(shader => this.state.registerShader('grid', shader)),
-      createShader(gl, SHADER_NAME, [...defs, 'SPRITE_FACE']).then(shader => this.state.registerShader('spriteFaceShader', shader))
-    ]).then(r => {
-      this.state.setTexture('pal', pal);
-      this.state.setTexture('plu', plus);
-      cb()
-    });
   }
 
   public setProjectionMatrix(proj: Mat4Array) { this.state.setUniform('P', proj) }
@@ -106,5 +101,4 @@ export class BuildGl {
   public flush() {
     this.state.flush(this.gl);
   }
-
 }

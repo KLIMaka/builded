@@ -7,6 +7,7 @@ export class TextureStub implements DS.Texture {
   public getHeight(): number { return this.h }
   public getFormat(): number { return null }
   public getType(): number { return null }
+  public destroy(gl: WebGLRenderingContext) { }
 }
 
 function getMagFilter(filter: number): number {
@@ -89,6 +90,11 @@ export class TextureImpl implements DS.Texture {
     gl.texImage2D(gl.TEXTURE_2D, level, this.format, width, height, 0, this.format, this.type, data);
     gl.bindTexture(gl.TEXTURE_2D, null);
   }
+
+  public destroy(gl: WebGLRenderingContext) {
+    gl.deleteTexture(this.id);
+    this.data = null;
+  }
 }
 
 export function createTexture(width: number, height: number, gl: WebGLRenderingContext, options: any = {}, img: Uint8Array = null, format: number = gl.RGBA, bpp: number = 4) {
@@ -132,7 +138,7 @@ export class RenderTexture extends TextureImpl {
     gl.bindRenderbuffer(gl.RENDERBUFFER, null);
   }
 
-  public drawTo(gl: WebGLRenderingContext, callback: (WebGLRenderingContext) => void): Uint8Array {
+  public drawTo(gl: WebGLRenderingContext, callback: (gl: WebGLRenderingContext) => void): Uint8Array {
     let v = gl.getParameter(gl.VIEWPORT);
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
     gl.bindRenderbuffer(gl.RENDERBUFFER, this.renderbuffer);

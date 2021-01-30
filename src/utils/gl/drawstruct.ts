@@ -6,11 +6,13 @@ export interface VertexBuffer {
   getNormalized(): boolean;
   getStride(): number;
   getOffset(): number;
+  destroy(gl: WebGLRenderingContext): void;
 }
 
 export interface IndexBuffer {
   getBuffer(): WebGLBuffer;
   getType(): number;
+  destroy(gl: WebGLRenderingContext): void;
 }
 
 export interface Texture {
@@ -19,6 +21,7 @@ export interface Texture {
   getHeight(): number;
   getFormat(): number;
   getType(): number;
+  destroy(gl: WebGLRenderingContext): void;
 }
 
 export interface Shader {
@@ -28,6 +31,7 @@ export interface Shader {
   getUniforms(): Definition[];
   getAttributes(): Definition[];
   getSamplers(): Definition[];
+  destroy(gl: WebGLRenderingContext): void;
 }
 
 export interface Definition {

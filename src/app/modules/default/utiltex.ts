@@ -1,11 +1,11 @@
-import { Lexer, LexerRule } from "../../../utils/lexer";
-import { getInstances, Injector, provider } from "../../../utils/injector";
 import { Texture } from "../../../utils/gl/drawstruct";
-import { GL, createIndexedTexture, TextureProvider } from "../buildartprovider";
-import { FS } from "../fs/fs";
-import { INDEXED_IMG_LIB } from "../../../utils/imglib";
-import { loadImageFromBuffer, loadImage } from "../../../utils/imgutils";
 import { createTexture } from "../../../utils/gl/textures";
+import { INDEXED_IMG_LIB } from "../../../utils/imglib";
+import { loadImage, loadImageFromBuffer } from "../../../utils/imgutils";
+import { getInstances, lifecycle } from "../../../utils/injector";
+import { Lexer, LexerRule } from "../../../utils/lexer";
+import { createIndexedTexture, GL } from "../buildartprovider";
+import { FS } from "../fs/fs";
 
 function createLexer(str: string) {
   const lexer = new Lexer();
@@ -32,7 +32,7 @@ async function loadTexture(gl: WebGLRenderingContext, name: string, options: any
   return loadImage(name).then(img => createTexture(img[0], img[1], gl, options, img[2], format, bpp))
 }
 
-export const DefaultAdditionalTextures = provider(async (injector: Injector) => {
+export const DefaultAdditionalTextures = lifecycle(async (injector, lifecycle) => {
   const textures: { [index: number]: Texture } = {};
   const [gl, fs, lib] = await getInstances(injector, GL, FS, INDEXED_IMG_LIB);
   const file = await fs.get('texlist.lst');
@@ -49,12 +49,12 @@ export const DefaultAdditionalTextures = provider(async (injector: Injector) => 
 
       if (options == 'plain') {
         const opts = { filter: WebGLRenderingContext.NEAREST, repeat: WebGLRenderingContext.CLAMP_TO_EDGE };
-        textures[id] = await loadTexture(gl, path, opts);
+        textures[id] = lifecycle(await loadTexture(gl, path, opts), async t => t.destroy(gl));
       } else if (options == 'palletize') {
         const texture = await fs.get(path);
         const [w, h, buff] = await loadImageFromBuffer(texture);
         const indexed = lib.palettize(w, h, buff);
-        textures[id] = createIndexedTexture(gl, w, h, indexed, true, lib);
+        textures[id] = lifecycle(createIndexedTexture(gl, w, h, indexed, true, lib), async t => t.destroy(gl));
       }
     }
   } finally {

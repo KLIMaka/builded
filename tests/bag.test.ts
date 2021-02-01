@@ -1,4 +1,5 @@
-import { Bag, BagController, Place } from "../src/utils/bag"
+import { Bag, BagController, Place } from "../src/utils/bag";
+import { coin, randInt, randInt0 } from "../src/utils/random";
 
 test('bag', () => {
   const bag = new Bag(1024);
@@ -19,17 +20,33 @@ test('bag', () => {
 });
 
 test('bag controller', () => {
-  const updater = (place: Place, noffset: number) => { }
-  const controller = new BagController(1024, updater);
-  const p1 = controller.get(128);
-  const p2 = controller.get(128);
-  const p3 = controller.get(128);
-  const p4 = controller.get(128);
-  expect(p2).toStrictEqual(new Place(128, 128));
-  expect(p4).toStrictEqual(new Place(384, 128));
-  controller.put(p1);
-  controller.put(p3);
+  const N = 1024;
+  const buff = new Uint16Array(N);
+  const updater = (place: Place, noffset: number) => {
+    buff.set(buff.subarray(place.offset, place.offset + place.size), noffset);
+  }
+  const controller = new BagController(N, updater);
+  const get = (size: number) => {
+    const p = controller.get(size);
+    if (p == null) return null;
+    const x = p.data = randInt0(N);
+    for (let i = 0; i < size; i++) buff[i + p.offset] = i + x;
+    return p;
+  }
+  const check = (p: Place) => {
+    const x: number = p.data;
+    for (let i = 0; i < p.size; i++) if (buff[i + p.offset] != x + i) return false;
+    return true;
+  }
+
+  const places = [];
+  for (let p = get(randInt(64, 128)); p != null; p = get(randInt(64, 128))) places.push(p);
+  const validPlaces = [];
+  for (const p of places) {
+    if (coin()) controller.put(p);
+    else validPlaces.push(p);
+  }
+
   controller.optimize();
-  expect(p2).toStrictEqual(new Place(0, 128));
-  expect(p4).toStrictEqual(new Place(128, 128));
+  for (const p of validPlaces) expect(check(p)).toBe(true);
 })

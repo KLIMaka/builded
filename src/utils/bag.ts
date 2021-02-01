@@ -127,8 +127,10 @@ export class BagController {
       const key = keys[i];
       const place = places[key];
       this.places[offset] = place;
-      if (place.offset == offset)
+      if (place.offset == offset) {
+        offset += place.size;
         continue;
+      }
       this.updater(place, offset);
       place.offset = offset;
       offset += place.size;

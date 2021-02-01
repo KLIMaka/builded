@@ -12,6 +12,7 @@ export async function InfoModule(module: Module) {
     const bus = await injector.getInstance(BUS);
     const info = await create(injector, Info, VIEW, BOARD);
     lifecycle(bus.connect(info), busDisconnector(bus));
+    lifecycle(info, async i => i.stop());
   }));
 }
 
@@ -172,5 +173,12 @@ export class Info extends MessageHandlerReflective {
 
   public BoardInvalidate(msg: BoardInvalidate) {
     this.lastEnt = NULL_ENT;
+  }
+
+  public stop() {
+    const panel = document.getElementById('info_panel');
+    panel.removeChild(this.sector);
+    panel.removeChild(this.wall);
+    panel.removeChild(this.sprite);
   }
 }

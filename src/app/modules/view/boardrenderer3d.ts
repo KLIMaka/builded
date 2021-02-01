@@ -5,7 +5,6 @@ import { mat4, vec2, vec3 } from '../../../libs_js/glmatrix';
 import { Deck } from '../../../utils/collections';
 import { Dependency, Injector } from '../../../utils/injector';
 import { dot2d } from '../../../utils/mathutils';
-import * as PROFILE from '../../../utils/profiler';
 import { mirrorBasis, normal2d, reflectPoint3d } from '../../../utils/vecmath';
 import { BOARD, BoardProvider } from '../../apis/app';
 import { BuildRenderableProvider, DrawCallConsumer, Renderable, SortingRenderable } from '../../apis/renderable';
@@ -120,12 +119,10 @@ export class Boardrenderer3D {
   }
 
   private drawGeometry(view: View3d) {
-    PROFILE.startProfile('processing');
     const board = this.board();
     let result = view.sec == -1
       ? all.visit(board)
       : visible.visit(board, view, view.getForward());
-    PROFILE.endProfile();
 
     this.bgl.setProjectionMatrix(view.getProjectionMatrix());
     this.drawMirrors(result, view);
@@ -180,7 +177,6 @@ export class Boardrenderer3D {
   private rorSectorCollector = createSectorCollector((board: Board, sectorId: number) => this.impl.rorLinks().hasRor(sectorId));
   private drawRor(result: VisResult, view: View3d) {
     result.forSector(this.board(), this.rorSectorCollector.visit());
-    PROFILE.get(null).inc('rors', this.rorSectorCollector.sectors.length());
 
     this.bgl.gl.enable(WebGLRenderingContext.STENCIL_TEST);
     for (let i = 0; i < this.rorSectorCollector.sectors.length(); i++) {
@@ -197,7 +193,6 @@ export class Boardrenderer3D {
   private drawMirrors(result: VisResult, view: View3d) {
     const board = this.board();
     result.forWall(board, this.mirrorWallsCollector.visit());
-    PROFILE.get(null).inc('mirrors', this.mirrorWallsCollector.walls.length());
     this.bgl.gl.enable(WebGLRenderingContext.STENCIL_TEST);
     for (let i = 0; i < this.mirrorWallsCollector.walls.length(); i++) {
       const w = unpackWallId(this.mirrorWallsCollector.walls.get(i));
@@ -259,7 +254,6 @@ export class Boardrenderer3D {
       this.surfaces.add(sector.floor);
     if (this.impl.rorLinks().ceilLinks[sectorId] == undefined)
       this.surfaces.add(sector.ceiling);
-    PROFILE.incCount('sectors');
   }
 
   private _wallVisitor = (board: Board, wallId: number, sectorId: number) => this.wallVisitor(board, wallId, sectorId);
@@ -276,7 +270,6 @@ export class Boardrenderer3D {
     } else {
       this.surfaces.add(wallr);
     }
-    PROFILE.incCount('walls');
   }
 
   private _spriteVisitor = (board: Board, spriteId: number) => this.spriteVisitor(board, spriteId);
@@ -285,21 +278,16 @@ export class Boardrenderer3D {
     const sprite = board.sprites[spriteId];
     const trans = sprite.cstat.translucent == 1 || sprite.cstat.tranclucentReversed == 1;
     (trans ? this.spritesTrans : this.sprites).add(spriter);
-    PROFILE.incCount('sprites');
   }
 
   private drawRooms(result: VisResult) {
-    PROFILE.startProfile('processing');
     this.clearDrawLists();
     const board = this.board();
     result.forSector(board, this._sectorVisitor);
     result.forWall(board, this._wallVisitor);
     result.forSprite(board, this._spriteVisitor);
-    PROFILE.endProfile();
 
-    PROFILE.startProfile('draw');
     this.drawImpl();
-    PROFILE.endProfile();
   }
 
   private drawImpl() {

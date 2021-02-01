@@ -3,7 +3,6 @@ import { Board } from '../../build/board/structs';
 import { Deck } from '../../utils/collections';
 import { IndexedImgLibJsConstructor, INDEXED_IMG_LIB } from '../../utils/imglib';
 import { create, getInstances, Injector, instance, lifecycle, Module, plugin } from '../../utils/injector';
-import * as PROFILE from '../../utils/profiler';
 import { ART, BOARD, ENGINE_API, GRID, PORTALS, REFERENCE_TRACKER, SCHEDULER, STATE, STORAGES, View, VIEW } from '../apis/app';
 import { BUS, busDisconnector, DefaultMessageBus, MessageBus, MessageHandlerReflective } from '../apis/handler';
 import { Renderable } from '../apis/renderable';
@@ -34,6 +33,7 @@ import { BuildGlConstructor, BUILD_GL } from './gl/buildgl';
 import { InfoModule } from './info';
 import { SwappableViewModule } from './view/view';
 import { DefaultPortalsConstructor } from '../modules/default/portals';
+import { PROFILER, DefaultProfiler, Profiler } from '../../utils/profiler';
 
 function mapBackupService(module: Module) {
   module.bind(plugin('MapBackupService'), lifecycle(async (injector, lifecycle) => {
@@ -82,6 +82,7 @@ export function DefaultSetupModule(module: Module) {
   module.bind(INDEXED_IMG_LIB, IndexedImgLibJsConstructor);
   module.bind(SCHEDULER, DefaultScheduler);
   module.bind(PORTALS, DefaultPortalsConstructor);
+  module.bind(PROFILER, instance(new DefaultProfiler()));
 
   module.install(SwappableViewModule);
   module.install(JoinSectorsModule);
@@ -102,7 +103,7 @@ export function DefaultSetupModule(module: Module) {
 }
 
 export function MainLoopConstructor(injector: Injector) {
-  return create(injector, MainLoop, VIEW, BUS);
+  return create(injector, MainLoop, VIEW, BUS, PROFILER);
 }
 
 function createTools() {
@@ -124,6 +125,7 @@ export class MainLoop extends MessageHandlerReflective {
   constructor(
     private view: View,
     private bus: MessageBus,
+    private profiler: Profiler
   ) {
     super();
     this.view = view;
@@ -138,12 +140,13 @@ export class MainLoop extends MessageHandlerReflective {
   }
 
   frame(dt: number) {
-    PROFILE.start();
+    this.profiler.frameStart();
+    const frame = this.profiler.frame().timer('Frame').start();
     this.bus.handle(PREFRAME);
     FRAME.dt = dt;
     this.bus.handle(FRAME);
     this.drawTools();
-    PROFILE.endProfile();
+    frame.stop();
     this.bus.handle(POSTFRAME);
   }
 }

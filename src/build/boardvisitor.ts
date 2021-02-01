@@ -1,7 +1,6 @@
 import { arcsIntersects, monoatan2, dot2d, len2d } from '../utils/mathutils';
 import * as GLM from '../libs_js/glmatrix';
 import { Deck, IndexedDeck } from '../utils/collections';
-import * as PROFILE from '../utils/profiler';
 import { Board } from './board/structs';
 import * as U from './utils';
 import { inSector, nextwall } from './board/query';
@@ -285,7 +284,6 @@ export class PvsBoardVisitorResult implements VisResult {
   public visit(board: Board, ms: U.MoveStruct, fwd: GLM.Mat3Array): VisResult {
     this.init(board, ms.sec);
     // this.fillPVS(ms, fwd);
-    PROFILE.get(null).inc('pvs', this.prepvs.length());
     let sectors = board.sectors;
     let sec2spr = U.groupSprites(board);
     for (let i = 0; i < this.pvs.length(); i++) {
@@ -318,7 +316,6 @@ export class PvsBoardVisitorResult implements VisResult {
           this.sprites.push(sprs[i]);
       }
     }
-    PROFILE.get(null).inc('pvs', this.pvs.length());
     return this;
   }
 

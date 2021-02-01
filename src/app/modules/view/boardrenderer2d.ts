@@ -4,7 +4,6 @@ import { mat4, Vec3Array } from '../../../libs_js/glmatrix';
 import { Controller2D } from '../../../utils/camera/controller2d';
 import { Deck } from '../../../utils/collections';
 import { Injector } from '../../../utils/injector';
-import * as PROFILE from '../../../utils/profiler';
 import { BOARD, BoardProvider } from '../../apis/app';
 import { BuildRenderableProvider, HELPER_GRID, SPRITE_LABEL, Renderable, SortingRenderable } from '../../apis/renderable';
 import { GRID_SECTOR_MATRIX } from '../geometry/builders/common';
@@ -77,10 +76,8 @@ export class BoardRenderer2D {
   }
 
   public draw(view: View2d, campos: Vec3Array, dist: number, controller: Controller2D) {
-    PROFILE.startProfile('processing');
     this.upp = controller.getUnitsPerPixel();
     const result = visible.visit(this.board());
-    PROFILE.endProfile();
 
     this.bgl.setProjectionMatrix(view.getProjectionMatrix());
     this.bgl.setViewMatrix(view.getTransformMatrix());
@@ -103,34 +100,27 @@ export class BoardRenderer2D {
   private sectorVisitor_ = (board: Board, sectorId: number) => this.sectorVisitor(board, sectorId);
   private sectorVisitor(board: Board, sectorId: number) {
     this.surfaces.push(this.renderables.sector(sectorId));
-    PROFILE.incCount('sectors');
   }
 
   private wallVisitor_ = (board: Board, wallId: number, sectorId: number) => this.wallVisitor(board, wallId, sectorId);
   private wallVisitor(board: Board, wallId: number, sectorId: number) {
     this.surfaces.push(this.renderables.wall(wallId));
-    PROFILE.incCount('walls');
   }
 
   private spriteVisitor_ = (board: Board, spriteId: number) => this.spriteVisitor(board, spriteId);
   private spriteVisitor(board: Board, spriteId: number) {
     this.surfaces.push(this.renderables.sprite(spriteId));
-    PROFILE.incCount('sprites');
   }
 
   private drawRooms(result: VisResult) {
-    PROFILE.startProfile('processing');
     this.clearDrawLists();
     const board = this.board();
     result.forSector(board, this.sectorVisitor_);
     result.forWall(board, this.wallVisitor_);
     result.forSprite(board, this.spriteVisitor_);
-    PROFILE.endProfile();
 
-    PROFILE.startProfile('draw');
     this.bgl.draw(this.pass);
     this.bgl.flush();
-    PROFILE.endProfile();
   }
 }
 

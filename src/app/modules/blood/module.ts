@@ -143,7 +143,7 @@ const BloodResources = provider(async (injector: Injector) => {
 });
 
 const picTags = provider(async (injector: Injector) => {
-  const fs = await injector.getInstance(FS);
+  const fs = await injector.getInstance(RESOURCES);
   const surfaceDat = await fs.get('SURFACE.DAT');
   if (surfaceDat == null) return <PicTags>{ allTags: () => [], tags: id => [] }
   return loadTags(surfaceDat);

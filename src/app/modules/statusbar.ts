@@ -1,6 +1,6 @@
-import h from "stage0";
+import h, { hElement } from "stage0";
 import { create, lifecycle, Module, plugin } from "../../utils/injector";
-import * as PROFILE from "../../utils/profiler";
+import { Profiler, PROFILER } from "../../utils/profiler";
 import { View, VIEW } from "../apis/app";
 import { BUS, busDisconnector, MessageHandlerReflective } from "../apis/handler";
 import { PostFrame } from "../edit/messages";
@@ -9,8 +9,9 @@ import { PostFrame } from "../edit/messages";
 export async function StatusBarModule(module: Module) {
   module.bind(plugin('StatusBar'), lifecycle(async (injector, lifecycle) => {
     const bus = await injector.getInstance(BUS);
-    const statusbar = await create(injector, Statusbar, VIEW);
+    const statusbar = await create(injector, Statusbar, VIEW, PROFILER);
     lifecycle(bus.connect(statusbar), busDisconnector(bus));
+    lifecycle(statusbar, async s => s.stop());
   }));
 }
 
@@ -77,22 +78,28 @@ export class Statusbar extends MessageHandlerReflective {
     drawsUpdate: (value: any) => void;
     fpsUpdate: (value: any) => void;
   };
+  private root: hElement;
 
-  constructor(private view: View) {
+  constructor(private view: View, private profiler: Profiler) {
     super();
     const { root, updaters } = StatusBar();
+    this.root = root;
     document.getElementById('footer').appendChild(root);
     this.updaters = updaters;
   }
 
+  public stop() {
+    document.getElementById('footer').removeChild(this.root);
+  }
+
   public PostFrame(msg: PostFrame) {
     const view = this.view;
-    const profile = PROFILE.get(null);
-    const draws = profile.counts['drawsRequested'] || 0;
-    const skips = profile.counts['drawsMerged'] || 0;
+    const profile = this.profiler.frame();
+    const draws = profile.counter('drawsRequested').get();
+    const skips = profile.counter('drawsMerged').get();
     this.updaters.posUpdate(view.x, view.y);
     this.updaters.sectorUpdate(view.sec);
-    this.updaters.fpsUpdate((1000 / profile.time).toFixed(0));
+    this.updaters.fpsUpdate((1000 / profile.timer('Frame').get()).toFixed(0));
     this.updaters.drawsUpdate(draws + ' / ' + (draws - skips));
   }
 }

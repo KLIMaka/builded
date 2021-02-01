@@ -4,7 +4,7 @@ import { createShader } from '../../../utils/gl/shaders';
 import { Profile, State } from '../../../utils/gl/stategl';
 import { Dependency, getInstances, lifecycle } from '../../../utils/injector';
 import { info } from '../../../utils/logger';
-import * as PROFILER from '../../../utils/profiler';
+import { Profiler, PROFILER } from '../../../utils/profiler';
 import { Renderable } from '../../apis/renderable';
 import { GL } from '../buildartprovider';
 
@@ -15,7 +15,7 @@ export const PALSWAPS = new Dependency<number>('Palswaps');
 export const BUILD_GL = new Dependency<BuildGl>('BuildGL');
 
 export const BuildGlConstructor = lifecycle(async (injector, lifecycle) => {
-  const [gl, pal, plus, palswaps, shadowsteps] = await getInstances(injector, GL, PAL_TEXTURE, PLU_TEXTURE, PALSWAPS, SHADOWSTEPS);
+  const [gl, pal, plus, palswaps, shadowsteps, profiler] = await getInstances(injector, GL, PAL_TEXTURE, PLU_TEXTURE, PALSWAPS, SHADOWSTEPS, PROFILER);
   const defs = ['PALSWAPS (' + palswaps + '.0)', 'SHADOWSTEPS (' + shadowsteps + '.0)', 'PAL_LIGHTING'/*, 'DITHERING'*/];
   const SHADER_NAME = 'resources/shaders/build';
   const state = new State()
@@ -29,7 +29,7 @@ export const BuildGlConstructor = lifecycle(async (injector, lifecycle) => {
   state.registerShader('spriteFaceShader', lifecycle(await createShader(gl, SHADER_NAME, [...defs, 'SPRITE_FACE']), shaderCleaner));
   state.setTexture('pal', pal);
   state.setTexture('plu', plus);
-  return new BuildGl(state, gl);
+  return new BuildGl(state, gl, profiler);
 });
 
 const inv = mat4.create();
@@ -38,7 +38,7 @@ const clipPlane = vec4.create();
 
 export class BuildGl {
 
-  constructor(readonly state: State, readonly gl: WebGLRenderingContext) {
+  constructor(readonly state: State, readonly gl: WebGLRenderingContext, private profiler: Profiler) {
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.enable(gl.CULL_FACE);
     gl.enable(gl.DEPTH_TEST);
@@ -84,13 +84,13 @@ export class BuildGl {
   }
 
   private updateProfile(profile: Profile) {
-    const p = PROFILER.get(null);
-    p.set('drawsRequested', profile.drawsRequested);
-    p.set('drawsMerged', profile.drawsMerged);
-    p.set('shaderChanges', profile.shaderChanges);
-    p.set('uniformChanges', profile.uniformChanges);
-    p.set('textureChanges', profile.textureChanges);
-    p.set('bufferChanges', profile.bufferChanges);
+    const p = this.profiler.frame();
+    p.counter('drawsRequested').set(profile.drawsRequested);
+    p.counter('drawsMerged').set(profile.drawsMerged);
+    p.counter('shaderChanges').set(profile.shaderChanges);
+    p.counter('uniformChanges').set(profile.uniformChanges);
+    p.counter('textureChanges').set(profile.textureChanges);
+    p.counter('bufferChanges').set(profile.bufferChanges);
     profile.reset();
   }
 

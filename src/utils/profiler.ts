@@ -1,108 +1,83 @@
+import { Dependency } from "./injector";
 
 function now() {
   return window.performance.now();
 }
 
-export class Section {
-  constructor(
-    public parent: Section,
-    public name: string,
-    public startTime: number = now(),
-    public time: number = 0,
-    public subSections = {},
-    public counts = {}) {
-    if (parent != null)
-      parent.subSections[name] = this;
-  }
+export interface Timer {
+  start(): Timer;
+  stop(): Timer;
+  get(): number;
+}
 
-  public start() {
-    if (this.startTime == -1)
-      this.startTime = now();
-  }
+export interface Counter {
+  inc(): Counter;
+  incAmount(amount: number): Counter;
+  set(values: number): Counter;
+  get(): number;
+}
 
-  public stop() {
+export interface Profile {
+  timer(name: string): Timer;
+  counter(name: string): Counter;
+}
+
+export interface Profiler {
+  global(): Profile;
+  frame(): Profile;
+  frameStart(): void;
+}
+
+export const PROFILER = new Dependency<Profiler>('Profiler');
+
+export class DefaultTimer implements Timer {
+  private time = 0;
+  private startTime = -1;
+
+  get() { return this.startTime != -1 ? now() - this.startTime : this.time }
+  start() {
+    if (this.startTime == -1) this.startTime = now();
+    return this;
+  }
+  stop() {
     if (this.startTime != -1) {
       this.time = now() - this.startTime;
       this.startTime = -1;
     }
-    return this.time;
-  }
-
-  public pause() {
-    if (this.startTime != -1) {
-      this.time += now() - this.startTime;
-      this.startTime = -1;
-    }
-    return this.time;
-  }
-
-  public currentTime() {
-    return this.startTime == -1 ? this.time : now() - this.startTime;
-  }
-
-  public createSubsection(name: string): Section {
-    return new Section(this, name);
-  }
-
-  public inc(name: string, amount = 1) {
-    let count = this.counts[name];
-    this.counts[name] = (count == undefined ? 0 : count) + amount;
-  }
-
-  public set(name: string, value: any) {
-    this.counts[name] = value;
+    return this;
   }
 }
 
-let mainSection = new Section(null, 'Main');
-let currentSection: Section = mainSection;
+export class DefaultCounter implements Counter {
+  private count = 0;
+  inc() { this.count++; return this; }
+  incAmount(amount: number) { this.count += amount; return this; }
+  set(value: number) { this.count = value; return this; }
+  get(): number { return this.count }
+}
 
-export function startProfile(name: string) {
-  let subsec = currentSection.subSections[name];
-  if (subsec == undefined) {
-    subsec = new Section(currentSection, name);
+function ensure<T>(map: Map<string, T>, key: string, constructor: () => T) {
+  let value = map.get(key);
+  if (value == undefined) {
+    value = constructor();
+    map.set(key, value);
   }
-  currentSection = subsec;
-  currentSection.start();
+  return value;
 }
 
-export function startGlobalProfile(name: string) {
-  let subsec = mainSection.subSections[name];
-  if (subsec == undefined) {
-    subsec = new Section(mainSection, name);
-    subsec.parent = currentSection;
-  }
-  currentSection = subsec;
-  currentSection.start();
+export class DefaultProfile implements Profile {
+  private timers = new Map<string, Timer>();
+  private counters = new Map<string, Counter>();
+
+  timer(name: string): Timer { return ensure(this.timers, name, () => new DefaultTimer()) }
+  counter(name: string): Counter { return ensure(this.counters, name, () => new DefaultCounter()) }
 }
 
-export function incCount(name: string, amount = 1) {
-  currentSection.inc(name, amount);
-}
+export class DefaultProfiler implements Profiler {
+  private globalProfile = new DefaultProfile();
+  private frameProfile = new DefaultProfile();
 
-export function set(name: string, value: any) {
-  currentSection.set(name, value);
-}
-
-export function endProfile() {
-  let time = currentSection.pause();
-  if (currentSection != mainSection)
-    currentSection = currentSection.parent;
-  return time;
-}
-
-export function start() {
-  mainSection = new Section(null, 'Main');
-  currentSection = mainSection;
-}
-
-export function get(path: string = null): Section {
-  if (path == null)
-    return mainSection;
-  let parts = path.split('.');
-  let section = mainSection;
-  for (let i = 0; i < parts.length; i++) {
-    section = section.subSections[parts[i]];
-  }
-  return section;
+  global() { return this.globalProfile }
+  frame() { return this.frameProfile }
+  frameStart() { this.frameProfile = new DefaultProfile() }
 }

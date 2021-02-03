@@ -1,7 +1,7 @@
-import { MessageHandlerReflective, BUS, BusPlugin, Handle } from "../../apis/handler";
-import { cyclic } from "../../../utils/mathutils";
-import { NamedMessage } from "../../edit/messages";
 import { Injector } from "../../../utils/injector";
+import { cyclic } from "../../../utils/mathutils";
+import { BUS, Handle, MessageHandlerReflective } from "../../apis/handler";
+import { NamedMessage } from "../../edit/messages";
 
 export class GridControllerImpl extends MessageHandlerReflective {
   private gridSizes = [16, 32, 64, 128, 256, 512, 1024];

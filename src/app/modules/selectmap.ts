@@ -1,35 +1,28 @@
-import { Dependency, Injector } from "../../utils/injector";
+import { Dependency, getInstances, lifecycle } from "../../utils/injector";
 import { replaceContent, span, Table } from "../../utils/ui/ui";
-import { UI, Window } from "../apis/ui";
+import { UI } from "../apis/ui";
 
 export const MAP_NAMES = new Dependency<() => Promise<string[]>>('MapNames');
+export const MAP_SELECTOR = new Dependency<() => Promise<string>>('MapSelector');
 
-let selectMapWindow: Window;
-async function getWindow(injector: Injector) {
-  const ui = await injector.getInstance(UI);
-  if (selectMapWindow == null) {
-    selectMapWindow = ui.builder.window()
-      .title('Select Map')
-      .closeable(true)
-      .size(350, 600)
-      .build();
-  }
-  return selectMapWindow;
-}
-
-export function showMapSelection(injector: Injector): Promise<string> {
-  return new Promise(async resolve => {
-    const mapNamesProvider = await injector.getInstance(MAP_NAMES);
-    const mapNames = await mapNamesProvider();
-    const win = await getWindow(injector);
-    win.onclose = () => resolve(null);
+export const DefaultMapSelector = lifecycle(async (injector, lifecycle) => {
+  const [mapNamesProvider, ui] = await getInstances(injector, MAP_NAMES, UI);
+  const selectMapWindow = ui.builder.window()
+    .title('Select Map')
+    .draggable(true)
+    .closeable(true)
+    .size(350, 600)
+    .build();
+  selectMapWindow.hide();
+  lifecycle(selectMapWindow, async s => s.destroy());
+  const selector = () => new Promise(async (resolve: (s: string) => void) => {
+    selectMapWindow.onclose = () => resolve(null);
     const table = new Table();
     table.className("table-striped");
-    mapNames.forEach(map => table.row([span().text(map)]).click(() => {
-      win.hide();
-      resolve(map);
-    }));
-    replaceContent(win.contentElement, table.elem());
-    win.show();
-  })
-}
+    const mapNames = await mapNamesProvider();
+    mapNames.forEach(map => table.row([span().text(map)]).click(() => { selectMapWindow.hide(); resolve(map); }));
+    replaceContent(selectMapWindow.contentElement, table.elem());
+    selectMapWindow.show();
+  });
+  return selector;
+});

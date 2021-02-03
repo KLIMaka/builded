@@ -61,6 +61,8 @@ class TaskManager implements ScheddulerHandler, GridModel {
     for (const task of currentTasks) this.onTaskAdd(task);
   }
 
+  stop() { this.window.destroy() }
+
   onTaskAdd(task: TaskHandle): void {
     this.tasks.push(task);
     this.taskWidgets.push(new TaskWidget(task));
@@ -115,5 +117,6 @@ export async function TaskManagerModule(module: Module) {
     lifecycle(scheduler.addHandler(manager), async v => scheduler.removeHandler(v));
     lifecycle(bus.connect(namedMessageHandler('show_tasks', () => manager.show())), busDisconnect);
     lifecycle(bus.connect(namedMessageHandler('add_test_task', () => scheduler.addTask(task()))), busDisconnect);
+    lifecycle(manager, async m => m.stop());
   }));
 }

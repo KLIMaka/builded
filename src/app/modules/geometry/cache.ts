@@ -1,12 +1,13 @@
-import { create, Dependency, getInstances, Injector, lifecycle, Module, plugin, provider } from '../../../utils/injector';
-import { ART, ArtProvider, BOARD, BoardProvider, STATE, State, SCHEDULER, Scheduler, TaskHandle, SchedulerTask, PORTALS, Portals } from '../../apis/app';
+import { create, Dependency, getInstances, lifecycle, Module, plugin, provider } from '../../../utils/injector';
+import { ART, ArtProvider, BOARD, BoardProvider, PORTALS, Portals, SCHEDULER, Scheduler, SchedulerTask, STATE, State, TaskHandle } from '../../apis/app';
 import { Builder } from '../../apis/builder';
-import { BUS, busDisconnector, BusPlugin, MessageHandler, MessageHandlerReflective } from '../../apis/handler';
-import { BuildRenderableProvider, ClusterRenderable, SectorRenderable, WallRenderable, Renderable } from '../../apis/renderable';
-import { BoardInvalidate, NamedMessage, LoadBoard } from '../../edit/messages';
+import { BUS, busDisconnector, MessageHandler, MessageHandlerReflective } from '../../apis/handler';
+import { BuildRenderableProvider, ClusterRenderable, Renderable, SectorRenderable, WallRenderable } from '../../apis/renderable';
+import { BoardInvalidate } from '../../edit/messages';
 import { SectorBuilder, updateSector } from './builders/sector';
 import { updateCluster } from './builders/sectorcluster';
 import { SectorHelperBuilder, updateSectorHelper } from './builders/sectorhelper';
+import { SectorSelectedBuilder, updateSectorSelected, updateWallSelected, WallSelectedBuilder } from './builders/selected';
 import { updateSprite } from './builders/sprite';
 import { updateSprite2d } from './builders/sprite2d';
 import { updateSpriteHelper } from './builders/spritehelper';
@@ -14,8 +15,7 @@ import { updateWall } from './builders/wall';
 import { updateWall2d } from './builders/wall2d';
 import { updateWallHelper, WallHelperBuilder } from './builders/wallhelper';
 import { updateWallPoint } from './builders/wallpointhelper';
-import { BuildersFactory, BUILDERS_FACTORY, FlatBuilder, SolidBuilder } from './common';
-import { updateSectorSelected, SectorSelectedBuilder, updateWallSelected, WallSelectedBuilder } from './builders/selected';
+import { BuildersFactory, BUILDERS_FACTORY } from './common';
 
 class Entry<T> {
   constructor(public value: T, public valid: boolean = false) { }

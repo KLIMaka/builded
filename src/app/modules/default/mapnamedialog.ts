@@ -1,34 +1,27 @@
-import { Injector } from "../../../utils/injector";
+import { Dependency, lifecycle } from "../../../utils/injector";
 import { tag } from '../../../utils/ui/ui';
 import { PhotonDialog } from "../photonui";
 
 
-let selectMapNameWindow: PhotonDialog;
-let applyCallback: (name: string) => void;
-let setDefaultName: (name: string) => void;
-async function getWindow(injector: Injector) {
-  if (selectMapNameWindow == null) {
-    const input = <HTMLInputElement>tag('input')
-      .attr('type', 'text')
-      .attr('placeholder', 'Map Name')
-      .className('form-control')
-      .css('width', '300px').elem();
-    const form = tag('form').css('padding', '10px 10px 5px 10px').appendHtml(input);
-    setDefaultName = name => input.value = name;
+export const MAP_NAME = new Dependency<(name: string) => Promise<string>>('MapName');
 
-    selectMapNameWindow = new PhotonDialog('Save As');
-    selectMapNameWindow.contentElement.appendChild(form.elem());
-    selectMapNameWindow.onok = () => applyCallback(input.value);
-  }
-  return selectMapNameWindow;
-}
+export const DefaultMapName = lifecycle(async (injector, lifecycle) => {
+  const input = <HTMLInputElement>tag('input')
+    .attr('type', 'text')
+    .attr('placeholder', 'Map Name')
+    .className('form-control')
+    .css('width', '300px').elem();
+  const form = tag('form').css('padding', '10px 10px 5px 10px').appendHtml(input);
 
-export function showMapNameSelection(injector: Injector, defaultName: string): Promise<string> {
-  return new Promise(async resolve => {
-    const win = await getWindow(injector);
-    setDefaultName(defaultName);
-    win.onclose = () => resolve(null);
-    applyCallback = (name: string) => { win.hide(); resolve(name); }
-    win.show();
-  })
-}
+  const selectMapNameWindow = new PhotonDialog('Save As');
+  selectMapNameWindow.contentElement.appendChild(form.elem());
+  selectMapNameWindow.hide();
+  lifecycle(selectMapNameWindow, async s => s.destroy())
+
+  return (name: string) => new Promise((resolve: (s: string) => void) => {
+    input.value = name;
+    selectMapNameWindow.onok = () => { selectMapNameWindow.hide(); resolve(input.value) };
+    selectMapNameWindow.onclose = () => resolve(null);
+    selectMapNameWindow.show();
+  });
+});

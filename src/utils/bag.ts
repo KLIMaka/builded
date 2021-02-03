@@ -5,7 +5,7 @@ export class Place {
 }
 
 export class Bag {
-  readonly holes: List<Place>;
+  private holes: List<Place>;
 
   constructor(readonly size: number) {
     this.reset();
@@ -71,6 +71,8 @@ export class Bag {
     this.holes = new List<Place>();
     this.holes.insertAfter(new Place(0, this.size));
   }
+
+  public getHoles() { return [...this.holes] }
 
   public freeSpace(segments: number) {
     const results = new Array<number>(segments).fill(1);

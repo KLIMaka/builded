@@ -40,6 +40,7 @@ export class PhotonDialog implements Window {
 
   hide() { this.winElement.classList.add('hidden') }
   show() { this.winElement.classList.remove('hidden') }
+  destroy() { document.body.removeChild(this.winElement) }
 
   public close() {
     this.hide();
@@ -113,6 +114,7 @@ class PhotonWindow implements Window {
   }
 
   hide() { this.winElement.classList.add('hidden') }
+  destroy() { document.body.removeChild(this.winElement) }
 
   show() {
     if (this.centered) this.setPosition((document.body.clientWidth - this.w) / 2, (document.body.clientHeight - this.h) / 2);

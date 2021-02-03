@@ -3,7 +3,7 @@ import { create, Dependency, lifecycle, Module, plugin } from "../../../utils/in
 import { iter } from "../../../utils/iter";
 import { GridModel, IconText, IconTextRenderer, renderGrid } from "../../../utils/ui/renderers";
 import { addDragAndDrop, Element, replaceContent } from "../../../utils/ui/ui";
-import { BUS, busDisconnector, BusPlugin } from "../../apis/handler";
+import { BUS, busDisconnector } from "../../apis/handler";
 import { UI, Ui, Window } from "../../apis/ui";
 import { namedMessageHandler } from "../../edit/messages";
 
@@ -58,9 +58,7 @@ class FileBrowser implements GridModel {
     addDragAndDrop(win, this.dragAndDropHandler);
   }
 
-  public async stop() {
-    document.removeChild(this.window.winElement);
-  }
+  public async stop() { this.window.destroy() }
 
   async rows() { return iter(await this.manager.list()).map(f => [{ text: f, icon: this.getIcon(f), style: this.selected.has(f) ? "selected" : "" }]) }
   columns() { return columns }

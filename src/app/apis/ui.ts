@@ -7,6 +7,7 @@ export interface Window {
   show(): void;
   hide(): void;
   setPosition(x: number | string, y: string | number): void;
+  destroy(): void;
 }
 
 export interface WindowBuilder {

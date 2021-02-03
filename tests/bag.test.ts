@@ -10,13 +10,13 @@ test('bag', () => {
   bag.put(0, 16)
   bag.put(128, 32)
   bag.put(256, 128)
-  expect([...bag.holes]).toStrictEqual([new Place(0, 16), new Place(128, 32), new Place(256, 128), new Place(528, 496)]);
+  expect(bag.getHoles()).toStrictEqual([new Place(0, 16), new Place(128, 32), new Place(256, 128), new Place(528, 496)]);
   expect(bag.get(512)).toBe(null);
   expect(bag.get(8)).toBe(0);
   expect(bag.get(8)).toBe(8);
   expect(bag.get(128)).toBe(256);
   expect(bag.get(16)).toBe(128);
-  expect([...bag.holes]).toStrictEqual([new Place(144, 16), new Place(528, 496)]);
+  expect(bag.getHoles()).toStrictEqual([new Place(144, 16), new Place(528, 496)]);
 });
 
 test('bag controller', () => {

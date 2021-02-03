@@ -12,13 +12,13 @@ import { Stream } from '../../../utils/stream';
 import { BOARD, ENGINE_API, RESOURCES } from '../../apis/app';
 import { BUS, busDisconnector } from '../../apis/handler';
 import { LoadBoard, namedMessageHandler } from '../../edit/messages';
-import { showMapNameSelection } from '../../modules/default/mapnamedialog';
+import { DefaultMapName, MAP_NAME } from '../../modules/default/mapnamedialog';
 import { Palette, PicTags, PIC_TAGS, RAW_PAL, RAW_PLUs } from '../artselector';
 import { ART_FILES, GL, PARALLAX_TEXTURES } from '../buildartprovider';
 import { FileSystem, FS } from '../fs/fs';
 import { FS_MANAGER } from '../fs/manager';
 import { PALSWAPS, PAL_TEXTURE, PLU_TEXTURE, SHADOWSTEPS } from '../gl/buildgl';
-import { MAP_NAMES, showMapSelection } from '../selectmap';
+import { DefaultMapSelector, MAP_NAMES, MAP_SELECTOR } from '../selectmap';
 import { Implementation_ } from '../view/boardrenderer3d';
 
 const artFiles = provider(async (injector: Injector): Promise<ArtFiles> => {
@@ -66,9 +66,9 @@ function loadMapImpl(name: string) {
 
 function mapLoader(module: Module) {
   module.bind(plugin('MapLoader'), lifecycle(async (injector, lifecycle) => {
-    const bus = await injector.getInstance(BUS);
+    const [bus, mapSelector] = await getInstances(injector, BUS, MAP_SELECTOR);
     lifecycle(bus.connect(namedMessageHandler('load_map', async () => {
-      const mapName = await showMapSelection(injector);
+      const mapName = await mapSelector();
       if (!mapName) return;
       const map = await loadMapImpl(mapName)(injector);
       bus.handle(new LoadBoard(map));
@@ -80,7 +80,7 @@ function mapSaver(module: Module) {
   module.bind(plugin('MapSaver'), lifecycle(async (injector, lifecycle) => {
     let mapName = 'newboard.map';
     let savedBefore = false;
-    const [fsmgr, board, bus] = await getInstances(injector, FS_MANAGER, BOARD, BUS);
+    const [fsmgr, board, bus, mapNameDialog] = await getInstances(injector, FS_MANAGER, BOARD, BUS, MAP_NAME);
     const saveMap = (name: string) => {
       if (name != null && name.length != 0) {
         if (!name.endsWith('.map')) name = name + '.map'
@@ -90,8 +90,8 @@ function mapSaver(module: Module) {
       }
     }
 
-    lifecycle(bus.connect(namedMessageHandler('save_map', async () => saveMap(savedBefore ? mapName : await showMapNameSelection(injector, mapName)))), busDisconnector(bus));
-    lifecycle(bus.connect(namedMessageHandler('save_map_as', async () => saveMap(await showMapNameSelection(injector, mapName)))), busDisconnector(bus));
+    lifecycle(bus.connect(namedMessageHandler('save_map', async () => saveMap(savedBefore ? mapName : await mapNameDialog(mapName)))), busDisconnector(bus));
+    lifecycle(bus.connect(namedMessageHandler('save_map_as', async () => saveMap(await mapNameDialog(mapName)))), busDisconnector(bus));
   }));
 }
 
@@ -179,6 +179,8 @@ export function BloodModule(module: Module) {
   module.bind(PLU_TEXTURE, pluTexture);
   module.bind(Implementation_, BloodImplementationConstructor);
   module.bind(MAP_NAMES, mapNames);
+  module.bind(MAP_NAME, DefaultMapName);
+  module.bind(MAP_SELECTOR, DefaultMapSelector);
   module.bind(PIC_TAGS, picTags);
 
   module.install(mapLoader);

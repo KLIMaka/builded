@@ -1,6 +1,6 @@
 import { Injector, instance, lifecycle, Module, plugin, provider, RUNTIME } from "../../../utils/injector";
 import { Storage, STORAGES } from "../../apis/app";
-import { BUS, busDisconnector, BusPlugin } from "../../apis/handler";
+import { BUS, busDisconnector } from "../../apis/handler";
 import { namedMessageHandler } from "../../edit/messages";
 import { StorageDbConstructor } from "../db";
 import { FileSystem, FS, UrlFs } from "./fs";

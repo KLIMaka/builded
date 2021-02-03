@@ -34,6 +34,7 @@ export async function ArtEditorModule(module: Module) {
     const bus = await injector.getInstance(BUS);
     const editor = await create(injector, ArtEditor, UI, ART, RAW_PAL, RAW_PLUs, PIC_TAGS, SHADOWSTEPS);
     lifecycle(bus.connect(namedMessageHandler('show_artedit', () => editor.show())), busDisconnector(bus));
+    lifecycle(editor, async e => e.stop());
   }));
 }
 
@@ -81,6 +82,8 @@ export class ArtEditor {
       .build();
     this.window.hide();
   }
+
+  public stop() { this.window.destroy() }
 
   private createPalSelectingMenu() {
     const menu = this.ui.builder.menu();

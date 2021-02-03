@@ -1,6 +1,6 @@
 import { ArtInfoProvider } from "../../build/formats/art";
 import { range } from "../../utils/collections";
-import { create, Dependency, Injector, provider } from "../../utils/injector";
+import { create, Dependency, Injector, lifecycle, provider } from "../../utils/injector";
 import { iter } from "../../utils/iter";
 import { axisSwap, RGBPalPixelProvider } from "../../utils/pixelprovider";
 import { DrawPanel, PixelDataProvider } from "../../utils/ui/drawpanel";
@@ -30,50 +30,22 @@ export const RAW_PAL = new Dependency<Uint8Array>('RawPal');
 export const RAW_PLUs = new Dependency<Palette[]>('Raw PLUs');
 export const PIC_TAGS = new Dependency<PicTags>('Tags');
 
-export const SelectorConstructor = provider(async (injector: Injector) => {
+export const SelectorConstructor = lifecycle(async (injector, lifecycle) => {
   const selector = await create(injector, Selector, UI, ART, RAW_PAL, PIC_TAGS);
+  lifecycle(selector, async s => s.stop());
   return (cb: PicNumCallback) => selector.modal(cb);
 });
 
-function createTagsGridModel(tags: PicTags) {
-  const selected = new Set<string>();
-  const columns = [IconTextRenderer];
-  let callback: (selected: Iterable<string>) => void;
-  const grid = {
-    async rows() { return iter(tags.allTags()).map(s => [[s, selected.has(s)]]) },
-    columns() { return columns },
-    onClick(row: any[], rowElement: Element) {
-      const value = row[0][0];
-      if (selected.has(value)) selected.delete(value);
-      else selected.add(value);
-      rowElement.elem().classList.toggle('selected');
-      if (callback) callback(selected.values());
-    }
-  }
-  return {
-    renderGrid() { return renderGrid(grid) },
-    selected() { return selected },
-    connect(cb: (selected: Iterable<string>) => void) { callback = cb }
-  }
-}
 
 export class Selector {
   private window: Window;
   private drawPanel: DrawPanel;
   private cb: PicNumCallback;
   private filter = "";
-  // private selectedTags: string[] = [];
 
   constructor(private ui: Ui, arts: ArtInfoProvider, pal: Uint8Array, private tags: PicTags) {
     const canvas = document.createElement('canvas');
     canvas.width = canvas.height = 640;
-    // const grid = createTagsGridModel(tags);
-    // const gridPanel = div('pane-sm sidebar').css('width', '170px');
-    // grid.renderGrid().then(g => gridPanel.append(g));
-    // grid.connect(tags => { this.selectedTags = [...tags], this.drawPanel.draw() });
-    // const paneGroup = div('pane-group')
-    //   .append(gridPanel)
-    //   .append(div('pane').css('overflow', 'hidden').appendHtml(canvas));
     this.window = ui.builder.window()
       .title('Tiles')
       .draggable(true)
@@ -95,6 +67,8 @@ export class Selector {
     this.hide();
   }
 
+  public stop() { this.window.destroy() }
+
   private updateFilter(s: string) {
     this.filter = s;
     this.drawPanel.seOffset(0);
@@ -109,7 +83,6 @@ export class Selector {
 
   private applyFilter(id: number): boolean {
     const tags = iter(this.tags.tags(id));
-    // if (!tags.isEmpty() && !tags.any(t => this.selectedTags.includes(t))) return false;
     if (this.filter.startsWith('*')) return (id + '').includes(this.filter.substr(1))
     return (id + '').startsWith(this.filter) || tags.any(t => t.toLowerCase() == this.filter.toLowerCase());
   }

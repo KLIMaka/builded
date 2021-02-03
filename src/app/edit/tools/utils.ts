@@ -11,7 +11,7 @@ import { create, lifecycle, Module, plugin } from "../../../utils/injector";
 import { info } from "../../../utils/logger";
 import { int, trz } from "../../../utils/mathutils";
 import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, GRID, GridController, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
-import { BUS, busDisconnector, BusPlugin, MessageBus } from "../../apis/handler";
+import { BUS, busDisconnector, MessageBus } from "../../apis/handler";
 import { invalidateSectorAndWalls } from "../editutils";
 import { Commit, INVALIDATE_ALL, NamedMessage, SetPicnum } from "../messages";
 import { PicNumSelector, PICNUM_SELECTOR, Selected, SELECTED } from "./selection";

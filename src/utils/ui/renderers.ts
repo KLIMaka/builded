@@ -33,6 +33,36 @@ export async function renderGrid(grid: GridModel): Promise<Element> {
   return table;
 }
 
+export type NavItem = { icon: string, title: string };
+
+export interface NavModel {
+  readonly name: string;
+  readonly items: NavItem[];
+}
+
+const navGroupTemplate = h`<nav class='nav-group'><h5 class='nav-group-title'>#navGroupTitleText</h5></nav>`;
+const navGroupItemTemplate = h`<span class="nav-group-item"><span class="icon" #icon></span>#text</span>`;
+export function renderNav(model: NavModel) {
+  const root = <HTMLElement>navGroupTemplate.cloneNode(true);
+  const { navGroupTitleText } = navGroupTemplate.collect(root);
+  navGroupTitleText.nodeValue = model.name;
+  for (const item of model.items) {
+    const itemRoot = navGroupItemTemplate.cloneNode(true);
+    const { icon, text } = navGroupItemTemplate.collect(itemRoot);
+    text.nodeValue = item.title;
+    icon.classList.add(item.icon);
+    root.appendChild(itemRoot);
+  }
+  return root;
+}
+
+const paneGroupTemplate = h`<div class='pane-group'><div class='pane pane-sm sidebar' #sidebar></div><div class='pane' #main></div></div>`;
+export function paneGroup() {
+  const root = <HTMLElement>paneGroupTemplate.cloneNode(true);
+  const { sidebar, main } = paneGroupTemplate.collect(root);
+  return { root, sidebar, main };
+}
+
 export function menuButton(icon: string, menu: MenuBuilder): HTMLElement {
   const btn = tag('button').className('btn btn-default btn-dropdown').append(span().className('icon ' + icon));
   menu.build(btn.elem());

@@ -1,9 +1,15 @@
 import { loadBin } from "../../../utils/getter";
 import { Dependency, Injector, InstanceProvider } from "../../../utils/injector";
 
+export interface WritableFileSystem {
+  delete(name: string): Promise<any>;
+  write(name: string, data: ArrayBuffer): Promise<any>;
+}
+
 export interface FileSystem {
   get(name: string): Promise<ArrayBuffer>
   list(): Promise<string[]>;
+  write(): WritableFileSystem;
 }
 export const FS = new Dependency<FileSystem>('FileSystem');
 
@@ -14,6 +20,7 @@ export function UrlFs(path: string): InstanceProvider<FileSystem> {
     return {
       get: async name => loadBin(path + name),
       list: async () => [],
+      write: () => null,
     }
   }
 }

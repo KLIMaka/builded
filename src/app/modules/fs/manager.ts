@@ -1,51 +1,44 @@
 import { saveAs } from "../../../utils/filesave";
-import { create, Dependency, lifecycle, Module, plugin } from "../../../utils/injector";
+import { create, lifecycle, Module, plugin } from "../../../utils/injector";
 import { iter } from "../../../utils/iter";
-import { GridModel, IconText, IconTextRenderer, renderGrid } from "../../../utils/ui/renderers";
+import { GridModel, IconText, IconTextRenderer, paneGroup, renderGrid, renderNav } from "../../../utils/ui/renderers";
 import { addDragAndDrop, Element, replaceContent } from "../../../utils/ui/ui";
 import { BUS, busDisconnector } from "../../apis/handler";
 import { UI, Ui, Window } from "../../apis/ui";
 import { namedMessageHandler } from "../../edit/messages";
-
-export interface FsManager {
-  read(name: string): Promise<ArrayBuffer>;
-  write(name: string, data: ArrayBuffer): Promise<any>;
-  delete(name: string): Promise<any>;
-  list(): Promise<string[]>
-}
-export const FS_MANAGER = new Dependency<FsManager>('FileSystem Manager');
-
-export interface FsManagers {
-  list(): string[];
-  get(name: string): FsManager;
-  add(name: string, manager: FsManager): void;
-}
+import { FileSystem } from "./fs";
+import { MOUNTS } from "./mount";
 
 const columns = [IconTextRenderer];
 
 class FileBrowser implements GridModel {
   private window: Window;
   private selected = new Set<string>();
+  private activeFs: FileSystem;
   private dragAndDropHandler = (e: DragEvent) => {
+    const writable = this.activeFs.write();
+    if (writable == null) return;
     for (const file of e.dataTransfer.files) {
       const fileReader = new FileReader();
       const name = file.name;
       fileReader.readAsArrayBuffer(file);
       fileReader.onload = async e => {
         const data = <ArrayBuffer>e.target.result;
-        await this.manager.write(name, data);
+        await writable.write(name, data);
         this.refreshContent();
       }
     }
   }
+  private sidebar: HTMLElement;
+  private main: HTMLElement;
 
-  constructor(ui: Ui, private manager: FsManager) {
+  constructor(ui: Ui, private mounts: FileSystem[]) {
     this.window = ui.builder.window()
       .title('Files')
       .draggable(true)
       .closeable(true)
       .centered(true)
-      .size(600, 600)
+      .size(800, 600)
       .toolbar(ui.builder.toolbar()
         .startGroup()
         .iconButton('icon-arrows-ccw', () => this.refreshContent())
@@ -54,19 +47,24 @@ class FileBrowser implements GridModel {
         .endGroup())
       .build();
 
+    this.activeFs = mounts[0];
     const win = this.window.winElement;
     addDragAndDrop(win, this.dragAndDropHandler);
+    const { root, sidebar, main } = paneGroup();
+    this.sidebar = sidebar;
+    this.main = main;
+    replaceContent(this.window.contentElement, root);
   }
 
   public async stop() { this.window.destroy() }
 
-  async rows() { return iter(await this.manager.list()).map(f => [{ text: f, icon: this.getIcon(f), style: this.selected.has(f) ? "selected" : "" }]) }
+  async rows() { return iter(await this.activeFs.list()).map(f => [{ text: f, icon: this.getIcon(f), style: this.selected.has(f) ? "selected" : "" }]) }
   columns() { return columns }
   onClick(row: [IconText], rowElement: Element) { this.toggleItem(rowElement.elem(), row[0].text) }
 
   private async refreshContent() {
-    const table = await renderGrid(this);
-    replaceContent(this.window.contentElement, table.elem());
+    replaceContent(this.main, (await renderGrid(this)).elem());
+    replaceContent(this.sidebar, renderNav({ name: "File Sources", items: [{ title: 'Local', icon: 'icon-home' }, { title: 'Remote', icon: 'icon-download' }] }))
   }
 
   private getIcon(name: string) {
@@ -82,8 +80,10 @@ class FileBrowser implements GridModel {
   }
 
   private async deleteSelected() {
+    const writable = this.activeFs.write();
+    if (writable == null) return;
     for (const file of this.selected) {
-      await this.manager.delete(file)
+      await writable.delete(file)
       this.selected.delete(file);
     }
     this.refreshContent();
@@ -91,7 +91,7 @@ class FileBrowser implements GridModel {
 
   private async downloadSelected() {
     for (const file of this.selected) {
-      saveAs(await this.manager.read(file), file);
+      saveAs(await this.activeFs.get(file), file);
       this.selected.delete(file);
     }
     this.refreshContent();
@@ -106,8 +106,8 @@ class FileBrowser implements GridModel {
 export async function FileBrowserModule(module: Module) {
   module.bind(plugin('FileBrowser'), lifecycle(async (injector, lifecycle) => {
     const bus = await injector.getInstance(BUS);
-    const browser = await create(injector, FileBrowser, UI, FS_MANAGER);
-    lifecycle(browser, b => b.stop())
+    const browser = await create(injector, FileBrowser, UI, MOUNTS);
     lifecycle(bus.connect(namedMessageHandler('show_files', () => browser.show())), busDisconnector(bus));
+    lifecycle(browser, b => b.stop());
   }));
 }

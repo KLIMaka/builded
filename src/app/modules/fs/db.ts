@@ -24,22 +24,18 @@ const fsinfoProvider = createDb('filesystem-info');
 
 export async function StorageFs(injector: Injector): Promise<FileSystem> {
   const fs = await fsProvider(injector);
+  const fsinfo = await fsinfoProvider(injector);
   return {
     get: async name => fs.get(name),
     list: async () => fs.keys(),
+    write: () => {
+      return {
+        write: async (name: string, data: ArrayBuffer) => Promise.all([fs.set(name, data), fsinfo.set(name, { size: data.byteLength })]),
+        delete: async (name: string) => Promise.all([fs.delete(name), fsinfo.delete(name)]),
+      }
+    }
   }
 }
-
-const StorageFsManager = provider(async (injector: Injector) => {
-  const fs = await fsProvider(injector);
-  const fsinfo = await fsinfoProvider(injector);
-  return {
-    read: (name: string) => fs.get(name),
-    write: async (name: string, data: ArrayBuffer) => await Promise.all([fs.set(name, data), fsinfo.set(name, { size: data.byteLength })]),
-    delete: async (name: string) => await Promise.all([fs.delete(name), fsinfo.delete(name)]),
-    list: () => fsinfo.keys(),
-  }
-});
 
 const RomFs = (rom: string) => provider(async (injector: Injector) => {
   return rom == null ? [] : [await UrlFs(rom)(injector)];
@@ -50,7 +46,6 @@ export function DbFsModule(rom: string = null) {
     module.bind(STORAGES, StorageDbConstructor);
     module.bind(FS, MountableFs);
     module.bind(MOUNTS, RomFs(rom));
-    module.bind(FS_MANAGER, StorageFsManager);
 
     module.bind(plugin('FileSystem'), lifecycle(async (injector, lifecycle) => {
       const bus = await injector.getInstance(BUS);

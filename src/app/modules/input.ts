@@ -29,8 +29,8 @@ export function InputModule(module: Module) {
       PreFrame(msg: PreFrame) {
         const inputState = get()
         this.mouseMove(inputState);
-        binder.updateState(inputState, state);
-        for (const m of binder.poolEvents(inputState)) bus.handle(m);
+        binder.updateState(inputState, state, 'view3d');
+        for (const m of binder.poolEvents(inputState, 'view3d')) bus.handle(m);
       }
 
       PostFrame(msg: PostFrame) {

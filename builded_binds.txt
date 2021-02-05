@@ -1,89 +1,89 @@
-P               msg sectorcstat parallaxing true true
-SHIFT+RIGHT     msg panrepeat 1 0 0 0 false
-SHIFT+LEFT      msg panrepeat -1 0 0 0 false
-SHIFT+UP        msg panrepeat 0 1 0 0 false
-SHIFT+DOWN      msg panrepeat 0 -1 0 0 false
-RIGHT           msg panrepeat 8 0 0 0 false
-LEFT            msg panrepeat -8 0 0 0 false
-UP              msg panrepeat 0 8 0 0 false
-DOWN            msg panrepeat 0 -8 0 0 false
-CTRL+RIGHT      msg panrepeat 0 0 1 0 false
-CTRL+LEFT       msg panrepeat 0 0 -1 0 false
-CTRL+UP         msg panrepeat 0 0 0 1 false
-CTRL+DOWN       msg panrepeat 0 0 0 -1 false
-CTRL+SHIFT+RIGHT msg panrepeat 0 0 8 0 false
-CTRL+SHIFT+LEFT msg panrepeat 0 0 -8 0 false
-CTRL+SHIFT+UP   msg panrepeat 0 0 0 8 false
-CTRL+SHIFT+DOWN msg panrepeat 0 0 0 -8 false
-\               msg reset_panrepeat
-CTRL+\          msg rotate 0 true
-O               msg pal 1 15 false
-F               msg flip
-wheelUp         msg shade 1 false
-wheelDown       msg shade -1 false
-SHIFT+wheelUp   msg shade 8 false
-SHIFT+wheelDown msg shade -8 false
-ALT+wheelDown   msg rotate -128 false
-ALT+wheelUp     msg rotate 128 false
-K               msg wallcstat swapBottoms true true
-M               msg wallcstat alignBottom true true
-R               msg sprite_mode
-R               msg sectorcstat alignToFirstWall true true
-E               msg sectorcstat doubleSmooshiness true true
-C               msg spritecstat realCenter true true
+view3d | P                  | msg sectorcstat parallaxing true true
+view3d | SHIFT+RIGHT        | msg panrepeat 1 0 0 0 false
+view3d | SHIFT+LEFT         | msg panrepeat -1 0 0 0 false
+view3d | SHIFT+UP           | msg panrepeat 0 1 0 0 false
+view3d | SHIFT+DOWN         | msg panrepeat 0 -1 0 0 false
+view3d | RIGHT              | msg panrepeat 8 0 0 0 false
+view3d | LEFT               | msg panrepeat -8 0 0 0 false
+view3d | UP                 | msg panrepeat 0 8 0 0 false
+view3d | DOWN               | msg panrepeat 0 -8 0 0 false
+view3d | CTRL+RIGHT         | msg panrepeat 0 0 1 0 false
+view3d | CTRL+LEFT          | msg panrepeat 0 0 -1 0 false
+view3d | CTRL+UP            | msg panrepeat 0 0 0 1 false
+view3d | CTRL+DOWN          | msg panrepeat 0 0 0 -1 false
+view3d | CTRL+SHIFT+RIGHT   | msg panrepeat 0 0 8 0 false
+view3d | CTRL+SHIFT+LEFT    | msg panrepeat 0 0 -8 0 false
+view3d | CTRL+SHIFT+UP      | msg panrepeat 0 0 0 8 false
+view3d | CTRL+SHIFT+DOWN    | msg panrepeat 0 0 0 -8 false
+view3d | \                  | msg reset_panrepeat
+view3d | CTRL+\             | msg rotate 0 true
+view3d | O                  | msg pal 1 15 false
+view3d | F                  | msg flip
+view3d | wheelUp            | msg shade 1 false
+view3d | wheelDown          | msg shade -1 false
+view3d | SHIFT+wheelUp      | msg shade 8 false
+view3d | SHIFT+wheelDown    | msg shade -8 false
+view3d | ALT+wheelDown      | msg rotate -128 false
+view3d | ALT+wheelUp        | msg rotate 128 false
+view3d | K                  | msg wallcstat swapBottoms true true
+view3d | M                  | msg wallcstat alignBottom true true
+view3d | R                  | msg sprite_mode
+view3d | R                  | msg sectorcstat alignToFirstWall true true
+view3d | E                  | msg sectorcstat doubleSmooshiness true true
+view3d | C                  | msg spritecstat realCenter true true
 
-PAGE_UP         fly
-PAGE_DOWN       fall
-T               push_wall
-SHIFT+T         push_wall_copy
-BACKSPACE       push_wall_stop
-V               set_picnum
-I               insert_sprite
-1               copy
-2               paste_shade
-3               paste_picnum
-ENTER           view_mode
-mouse0          print_selected
-INSERT          split_wall
-SPACE           draw
-SHIFT+SPACE     draw_rect
-BACKSPACE       undo_draw
-[               grid+
-]               grid-
-Q               adapt_grid
-J               join_sectors
-CTRL+Z          undo
-CTRL+Y          redo
-DELETE          delete
-ALT+F           set_first_wall
-ALT+J           fill_inner_sector
-ALT+DELETE      delete_loop
-ALT+SHIFT+DELETE delete_full
-CTRL+SHIFT+F    show_files
-0               print_info
-F3              load_map
-F2              save_map
-SHIFT+F2        save_map_as
-F4              print_usage
-F10             add_test_task
-SHIFT+mouse0    add_selection
-CTRL+D          clear_selection
-ALT+N           new_board
-CTRL+SHIFT+A    show_artedit
-CTRL+ALT+T      show_tasks
-F11             toggle_draw_portals
-F9              add_mount
+view3d | PAGE_UP            | fly
+view3d | PAGE_DOWN          | fall
+view3d | T                  | push_wall
+view3d | SHIFT+T            | push_wall_copy
+view3d | BACKSPACE          | push_wall_stop
+view3d | V                  | set_picnum
+view3d | I                  | insert_sprite
+view3d | 1                  | copy
+view3d | 2                  | paste_shade
+view3d | 3                  | paste_picnum
+view3d | ENTER              | view_mode
+view3d | mouse0             | print_selected
+view3d | INSERT             | split_wall
+view3d | SPACE              | draw
+view3d | SHIFT+SPACE        | draw_rect
+view3d | BACKSPACE          | undo_draw
+view3d | [                  | grid+
+view3d | ]                  | grid-
+view3d | Q                  | adapt_grid
+view3d | J                  | join_sectors
+view3d | CTRL+Z             | undo
+view3d | CTRL+Y             | redo
+view3d | DELETE             | delete
+view3d | ALT+F              | set_first_wall
+view3d | ALT+J              | fill_inner_sector
+view3d | ALT+DELETE         | delete_loop
+view3d | ALT+SHIFT+DELETE   | delete_full
+view3d | CTRL+SHIFT+F       | show_files
+view3d | 0                  | print_info
+view3d | F3                 | load_map
+view3d | F2                 | save_map
+view3d | SHIFT+F2           | save_map_as
+view3d | F4                 | print_usage
+view3d | F10                | add_test_task
+view3d | SHIFT+mouse0       | add_selection
+view3d | CTRL+D             | clear_selection
+view3d | ALT+N              | new_board
+view3d | CTRL+SHIFT+A       | show_artedit
+view3d | CTRL+ALT+T         | show_tasks
+view3d | F11                | toggle_draw_portals
+view3d | F9                 | add_mount
 
-+W              forward
-+S              backward
-+A              strafe_left
-+D              strafe_right
-+mouse2         lookaim
-+W              zoom+
-+S              zoom-
-+TAB            select_loop_mod
-+`              select_full_loop_mod
-+mouse0         move
-+SHIFT          move.parallel
-+ALT            move.vertical
-+CTRL           move.copy
+view3d | +W                 | forward
+view3d | +S                 | backward
+view3d | +A                 | strafe_left
+view3d | +D                 | strafe_right
+view3d | +mouse2            | lookaim
+view3d | +W                 | zoom+
+view3d | +S                 | zoom-
+view3d | +TAB               | select_loop_mod
+view3d | +`                 | select_full_loop_mod
+view3d | +mouse0            | move
+view3d | +SHIFT             | move.parallel
+view3d | +ALT               | move.vertical
+view3d | +CTRL              | move.copy

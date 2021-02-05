@@ -5,7 +5,6 @@ import { namedMessageHandler } from "../../edit/messages";
 import { StorageDbConstructor } from "../db";
 import { FileSystem, FS, UrlFs } from "./fs";
 import { createLocalFs } from "./local";
-import { FS_MANAGER } from "./manager";
 import { MountableFs, MOUNTS } from "./mount";
 
 function createDb(name: string) {

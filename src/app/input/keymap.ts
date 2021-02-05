@@ -46,34 +46,39 @@ function createHandler(k: string, mods: string[]): InputHandler {
   return handler;
 }
 
+type ContextMatcher = (context: string) => boolean;
+
 export class Binder {
+
+
   private binds: string[] = [];
-  private handlers: InputHandler[] = [];
+  private handlers: { handler: InputHandler, matcher: ContextMatcher }[] = [];
   private messages: Deck<Message>[] = [];
   private sorttable: number[] = [];
 
   private stateBinds: string[] = [];
-  private stateHandlers: InputHandler[] = [];
+  private stateHandlers: { handler: InputHandler, matcher: ContextMatcher }[] = [];
   private stateValues: [string, any, any][][] = [];
 
-  public poolEvents(state: InputState): Iterable<Message> {
+  public poolEvents(state: InputState, context: string): Iterable<Message> {
     for (let i = this.handlers.length - 1; i >= 0; i--) {
-      if (this.handlers[i](state)) return this.messages[i];
+      const handler = this.handlers[i];
+      if (handler.matcher(context) && handler.handler(state)) return this.messages[i];
     }
     return EMPTY_COLLECTION;
   }
 
-  public updateState(input: InputState, state: State) {
+  public updateState(input: InputState, state: State, context: string) {
     for (let i = 0; i < this.stateHandlers.length; i++) {
       const handler = this.stateHandlers[i];
       const values = this.stateValues[i];
       for (const [name, on, off] of values) {
-        if (state.has(name)) state.set(name, handler(input) ? on : off);
+        if (handler.matcher(context) && state.has(name)) state.set(name, handler.handler(input) ? on : off);
       }
     }
   }
 
-  public addStateBind(name: string, enabled: any, disabled: any, ...keys: string[]) {
+  public addStateBind(matcher: ContextMatcher, name: string, enabled: any, disabled: any, ...keys: string[]) {
     const last = keys.pop();
     const bindName = canonizeBind(last, keys);
     const idx = this.stateBinds.indexOf(bindName);
@@ -81,29 +86,29 @@ export class Binder {
       this.stateBinds.push(bindName);
       let handler = parseMod(last);
       for (const key of keys) handler = combination(handler, parseMod(key));
-      this.stateHandlers.push(handler);
+      this.stateHandlers.push({ handler, matcher });
       this.stateValues.push([[name, enabled, disabled]]);
     } else {
       this.stateValues[idx].push([name, enabled, disabled]);
     }
   }
 
-  public addBind(messages: Collection<Message>, key: string, ...mods: string[]) {
+  public addBind(messages: Collection<Message>, matcher: ContextMatcher, key: string, ...mods: string[]) {
     const bindName = canonizeBind(key, mods);
     const bindIdx = this.findBind(bindName, mods.length);
     if (bindIdx == -1) {
       const handler = createHandler(key, mods);
-      this.insertBind(bindName, handler, messages, mods.length);
+      this.insertBind(bindName, handler, matcher, messages, mods.length);
     } else {
       this.messages[bindIdx].pushAll(messages);
     }
   }
 
-  private insertBind(bindName: string, handler: InputHandler, messages: Collection<Message>, mods: number): void {
+  private insertBind(bindName: string, handler: InputHandler, matcher: ContextMatcher, messages: Collection<Message>, mods: number): void {
     this.ensureSortTable(mods);
     const pos = this.sorttable[mods];
     this.binds.splice(pos, 0, bindName);
-    this.handlers.splice(pos, 0, handler);
+    this.handlers.splice(pos, 0, { handler, matcher });
     this.messages.splice(pos, 0, new Deck<Message>().pushAll(messages));
     for (let i = this.sorttable.length - 1; i >= mods; i--) {
       this.sorttable[i]++;
@@ -126,6 +131,10 @@ export class Binder {
   }
 }
 
+function parseContextMatcher(str: string): ContextMatcher {
+  return s => s == str;
+}
+
 export type EventParser = (str: string) => Collection<Message>;
 
 export function loadBinds(binds: string, binder: Binder, messageParser: EventParser) {
@@ -133,25 +142,23 @@ export function loadBinds(binds: string, binder: Binder, messageParser: EventPar
   for (let line of lines) {
     line = line.trim();
     if (line.length == 0) continue;
-    const idx = line.indexOf(' ');
-    if (idx == -1) {
-      warning(`Skipping bind line: ${line}`);
-      continue;
-    }
-    let keys = line.substr(0, idx).toLowerCase();
+    const parts = line.split('|');
+    if (parts.length != 3) { warning(`Skipping bind line: ${line}`); continue; }
+    const context = parseContextMatcher(parts[0].trim());
+    let keys = parts[1].trim();
+    const command = parts[2].trim();
     if (keys.startsWith('+')) {
       keys = keys.substr(1);
       const keyParts = keys.split('+');
-      binder.addStateBind(line.substr(idx + 1).trim(), true, false, ...keyParts);
+      binder.addStateBind(context, command, true, false, ...keyParts);
     } else {
-      const str = line.substr(idx + 1).trim();
-      const messages = messageParser(str);
+      const messages = messageParser(command);
       if (messages == null) {
-        warning(`'${str}' failed to parse`);
+        warning(`'${command}' failed to parse`);
         continue;
       }
       const keyParts = keys.split('+');
-      binder.addBind(messages, keyParts.pop(), ...keyParts);
+      binder.addBind(messages, context, keyParts.pop(), ...keyParts);
     }
   }
 }

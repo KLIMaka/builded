@@ -9,7 +9,7 @@ import { createTexture } from '../../../utils/gl/textures';
 import { getInstances, Injector, instance, lifecycle, Module, plugin, provider } from '../../../utils/injector';
 import { iter } from '../../../utils/iter';
 import { Stream } from '../../../utils/stream';
-import { BOARD, ENGINE_API, RESOURCES } from '../../apis/app';
+import { ACTIVITY, ACTIVITY_CONTROLLER, BOARD, ENGINE_API, RESOURCES } from '../../apis/app';
 import { BUS, busDisconnector } from '../../apis/handler';
 import { LoadBoard, namedMessageHandler } from '../../edit/messages';
 import { DefaultMapName, MAP_NAME } from '../../modules/default/mapnamedialog';
@@ -183,6 +183,7 @@ export function BloodModule(module: Module) {
   module.bind(MAP_NAME, DefaultMapName);
   module.bind(MAP_SELECTOR, DefaultMapSelector);
   module.bind(PIC_TAGS, picTags);
+  module.bind(ACTIVITY, instance(() => { return { id: () => "view3d" } }));
 
   module.install(mapLoader);
   module.install(mapSaver);

@@ -33,7 +33,6 @@ function parseKey(str: string): InputHandler {
 }
 
 function canonizeBind(key: string, mods: string[]) {
-  key = key.toLowerCase();
   mods = mods.map((s) => s.toLowerCase());
   mods.sort();
   return [...mods, key].join('+');
@@ -73,7 +72,8 @@ export class Binder {
       const handler = this.stateHandlers[i];
       const values = this.stateValues[i];
       for (const [name, on, off] of values) {
-        if (handler.matcher(context) && state.has(name)) state.set(name, handler.handler(input) ? on : off);
+        if (handler.matcher(context) && state.has(name))
+          state.set(name, handler.handler(input) ? on : off);
       }
     }
   }
@@ -142,23 +142,20 @@ export function loadBinds(binds: string, binder: Binder, messageParser: EventPar
   for (let line of lines) {
     line = line.trim();
     if (line.length == 0) continue;
-    const parts = line.split('|');
+    const parts = line.toLowerCase().split('|');
     if (parts.length != 3) { warning(`Skipping bind line: ${line}`); continue; }
     const context = parseContextMatcher(parts[0].trim());
-    let keys = parts[1].trim();
+    const keys = parts[1].trim().split('+');
     const command = parts[2].trim();
-    if (keys.startsWith('+')) {
-      keys = keys.substr(1);
-      const keyParts = keys.split('+');
-      binder.addStateBind(context, command, true, false, ...keyParts);
+    if (keys[0] == '') {
+      binder.addStateBind(context, command, true, false, ...keys.slice(1));
     } else {
       const messages = messageParser(command);
       if (messages == null) {
         warning(`'${command}' failed to parse`);
         continue;
       }
-      const keyParts = keys.split('+');
-      binder.addBind(messages, context, keyParts.pop(), ...keyParts);
+      binder.addBind(messages, context, keys.pop(), ...keys);
     }
   }
 }

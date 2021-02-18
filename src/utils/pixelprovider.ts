@@ -165,6 +165,64 @@ export class ResizePixelProvider extends AbstractPixelProvider {
   }
 }
 
+const DITH = [
+  0.0, 0.5, 0.125, 0.625,
+  0.75, 0.25, 0.875, 0.375,
+  0.1875, 0.6875, 0.0625, 0.5625,
+  0.9375, 0.4375, 0.8125, 0.3125
+];
+function dithOffset(x: number, y: number) {
+  const idx = MU.int(x) % 4 * 4 + MU.int(y) % 4;
+  return DITH[idx];
+}
+
+export class SuperResizePixelProvider extends AbstractPixelProvider {
+  private dx: number;
+  private dy: number;
+  private maxw: number;
+  private maxh: number;
+  private tmp: Uint8Array = new Uint8Array(4 * 3);
+  private tmpView = new Uint32Array(this.tmp.buffer);
+
+  constructor(private provider: PixelProvider, private resizedW: number, private resizedH: number) {
+    super(resizedW, resizedH);
+    this.dx = provider.getWidth() / resizedW;
+    this.dy = provider.getHeight() / resizedH;
+    this.maxw = this.provider.getWidth() - 1;
+    this.maxh = this.provider.getHeight() - 1;
+  }
+
+  samplePixels(inx: number, iny: number, dx: number, dy: number) {
+    this.provider.putToDst(MU.clamp(inx + dx, 0, this.maxw), iny, this.tmp, 1 * 4, BlendNormal);
+    this.provider.putToDst(inx, MU.clamp(iny + dy, 0, this.maxh), this.tmp, 2 * 4, BlendNormal);
+  }
+
+  sample(fracx: number, fracy: number, inx: number, iny: number) {
+    this.provider.putToDst(inx, iny, this.tmp, 0, BlendNormal);
+    if (fracx < 0.5) {
+      if (fracy < 0.5) this.samplePixels(inx, iny, -1, -1);
+      else this.samplePixels(inx, iny, -1, +1);
+    } else {
+      if (fracy < 0.5) this.samplePixels(inx, iny, +1, -1);
+      else this.samplePixels(inx, iny, +1, +1);
+    }
+  }
+
+  public putToDst(x: number, y: number, dst: Uint8Array, dstoff: number, blend: BlendFunc): void {
+    const nx = x * this.dx + this.dx / 2;
+    const ny = y * this.dy + this.dy / 2;
+    const inx = MU.int(nx);
+    const iny = MU.int(ny);
+    if (dithOffset(x, y) >= 0.5) {
+      this.provider.putToDst(inx, iny, dst, dstoff, blend);
+    } else {
+      this.sample(nx - inx, ny - iny, inx, iny);
+      const off = this.tmpView[1] == this.tmpView[2] ? 4 : 0;
+      blend(dst, dstoff, this.tmp, off);
+    }
+  }
+}
+
 export class AxisSwapPixelProvider extends AbstractPixelProvider {
 
   constructor(private provider: PixelProvider) {

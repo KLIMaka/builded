@@ -51,6 +51,18 @@ export interface State {
 }
 export const STATE = new Dependency<State>('State');
 
+export interface Activity {
+  id(): string;
+}
+export const ACTIVITY = new Dependency<() => Activity>('Activity');
+
+export interface ActivityController {
+  top(): Activity;
+  pop(): Activity;
+  push(activity: Activity): void;
+}
+export const ACTIVITY_CONTROLLER = new Dependency<ActivityController>('ActivityController');
+
 export interface BuildReferenceTracker {
   readonly walls: ReferenceTracker<number, number>;
   readonly sectors: ReferenceTracker<number, number>;

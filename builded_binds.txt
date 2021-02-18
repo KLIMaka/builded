@@ -1,3 +1,4 @@
+view3d | CTRL+SHIFT+F       | show_files
 view3d | P                  | msg sectorcstat parallaxing true true
 view3d | SHIFT+RIGHT        | msg panrepeat 1 0 0 0 false
 view3d | SHIFT+LEFT         | msg panrepeat -1 0 0 0 false

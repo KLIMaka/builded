@@ -7,7 +7,7 @@ import { drawToCanvas } from "../../utils/imgutils";
 import { create, lifecycle, Module, plugin } from "../../utils/injector";
 import { iter } from "../../utils/iter";
 import { int } from "../../utils/mathutils";
-import { resize } from "../../utils/pixelprovider";
+import { resize, SuperResizePixelProvider } from "../../utils/pixelprovider";
 import { DrawPanel, PixelDataProvider } from "../../utils/ui/drawpanel";
 import { menuButton, search } from "../../utils/ui/renderers";
 import { addDragController, div } from "../../utils/ui/ui";
@@ -198,7 +198,8 @@ export class ArtEditor {
     if (mainInfo == null || frameInfo == null) return;
     const scaledW = int(frameInfo.w * this.scale);
     const scaledH = int(frameInfo.h * this.scale);
-    const img = resize(new ArtPixelProvider(frameInfo, this.pal, this.pluProvider), scaledW, scaledH);
+    // const img = resize(new ArtPixelProvider(frameInfo, this.pal, this.pluProvider), scaledW, scaledH);
+    const img = new SuperResizePixelProvider(new ArtPixelProvider(frameInfo, this.pal, this.pluProvider), scaledW, scaledH);
     const x = this.centerX - int(((frameInfo.attrs.xoff | 0) + frameInfo.w / 2) * this.scale);
     const y = this.centerY - int(((frameInfo.attrs.yoff | 0) + frameInfo.h / 2) * this.scale);
     drawToCanvas(img, ctx, x, y);

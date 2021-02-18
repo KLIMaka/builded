@@ -30,6 +30,10 @@ export function int(x: number) {
   return x | 0;
 }
 
+export function clamp(x: number, min: number, max: number) {
+  return x > max ? max : x < min ? min : x;
+}
+
 export function trz(x: number) {
   x = int(x);
   if (x == 0) return 32;

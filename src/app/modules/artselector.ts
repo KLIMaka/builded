@@ -1,23 +1,24 @@
+import { art } from "../../build/artraster";
 import { ArtInfoProvider } from "../../build/formats/art";
 import { range } from "../../utils/collections";
-import { create, Dependency, Injector, lifecycle, provider } from "../../utils/injector";
+import { create, Dependency, lifecycle } from "../../utils/injector";
 import { iter } from "../../utils/iter";
-import { axisSwap, RGBPalPixelProvider } from "../../utils/pixelprovider";
-import { DrawPanel, PixelDataProvider } from "../../utils/ui/drawpanel";
-import { IconTextRenderer, menuButton, renderGrid, search } from "../../utils/ui/renderers";
-import { Element } from "../../utils/ui/ui";
+import { palRasterizer } from "../../utils/pixelprovider";
+import { DrawPanel, RasterProvider } from "../../utils/ui/drawpanel";
+import { menuButton, search } from "../../utils/ui/renderers";
 import { ART } from "../apis/app";
 import { Ui, UI, Window } from "../apis/ui";
 import { PicNumCallback } from "../edit/tools/selection";
 
 function createDrawPanel(arts: ArtInfoProvider, pal: Uint8Array, canvas: HTMLCanvasElement, cb: PicNumCallback, iter: () => Iterable<number>) {
-  let provider = new PixelDataProvider(1024 * 10, (i: number) => {
-    let info = arts.getInfo(i);
-    if (info == null) return null;
-    return axisSwap(new RGBPalPixelProvider(info.img, pal, info.h, info.w, 255, 255));
+  const provider = new RasterProvider(1024 * 10, (i: number) => {
+    const info = arts.getInfo(i);
+    return info == null ? null : art(info);
   });
-  return new DrawPanel(canvas, iter, provider, cb);
+  const rasterizer = palRasterizer(pal);
+  return new DrawPanel(canvas, iter, provider, rasterizer, 0, cb);
 }
+
 
 export interface PicTags {
   allTags(): Iterable<string>;
@@ -39,7 +40,7 @@ export const SelectorConstructor = lifecycle(async (injector, lifecycle) => {
 
 export class Selector {
   private window: Window;
-  private drawPanel: DrawPanel;
+  private drawPanel: DrawPanel<number>;
   private cb: PicNumCallback;
   private filter = "";
 

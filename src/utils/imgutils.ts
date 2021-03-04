@@ -1,4 +1,4 @@
-import { PixelProvider, BlendFunc, BlendNormal } from "./pixelprovider";
+import { Raster, Rasterizer } from "./pixelprovider";
 
 export function createEmptyCanvas(width: number, height: number): HTMLCanvasElement {
   const canvas: HTMLCanvasElement = document.createElement('canvas');
@@ -7,25 +7,18 @@ export function createEmptyCanvas(width: number, height: number): HTMLCanvasElem
   return canvas;
 }
 
-export function createCanvas(provider: PixelProvider, blend: BlendFunc = BlendNormal): HTMLCanvasElement {
+export function createCanvas<P>(raster: Raster<P>, rasterizer: Rasterizer<P>): HTMLCanvasElement {
   const canvas: HTMLCanvasElement = document.createElement('canvas');
-  canvas.width = provider.getWidth();
-  canvas.height = provider.getHeight();
-  drawToCanvas(provider, canvas.getContext('2d'), 0, 0, blend);
+  canvas.width = raster.width;
+  canvas.height = raster.height;
+  drawToCanvas(raster, canvas.getContext('2d'), rasterizer, 0, 0);
   return canvas;
 }
 
-export function drawToCanvas(provider: PixelProvider, ctx: CanvasRenderingContext2D, x: number = 0, y: number = 0, blend: BlendFunc = BlendNormal) {
-  let data: Uint8ClampedArray;
-  let id: ImageData;
-  if (blend === BlendNormal) {
-    data = new Uint8ClampedArray(provider.getWidth() * provider.getHeight() * 4);
-    id = new ImageData(data, provider.getWidth(), provider.getHeight());
-  } else {
-    id = ctx.getImageData(x, y, provider.getWidth(), provider.getHeight());
-    data = id.data;
-  }
-  provider.render(data, blend);
+export function drawToCanvas<P>(raster: Raster<P>, ctx: CanvasRenderingContext2D, rasterizer: Rasterizer<P>, x: number = 0, y: number = 0) {
+  const data = new Uint8ClampedArray(raster.width * raster.height * 4);
+  const id = new ImageData(data, raster.width, raster.height);
+  rasterizer(raster, data);
   ctx.putImageData(id, x, y);
 }
 

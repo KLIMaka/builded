@@ -1,14 +1,14 @@
 import h from "stage0";
 import tippy from "tippy.js";
-import { ArtPixelProvider } from "../../build/artpixelprovider";
+import { art } from "../../build/artraster";
 import { animate, ArtInfoProvider } from "../../build/formats/art";
 import { enumerate, range } from "../../utils/collections";
 import { drawToCanvas } from "../../utils/imgutils";
 import { create, lifecycle, Module, plugin } from "../../utils/injector";
 import { iter } from "../../utils/iter";
 import { int } from "../../utils/mathutils";
-import { resize, SuperResizePixelProvider } from "../../utils/pixelprovider";
-import { DrawPanel, PixelDataProvider } from "../../utils/ui/drawpanel";
+import { palRasterizer, Rasterizer, superResize, transform } from "../../utils/pixelprovider";
+import { DrawPanel, RasterProvider } from "../../utils/ui/drawpanel";
 import { menuButton, search } from "../../utils/ui/renderers";
 import { addDragController, div } from "../../utils/ui/ui";
 import { ART } from "../apis/app";
@@ -20,13 +20,12 @@ import { Palette, PicTags, PIC_TAGS, RAW_PAL, RAW_PLUs } from "./artselector";
 import { SHADOWSTEPS } from "./gl/buildgl";
 
 function createDrawPanel(arts: ArtInfoProvider, pal: Uint8Array, plu: (x: number) => number, canvas: HTMLCanvasElement, cb: PicNumCallback, iter: () => Iterable<number>) {
-  const provider = new PixelDataProvider(1024 * 10, (i: number) => {
+  const provider = new RasterProvider(1024 * 10, (i: number) => {
     const info = arts.getInfo(i);
-    return info == null
-      ? null
-      : new ArtPixelProvider(info, pal, plu);
+    return info == null ? null : transform(art(info), plu);
   });
-  return new DrawPanel(canvas, iter, provider, cb);
+  const rasterizer = palRasterizer(pal);
+  return new DrawPanel(canvas, iter, provider, rasterizer, 0, cb);
 }
 
 export async function ArtEditorModule(module: Module) {
@@ -40,10 +39,10 @@ export async function ArtEditorModule(module: Module) {
 
 export class ArtEditor {
   private window: Window;
-  private drawPanel: DrawPanel;
+  private drawPanel: DrawPanel<number>;
   private filter = "";
   private view: HTMLCanvasElement;
-  private currentId = -1;
+  private currentId = 0;
   private centerX = 320;
   private centerY = 320;
   private frame = 0;
@@ -52,6 +51,7 @@ export class ArtEditor {
   private currentPlu = 0;
   private currentShadow = 0;
   private pluProvider = (x: number) => this.plus[this.currentPlu].plu[this.currentShadow * 256 + x];
+  private rasterizer: Rasterizer<number>;
 
   constructor(
     private ui: Ui,
@@ -61,6 +61,7 @@ export class ArtEditor {
     private tags: PicTags,
     private shadowsteps: number) {
 
+    this.rasterizer = palRasterizer(pal);
     this.drawPanel = createDrawPanel(arts, pal, this.pluProvider, this.createBrowser(), (id: number) => this.select(id), () => this.pics());
     this.view = this.createView();
     this.window = ui.builder.window()
@@ -188,6 +189,8 @@ export class ArtEditor {
   }
 
   private updateView(anim = true) {
+    if (this.currentId < 0) return;
+
     const ctx = this.view.getContext('2d');
     ctx.fillStyle = 'black';
     ctx.strokeStyle = 'white';
@@ -198,11 +201,10 @@ export class ArtEditor {
     if (mainInfo == null || frameInfo == null) return;
     const scaledW = int(frameInfo.w * this.scale);
     const scaledH = int(frameInfo.h * this.scale);
-    // const img = resize(new ArtPixelProvider(frameInfo, this.pal, this.pluProvider), scaledW, scaledH);
-    const img = new SuperResizePixelProvider(new ArtPixelProvider(frameInfo, this.pal, this.pluProvider), scaledW, scaledH);
+    const img = superResize(transform(art(frameInfo), this.pluProvider), scaledW, scaledH, (l, r) => l == r ? l : null);
     const x = this.centerX - int(((frameInfo.attrs.xoff | 0) + frameInfo.w / 2) * this.scale);
     const y = this.centerY - int(((frameInfo.attrs.yoff | 0) + frameInfo.h / 2) * this.scale);
-    drawToCanvas(img, ctx, x, y);
+    drawToCanvas(img, ctx, this.rasterizer, x, y);
 
     if (anim && (mainInfo.attrs.frames | 0) != 0) {
       this.frame++;

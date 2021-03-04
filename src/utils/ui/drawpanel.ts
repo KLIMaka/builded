@@ -2,23 +2,16 @@ import { Deck, isEmpty, map } from "../collections";
 import { drawToCanvas } from "../imgutils";
 import { iter } from "../iter";
 import { int } from "../mathutils";
-import { BlendAlpha, fit, PixelProvider } from "../pixelprovider";
+import { BlendAlpha, fit, PixelProvider, Raster, Rasterizer } from "../pixelprovider";
 import { drawGrid } from "./canvasgrid";
 
-export class PixelDataProvider {
-
+export class RasterProvider<P> {
   constructor(
     private s: number,
-    private f: (i: number) => PixelProvider
+    private f: (i: number) => Raster<P>
   ) { }
-
-  public size(): number {
-    return this.s;
-  }
-
-  public get(i: number): PixelProvider {
-    return this.f(i);
-  }
+  public size(): number { return this.s }
+  public get(i: number): Raster<P> { return this.f(i) }
 }
 
 export enum ScrollType {
@@ -27,7 +20,7 @@ export enum ScrollType {
   PAGE
 }
 
-export class DrawPanel {
+export class DrawPanel<P> {
   private offset = 0;
   private pageIds: Deck<number> = new Deck();
   private selected = new Set<number>();
@@ -35,7 +28,9 @@ export class DrawPanel {
   constructor(
     readonly canvas: HTMLCanvasElement,
     private idsProvider: () => Iterable<number>,
-    private provider: PixelDataProvider,
+    private provider: RasterProvider<P>,
+    private rasterizer: Rasterizer<P>,
+    private padd: P,
     private selectCallback: (id: number) => void,
     private cellW = 64,
     private cellH = 64,
@@ -132,8 +127,8 @@ export class DrawPanel {
       ctx.textAlign = "center";
       const img = this.provider.get(id);
       if (img != null) {
-        const pixels = fit(cw, ch - 10, img, new Uint8Array([0, 0, 0, 255]));
-        drawToCanvas(pixels, ctx, x, y, BlendAlpha);
+        const pixels = fit(cw, ch - 10, img, this.padd);
+        drawToCanvas(pixels, ctx, this.rasterizer, x, y);
       }
       ctx.fillText(id + "", x + cw / 2, y + ch - 2);
       if (this.selected.has(id)) ctx.strokeRect(x + 0.5, y + 0.5, cw - 1, ch - 1);

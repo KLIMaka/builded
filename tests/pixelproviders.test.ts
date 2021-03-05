@@ -26,11 +26,11 @@ test('resize', () => {
 test('superResize', () => {
   const img = [1, 2, 2, 1];
   const pp = array(img, 2, 2);
-  const resizepp = superResize(pp, 4, 4, (l, r) => l == r ? l : null);
+  const resizepp = superResize(pp, 4, 4, (l, r) => l == r ? l : null, (l, r) => (l + r) / 2);
   expect(rasterizer(resizepp)).toStrictEqual([
     1, 1, 2, 2,
-    1, 1, 1, 2,
-    2, 1, 1, 1,
+    1, 1.5, 1.5, 2,
+    2, 1.5, 1.5, 1,
     2, 2, 1, 1,
   ]);
 });

@@ -30,6 +30,7 @@ export type Palette = { readonly name: string, readonly plu: Uint8Array }
 export const RAW_PAL = new Dependency<Uint8Array>('RawPal');
 export const RAW_PLUs = new Dependency<Palette[]>('Raw PLUs');
 export const PIC_TAGS = new Dependency<PicTags>('Tags');
+export const TRANS_TABLE = new Dependency<Uint8Array>('Trans Table');
 
 export const SelectorConstructor = lifecycle(async (injector, lifecycle) => {
   const selector = await create(injector, Selector, UI, ART, RAW_PAL, PIC_TAGS);

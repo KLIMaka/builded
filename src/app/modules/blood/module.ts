@@ -13,7 +13,7 @@ import { ACTIVITY, ACTIVITY_CONTROLLER, BOARD, ENGINE_API, RESOURCES } from '../
 import { BUS, busDisconnector } from '../../apis/handler';
 import { LoadBoard, namedMessageHandler } from '../../edit/messages';
 import { DefaultMapName, MAP_NAME } from '../../modules/default/mapnamedialog';
-import { Palette, PicTags, PIC_TAGS, RAW_PAL, RAW_PLUs } from '../artselector';
+import { Palette, PicTags, PIC_TAGS, RAW_PAL, RAW_PLUs, TRANS_TABLE } from '../artselector';
 import { ART_FILES, GL, PARALLAX_TEXTURES } from '../buildartprovider';
 import { FileSystem, FS } from '../fs/fs';
 import { PALSWAPS, PAL_TEXTURE, PLU_TEXTURE, SHADOWSTEPS } from '../gl/buildgl';
@@ -126,6 +126,11 @@ const pal = provider(async (injector: Injector) => {
   return new Uint8Array(await res.get('BLOOD.PAL'));
 });
 
+const trans = provider(async (injector: Injector) => {
+  const res = await injector.getInstance(RESOURCES);
+  return new Uint8Array(await res.get('TRANS.TLU'));
+});
+
 const BloodResources = provider(async (injector: Injector) => {
   const fs = await injector.getInstance(FS);
   const rfffs = await loadRffFs(injector);
@@ -174,6 +179,7 @@ export function BloodModule(module: Module) {
   module.bind(RESOURCES, BloodResources);
   module.bind(ART_FILES, artFiles);
   module.bind(RAW_PAL, pal);
+  module.bind(TRANS_TABLE, trans);
   module.bind(RAW_PLUs, rawPlus);
   module.bind(PALSWAPS, PLUs);
   module.bind(PAL_TEXTURE, palTexture);

@@ -117,7 +117,8 @@ export class SuperResizeRaster<P> implements Raster<P> {
     private src: Raster<P>,
     readonly width: number,
     readonly height: number,
-    private operator: PixelOperator<P>,
+    private op1: PixelOperator<P>,
+    private op2: PixelOperator<P>,
   ) {
     this.dx = src.width / this.width;
     this.dy = src.height / this.height;
@@ -130,16 +131,17 @@ export class SuperResizeRaster<P> implements Raster<P> {
     const ny = y * this.dy + this.dy / 2;
     const inx = int(nx);
     const iny = int(ny);
-    const doff = dithOffset(x, y);
-    if (doff < 0.5) return this.src.pixel(inx, iny);
+    // const doff = dithOffset(x, y);
+    // if (doff < 0.5) return this.src.pixel(inx, iny);
     const fracx = nx - inx;
     const fracy = ny - iny;
     const dx = fracx <= 0.5 ? -1 : +1;
     const dy = fracy <= 0.5 ? -1 : +1;
     const addSample1 = this.src.pixel(clamp(inx + dx, 0, this.maxw), iny);
     const addSample2 = this.src.pixel(inx, clamp(iny + dy, 0, this.maxh));
-    const newSample = this.operator(addSample1, addSample2);
-    return newSample == null ? this.src.pixel(inx, iny) : newSample;
+    const newSample = this.op1(addSample1, addSample2);
+    const origSample = this.src.pixel(inx, iny);
+    return newSample == null ? origSample : this.op2(origSample, newSample);
   }
 }
 
@@ -173,9 +175,9 @@ export function resize<P>(src: Raster<P>, w: number, h: number) {
   return new ResizeRaster(src, w, h);
 }
 
-export function superResize<P>(src: Raster<P>, w: number, h: number, op: PixelOperator<P>) {
+export function superResize<P>(src: Raster<P>, w: number, h: number, op1: PixelOperator<P>, op2: PixelOperator<P>) {
   if (src.height == h && src.width == w) return src;
-  return new SuperResizeRaster(src, w, h, op);
+  return new SuperResizeRaster(src, w, h, op1, op2);
 }
 
 export function fit<P>(w: number, h: number, src: Raster<P>, padd: P) {

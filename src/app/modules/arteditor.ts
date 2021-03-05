@@ -16,7 +16,7 @@ import { BUS, busDisconnector } from "../apis/handler";
 import { Ui, UI, Window } from "../apis/ui";
 import { namedMessageHandler } from "../edit/messages";
 import { PicNumCallback } from "../edit/tools/selection";
-import { Palette, PicTags, PIC_TAGS, RAW_PAL, RAW_PLUs } from "./artselector";
+import { Palette, PicTags, PIC_TAGS, RAW_PAL, RAW_PLUs, TRANS_TABLE } from "./artselector";
 import { SHADOWSTEPS } from "./gl/buildgl";
 
 function createDrawPanel(arts: ArtInfoProvider, pal: Uint8Array, plu: (x: number) => number, canvas: HTMLCanvasElement, cb: PicNumCallback, iter: () => Iterable<number>) {
@@ -31,7 +31,7 @@ function createDrawPanel(arts: ArtInfoProvider, pal: Uint8Array, plu: (x: number
 export async function ArtEditorModule(module: Module) {
   module.bind(plugin('ArtEditor'), lifecycle(async (injector, lifecycle) => {
     const bus = await injector.getInstance(BUS);
-    const editor = await create(injector, ArtEditor, UI, ART, RAW_PAL, RAW_PLUs, PIC_TAGS, SHADOWSTEPS);
+    const editor = await create(injector, ArtEditor, UI, ART, RAW_PAL, TRANS_TABLE, RAW_PLUs, PIC_TAGS, SHADOWSTEPS);
     lifecycle(bus.connect(namedMessageHandler('show_artedit', () => editor.show())), busDisconnector(bus));
     lifecycle(editor, async e => e.stop());
   }));
@@ -52,11 +52,14 @@ export class ArtEditor {
   private currentShadow = 0;
   private pluProvider = (x: number) => this.plus[this.currentPlu].plu[this.currentShadow * 256 + x];
   private rasterizer: Rasterizer<number>;
+  private closeBlend = (l: number, r: number) => Math.abs(l - r) <= 3 ? this.trans[l * 256 + r] : null;
+  private blend = (l: number, r: number) => this.trans[l * 256 + r];
 
   constructor(
     private ui: Ui,
     private arts: ArtInfoProvider,
     private pal: Uint8Array,
+    private trans: Uint8Array,
     private plus: Palette[],
     private tags: PicTags,
     private shadowsteps: number) {
@@ -201,7 +204,7 @@ export class ArtEditor {
     if (mainInfo == null || frameInfo == null) return;
     const scaledW = int(frameInfo.w * this.scale);
     const scaledH = int(frameInfo.h * this.scale);
-    const img = superResize(transform(art(frameInfo), this.pluProvider), scaledW, scaledH, (l, r) => l == r ? l : null);
+    const img = superResize(transform(art(frameInfo), this.pluProvider), scaledW, scaledH, this.closeBlend, this.blend);
     const x = this.centerX - int(((frameInfo.attrs.xoff | 0) + frameInfo.w / 2) * this.scale);
     const y = this.centerY - int(((frameInfo.attrs.yoff | 0) + frameInfo.h / 2) * this.scale);
     drawToCanvas(img, ctx, this.rasterizer, x, y);

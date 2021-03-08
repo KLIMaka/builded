@@ -255,6 +255,10 @@ export class State {
     this.getTextureValue(name).set(tex);
   }
 
+  public isTextureEnabled(name: string) {
+    return this.textureIndex[name] != undefined;
+  }
+
   public getTextureValue(name: string): StateValue<Texture> {
     const t = this.textureIndex[name];
     if (t == undefined) throw new Error('Invalid sampler name: ' + name);

@@ -7,7 +7,7 @@ import { drawToCanvas } from "../../utils/imgutils";
 import { create, lifecycle, Module, plugin } from "../../utils/injector";
 import { iter } from "../../utils/iter";
 import { int } from "../../utils/mathutils";
-import { palRasterizer, Rasterizer, superResize, transform } from "../../utils/pixelprovider";
+import { array, palRasterizer, Raster, Rasterizer, rect, resize, superResize, transform } from "../../utils/pixelprovider";
 import { DrawPanel, RasterProvider } from "../../utils/ui/drawpanel";
 import { menuButton, search } from "../../utils/ui/renderers";
 import { addDragController, div } from "../../utils/ui/ui";
@@ -52,7 +52,7 @@ export class ArtEditor {
   private currentShadow = 0;
   private pluProvider = (x: number) => this.plus[this.currentPlu].plu[this.currentShadow * 256 + x];
   private rasterizer: Rasterizer<number>;
-  private closeBlend = (l: number, r: number) => Math.abs(l - r) <= 3 ? this.trans[l * 256 + r] : null;
+  private closeBlend = (l: number, r: number) => Math.abs(l - r) <= 4 ? this.trans[l * 256 + r] : null;
   private blend = (l: number, r: number) => this.trans[l * 256 + r];
 
   constructor(
@@ -207,7 +207,7 @@ export class ArtEditor {
     const img = superResize(transform(art(frameInfo), this.pluProvider), scaledW, scaledH, this.closeBlend, this.blend);
     const x = this.centerX - int(((frameInfo.attrs.xoff | 0) + frameInfo.w / 2) * this.scale);
     const y = this.centerY - int(((frameInfo.attrs.yoff | 0) + frameInfo.h / 2) * this.scale);
-    drawToCanvas(img, ctx, this.rasterizer, x, y);
+    drawToCanvas(rect(img, - x, - y, this.view.width - x, this.view.height - y, 0), ctx, this.rasterizer);
 
     if (anim && (mainInfo.attrs.frames | 0) != 0) {
       this.frame++;

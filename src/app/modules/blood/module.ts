@@ -16,7 +16,7 @@ import { DefaultMapName, MAP_NAME } from '../../modules/default/mapnamedialog';
 import { Palette, PicTags, PIC_TAGS, RAW_PAL, RAW_PLUs, TRANS_TABLE } from '../artselector';
 import { ART_FILES, GL, PARALLAX_TEXTURES } from '../buildartprovider';
 import { FileSystem, FS } from '../fs/fs';
-import { PALSWAPS, PAL_TEXTURE, PLU_TEXTURE, SHADOWSTEPS } from '../gl/buildgl';
+import { PALSWAPS, PAL_TEXTURE, PLU_TEXTURE, SHADOWSTEPS, TRANS_TEXTURE } from '../gl/buildgl';
 import { DefaultMapSelector, MAP_NAMES, MAP_SELECTOR } from '../selectmap';
 import { Implementation_ } from '../view/boardrenderer3d';
 
@@ -40,6 +40,11 @@ const PLUs = provider(async (injector: Injector) => {
 const palTexture = lifecycle(async (injector, lifecycle) => {
   const [pal, gl] = await getInstances(injector, RAW_PAL, GL);
   return lifecycle(createTexture(256, 1, gl, { filter: gl.NEAREST }, pal, gl.RGB, 3), async t => t.destroy(gl));
+});
+
+const transTexture = lifecycle(async (injector, lifecycle) => {
+  const [table, gl] = await getInstances(injector, TRANS_TABLE, GL);
+  return lifecycle(createTexture(256, 256, gl, { filter: gl.NEAREST }, table, gl.LUMINANCE), async t => t.destroy(gl));
 });
 
 const rawPlus = provider(async (injector: Injector) => {
@@ -184,6 +189,7 @@ export function BloodModule(module: Module) {
   module.bind(PALSWAPS, PLUs);
   module.bind(PAL_TEXTURE, palTexture);
   module.bind(PLU_TEXTURE, pluTexture);
+  module.bind(TRANS_TEXTURE, transTexture);
   module.bind(Implementation_, BloodImplementationConstructor);
   module.bind(MAP_NAMES, mapNames);
   module.bind(MAP_NAME, DefaultMapName);

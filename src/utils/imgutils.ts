@@ -1,4 +1,4 @@
-import { Raster, Rasterizer } from "./pixelprovider";
+import { fit, Raster, Rasterizer, rect } from "./pixelprovider";
 
 export function createEmptyCanvas(width: number, height: number): HTMLCanvasElement {
   const canvas: HTMLCanvasElement = document.createElement('canvas');

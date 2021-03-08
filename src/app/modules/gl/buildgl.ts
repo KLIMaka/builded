@@ -10,12 +10,13 @@ import { GL } from '../buildartprovider';
 
 export const PAL_TEXTURE = new Dependency<Texture>('PAL Texture');
 export const PLU_TEXTURE = new Dependency<Texture>('PLU Texture');
+export const TRANS_TEXTURE = new Dependency<Texture>('Trans Texture');
 export const SHADOWSTEPS = new Dependency<number>('Shadowsteps');
 export const PALSWAPS = new Dependency<number>('Palswaps');
 export const BUILD_GL = new Dependency<BuildGl>('BuildGL');
 
 export const BuildGlConstructor = lifecycle(async (injector, lifecycle) => {
-  const [gl, pal, plus, palswaps, shadowsteps, profiler] = await getInstances(injector, GL, PAL_TEXTURE, PLU_TEXTURE, PALSWAPS, SHADOWSTEPS, PROFILER);
+  const [gl, pal, plus, trans, palswaps, shadowsteps, profiler] = await getInstances(injector, GL, PAL_TEXTURE, PLU_TEXTURE, TRANS_TEXTURE, PALSWAPS, SHADOWSTEPS, PROFILER);
   const defs = ['PALSWAPS (' + palswaps + '.0)', 'SHADOWSTEPS (' + shadowsteps + '.0)', 'PAL_LIGHTING'/*, 'DITHERING'*/];
   const SHADER_NAME = 'resources/shaders/build';
   const state = new State()
@@ -29,6 +30,7 @@ export const BuildGlConstructor = lifecycle(async (injector, lifecycle) => {
   state.registerShader('spriteFaceShader', lifecycle(await createShader(gl, SHADER_NAME, [...defs, 'SPRITE_FACE']), shaderCleaner));
   state.setTexture('pal', pal);
   state.setTexture('plu', plus);
+  if (state.isTextureEnabled('trans')) state.setTexture('trans', trans);
   return new BuildGl(state, gl, profiler);
 });
 

@@ -52,8 +52,7 @@ export class TextureImpl implements DS.Texture {
     }
 
 
-    if (img == null)
-      img = new Uint8Array(width * height * bpp);
+    if (img == null) img = new Uint8Array(width * height * bpp);
     this.data = img;
     gl.texImage2D(gl.TEXTURE_2D, 0, this.format, width, height, 0, this.format, this.type, this.data);
 

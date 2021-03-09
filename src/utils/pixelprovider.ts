@@ -15,10 +15,13 @@ export function palRasterizer(pal: ArrayLike<number>): Rasterizer<number> {
     let off = 0;
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
-        const palIdx = raster.pixel(x, y) * 3;
-        out[off + 0] = pal[palIdx + 0];
-        out[off + 1] = pal[palIdx + 1];
-        out[off + 2] = pal[palIdx + 2];
+        const color = raster.pixel(x, y);
+        if (color != 255) {
+          const palIdx = color * 3;
+          out[off + 0] = pal[palIdx + 0];
+          out[off + 1] = pal[palIdx + 1];
+          out[off + 2] = pal[palIdx + 2];
+        }
         out[off + 3] = 255;
         off += 4;
       }

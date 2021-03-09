@@ -58,6 +58,7 @@ const pluTexture = lifecycle(async (injector, lifecycle) => {
   const [plus, gl, shadowsteps] = await getInstances(injector, RAW_PLUs, GL, SHADOWSTEPS);
   const tex = new Uint8Array(256 * shadowsteps * plus.length);
   for (const [plu, i] of enumerate(plus)) tex.set(plu.plu, 256 * shadowsteps * i);
+  for (let i = 0; i < shadowsteps * plus.length; i++) tex[256 * i - 1] = 255;
   return lifecycle(createTexture(256, shadowsteps * plus.length, gl, { filter: gl.NEAREST }, tex, gl.LUMINANCE), async t => t.destroy(gl));
 });
 

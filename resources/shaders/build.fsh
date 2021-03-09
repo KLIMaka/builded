@@ -41,13 +41,12 @@ float ditherOffset() {
   return dith[idx];
 }
 
-float ditherColors(float c1, float c2, float d) {
+float ditherColors(vec2 c, float d) {
   float off = ditherOffset();
-  return c1 > c2 
-    ? off >= d ? c1 : c2 
-    : off >= d ? c2 : c1;
+  return c.x > c.y 
+    ? off >= d ? c.x : c.y 
+    : off >= d ? c.y : c.x;
 }
-
 
 float lightOffset() {
 #ifdef PARALLAX
@@ -106,13 +105,13 @@ float lightOffset(float lightLevel) {
 }
 
 float samplePaletteIndex(float idx, float palShadowOffset) {
-  return isTransIdx(idx) ? TARANS_IDX : texture(plu, vec2(idx, palShadowOffset)).r;
+  return texture(plu, vec2(idx, palShadowOffset)).r;
 }
 
-float transBlend(float l, float r) {
-  return (isTransIdx(l) || isTransIdx(r))
-    ? ditherColors(r, l, 0.5)
-    : texture(trans, vec2(l, r)).r;
+float transBlend(vec2 idxs) {
+  return any(greaterThanEqual(idxs, vec2(TARANS_IDX)))
+    ? ditherColors(idxs, 0.5)
+    : texture(trans, idxs).r;
 }
 
 vec3 sampleColor(vec3 palSamples, float lightLevel, float overbright) {
@@ -123,7 +122,7 @@ vec3 sampleColor(vec3 palSamples, float lightLevel, float overbright) {
     samplePaletteIndex(palSamples.b, off)
   );
   float idx = abs(idxs.g-idxs.b) <= 4.0 / 256.0
-    ? transBlend(transBlend(idxs.g, idxs.b), idxs.r)
+    ? transBlend(vec2(transBlend(idxs.gb), idxs.r))
     : idxs.r;
   if (isTransIdx(idx)) discard;
   vec3 color = texture(pal, vec2(idx, 0)).rgb;
@@ -164,7 +163,7 @@ vec3 scale2xSample(vec2 tc) {
 }
 
 vec3 getPalSamples(vec2 tc) {
-  return  mipLevel(tc, vec2(textureSize(base, 0))) > 0.0 
+  return mipLevel(tc, vec2(textureSize(base, 0))) > 0.0 
     ? vec3(textureGrad(base, repeat(tc), dFdx(tc), dFdy(tc)).r) 
     : scale2xSample(tc);
 }

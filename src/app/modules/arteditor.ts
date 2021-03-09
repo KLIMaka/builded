@@ -7,7 +7,7 @@ import { drawToCanvas } from "../../utils/imgutils";
 import { create, lifecycle, Module, plugin } from "../../utils/injector";
 import { iter } from "../../utils/iter";
 import { int } from "../../utils/mathutils";
-import { array, palRasterizer, Raster, Rasterizer, rect, resize, superResize, transform } from "../../utils/pixelprovider";
+import { palRasterizer, Rasterizer, rect, resize, superResize, transform } from "../../utils/pixelprovider";
 import { DrawPanel, RasterProvider } from "../../utils/ui/drawpanel";
 import { menuButton, search } from "../../utils/ui/renderers";
 import { addDragController, div } from "../../utils/ui/ui";
@@ -50,10 +50,11 @@ export class ArtEditor {
   private scale = 2.0;
   private currentPlu = 0;
   private currentShadow = 0;
-  private pluProvider = (x: number) => this.plus[this.currentPlu].plu[this.currentShadow * 256 + x];
+  private superSample = true;
+  private pluProvider = (x: number) => x == 255 ? 255 : this.plus[this.currentPlu].plu[this.currentShadow * 256 + x];
   private rasterizer: Rasterizer<number>;
-  private closeBlend = (l: number, r: number) => Math.abs(l - r) <= 4 ? this.trans[l * 256 + r] : null;
-  private blend = (l: number, r: number) => this.trans[l * 256 + r];
+  private closeBlend = (l: number, r: number) => l == 255 || r == 255 ? 255 : Math.abs(l - r) <= 8 ? this.trans[l * 256 + r] : null;
+  private blend = (l: number, r: number) => l == 255 || r == 255 ? 255 : this.trans[l * 256 + r];
 
   constructor(
     private ui: Ui,
@@ -81,6 +82,7 @@ export class ArtEditor {
         .startGroup()
         .widget(this.createPalSelectingMenu())
         .widget(this.createShadowLevels())
+        .iconButton('icon-adjust', () => { this.superSample = !this.superSample; this.updateView(false) })
         .endGroup()
         .widget(search('Search', s => this.oracle(s))))
       .build();
@@ -204,7 +206,9 @@ export class ArtEditor {
     if (mainInfo == null || frameInfo == null) return;
     const scaledW = int(frameInfo.w * this.scale);
     const scaledH = int(frameInfo.h * this.scale);
-    const img = superResize(transform(art(frameInfo), this.pluProvider), scaledW, scaledH, this.closeBlend, this.blend);
+    const img = this.superSample
+      ? superResize(transform(art(frameInfo), this.pluProvider), scaledW, scaledH, this.closeBlend, this.blend)
+      : resize(transform(art(frameInfo), this.pluProvider), scaledW, scaledH);
     const x = this.centerX - int(((frameInfo.attrs.xoff | 0) + frameInfo.w / 2) * this.scale);
     const y = this.centerY - int(((frameInfo.attrs.yoff | 0) + frameInfo.h / 2) * this.scale);
     drawToCanvas(rect(img, - x, - y, this.view.width - x, this.view.height - y, 0), ctx, this.rasterizer);

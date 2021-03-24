@@ -98,7 +98,7 @@ export class ResizeRaster<P> implements Raster<P> {
   pixel(x: number, y: number): P { return this.src.pixel(int(x * this.dx), int(y * this.dy)) }
 }
 
-export type PixelOperator<P> = (lh: P, rh: P) => P;
+export type PixelOperator<P> = (lh: P, rh: P, off: number) => P;
 const DITH = [
   0.0, 0.5, 0.125, 0.625,
   0.75, 0.25, 0.875, 0.375,
@@ -134,17 +134,16 @@ export class SuperResizeRaster<P> implements Raster<P> {
     const ny = y * this.dy + this.dy / 2;
     const inx = int(nx);
     const iny = int(ny);
-    // const doff = dithOffset(x, y);
-    // if (doff < 0.5) return this.src.pixel(inx, iny);
+    const doff = dithOffset(x, y);
     const fracx = nx - inx;
     const fracy = ny - iny;
     const dx = fracx <= 0.5 ? -1 : +1;
     const dy = fracy <= 0.5 ? -1 : +1;
     const addSample1 = this.src.pixel(clamp(inx + dx, 0, this.maxw), iny);
     const addSample2 = this.src.pixel(inx, clamp(iny + dy, 0, this.maxh));
-    const newSample = this.op1(addSample1, addSample2);
+    const newSample = this.op1(addSample1, addSample2, doff);
     const origSample = this.src.pixel(inx, iny);
-    return newSample == null ? origSample : this.op2(origSample, newSample);
+    return newSample == null ? origSample : this.op2(origSample, newSample, doff);
   }
 }
 

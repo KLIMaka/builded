@@ -25,7 +25,8 @@ app.install(PhotonUiModule);
 app.install(FileBrowserModule);
 app.install(ArtEditorModule);
 app.bind(plugin('MainLoop'), provider(async injector => {
-  MainLoopConstructor(injector).then(mainLoop => animate(gl, (_, time) => mainLoop.frame(time)));
+  const mainLoop = await MainLoopConstructor(injector);
+  animate(gl, (_, time) => mainLoop.frame(time));
 }));
 app.start();
 

@@ -17,7 +17,7 @@ export const BUILD_GL = new Dependency<BuildGl>('BuildGL');
 
 export const BuildGlConstructor = lifecycle(async (injector, lifecycle) => {
   const [gl, pal, plus, trans, palswaps, shadowsteps, profiler] = await getInstances(injector, GL, PAL_TEXTURE, PLU_TEXTURE, TRANS_TEXTURE, PALSWAPS, SHADOWSTEPS, PROFILER);
-  const defs = ['PALSWAPS (' + palswaps + '.0)', 'SHADOWSTEPS (' + shadowsteps + '.0)', 'PAL_LIGHTING'/*, 'DITHERING'*/];
+  const defs = ['PALSWAPS (' + palswaps + '.0)', 'SHADOWSTEPS (' + shadowsteps + '.0)', 'PAL_LIGHTING'];
   const SHADER_NAME = 'resources/shaders/build';
   const state = new State()
   const shaderCleaner = async (s: Shader) => s.destroy(gl);

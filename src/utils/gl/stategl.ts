@@ -313,8 +313,7 @@ export class State {
       const buf = this.attribs[idx];
       const vbuf = buf.get();
       const location = shader.getAttributeLocation(this.attribNames[idx], gl);
-      if (location == -1)
-        continue;
+      if (location == -1) continue;
       gl.bindBuffer(gl.ARRAY_BUFFER, vbuf.getBuffer());
       gl.enableVertexAttribArray(location);
       gl.vertexAttribPointer(location, vbuf.getSpacing(), vbuf.getType(), vbuf.getNormalized(), vbuf.getStride(), vbuf.getOffset());

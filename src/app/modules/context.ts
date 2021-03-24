@@ -126,12 +126,7 @@ export class MainLoop extends MessageHandlerReflective {
     private view: View,
     private bus: MessageBus,
     private profiler: Profiler
-  ) {
-    super();
-    this.view = view;
-    this.bus = bus;
-    this.bus.connect(this);
-  }
+  ) { super() }
 
   private drawTools() {
     tools.clear();
@@ -148,5 +143,21 @@ export class MainLoop extends MessageHandlerReflective {
     this.drawTools();
     frame.stop();
     this.bus.handle(POSTFRAME);
+  }
+}
+
+export class FrameGenerator {
+  private time = window.performance.now();
+
+  constructor(private bus: MessageBus) { }
+
+  private frame() {
+    this.bus.handle(PREFRAME);
+    const now = window.performance.now();
+    FRAME.dt = now - this.time;
+    this.time = now;
+    this.bus.handle(FRAME);
+    this.bus.handle(POSTFRAME);
+    requestAnimationFrame(() => this.frame());
   }
 }

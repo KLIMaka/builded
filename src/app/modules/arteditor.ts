@@ -53,8 +53,8 @@ export class ArtEditor {
   private superSample = true;
   private pluProvider = (x: number) => x == 255 ? 255 : this.plus[this.currentPlu].plu[this.currentShadow * 256 + x];
   private rasterizer: Rasterizer<number>;
-  private closeBlend = (l: number, r: number) => l == 255 || r == 255 ? 255 : Math.abs(l - r) <= 8 ? this.trans[l * 256 + r] : null;
-  private blend = (l: number, r: number) => l == 255 || r == 255 ? 255 : this.trans[l * 256 + r];
+  private closeBlend = (l: number, r: number, doff: number) => Math.abs(l - r) <= 4 ? this.blendColors(l, r, doff) : null;
+  private blend = (l: number, r: number, doff: number) => this.blendColors(l, r, doff);
 
   constructor(
     private ui: Ui,
@@ -90,6 +90,11 @@ export class ArtEditor {
   }
 
   public stop() { this.window.destroy() }
+
+  private blendColors(l: number, r: number, doff: number) {
+    if (l != 255 && r != 255) return this.trans[l * 256 + r];
+    else return doff >= 0.5 ? l : r;
+  }
 
   private createPalSelectingMenu() {
     const menu = this.ui.builder.menu();
@@ -206,9 +211,10 @@ export class ArtEditor {
     if (mainInfo == null || frameInfo == null) return;
     const scaledW = int(frameInfo.w * this.scale);
     const scaledH = int(frameInfo.h * this.scale);
+    const plued = transform(art(frameInfo), this.pluProvider);
     const img = this.superSample
-      ? superResize(transform(art(frameInfo), this.pluProvider), scaledW, scaledH, this.closeBlend, this.blend)
-      : resize(transform(art(frameInfo), this.pluProvider), scaledW, scaledH);
+      ? superResize(plued, scaledW, scaledH, this.closeBlend, this.blend)
+      : resize(plued, scaledW, scaledH);
     const x = this.centerX - int(((frameInfo.attrs.xoff | 0) + frameInfo.w / 2) * this.scale);
     const y = this.centerY - int(((frameInfo.attrs.yoff | 0) + frameInfo.h / 2) * this.scale);
     drawToCanvas(rect(img, - x, - y, this.view.width - x, this.view.height - y, 0), ctx, this.rasterizer);

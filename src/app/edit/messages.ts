@@ -23,6 +23,7 @@ export class BoardInvalidate implements Message { constructor(public ent: Entity
 export class PreFrame implements Message { }
 export class PostFrame implements Message { }
 export class Mouse implements Message { constructor(public x: number, public y: number) { } }
+export class Key implements Message { constructor(public key: string, public down: boolean) { } }
 export class SetWallCstat implements Message { constructor(public name: string, public value = false, public toggle = true) { } }
 export class SetSectorCstat implements Message { constructor(public name: string, public value = false, public toggle = true) { } }
 export class SetSpriteCstat implements Message { constructor(public name: string, public value = false, public toggle = true) { } }

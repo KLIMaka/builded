@@ -1,4 +1,4 @@
-import { Binder, loadBinds } from "../../app/input/keymap"
+import { loadBinds } from "../../app/input/keymap"
 import { messageParser } from "../../app/input/messageparser"
 import { GL } from "../../app/modules/buildartprovider"
 import { forEach } from "../../utils/collections"
@@ -15,8 +15,7 @@ export function InputModule(module: Module) {
   module.bind(plugin('Input'), lifecycle(async (injector, lifecycle) => {
     const [gl, bus, state, activity] = await getInstances(injector, GL, BUS, STATE, ACTIVITY);
     const keybinds = await loadString('builded_binds.txt');
-    const binder = new Binder();
-    loadBinds(keybinds, binder, messageParser);
+    const binder = loadBinds(keybinds, messageParser);
     bind(<HTMLCanvasElement>gl.canvas);
 
     lifecycle(bus.connect(new class extends MessageHandlerReflective {

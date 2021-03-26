@@ -2,16 +2,9 @@ import { Board } from "../../../build/board/structs";
 import { Deck } from "../../../utils/collections";
 import { Injector } from "../../../utils/injector";
 import { info } from "../../../utils/logger";
-import { BoardProvider, ENGINE_API } from "../../apis/app";
+import { ENGINE_API } from "../../apis/app";
 import { BUS, Handle, MessageHandlerReflective } from "../../apis/handler";
 import { Commit, INVALIDATE_ALL, LoadBoard, NamedMessage } from "../../edit/messages";
-
-class History {
-  private history: Deck<Board> = new Deck();
-  public push(board: Board) { this.history.push(board) }
-  public pop() { if (this.history.length() > 1) this.history.pop() }
-  public top() { return this.history.top() }
-}
 
 export const DefaultBoardProviderConstructor = (() => {
   let handle: Handle;
@@ -20,7 +13,7 @@ export const DefaultBoardProviderConstructor = (() => {
       const bus = await injector.getInstance(BUS);
       const api = await injector.getInstance(ENGINE_API);
       const defaultBoard = api.newBoard();
-      const history = new History();
+      const history = new Deck<Board>();
       const forward = new Deck<Board>();
       const dt = 5000;
       let activeBoard: Board = api.cloneBoard(defaultBoard);
@@ -32,6 +25,7 @@ export const DefaultBoardProviderConstructor = (() => {
         NamedMessage(msg: NamedMessage) {
           switch (msg.name) {
             case 'undo':
+              if (history.length() == 1) return;
               forward.push(api.cloneBoard(activeBoard));
               history.pop();
               activeBoard = api.cloneBoard(history.top());

@@ -3,6 +3,7 @@ import { InputState } from "../../utils/input";
 import { warning } from "../../utils/logger";
 import { Message } from "../apis/handler";
 import { State } from "../apis/app";
+import { Key } from "../edit/messages";
 
 type InputHandler = (state: InputState) => boolean;
 
@@ -43,6 +44,40 @@ function createHandler(k: string, mods: string[]): InputHandler {
   for (const mod of ['shift', 'ctrl', 'alt'])
     handler = combination(handler, mods.includes(mod) ? key(mod) : notKey(mod));
   return handler;
+}
+
+export class InputConsumer {
+  private pressed: { [index: string]: boolean } = {}
+  private actions: { [index: string]: Message[] }[] = [];
+  private states: { [index: string]: [string, any, any][] } = {}
+
+  public consume(input: Key, state: State): Iterable<Message> {
+    let result: Iterable<Message> = [];
+    if (input.down) {
+      this.keydown(input.key);
+      result = this.press(input.key);
+    } else {
+      this.keyup(input.key);
+    }
+    const stateChange = this.states[input.key];
+    if (stateChange != undefined) {
+      for (const s of stateChange) {
+        if (state.has(s[0])) state.set(s[0], input.down ? s[1] : s[2]);
+      }
+    }
+    return result;
+  }
+
+  private keydown(key: string) { this.pressed[key] = true }
+  private keyup(key: string) { this.pressed[key] = false }
+  private isPressed(key: string): boolean { return this.pressed[key] }
+  private modState(shift: boolean, ctrl: boolean, alt: boolean): number { return (shift ? 0 : 1) + (ctrl ? 0 : 2) + (alt ? 0 : 4) }
+
+  private press(key: string): Iterable<Message> {
+    const mods = this.modState(this.isPressed('shift'), this.isPressed('ctrl'), this.isPressed('alt'));
+    const actions = this.actions[mods]?.[key];
+    return actions ? actions : [];
+  }
 }
 
 type ContextMatcher = (context: string) => boolean;
@@ -137,7 +172,8 @@ function parseContextMatcher(str: string): ContextMatcher {
 
 export type EventParser = (str: string) => Collection<Message>;
 
-export function loadBinds(binds: string, binder: Binder, messageParser: EventParser) {
+export function loadBinds(binds: string, messageParser: EventParser) {
+  const binder = new Binder();
   const lines = binds.split(/\r?\n/);
   for (let line of lines) {
     line = line.trim();
@@ -158,4 +194,5 @@ export function loadBinds(binds: string, binder: Binder, messageParser: EventPar
       binder.addBind(messages, context, keys.pop(), ...keys);
     }
   }
+  return binder;
 }

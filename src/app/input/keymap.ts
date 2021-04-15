@@ -46,13 +46,28 @@ function createHandler(k: string, mods: string[]): InputHandler {
   return handler;
 }
 
+interface Indexed<T> { [index: string]: T;[index: number]: T }
+interface Arr<T> { [index: number]: T }
+type Index<T> = T extends string | number ? T : never;
+
+function ensure<K, T>(container: Indexed<T>, key: Index<K>, factory: () => T) {
+  let value = container[key];
+  if (value == undefined) {
+    value = factory();
+    container[key] = value;
+  }
+  return value;
+}
+
 export class InputConsumer {
   private pressed: { [index: string]: boolean } = {}
   private actions: { [index: string]: Message[] }[] = [];
   private states: { [index: string]: [string, any, any][] } = {}
 
+  constructor() { for (let i = 0; i < 8; i++) this.actions[i] = {} }
+
   public consume(input: Key, state: State): Iterable<Message> {
-    let result: Iterable<Message> = [];
+    let result: Iterable<Message> = EMPTY_COLLECTION;
     if (input.down) {
       this.keydown(input.key);
       result = this.press(input.key);
@@ -68,13 +83,22 @@ export class InputConsumer {
     return result;
   }
 
+  public addBind(messages: Collection<Message>, key: string, ...mods: string[]) {
+    const modState = this.modState(mods.includes('shift'), mods.includes('ctrl'), mods.includes('alt'));
+    ensure(this.actions[modState], key, () => []).push(...messages);
+  }
+
+  public addStateBind(name: string, enabled: any, disabled: any, key: string) {
+    ensure(this.states, key, () => []).push([name, enabled, disabled]);
+  }
+
   private keydown(key: string) { this.pressed[key] = true }
   private keyup(key: string) { this.pressed[key] = false }
   private isPressed(key: string): boolean { return this.pressed[key] }
-  private modState(shift: boolean, ctrl: boolean, alt: boolean): number { return (shift ? 0 : 1) + (ctrl ? 0 : 2) + (alt ? 0 : 4) }
+  private modState(shift: boolean, ctrl: boolean, alt: boolean): number { return (shift ? 1 : 0) + (ctrl ? 2 : 0) + (alt ? 4 : 0) }
 
   private press(key: string): Iterable<Message> {
-    const mods = this.modState(this.isPressed('shift'), this.isPressed('ctrl'), this.isPressed('alt'));
+    const mods = this.modState(this.isPressed('shift'), this.isPressed('control'), this.isPressed('alt'));
     const actions = this.actions[mods]?.[key];
     return actions ? actions : [];
   }
@@ -195,4 +219,29 @@ export function loadBinds(binds: string, messageParser: EventParser) {
     }
   }
   return binder;
+}
+
+export function loadBinds1(binds: string, messageParser: EventParser) {
+  const consumer = new InputConsumer();
+  const lines = binds.split(/\r?\n/);
+  for (let line of lines) {
+    line = line.trim();
+    if (line.length == 0) continue;
+    const parts = line.toLowerCase().split('|');
+    if (parts.length != 3) { warning(`Skipping bind line: ${line}`); continue; }
+    const context = parseContextMatcher(parts[0].trim());
+    const keys = parts[1].trim().split('+');
+    const command = parts[2].trim();
+    if (keys[0] == '') {
+      consumer.addStateBind(command, true, false, keys[1]);
+    } else {
+      const messages = messageParser(command);
+      if (messages == null) {
+        warning(`'${command}' failed to parse`);
+        continue;
+      }
+      consumer.addBind(messages, keys.pop(), ...keys);
+    }
+  }
+  return consumer;
 }

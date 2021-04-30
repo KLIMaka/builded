@@ -54,7 +54,7 @@ export const DefaultAdditionalTextures = lifecycle(async (injector, lifecycle) =
         const texture = await fs.get(path);
         const [w, h, buff] = await loadImageFromBuffer(texture);
         const indexed = lib.palettize(w, h, buff);
-        textures[id] = lifecycle(createIndexedTexture(gl, w, h, indexed, true, lib), async t => t.destroy(gl));
+        textures[id] = lifecycle(createIndexedTexture(gl, w, h, indexed, false, lib), async t => t.destroy(gl));
       }
     }
   } finally {

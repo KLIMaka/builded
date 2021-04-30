@@ -1,6 +1,7 @@
 import { Buffer, BufferBuilder, Pointer } from '../../../utils/gl/buffergl';
 import { IndexBuffer, VertexBuffer } from '../../../utils/gl/drawstruct';
-import { Dependency, Injector, provider } from '../../../utils/injector';
+import { Dependency, getInstances, Injector, provider } from '../../../utils/injector';
+import { PROFILER, Profiler } from '../../../utils/profiler';
 import { GL } from '../buildartprovider';
 
 export interface GenericBuildBuffer {
@@ -29,8 +30,8 @@ export interface BuildBufferFactory {
 export const BUFFER_FACTORY = new Dependency<BuildBufferFactory>('Build Buffer Factory');
 
 export const DefaultBufferFactory = provider(async (injector: Injector) => {
-  const gl = await injector.getInstance(GL);
-  return new BuildBufferFactoryImpl(gl);
+  const [gl, profiler] = await getInstances(injector, GL, PROFILER);
+  return new BuildBufferFactoryImpl(gl, profiler);
 });
 
 export class PointSpritesBuilder {
@@ -128,7 +129,7 @@ const TEX_SHADING = 2;
 class BuildBufferFactoryImpl implements BuildBufferFactory {
   private buffers = new Map<string, Buffer[]>();
 
-  constructor(private gl: WebGLRenderingContext) { }
+  constructor(private gl: WebGLRenderingContext, readonly profiler: Profiler) { }
 
   private addNewBuffer(hint: string) {
     const buffer = new Buffer(this.gl, new BufferBuilder()
@@ -166,7 +167,11 @@ export class BuildBufferImpl implements BuildBuffer {
 
   public get(): Pointer { return this.ptr }
   public getSize() { return this.size }
-  private remove() { this.ptr.buffer.deallocate(this.ptr) }
+
+  private remove() {
+    this.factory.profiler.global().counter('Buffer').incAmount(-this.ptr.vtx.size);
+    this.ptr.buffer.deallocate(this.ptr)
+  }
 
   public allocate(vtxCount: number, triIndexCount: number) {
     if (this.ptr != null) {
@@ -177,6 +182,7 @@ export class BuildBufferImpl implements BuildBuffer {
       this.remove();
     }
     this.ptr = this.factory.allocate(this.hint, vtxCount, triIndexCount);
+    this.factory.profiler.global().counter('Buffer').incAmount(this.ptr.vtx.size);
     this.size = this.ptr.idx.size;
   }
 

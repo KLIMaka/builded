@@ -1,7 +1,7 @@
 import { Dependency } from "./injector";
 
 function now() {
-  return window.performance.now();
+  return performance.now();
 }
 
 export interface Timer {
@@ -56,10 +56,10 @@ export class DefaultCounter implements Counter {
   get(): number { return this.count }
 }
 
-function ensure<T>(map: Map<string, T>, key: string, constructor: () => T) {
+function ensure<T>(map: Map<string, T>, key: string, ctor: () => T) {
   let value = map.get(key);
   if (value == undefined) {
-    value = constructor();
+    value = ctor();
     map.set(key, value);
   }
   return value;

@@ -63,12 +63,14 @@ function StatusBar() {
   const [posBox, posUpdate] = PositionBox();
   const [sectorBox, sectorUpdate] = ValueBox('Sector', 25);
   const [drawsBox, drawsUpdate] = ValueBox('Draws', 85);
+  const [bufferBox, bufferUpdate] = ValueBox('Buffer', 35);
   const [fpsBox, fpsUpdate] = ValueBox('FPS', 35);
   statusbar.appendChild(posBox);
   statusbar.appendChild(sectorBox);
   statusbar.appendChild(drawsBox);
+  statusbar.appendChild(bufferBox);
   statusbar.appendChild(fpsBox);
-  return { root, updaters: { posUpdate, sectorUpdate, drawsUpdate, fpsUpdate } };
+  return { root, updaters: { posUpdate, sectorUpdate, drawsUpdate, bufferUpdate, fpsUpdate } };
 }
 
 export class Statusbar extends MessageHandlerReflective {
@@ -77,6 +79,7 @@ export class Statusbar extends MessageHandlerReflective {
     sectorUpdate: (value: any) => void;
     drawsUpdate: (value: any) => void;
     fpsUpdate: (value: any) => void;
+    bufferUpdate: (value: any) => void;
   };
   private root: hElement;
 
@@ -97,9 +100,12 @@ export class Statusbar extends MessageHandlerReflective {
     const profile = this.profiler.frame();
     const draws = profile.counter('drawsRequested').get();
     const skips = profile.counter('drawsMerged').get();
+    const frameTime = profile.timer('Frame').get();
+    const bufferSize = this.profiler.global().counter('Buffer').get();
     this.updaters.posUpdate(view.x, view.y);
     this.updaters.sectorUpdate(view.sec);
-    this.updaters.fpsUpdate((1000 / profile.timer('Frame').get()).toFixed(0));
+    this.updaters.fpsUpdate((1000 / frameTime).toFixed(0));
     this.updaters.drawsUpdate(draws + ' / ' + (draws - skips));
+    this.updaters.bufferUpdate((bufferSize / 1024).toFixed(2) + 'k');
   }
 }

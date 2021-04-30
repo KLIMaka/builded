@@ -1,21 +1,21 @@
 view3d | CTRL+SHIFT+F       | show_files
 view3d | P                  | msg sectorcstat parallaxing true true
-view3d | SHIFT+RIGHT        | msg panrepeat 1 0 0 0 false
-view3d | SHIFT+LEFT         | msg panrepeat -1 0 0 0 false
-view3d | SHIFT+UP           | msg panrepeat 0 1 0 0 false
-view3d | SHIFT+DOWN         | msg panrepeat 0 -1 0 0 false
-view3d | RIGHT              | msg panrepeat 8 0 0 0 false
-view3d | LEFT               | msg panrepeat -8 0 0 0 false
-view3d | UP                 | msg panrepeat 0 8 0 0 false
-view3d | DOWN               | msg panrepeat 0 -8 0 0 false
-view3d | CTRL+RIGHT         | msg panrepeat 0 0 1 0 false
-view3d | CTRL+LEFT          | msg panrepeat 0 0 -1 0 false
-view3d | CTRL+UP            | msg panrepeat 0 0 0 1 false
-view3d | CTRL+DOWN          | msg panrepeat 0 0 0 -1 false
-view3d | CTRL+SHIFT+RIGHT   | msg panrepeat 0 0 8 0 false
-view3d | CTRL+SHIFT+LEFT    | msg panrepeat 0 0 -8 0 false
-view3d | CTRL+SHIFT+UP      | msg panrepeat 0 0 0 8 false
-view3d | CTRL+SHIFT+DOWN    | msg panrepeat 0 0 0 -8 false
+view3d | SHIFT+ARROWRIGHT   | msg panrepeat 1 0 0 0 false
+view3d | SHIFT+ARROWLEFT    | msg panrepeat -1 0 0 0 false
+view3d | SHIFT+ARROWUP      | msg panrepeat 0 1 0 0 false
+view3d | SHIFT+ARROWDOWN    | msg panrepeat 0 -1 0 0 false
+view3d | ARROWRIGHT         | msg panrepeat 8 0 0 0 false
+view3d | ARROWLEFT          | msg panrepeat -8 0 0 0 false
+view3d | ARROWUP            | msg panrepeat 0 8 0 0 false
+view3d | ARROWDOWN          | msg panrepeat 0 -8 0 0 false
+view3d | CTRL+ARROWRIGHT    | msg panrepeat 0 0 1 0 false
+view3d | CTRL+ARROWLEFT     | msg panrepeat 0 0 -1 0 false
+view3d | CTRL+ARROWUP       | msg panrepeat 0 0 0 1 false
+view3d | CTRL+ARROWDOWN     | msg panrepeat 0 0 0 -1 false
+view3d | CTRL+SHIFT+ARROWRIGHT   | msg panrepeat 0 0 8 0 false
+view3d | CTRL+SHIFT+ARROWLEFT    | msg panrepeat 0 0 -8 0 false
+view3d | CTRL+SHIFT+ARROWUP      | msg panrepeat 0 0 0 8 false
+view3d | CTRL+SHIFT+ARROWDOWN    | msg panrepeat 0 0 0 -8 false
 view3d | \                  | msg reset_panrepeat
 view3d | CTRL+\             | msg rotate 0 true
 view3d | O                  | msg pal 1 15 false
@@ -33,8 +33,8 @@ view3d | R                  | msg sectorcstat alignToFirstWall true true
 view3d | E                  | msg sectorcstat doubleSmooshiness true true
 view3d | C                  | msg spritecstat realCenter true true
 
-view3d | PAGE_UP            | fly
-view3d | PAGE_DOWN          | fall
+view3d | PAGEUP             | fly
+view3d | PAGEDOWN           | fall
 view3d | T                  | push_wall
 view3d | SHIFT+T            | push_wall_copy
 view3d | BACKSPACE          | push_wall_stop

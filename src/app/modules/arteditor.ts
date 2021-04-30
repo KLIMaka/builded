@@ -6,7 +6,7 @@ import { enumerate, range } from "../../utils/collections";
 import { drawToCanvas } from "../../utils/imgutils";
 import { create, lifecycle, Module, plugin } from "../../utils/injector";
 import { iter } from "../../utils/iter";
-import { int } from "../../utils/mathutils";
+import { clamp, int } from "../../utils/mathutils";
 import { palRasterizer, Rasterizer, rect, resize, superResize, transform } from "../../utils/pixelprovider";
 import { DrawPanel, RasterProvider } from "../../utils/ui/drawpanel";
 import { menuButton, search } from "../../utils/ui/renderers";
@@ -18,6 +18,8 @@ import { namedMessageHandler } from "../edit/messages";
 import { PicNumCallback } from "../edit/tools/selection";
 import { Palette, PicTags, PIC_TAGS, RAW_PAL, RAW_PLUs, TRANS_TABLE } from "./artselector";
 import { SHADOWSTEPS } from "./gl/buildgl";
+import { Sdf, sdf } from "../../app/modules/sdf/sdfraster";
+import { vec3, Vec3Array } from "../../libs_js/glmatrix";
 
 function createDrawPanel(arts: ArtInfoProvider, pal: Uint8Array, plu: (x: number) => number, canvas: HTMLCanvasElement, cb: PicNumCallback, iter: () => Iterable<number>) {
   const provider = new RasterProvider(1024 * 10, (i: number) => {
@@ -51,7 +53,7 @@ export class ArtEditor {
   private currentPlu = 0;
   private currentShadow = 0;
   private superSample = true;
-  private pluProvider = (x: number) => x == 255 ? 255 : this.plus[this.currentPlu].plu[this.currentShadow * 256 + x];
+  private pluProvider = (x: number) => (x >= 255 || x < 0) ? 255 : this.plus[this.currentPlu].plu[this.currentShadow * 256 + x];
   private rasterizer: Rasterizer<number>;
   private closeBlend = (l: number, r: number, doff: number) => Math.abs(l - r) <= 4 ? this.blendColors(l, r, doff) : null;
   private blend = (l: number, r: number, doff: number) => this.blendColors(l, r, doff);
@@ -211,7 +213,17 @@ export class ArtEditor {
     if (mainInfo == null || frameInfo == null) return;
     const scaledW = int(frameInfo.w * this.scale);
     const scaledH = int(frameInfo.h * this.scale);
-    const plued = transform(art(frameInfo), this.pluProvider);
+
+    const t = vec3.create();
+    const center = vec3.fromValues(0.8, 0.5, 0.5);
+    const center2 = vec3.fromValues(0.2, 0.5, 0.5);
+    const light = vec3.normalize(vec3.create(), vec3.fromValues(0, 0, -1));
+    const s: Sdf<number> = {
+      dist: (pos: Vec3Array) => Math.min(vec3.len(vec3.sub(t, pos, center2)) - 0.3, vec3.len(vec3.sub(t, pos, center)) - 0.4),
+      color: (pos: Vec3Array, normal: Vec3Array) => int(vec3.dot(normal, light) * 16),
+    }
+
+    const plued = transform(/*art(frameInfo)*/sdf(64, 64, s, 256), this.pluProvider);
     const img = this.superSample
       ? superResize(plued, scaledW, scaledH, this.closeBlend, this.blend)
       : resize(plued, scaledW, scaledH);

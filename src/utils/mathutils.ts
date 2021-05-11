@@ -34,6 +34,10 @@ export function clamp(x: number, min: number, max: number) {
   return x > max ? max : x < min ? min : x;
 }
 
+export function mix(x: number, y: number, d: number) {
+  return x + (y - x) * d;
+}
+
 export function trz(x: number) {
   x = int(x);
   if (x == 0) return 32;

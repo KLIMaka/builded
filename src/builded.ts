@@ -5,6 +5,7 @@ import { DefaultSetupModule, MainLoopConstructor } from './app/modules/context';
 import { DbFsModule } from './app/modules/fs/db';
 import { FileBrowserModule } from './app/modules/fs/manager';
 import { ArtEditorModule } from './app/modules/arteditor';
+import { PainterModule } from './app/modules/painter';
 import { PhotonUiModule } from './app/modules/photonui';
 import { animate, createContextFromCanvas } from './utils/gl/gl';
 import { App, instance, plugin, provider } from './utils/injector';
@@ -24,6 +25,7 @@ app.install(BloodModule);
 app.install(PhotonUiModule);
 app.install(FileBrowserModule);
 app.install(ArtEditorModule);
+app.install(PainterModule);
 app.bind(plugin('MainLoop'), provider(async injector => {
   const mainLoop = await MainLoopConstructor(injector);
   animate(gl, (_, time) => mainLoop.frame(time));

@@ -88,7 +88,6 @@ export class ArtEditor {
         .endGroup()
         .widget(search('Search', s => this.oracle(s))))
       .build();
-    this.window.hide();
   }
 
   public stop() { this.window.destroy() }
@@ -217,7 +216,7 @@ export class ArtEditor {
     const t = vec3.create();
     const center = vec3.fromValues(0.8, 0.5, 0.5);
     const center2 = vec3.fromValues(0.2, 0.5, 0.5);
-    const light = vec3.normalize(vec3.create(), vec3.fromValues(0, 0, -1));
+    const light = vec3.normalize(vec3.create(), vec3.fromValues(0.1, 0.3, -1));
     const s: Sdf<number> = {
       dist: (pos: Vec3Array) => Math.min(vec3.len(vec3.sub(t, pos, center2)) - 0.3, vec3.len(vec3.sub(t, pos, center)) - 0.4),
       color: (pos: Vec3Array, normal: Vec3Array) => int(vec3.dot(normal, light) * 16),

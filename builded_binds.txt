@@ -71,6 +71,7 @@ view3d | SHIFT+mouse0       | add_selection
 view3d | CTRL+D             | clear_selection
 view3d | ALT+N              | new_board
 view3d | CTRL+SHIFT+A       | show_artedit
+view3d | CTRL+SHIFT+P       | show_painter
 view3d | CTRL+ALT+T         | show_tasks
 view3d | F11                | toggle_draw_portals
 view3d | F9                 | add_mount

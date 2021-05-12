@@ -101,8 +101,8 @@ class Model {
     ctx.clearRect(0, 0, w, h);
 
     const point = this.findPoint();
-    ctx.fillStyle = 'rgba(256,256,256,1)';
-    ctx.strokeStyle = 'rgba(256,256,256,1)';
+    ctx.fillStyle = 'rgba(127,127,127,1)';
+    ctx.strokeStyle = 'rgba(127,127,127,1)';
     for (const p of this.points) {
       const x = p[0] * w;
       const y = p[1] * h;
@@ -150,8 +150,6 @@ class Painter {
   private handle: TaskHandle;
   private center1: number;
   private center2: number;
-  private r1: number;
-  private r2: number;
   private light: number;
 
   constructor(private ui: Ui, private scheduler: Scheduler) {
@@ -166,11 +164,9 @@ class Painter {
       .content(view)
       .build();
 
-    this.center1 = this.model.addPoint(0.5, 0.5, 0.5);
-    this.center2 = this.model.addPoint(0.5, 0.5, 0.5);
-    this.r1 = this.model.addPoint(0.2, 0.5, 0.5);
-    this.r2 = this.model.addPoint(0.2, 0.5, 0.5);
-    this.light = this.model.addPoint(0.5, 0.0, -0.5);
+    this.center1 = this.model.addPoint(0.3, 0.5, 0.5);
+    this.center2 = this.model.addPoint(0.8, 0.5, 0.5);
+    this.light = this.model.addPoint(0.5, 0.0, 0.2);
   }
 
   private createCanvases(): HTMLElement {
@@ -192,44 +188,52 @@ class Painter {
 
   private * render(): SchedulerTask {
     const ctx = this.display.getContext('2d');
-    const t = vec3.create();
-    const t1 = vec3.create();
-    const t2 = vec3.create();
-    const t3 = vec3.create();
+    const toLight = vec3.create();
+    const curpos = vec3.create();
+    const move = vec3.create();
     const center1 = this.model.getPoint(this.center1);
     const center2 = this.model.getPoint(this.center2);
-    const r1p = this.model.getPoint(this.r1);
-    const r2p = this.model.getPoint(this.r2);
-    const r1 = len2d(center1[0] - r1p[0], center1[1] - r1p[1]);
-    const r2 = len2d(center2[0] - r2p[0], center2[1] - r2p[1]);
     const light = this.model.getPoint(this.light);
     const s: Sdf<number> = {
-      // dist: (pos: Vec3Array) => sunion(pos, p => vec3.len(vec3.sub(t, p, center2)) - 0.3, p => vec3.len(vec3.sub(t, p, center1)) - 0.5, 0.04),
-      dist: (pos: Vec3Array) => sunion(pos, p => vec3.len(vec3.sub(t, p, center2)) - 0.3, p => 0.5 - p[2], 0.04),
-      color: (pos: Vec3Array, normal: Vec3Array) => {
-        vec3.sub(t, light, pos);
-        const maxl = vec3.len(t);
-        vec3.normalize(t, t);
-        vec3.copy(t1, t);
-        const diffuse = 20 + int(clamp(vec3.dot(normal, t), 0, 1) * 127)
-        vec3.copy(t3, light);
-        let mind = Number.MAX_VALUE;
+      dist: (pos: Vec3Array) => sunion(pos, p => sunion(p, p => vec3.distance(p, center1) - 0.2, p => vec3.distance(p, center2) - 0.2, 0.04), p => 0.5 - p[2], 0.004),
 
-        let l = 0;
-        for (; ;) {
-          if (l >= maxl) break;
-          const d = s.dist(t3);
-          if (d <= 0) {
-            mind = 0;
+      color: (pos: Vec3Array, normal: Vec3Array) => {
+        vec3.sub(toLight, light, pos);
+        vec3.normalize(toLight, toLight);
+        vec3.scale(move, toLight, 0.0001);
+        vec3.add(curpos, pos, move);
+        let shadow = 1.0;
+        let ph = 1e10;
+        for (let l = 0.0001; l < 4;) {
+          const d = s.dist(curpos);
+          if (d <= 1e-5) {
+            shadow = 0.0;
             break;
           }
+          const y = d * d / (2 * ph);
+          const z = Math.sqrt(d * d - y * y);
+          shadow = Math.min(shadow, 10 * z / Math.max(0.0, l - y) / l);
+          ph = d;
           l += d;
-          if (d < mind) mind = d;
-          vec3.scale(t2, t1, -d);
-          vec3.add(t3, t3, t2);
-          if (d < 1e-5 && Math.abs(l - maxl) > 1e-4) return 20;
+          vec3.scale(move, toLight, l);
+          vec3.add(curpos, pos, move);
         }
-        return clamp(diffuse - int(clamp(1 - mind, 0, 1) * 60), 0, 255);
+
+        const r = clamp(shadow, 0, 1);
+        const rr = r * r * (3 - 2 * r);
+        let occ = 0;
+        let sca = 1;
+        for (let i = 0; i < 5; i++) {
+          const h = 0.001 + 0.15 * i / 4.0;
+          vec3.scale(curpos, normal, h);
+          vec3.add(curpos, pos, curpos);
+          const d = s.dist(curpos)
+          occ += (h - d) * sca;
+          sca *= 0.95;
+        }
+        const ao = clamp(1 - 1.5 * occ, 0, 1);
+
+        return int(20 + clamp(vec3.dot(normal, toLight), 0, 1) * 200 * ao * rr);
       }
     }
 

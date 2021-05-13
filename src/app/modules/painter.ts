@@ -18,7 +18,7 @@ import { namedMessageHandler } from "../edit/messages";
 import { PicNumCallback } from "../edit/tools/selection";
 import { Palette, PicTags, PIC_TAGS, RAW_PAL, RAW_PLUs, TRANS_TABLE } from "./artselector";
 import { SHADOWSTEPS } from "./gl/buildgl";
-import { Sdf, sdf, sintersect, ssub, sub, sunion, union } from "../../app/modules/sdf/sdfraster";
+import { Sdf, sdf, softShadow, sintersect, ssub, sub, sunion, union, ambientOcclusion, lambert, normal } from "../../app/modules/sdf/sdfraster";
 import { vec2, vec3, Vec3Array } from "../../libs_js/glmatrix";
 import { VecStack3d } from "../../utils/vecstack";
 
@@ -167,7 +167,7 @@ class Painter {
 
     this.center1 = this.model.addPoint(0.3, 0.5, 0.5);
     this.center2 = this.model.addPoint(0.8, 0.5, 0.5);
-    this.light = this.model.addPoint(0.5, 0.0, 0.2);
+    this.light = this.model.addPoint(0.5, 0.0, 0.0);
   }
 
   private createCanvases(): HTMLElement {
@@ -194,49 +194,23 @@ class Painter {
     const center2 = vecs.pushVec(this.model.getPoint(this.center2));
     const light = vecs.pushVec(this.model.getPoint(this.light));
     const s: Sdf<number> = {
-      dist: (vecs: VecStack3d, pos: number) => sunion(vecs, pos,
-        (vecs, p) => sunion(vecs, p,
-          (vecs, p) => vecs.distance(p, center1) - 0.2,
-          (vecs, p) => vecs.distance(p, center2) - 0.2, 0.04),
-        (vecs, p) => 0.5 - p[2], 0.004),
+      // dist: (vecs: VecStack3d, pos: number) => 0.5 - vecs.get(pos)[2],
+      dist: (vecs: VecStack3d, pos: number) =>
+        ssub(vecs, pos,
+          (vecs, p) => sunion(vecs, p,
+            (vecs, p) => vecs.distance(p, center1) - 0.2,
+            (vecs, p) => vecs.distance(p, center2) - 0.2, 0.04),
+          (vecs, p) => 0.5 - vecs.get(p)[2], 0.004),
 
-      color: (vecs: VecStack3d, pos: number, normal: number) => {
+      color: (vecs: VecStack3d, pos: number) => {
+        vecs.start();
+        const n = normal(vecs, pos, s.dist);
         const toLight = vecs.normalized(vecs.sub(light, pos));
-        const curpos = vecs.add(pos, vecs.scale(toLight, 0.0001));
-        let shadow = 1.0;
-        let ph = 1e10;
-        for (let l = 0.0001; l < 4;) {
-          vecs.start();
-          const d = s.dist(vecs, curpos);
-          if (d <= 1e-5) {
-            shadow = 0.0;
-            break;
-          }
-          const y = d * d / (2 * ph);
-          const z = Math.sqrt(d * d - y * y);
-          shadow = Math.min(shadow, 10 * z / Math.max(0.0, l - y) / l);
-          ph = d;
-          l += d;
-          vecs.copy(curpos, vecs.add(pos, vecs.scale(toLight, l)));
-          vecs.stop();
-        }
-        const r = clamp(shadow, 0, 1);
-        const rr = r * r * (3 - 2 * r);
-
-
-        let occ = 0;
-        let sca = 1;
-        for (let i = 0; i < 5; i++) {
-          vecs.start();
-          const h = 0.001 + 0.15 * i / 4.0;
-          const d = s.dist(vecs, vecs.add(pos, vecs.scale(normal, h)))
-          occ += (h - d) * sca;
-          sca *= 0.95;
-          vecs.stop();
-        }
-        const ao = clamp(1 - 1.5 * occ, 0, 1);
-
-        return int(20 + clamp(vecs.dot(normal, toLight), 0, 1) * 200 * ao * rr);
+        const shadow = softShadow(8, vecs, pos, toLight, s.dist);
+        const ao = ambientOcclusion(vecs, pos, n, s.dist);
+        const lamb = lambert(vecs, n, toLight);
+        vecs.stop();
+        return int(clamp(20 + lamb * 200 * ao * shadow, 0, 255));
       }
     }
 
@@ -244,7 +218,9 @@ class Painter {
     for (let scale = 32; scale >= 1; scale /= 2) {
       for (let y = 0; y < 10; y++) {
         for (let x = 0; x < 10; x++) {
-          drawToCanvas(sdf(vecs, 64, 64, s, 0, x * 64, y * 64, 10), ctx, grayRasterizer(scale), x * 64, y * 64);
+          const img = sdf(vecs.start(), 64, 64, s, 0, x * 64, y * 64, 10);
+          drawToCanvas(img, ctx, grayRasterizer(scale), x * 64, y * 64);
+          vecs.stop();
         }
         handle = yield;
       }

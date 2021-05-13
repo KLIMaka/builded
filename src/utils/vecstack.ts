@@ -11,7 +11,7 @@ export class VecStack3d {
     for (let i = 0; i < size; i++) this.stack.push(vec3.create());
   }
 
-  start() { this.tops.push(this.currentTop); this.lastTop = this.currentTop }
+  start(): VecStack3d { this.tops.push(this.currentTop); this.lastTop = this.currentTop; return this }
   stop() { this.currentTop = this.tops.pop(); this.lastTop = this.currentTop }
   return(id: number): number { this.stop(); return this.pushVec(this.stack[id]) }
   reset() { this.currentTop = this.lastTop }

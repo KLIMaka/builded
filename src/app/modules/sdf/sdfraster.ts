@@ -31,59 +31,80 @@ export function sintersect(vecs: VecStack3d, pos: number, s1: SdfShape, s2: SdfS
   return mix(d2, d1, h) + k * h * (1 - h);
 }
 
+export function softShadow(penumbra: number, vecs: VecStack3d, pos: number, toLight: number, s: SdfShape): number {
+  let shadow = 1.0;
+  let ph = 1e20;
+  let l = 0.01;
+  for (let i = 0; i < 32; i++) {
+    const d = s(vecs, vecs.start().add(pos, vecs.scale(toLight, l)));
+    vecs.stop();
+    const y = d * d / (2.0 * ph);
+    const z = Math.sqrt(d * d - y * y);
+    shadow = Math.min(shadow, penumbra * z / Math.max(0.0, l - y));
+    // shadow = Math.min(shadow, penumbra * d / l)
+    ph = d;
+    l += d;
+    if (d <= 0.0001) { shadow = 0.0; break }
+    if (l > 1) break;
+  }
+  const r = clamp(shadow, 0.0, 1.0);
+  return r * r * (3.0 - 2.0 * r);
+}
 
+export function ambientOcclusion(vecs: VecStack3d, pos: number, normal: number, s: SdfShape): number {
+  let occ = 0;
+  let sca = 1;
+  for (let i = 0; i < 5; i++) {
+    const h = 0.001 + 0.15 * i / 4.0;
+    const d = s(vecs, vecs.start().add(pos, vecs.scale(normal, h)))
+    vecs.stop();
+    occ += (h - d) * sca;
+    sca *= 0.95;
+  }
+  return clamp(1 - 1.5 * occ, 0, 1);
+}
+
+export function lambert(vecs: VecStack3d, normal: number, toLight: number): number {
+  return clamp(vecs.dot(normal, toLight), 0, 1)
+}
+
+const H = 0.001;
+export function normal(vecs: VecStack3d, pos: number, s: SdfShape): number {
+  return vecs.start().return(vecs.normalized(
+    vecs.push(
+      s(vecs, vecs.add(pos, vecs.push(H, 0, 0))) - s(vecs, vecs.add(pos, vecs.push(-H, 0, 0))),
+      s(vecs, vecs.add(pos, vecs.push(0, H, 0))) - s(vecs, vecs.add(pos, vecs.push(0, -H, 0))),
+      s(vecs, vecs.add(pos, vecs.push(0, 0, H))) - s(vecs, vecs.add(pos, vecs.push(0, 0, -H))),
+    )
+  ));
+}
 
 export type Sdf<T> = {
   dist: (vecs: VecStack3d, pos: number) => number;
-  color: (vecs: VecStack3d, pos: number, normal: number) => T;
+  color: (vecs: VecStack3d, pos: number) => T;
 }
 
 class SdfRaster<P> implements Raster<P> {
-  private posId: number;
+  private pos: number;
   private dx: number;
   private dy: number;
-  private h = 0.00001;
 
   constructor(private vecs: VecStack3d, readonly width: number, readonly height: number, private sdf: Sdf<P>, private bg: P, private xoff = 0, private yoff = 0, private d = 1) {
     this.dx = 1 / (this.width * d);
     this.dy = 1 / (this.height * d);
-    this.posId = this.vecs.pushVec(vec3.create());
+    this.pos = this.vecs.pushVec(vec3.create());
   }
 
   pixel(x: number, y: number): P {
-    this.vecs.set(this.posId, (x + this.xoff) * this.dx, (y + this.yoff) * this.dy, 0);
-    const pos = this.vecs.get(this.posId);
+    this.vecs.set(this.pos, (x + this.xoff) * this.dx, (y + this.yoff) * this.dy, 0);
+    const pos = this.vecs.get(this.pos);
     for (let i = 0; i < 100; i++) {
       if (pos[2] >= 1) break;
-      const dist = this.getDist(this.posId);
-      if (dist <= 1e-4) {
-        this.vecs.start();
-        const color = this.sdf.color(this.vecs, this.posId, this.normal());
-        this.vecs.stop();
-        return color;
-      }
+      const dist = this.sdf.dist(this.vecs, this.pos);
+      if (dist <= 1e-4) return this.sdf.color(this.vecs, this.pos);
       pos[2] += dist;
     }
     return this.bg;
-  }
-
-  private getDist(pos: number): number {
-    this.vecs.start();
-    const dist = this.sdf.dist(this.vecs, pos);
-    this.vecs.stop();
-    return dist;
-  }
-
-  private normal(): number {
-    const vecs = this.vecs;
-    vecs.start();
-    return vecs.return(vecs.normalized(
-      vecs.push(
-        this.getDist(vecs.add(this.posId, vecs.push(this.h, 0, 0))) - this.getDist(vecs.add(this.posId, vecs.push(-this.h, 0, 0))),
-        this.getDist(vecs.add(this.posId, vecs.push(0, this.h, 0))) - this.getDist(vecs.add(this.posId, vecs.push(0, -this.h, 0))),
-        this.getDist(vecs.add(this.posId, vecs.push(0, 0, this.h))) - this.getDist(vecs.add(this.posId, vecs.push(0, 0, -this.h))),
-      )
-    ));
   }
 }
 

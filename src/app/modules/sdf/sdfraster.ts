@@ -31,21 +31,33 @@ export function sintersect(vecs: VecStack3d, pos: number, s1: SdfShape, s2: SdfS
   return mix(d2, d1, h) + k * h * (1 - h);
 }
 
+export function sphere(vecs: VecStack3d, pos: number, center: number, r: number): number {
+  return vecs.distance(pos, center) - r;
+}
+
 export function softShadow(penumbra: number, vecs: VecStack3d, pos: number, toLight: number, s: SdfShape): number {
   let shadow = 1.0;
   let ph = 1e20;
   let l = 0.01;
+  let radius = l;
   for (let i = 0; i < 32; i++) {
     const d = s(vecs, vecs.start().add(pos, vecs.scale(toLight, l)));
     vecs.stop();
-    const y = d * d / (2.0 * ph);
-    const z = Math.sqrt(d * d - y * y);
-    shadow = Math.min(shadow, penumbra * z / Math.max(0.0, l - y));
+    // const y = d * d / (2.0 * ph);
+    // const z = Math.sqrt(d * d - y * y);
+    // shadow = Math.min(shadow, penumbra * z / Math.max(0.0, l - y));
     // shadow = Math.min(shadow, penumbra * d / l)
-    ph = d;
+    // ph = d;
+    // l += d;
+    // if (d <= 0.0001) { shadow = 0.0; break }
+    // if (l > 1) break;
+
+    shadow = Math.min(shadow, penumbra * d / radius);
+    radius += clamp(d, 0.02, 0.1);
     l += d;
     if (d <= 0.0001) { shadow = 0.0; break }
     if (l > 1) break;
+
   }
   const r = clamp(shadow, 0.0, 1.0);
   return r * r * (3.0 - 2.0 * r);
@@ -68,7 +80,7 @@ export function lambert(vecs: VecStack3d, normal: number, toLight: number): numb
   return clamp(vecs.dot(normal, toLight), 0, 1)
 }
 
-const H = 0.001;
+const H = 0.0001;
 export function normal(vecs: VecStack3d, pos: number, s: SdfShape): number {
   return vecs.start().return(vecs.normalized(
     vecs.push(

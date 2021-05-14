@@ -2442,15 +2442,12 @@ td:last-child {
 }
 
 
-
-
-
 .tippy-box[data-animation=fade][data-state=hidden] {
 	opacity: 0
 }
 
 [data-tippy-root] {
-	max-width: calc(100vw - 10px)
+	max-width: calc(200vw - 10px)
 }
 
 .tippy-box {

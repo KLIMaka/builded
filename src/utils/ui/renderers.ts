@@ -164,3 +164,37 @@ function menu(input: HTMLElement, suggestContainer: HTMLElement) {
     appendTo: document.body
   });
 }
+
+
+export type SliderModel = {
+  label: string,
+  min: number,
+  max: number,
+  def: number,
+  setValue(value: number): void,
+}
+
+export function sliderToolbarButton(model: SliderModel) {
+  const widgetTemplate = h`<div class="popup-widget">
+  <label>${model.label}</label>
+  <input type="range" min="${model.min}" max="${model.max}" value="${model.def}" style="vertical-align: middle; margin-right:10px" #range>
+  <input type="number" min="${model.min}" max="${model.max}" value="${model.def}" step="1" class="input-widget" #box>
+</div>`;
+  const buttonTemplate = h`<button class="btn btn-default btn-dropdown">${model.label} ${model.def}</button>`;
+  const widget = <HTMLElement>widgetTemplate.cloneNode(true);
+  const { range, box } = widgetTemplate.collect(widget);
+  const btn = <HTMLElement>buttonTemplate.cloneNode(true);
+  tippy(btn, {
+    content: widget, maxWidth: 500, allowHTML: true, placement: 'bottom-start', trigger: 'click', interactive: true, arrow: false, offset: [0, 0], duration: 100, appendTo: document.body
+  });
+  const setValue = (value: number) => {
+    range.value = value;
+    box.value = value;
+    btn.textContent = `${model.label} ${value}`;
+    model.setValue(value);
+  }
+  range.oninput = () => setValue(range.value);
+  box.oninput = () => setValue(box.value);
+  return btn;
+}
+

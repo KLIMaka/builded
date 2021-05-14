@@ -9,7 +9,7 @@ import { iter } from "../../utils/iter";
 import { clamp, int, len2d } from "../../utils/mathutils";
 import { palRasterizer, Raster, Rasterizer, rect, resize, superResize, transform } from "../../utils/pixelprovider";
 import { DrawPanel, RasterProvider } from "../../utils/ui/drawpanel";
-import { menuButton, search } from "../../utils/ui/renderers";
+import { menuButton, search, sliderToolbarButton } from "../../utils/ui/renderers";
 import { addDragController, div } from "../../utils/ui/ui";
 import { ART, Scheduler, SCHEDULER, SchedulerTask, TaskHandle } from "../apis/app";
 import { BUS, busDisconnector } from "../apis/handler";
@@ -18,7 +18,7 @@ import { namedMessageHandler } from "../edit/messages";
 import { PicNumCallback } from "../edit/tools/selection";
 import { Palette, PicTags, PIC_TAGS, RAW_PAL, RAW_PLUs, TRANS_TABLE } from "./artselector";
 import { SHADOWSTEPS } from "./gl/buildgl";
-import { Sdf, sdf, softShadow, sintersect, ssub, sub, sunion, union, ambientOcclusion, lambert, normal } from "../../app/modules/sdf/sdfraster";
+import { Sdf, sdf, softShadow, sintersect, ssub, sub, sunion, union, ambientOcclusion, lambert, normal, sphere } from "../../app/modules/sdf/sdfraster";
 import { vec2, vec3, Vec3Array } from "../../libs_js/glmatrix";
 import { VecStack3d } from "../../utils/vecstack";
 
@@ -69,6 +69,7 @@ class Model {
     canvas.addEventListener('mousemove', e => this.move(e.offsetX, e.offsetY));
     canvas.addEventListener('mousedown', e => this.drag())
     canvas.addEventListener('mouseup', e => this.drop())
+    this.redraw();
   }
 
   addPoint(x: number, y: number, z: number): number {
@@ -147,39 +148,98 @@ class Painter {
   private window: Window;
   private display: HTMLCanvasElement;
   private overlay: HTMLCanvasElement;
+  private sidebarRight: HTMLElement;
+  private sidebarLeft: HTMLElement;
   private model: Model;
   private handle: TaskHandle;
   private center1: number;
   private center2: number;
   private light: number;
 
+  private ambientValue = 20;
+  private lightValue = 120;
+  private shadowHardness = 8;
+
   constructor(private ui: Ui, private scheduler: Scheduler) {
-    const view = this.createCanvases();
+    const view = this.createView();
     this.model = new Model(this.overlay, () => this.redraw());
     this.window = ui.builder.window()
       .title('Painter')
       .draggable(true)
       .closeable(true)
       .centered(true)
-      .size(640, 640)
+      .size(1081, 640)
       .content(view)
+      .toolbar(ui.builder.toolbar()
+        .startGroup()
+        .widget(this.createAmbientSlider())
+        .widget(this.createLightSlider())
+        .widget(this.createShadowHardnessSlider())
+        .endGroup()
+      )
       .build();
 
     this.center1 = this.model.addPoint(0.3, 0.5, 0.5);
-    this.center2 = this.model.addPoint(0.8, 0.5, 0.5);
+    this.center2 = this.model.addPoint(0.7, 0.5, 0.5);
     this.light = this.model.addPoint(0.5, 0.0, 0.0);
   }
 
-  private createCanvases(): HTMLElement {
-    const template = h`<div style="position: relative;">
-    <canvas width="640" height="640" style="position: absolute; left: 0; top: 0" #display></canvas>
-    <canvas width="640" height="640" style="position: absolute; left: 0; top: 0" #overlay></canvas>
+  private createView(): HTMLElement {
+    const template = h` 
+    <div class='pane-group'>
+      <div class='pane pane-sm sidebar' #sidebarleft></div>
+      <div class='pane' style="position: relative;">
+        <canvas width="640" height="640" style="position: absolute; left: 0; top: 0" #display></canvas>
+        <canvas width="640" height="640" style="position: absolute; left: 0; top: 0" #overlay></canvas>    
+      </div>
+      <div class='pane pane-sm sidebar' #sidebarright></div>
     </div>`;
     const widget = <HTMLElement>template.cloneNode(true);
-    const { overlay, display } = template.collect(widget);
+    const { overlay, display, sidebarleft, sidebarright } = template.collect(widget);
     this.display = display;
     this.overlay = overlay;
+    this.sidebarLeft = sidebarleft;
+    this.sidebarRight = sidebarright;
     return widget;
+  }
+
+  private createAmbientSlider() {
+    return sliderToolbarButton({
+      label: "Ambient",
+      min: 0,
+      max: 255,
+      def: this.ambientValue,
+      setValue: value => {
+        this.ambientValue = value;
+        this.redraw();
+      }
+    })
+  }
+
+  private createLightSlider() {
+    return sliderToolbarButton({
+      label: "Light",
+      min: 0,
+      max: 255,
+      def: this.lightValue,
+      setValue: value => {
+        this.lightValue = value;
+        this.redraw();
+      }
+    })
+  }
+
+  private createShadowHardnessSlider() {
+    return sliderToolbarButton({
+      label: "Shadow Hardness",
+      min: 1,
+      max: 128,
+      def: this.shadowHardness,
+      setValue: value => {
+        this.shadowHardness = value;
+        this.redraw();
+      }
+    })
   }
 
   private redraw() {
@@ -198,19 +258,21 @@ class Painter {
       dist: (vecs: VecStack3d, pos: number) =>
         ssub(vecs, pos,
           (vecs, p) => sunion(vecs, p,
-            (vecs, p) => vecs.distance(p, center1) - 0.2,
-            (vecs, p) => vecs.distance(p, center2) - 0.2, 0.04),
-          (vecs, p) => 0.5 - vecs.get(p)[2], 0.004),
+            (vecs, p) => sphere(vecs, p, center1, 0.2),
+            (vecs, p) => sphere(vecs, p, center2, 0.2), 0.04),
+          (vecs, p) => 0.5 - vecs.get(p)[2], 0.04),
 
       color: (vecs: VecStack3d, pos: number) => {
         vecs.start();
         const n = normal(vecs, pos, s.dist);
         const toLight = vecs.normalized(vecs.sub(light, pos));
-        const shadow = softShadow(8, vecs, pos, toLight, s.dist);
+        const shadow = softShadow(this.shadowHardness, vecs, pos, toLight, s.dist);
         const ao = ambientOcclusion(vecs, pos, n, s.dist);
         const lamb = lambert(vecs, n, toLight);
         vecs.stop();
-        return int(clamp(20 + lamb * 200 * ao * shadow, 0, 255));
+        const ambient = this.ambientValue * ao;
+        const diffuse = this.lightValue * shadow * lamb;
+        return int(clamp(ambient + diffuse, 0, 255));
       }
     }
 
@@ -221,8 +283,8 @@ class Painter {
           const img = sdf(vecs.start(), 64, 64, s, 0, x * 64, y * 64, 10);
           drawToCanvas(img, ctx, grayRasterizer(scale), x * 64, y * 64);
           vecs.stop();
+          handle = yield;
         }
-        handle = yield;
       }
     }
   }

@@ -6,7 +6,7 @@ import { enumerate, map, range } from "../../utils/collections";
 import { drawToCanvas } from "../../utils/imgutils";
 import { create, lifecycle, Module, plugin } from "../../utils/injector";
 import { iter } from "../../utils/iter";
-import { bilinear, clamp, int, len2d } from "../../utils/mathutils";
+import { bilinear, clamp, int, len2d, octaves2d, perlin2d } from "../../utils/mathutils";
 import { palRasterizer, Raster, Rasterizer, rect, resize, superResize, transform } from "../../utils/pixelprovider";
 import { DrawPanel, RasterProvider } from "../../utils/ui/drawpanel";
 import { menuButton, search, sliderToolbarButton } from "../../utils/ui/renderers";
@@ -161,8 +161,7 @@ class Painter {
   private lightValue = 120;
   private shadowHardness = 16;
 
-  private noiseSize = 64;
-  private noise: (x: number, y: number) => number;
+  private noise = octaves2d(perlin2d, 4);
 
   constructor(private ui: Ui, private scheduler: Scheduler) {
     const view = this.createView();
@@ -186,8 +185,6 @@ class Painter {
     this.center1 = this.model.addPoint(0.3, 0.5, 0.5);
     this.center2 = this.model.addPoint(0.7, 0.5, 0.5);
     this.light = this.model.addPoint(0.5, 0.0, 0.0);
-
-    this.noise = bilinear(this.noiseSize, this.noiseSize, [...map(range(0, this.noiseSize * this.noiseSize), i => Math.random())], NumberInterpolator);
   }
 
   private createView(): HTMLElement {
@@ -265,7 +262,7 @@ class Painter {
           (vecs, p) => sphere(vecs, p, center2, 0.2),
           (vecs, p) => sunion(vecs, p,
             (vecs, p) => sphere(vecs, p, center1, 0.2),
-            (vecs, p) => 0.5 + 0.0005 * this.noise(vecs.get(p)[0] * 10, vecs.get(p)[1] * 10) - vecs.get(p)[2], 0.04), 0.004),
+            (vecs, p) => 0.5 + 0.01 * this.noise(vecs.get(p)[0] * 16, vecs.get(p)[1] * 16) - vecs.get(p)[2], 0.04), 0.004),
 
       color: (vecs: VecStack3d, pos: number) => {
         vecs.start();
@@ -292,6 +289,8 @@ class Painter {
         }
       }
     }
+    // const n = octaves2d(perlin2d, 4);
+    // drawToCanvas({ width: 640, height: 640, pixel: (x, y) => (1 + n(x / 64, y / 64)) * 127 }, ctx, grayRasterizer(1));
   }
 
   public stop() { this.window.destroy() }

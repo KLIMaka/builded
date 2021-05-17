@@ -1,5 +1,5 @@
 import { NumberInterpolator } from "../src/utils/interpolator";
-import { bilinear } from "../src/utils/mathutils";
+import { bilinear, perlin2d } from "../src/utils/mathutils";
 
 test('interpolator', () => {
   const arr = [1, 2, 2, 1];

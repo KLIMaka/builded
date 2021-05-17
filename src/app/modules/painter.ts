@@ -262,12 +262,12 @@ class Painter {
           (vecs, p) => sphere(vecs, p, center2, 0.2),
           (vecs, p) => sunion(vecs, p,
             (vecs, p) => sphere(vecs, p, center1, 0.2),
-            (vecs, p) => 0.5 + 0.01 * this.noise(vecs.get(p)[0] * 16, vecs.get(p)[1] * 16) - vecs.get(p)[2], 0.04), 0.004),
+            (vecs, p) => 0.5 - 0.02 * clamp(this.noise(vecs.get(p)[0] * 16, vecs.get(p)[1] * 16), -0.1, 1) - vecs.get(p)[2], 0.04), 0.004),
 
       color: (vecs: VecStack3d, pos: number) => {
         vecs.start();
         const n = normal(vecs, pos, s.dist);
-        const toLight = vecs.normalized(vecs.sub(light, pos));
+        const toLight = vecs.normalized(vecs.sub(light, vecs.push(0.5, 0.5, 0.5)));
         const shadow = softShadow(this.shadowHardness, vecs, pos, toLight, s.dist);
         const ao = ambientOcclusion(vecs, pos, n, s.dist);
         const lamb = lambert(vecs, n, toLight);
@@ -279,14 +279,16 @@ class Painter {
     }
 
     let handle = yield;
-    for (let scale = 32; scale >= 1; scale /= 2) {
-      for (let y = 0; y < 10; y++) {
-        for (let x = 0; x < 10; x++) {
-          const img = sdf(vecs.start(), 64, 64, s, 0, x * 64, y * 64, 10);
-          drawToCanvas(img, ctx, grayRasterizer(scale), x * 64, y * 64);
-          vecs.stop();
-          handle = yield;
-        }
+    const img = sdf(vecs.start(), 640, 640, s, 0);
+    drawToCanvas(img, ctx, grayRasterizer(10));
+    vecs.stop();
+    handle = yield;
+    for (let y = 0; y < 10; y++) {
+      for (let x = 0; x < 10; x++) {
+        const img = sdf(vecs.start(), 64, 64, s, 0, x * 64, y * 64, 10);
+        drawToCanvas(img, ctx, grayRasterizer(1), x * 64, y * 64);
+        vecs.stop();
+        handle = yield;
       }
     }
     // const n = octaves2d(perlin2d, 4);

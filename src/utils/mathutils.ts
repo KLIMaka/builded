@@ -1,3 +1,5 @@
+import { Interpolator } from "./interpolator";
+
 export const radsInDeg = 180 / Math.PI;
 export const degInRad = Math.PI / 180;
 export const PI2 = Math.PI * 2;
@@ -182,5 +184,28 @@ export function memoize<T, U>(f: (t: T) => U) {
       cache.set(t, cached);
     }
     return cached;
+  }
+}
+
+
+export function bilinear<T>(w: number, h: number, data: T[], inter: Interpolator<T>) {
+  const hx = 1 / (w * 2);
+  const hy = 1 / (h * 2);
+  return (x: number, y: number): T => {
+    x = fract(x);
+    y = fract(y);
+    const cx = Math.floor((x - hx) * w);
+    const cy = Math.floor((y - hy) * h);
+    const cx0 = cyclic(cx, w);
+    const cx1 = cyclic(cx + 1, w);
+    const cy0 = cyclic(cy, h) * w;
+    const cy1 = cyclic(cy + 1, h) * w;
+    const r1 = data[cx0 + cy0];
+    const r2 = data[cx1 + cy0];
+    const r3 = data[cx0 + cy1];
+    const r4 = data[cx1 + cy1];
+    const fracx = (x - (cx + 0.5) / w) * w;
+    const fracy = (y - (cy + 0.5) / h) * h;
+    return inter(inter(r1, r2, fracx), inter(r3, r4, fracx), fracy);
   }
 }

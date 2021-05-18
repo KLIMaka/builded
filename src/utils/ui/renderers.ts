@@ -4,6 +4,7 @@ import { iter } from "../iter";
 import { div, Element, replaceContent, span, Table, tag } from "./ui";
 import h from "stage0";
 import { map } from "../collections";
+import { PreFrame } from "../../app/edit/messages";
 
 export type ColumnRenderer<T> = (value: T) => Element;
 
@@ -176,10 +177,8 @@ export type SliderModel = {
 
 export function sliderToolbarButton(model: SliderModel) {
   const widgetTemplate = h`<div class="popup-widget">
-  <label>${model.label}</label>
   <input type="range" min="${model.min}" max="${model.max}" value="${model.def}" style="vertical-align: middle; margin-right:10px" #range>
-  <input type="number" min="${model.min}" max="${model.max}" value="${model.def}" step="1" class="input-widget" #box>
-</div>`;
+  <input type="number" min="${model.min}" max="${model.max}" value="${model.def}" step="1" class="input-widget" #box></div>`;
   const buttonTemplate = h`<button class="btn btn-default btn-dropdown">${model.label} ${model.def}</button>`;
   const widget = <HTMLElement>widgetTemplate.cloneNode(true);
   const { range, box } = widgetTemplate.collect(widget);
@@ -196,5 +195,78 @@ export function sliderToolbarButton(model: SliderModel) {
   range.oninput = () => setValue(range.value);
   box.oninput = () => setValue(box.value);
   return btn;
+}
+
+export type NavItem1 = {
+  title: string,
+  setSelect: (cb: (select: boolean) => void) => void,
+};
+
+export type NavTreeModel = {
+  title: string,
+  items: NavItem1[],
+  setOnCnange: (cb: () => void) => void,
+  select: (item: NavItem1) => void;
+};
+
+const navGroupTemplate1 = h`<nav class='nav-group'><h5 class='nav-group-title'>#title</h5></nav>`;
+const navGroupItemTemplate1 = h`<span class="nav-group-item" #navitem><span class="icon" #icon></span>#text</span>`;
+export function navTree(root: HTMLElement, model: NavTreeModel): void {
+  const render = () => {
+    const group = <HTMLElement>navGroupTemplate1.cloneNode(true);
+    const { title } = navGroupTemplate1.collect(group);
+    title.nodeValue = model.title;
+    for (const item of model.items) {
+      const itemRoot = navGroupItemTemplate1.cloneNode(true);
+      const { icon, text, navitem } = navGroupItemTemplate1.collect(itemRoot);
+      text.nodeValue = item.title;
+      icon.classList.add('icon-record');
+      navitem.onclick = _ => model.select(item);
+      item.setSelect(s => { if (s) navitem.classList.add('active'); else navitem.classList.remove('active') });
+      group.appendChild(itemRoot);
+    }
+    replaceContent(root, group);
+  }
+  render();
+  model.setOnCnange(render);
+}
+
+export type Property = {
+  label: string,
+  widget: () => HTMLElement
+}
+
+export function textProp(label: string, change: (value: string) => void, value: string): Property {
+  const template = h`<input type="text" value="${value}" class="input-widget" style="max-width:100px">`;
+  const widget = () => {
+    const root = <HTMLInputElement>template.cloneNode(true);
+    root.oninput = () => change(root.value);
+    return root;
+  }
+  return { label, widget }
+}
+
+export function rangeProp(label: string, min: number, max: number, change: (value: number) => void, value: number): Property {
+  const template = h`<input type="range" min="${min}" max="${max} value"${value}" style="vertical-align: middle;">`;
+  const widget = () => {
+    const root = <HTMLInputElement>template.cloneNode(true);
+    root.oninput = () => change(Number.parseInt(root.value));
+    return root;
+  }
+  return { label, widget }
+}
+
+const propertiesTemplate = h`<div style="padding:10px 5px"></div>`;
+const propertyTemplate = h`<div><span style="padding:0px 5px; width:100px">#label</span><span #widget></span></div>`;
+export function properties(properties: Property[]): HTMLElement {
+  const props = <HTMLElement>propertiesTemplate.cloneNode(true);
+  for (const p of properties) {
+    const prop = propertyTemplate.cloneNode(true);
+    const { label, widget } = propertyTemplate.collect(prop);
+    label.nodeValue = p.label;
+    widget.appendChild(p.widget());
+    props.appendChild(prop);
+  }
+  return props;
 }
 

@@ -9,8 +9,8 @@ import { iter } from "../../utils/iter";
 import { bilinear, clamp, int, len2d, octaves2d, perlin2d } from "../../utils/mathutils";
 import { palRasterizer, Raster, Rasterizer, rect, resize, superResize, transform } from "../../utils/pixelprovider";
 import { DrawPanel, RasterProvider } from "../../utils/ui/drawpanel";
-import { menuButton, search, sliderToolbarButton } from "../../utils/ui/renderers";
-import { addDragController, div } from "../../utils/ui/ui";
+import { menuButton, NavItem, NavItem1, navTree, NavTreeModel, properties, rangeProp, search, sliderToolbarButton, textProp } from "../../utils/ui/renderers";
+import { addDragController, div, replaceContent } from "../../utils/ui/ui";
 import { ART, Scheduler, SCHEDULER, SchedulerTask, TaskHandle } from "../apis/app";
 import { BUS, busDisconnector } from "../apis/handler";
 import { Ui, UI, Window } from "../apis/ui";
@@ -144,6 +144,37 @@ class Model {
   }
 }
 
+class Model1Item implements NavItem1 {
+  private selectCallback: (select: boolean) => void;
+
+  constructor(public title: string) { }
+
+  setSelect(cb: (select: boolean) => void) { this.selectCallback = cb }
+  select(selected: boolean) { this.selectCallback(selected) }
+}
+
+class Model1 implements NavTreeModel {
+  items: NavItem1[] = [];
+  title = "Shapes";
+  private changeCallback: () => void;
+  private selected: Model1Item = null;
+
+  setOnCnange(cb: () => void) { this.changeCallback = cb }
+
+  select(item: Model1Item) {
+    if (this.selected == item) return;
+    if (this.selected != null) this.selected.select(false);
+    item.select(true);
+    this.selected = item;
+  }
+
+  add(title: string) {
+    const item = new Model1Item(title);
+    this.items.push(item);
+    this.changeCallback();
+  }
+}
+
 
 class Painter {
   private window: Window;
@@ -203,6 +234,15 @@ class Painter {
     this.overlay = overlay;
     this.sidebarLeft = sidebarleft;
     this.sidebarRight = sidebarright;
+
+    const shapes = new Model1();
+    navTree(sidebarleft, shapes);
+    shapes.add('Shape1')
+    shapes.add('Shape2')
+    shapes.add('Shape3')
+    shapes.add('Shape4')
+
+    replaceContent(this.sidebarRight, properties([textProp('Label1', s => { }, "123"), rangeProp('Range', 0, 100, v => { }, 50)]));
     return widget;
   }
 

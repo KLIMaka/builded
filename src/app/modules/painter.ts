@@ -9,7 +9,7 @@ import { iter } from "../../utils/iter";
 import { bilinear, clamp, int, len2d, octaves2d, perlin2d } from "../../utils/mathutils";
 import { palRasterizer, Raster, Rasterizer, rect, resize, superResize, transform } from "../../utils/pixelprovider";
 import { DrawPanel, RasterProvider } from "../../utils/ui/drawpanel";
-import { menuButton, NavItem, NavItem1, navTree, NavTreeModel, properties, rangeProp, search, sliderToolbarButton, textProp } from "../../utils/ui/renderers";
+import { menuButton, NavItem, NavItem1, navTree, NavTreeModel, properties, rangeProp, search, sliderToolbarButton, textProp, ValueHandleIml } from "../../utils/ui/renderers";
 import { addDragController, div, replaceContent } from "../../utils/ui/ui";
 import { ART, Scheduler, SCHEDULER, SchedulerTask, TaskHandle } from "../apis/app";
 import { BUS, busDisconnector } from "../apis/handler";
@@ -188,9 +188,9 @@ class Painter {
   private center2: number;
   private light: number;
 
-  private ambientValue = 20;
-  private lightValue = 120;
-  private shadowHardness = 16;
+  private ambientValue = new ValueHandleIml(20);
+  private lightValue = new ValueHandleIml(160);
+  private shadowHardness = new ValueHandleIml(16);
 
   private noise = octaves2d(perlin2d, 4);
 
@@ -216,6 +216,10 @@ class Painter {
     this.center1 = this.model.addPoint(0.3, 0.5, 0.5);
     this.center2 = this.model.addPoint(0.7, 0.5, 0.5);
     this.light = this.model.addPoint(0.5, 0.0, 0.0);
+
+    this.ambientValue.addListener(v => this.redraw());
+    this.lightValue.addListener(v => this.redraw());
+    this.shadowHardness.addListener(v => this.redraw());
   }
 
   private createView(): HTMLElement {
@@ -242,47 +246,25 @@ class Painter {
     shapes.add('Shape3')
     shapes.add('Shape4')
 
-    replaceContent(this.sidebarRight, properties([textProp('Label1', s => { }, "123"), rangeProp('Range', 0, 100, v => { }, 50)]));
+    replaceContent(this.sidebarRight,
+      properties([
+        rangeProp('Ambient', 0, 255, this.ambientValue),
+        rangeProp('Light', 0, 255, this.lightValue),
+        rangeProp('Shadows', 1, 128, this.shadowHardness)
+      ]));
     return widget;
   }
 
   private createAmbientSlider() {
-    return sliderToolbarButton({
-      label: "Ambient",
-      min: 0,
-      max: 255,
-      def: this.ambientValue,
-      setValue: value => {
-        this.ambientValue = value;
-        this.redraw();
-      }
-    })
+    return sliderToolbarButton({ label: "Ambient", min: 0, max: 255, handle: this.ambientValue })
   }
 
   private createLightSlider() {
-    return sliderToolbarButton({
-      label: "Light",
-      min: 0,
-      max: 255,
-      def: this.lightValue,
-      setValue: value => {
-        this.lightValue = value;
-        this.redraw();
-      }
-    })
+    return sliderToolbarButton({ label: "Light", min: 0, max: 255, handle: this.lightValue })
   }
 
   private createShadowHardnessSlider() {
-    return sliderToolbarButton({
-      label: "Shadow Hardness",
-      min: 1,
-      max: 128,
-      def: this.shadowHardness,
-      setValue: value => {
-        this.shadowHardness = value;
-        this.redraw();
-      }
-    })
+    return sliderToolbarButton({ label: "Shadow Hardness", min: 1, max: 128, handle: this.shadowHardness })
   }
 
   private redraw() {
@@ -308,12 +290,12 @@ class Painter {
         vecs.start();
         const n = normal(vecs, pos, s.dist);
         const toLight = vecs.normalized(vecs.sub(light, vecs.push(0.5, 0.5, 0.5)));
-        const shadow = softShadow(this.shadowHardness, vecs, pos, toLight, s.dist);
+        const shadow = softShadow(this.shadowHardness.get(), vecs, pos, toLight, s.dist);
         const ao = ambientOcclusion(vecs, pos, n, s.dist);
         const lamb = lambert(vecs, n, toLight);
         vecs.stop();
-        const ambient = this.ambientValue * ao;
-        const diffuse = this.lightValue * shadow * lamb;
+        const ambient = this.ambientValue.get() * ao;
+        const diffuse = this.lightValue.get() * shadow * lamb;
         return int(clamp(ambient + diffuse, 0, 255));
       }
     }

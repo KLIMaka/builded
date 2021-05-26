@@ -5,6 +5,7 @@ import { div, Element, replaceContent, span, Table, tag } from "./ui";
 import h from "stage0";
 import { map } from "../collections";
 import { PreFrame } from "../../app/edit/messages";
+import { createVertexBuffer } from "../gl/bufferimpl";
 
 export type ColumnRenderer<T> = (value: T) => Element;
 
@@ -171,27 +172,27 @@ export type SliderModel = {
   label: string,
   min: number,
   max: number,
-  def: number,
-  setValue(value: number): void,
+  handle: ValueHandle<number>,
 }
 
 export function sliderToolbarButton(model: SliderModel) {
   const widgetTemplate = h`<div class="popup-widget">
-  <input type="range" min="${model.min}" max="${model.max}" value="${model.def}" style="vertical-align: middle; margin-right:10px" #range>
-  <input type="number" min="${model.min}" max="${model.max}" value="${model.def}" step="1" class="input-widget" #box></div>`;
-  const buttonTemplate = h`<button class="btn btn-default btn-dropdown">${model.label} ${model.def}</button>`;
+  <input type="range" min="${model.min}" max="${model.max}" value="${model.handle.get()}" style="vertical-align: middle; margin-right:10px" #range>
+  <input type="number" min="${model.min}" max="${model.max}" value="${model.handle.get()}" step="1" class="input-widget" #box></div>`;
+  const buttonTemplate = h`<button class="btn btn-default btn-dropdown">${model.label} ${model.handle.get()}</button>`;
   const widget = <HTMLElement>widgetTemplate.cloneNode(true);
   const { range, box } = widgetTemplate.collect(widget);
   const btn = <HTMLElement>buttonTemplate.cloneNode(true);
   tippy(btn, {
     content: widget, maxWidth: 500, allowHTML: true, placement: 'bottom-start', trigger: 'click', interactive: true, arrow: false, offset: [0, 0], duration: 100, appendTo: document.body
   });
-  const setValue = (value: number) => {
+  const setValue = (value: number, handle = true) => {
     range.value = value;
     box.value = value;
     btn.textContent = `${model.label} ${value}`;
-    model.setValue(value);
+    if (handle) model.handle.set(value);
   }
+  model.handle.addListener(v => setValue(v, false))
   range.oninput = () => setValue(range.value);
   box.oninput = () => setValue(box.value);
   return btn;
@@ -236,37 +237,74 @@ export type Property = {
   widget: () => HTMLElement
 }
 
-export function textProp(label: string, change: (value: string) => void, value: string): Property {
-  const template = h`<input type="text" value="${value}" class="input-widget" style="max-width:100px">`;
+export function textProp(label: string, handle: ValueHandle<string>): Property {
+  const template = h`<input type="text" value="${handle.get()}" class="input-widget" style="max-width:100px">`;
   const widget = () => {
     const root = <HTMLInputElement>template.cloneNode(true);
-    root.oninput = () => change(root.value);
+    root.oninput = () => handle.set(root.value);
+    handle.addListener(v => root.value = v);
     return root;
   }
   return { label, widget }
 }
 
-export function rangeProp(label: string, min: number, max: number, change: (value: number) => void, value: number): Property {
-  const template = h`<input type="range" min="${min}" max="${max} value"${value}" style="vertical-align: middle;">`;
+export function rangeProp(label: string, min: number, max: number, handle: ValueHandle<number>): Property {
+  const model: SliderModel = { min, max, handle, label: "" };
   const widget = () => {
-    const root = <HTMLInputElement>template.cloneNode(true);
-    root.oninput = () => change(Number.parseInt(root.value));
-    return root;
+    return sliderToolbarButton(model)
   }
   return { label, widget }
 }
 
-const propertiesTemplate = h`<div style="padding:10px 5px"></div>`;
-const propertyTemplate = h`<div><span style="padding:0px 5px; width:100px">#label</span><span #widget></span></div>`;
+const propertiesTemplate = h`<div class="properties"></div>`;
+const propertyLabel = h`<div class="label"><span>#label</span></div>`
+const propertyWidget = h`<div class="widget"></div>`;
 export function properties(properties: Property[]): HTMLElement {
   const props = <HTMLElement>propertiesTemplate.cloneNode(true);
   for (const p of properties) {
-    const prop = propertyTemplate.cloneNode(true);
-    const { label, widget } = propertyTemplate.collect(prop);
+    const labelRoot = propertyLabel.cloneNode(true);
+    const { label } = propertyLabel.collect(labelRoot);
+    const widgetRoot = propertyWidget.cloneNode(true);
     label.nodeValue = p.label;
-    widget.appendChild(p.widget());
-    props.appendChild(prop);
+    widgetRoot.appendChild(p.widget());
+    props.appendChild(labelRoot);
+    props.appendChild(widgetRoot);
   }
   return props;
+}
+
+const closeableTemplate = h`<div class="closeable"><div class="title">#title</div><div class="container" #container></div></div>`;
+export function closeable(label: string, closed: boolean) {
+  const root = <HTMLElement>closeableTemplate.cloneNode(true);
+  const { title, container } = closeableTemplate.collect(root);
+  title.nodeValue = label;
+  const toggle = () => {
+    closed = !closed;
+    if (closed) root.classList.add('closed');
+    else root.classList.remove('closed')
+  }
+  title.onlick = toggle();
+  return { root, container };
+}
+
+export type ChangeCallback<T> = (value: T) => void;
+export type ValueHandle<T> = {
+  set(value: T): void;
+  get(): T;
+  addListener(cb: ChangeCallback<T>): void;
+}
+
+export class ValueHandleIml<T> implements ValueHandle<T> {
+  private cbs: ChangeCallback<T>[] = [];
+
+  constructor(private value: T) { }
+
+  set(value: T): void {
+    this.value = value;
+    this.cbs.forEach(cb => cb(value));
+  }
+
+  get(): T { return this.value }
+  addListener(cb: ChangeCallback<T>): void { this.cbs.push(cb) }
 }
 

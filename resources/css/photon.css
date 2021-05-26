@@ -2530,3 +2530,24 @@ td:last-child {
 	padding: 0px;
 	z-index: 1
 }
+
+
+.properties {
+  display: grid;
+  grid-template-columns: 70px 1fr;
+  grid-gap: 10px;
+  width: 100%;
+  padding: 5px 0px;
+  font-size: 12px;
+}
+
+.properties .span {
+  grid-column: 1 / span 2;
+  height: 2px;
+  background: black;
+}
+
+.properties .label {
+  text-align: right;
+  align-self: end;
+}

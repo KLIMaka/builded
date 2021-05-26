@@ -4,6 +4,7 @@ export const radsInDeg = 180 / Math.PI;
 export const degInRad = Math.PI / 180;
 export const PI2 = Math.PI * 2;
 export const EPS = 1e-9;
+export const HASH = (Math.sqrt(5) - 1) / 2;
 
 export function eq(lh: number, rh: number) {
   return Math.abs(lh - rh) < EPS;
@@ -187,24 +188,53 @@ export function memoize<T, U>(f: (t: T) => U) {
   }
 }
 
-export function bilinear<T>(w: number, h: number, data: T[], inter: Interpolator<T>) {
-  const hx = 1 / (w * 2);
-  const hy = 1 / (h * 2);
+export function quadratic(x0: number, x1: number, x2: number, t: number) {
+  const a2 = (x2 - x0) * 2 - (x1 - x0) * 4;
+  const a1 = (x1 - x0) * 2 - a2 * 0.5;
+  const a0 = x0;
+  return a0 + a1 * t + a2 * t * t;
+}
+
+export function biquad(w: number, h: number, data: number[], wrap: (x: number, max: number) => number = cyclic) {
+  return (x: number, y: number): number => {
+    const sx = x * w;
+    const sy = y * h;
+    const cx = Math.round(sx - 0.5);
+    const cy = Math.round(sy - 0.5);
+    const cx0 = wrap(cx - 1, w);
+    const cx1 = wrap(cx + 0, w);
+    const cx2 = wrap(cx + 1, w);
+    const cy0 = wrap(cy - 1, h) * w;
+    const cy1 = wrap(cy + 0, h) * w;
+    const cy2 = wrap(cy + 1, h) * w;
+
+    const fracx = (0.25 + 0.5 * (sx - cx));
+    const fracy = (0.25 + 0.5 * (sy - cy));
+
+    const q0 = quadratic(data[cx0 + cy0], data[cx1 + cy0], data[cx2 + cy0], fracx);
+    const q1 = quadratic(data[cx0 + cy1], data[cx1 + cy1], data[cx2 + cy1], fracx);
+    const q2 = quadratic(data[cx0 + cy2], data[cx1 + cy2], data[cx2 + cy2], fracx);
+
+    return quadratic(q0, q1, q2, fracy);
+  }
+}
+
+export function bilinear<T>(w: number, h: number, data: T[], inter: Interpolator<T>, wrap: (x: number, max: number) => number = cyclic) {
   return (x: number, y: number): T => {
-    x = fract(x);
-    y = fract(y);
-    const cx = Math.floor((x - hx) * w);
-    const cy = Math.floor((y - hy) * h);
-    const cx0 = cyclic(cx, w);
-    const cx1 = cyclic(cx + 1, w);
-    const cy0 = cyclic(cy, h) * w;
-    const cy1 = cyclic(cy + 1, h) * w;
+    const sx = x * w;
+    const sy = y * h;
+    const cx = Math.floor(sx - 0.5);
+    const cy = Math.floor(sy - 0.5);
+    const cx0 = wrap(cx, w);
+    const cx1 = wrap(cx + 1, w);
+    const cy0 = wrap(cy, h) * w;
+    const cy1 = wrap(cy + 1, h) * w;
     const r1 = data[cx0 + cy0];
     const r2 = data[cx1 + cy0];
     const r3 = data[cx0 + cy1];
     const r4 = data[cx1 + cy1];
-    const fracx = w * x - cx - 0.5;
-    const fracy = h * y - cy - 0.5;
+    const fracx = (sx - cx - 0.5);
+    const fracy = (sy - cy - 0.5);
     return inter(inter(r1, r2, fracx), inter(r3, r4, fracx), fracy);
   }
 }
@@ -239,10 +269,12 @@ function grad2d(hash: number, x: number, y: number) {
 }
 
 export function perlin2d(x: number, y: number) {
-  const X = Math.floor(x) & 255;
-  const Y = Math.floor(y) & 255;
-  x -= Math.floor(x);
-  y -= Math.floor(y);
+  const intx = Math.floor(x);
+  const inty = Math.floor(y);
+  const X = intx & 255;
+  const Y = inty & 255;
+  x -= intx;
+  y -= inty;
   const u = fade(x);
   const v = fade(y);
   const A = perlin[X] + Y;
@@ -257,13 +289,14 @@ export function perlin2d(x: number, y: number) {
     v);
 }
 
+
 export function octaves2d(f: (x: number, y: number) => number, octaves: number) {
   return (x: number, y: number) => {
     let sum = 0;
     let norm = 0;
     for (let i = 1; i <= octaves; i++) {
-      sum += f(x * i, y * i) * (1 / i);
-      norm += 1 / i;
+      sum += f(x * i, y * i) * (1 / Math.pow(2, i - 1));
+      norm += (1 / Math.pow(2, i - 1));
     }
     return sum / norm;
   }

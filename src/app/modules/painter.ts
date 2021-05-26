@@ -2,11 +2,11 @@ import h from "stage0";
 import tippy from "tippy.js";
 import { art } from "../../build/artraster";
 import { animate, ArtInfoProvider } from "../../build/formats/art";
-import { enumerate, map, range } from "../../utils/collections";
+import { enumerate, forEach, map, range } from "../../utils/collections";
 import { drawToCanvas } from "../../utils/imgutils";
 import { create, lifecycle, Module, plugin } from "../../utils/injector";
 import { iter } from "../../utils/iter";
-import { bilinear, clamp, int, len2d, octaves2d, perlin2d } from "../../utils/mathutils";
+import { bilinear, biquad, clamp, int, len2d, octaves2d, perlin2d } from "../../utils/mathutils";
 import { palRasterizer, Raster, Rasterizer, rect, resize, superResize, transform } from "../../utils/pixelprovider";
 import { DrawPanel, RasterProvider } from "../../utils/ui/drawpanel";
 import { menuButton, NavItem, NavItem1, navTree, NavTreeModel, properties, rangeProp, search, sliderToolbarButton, textProp } from "../../utils/ui/renderers";
@@ -242,7 +242,10 @@ class Painter {
     shapes.add('Shape3')
     shapes.add('Shape4')
 
-    replaceContent(this.sidebarRight, properties([textProp('Label1', s => { }, "123"), rangeProp('Range', 0, 100, v => { }, 50)]));
+    replaceContent(this.sidebarRight, properties([
+      textProp('Label1', s => { }, "123"),
+      rangeProp('Range', 0, 100, v => { }, 50)
+    ]));
     return widget;
   }
 
@@ -302,7 +305,7 @@ class Painter {
           (vecs, p) => sphere(vecs, p, center2, 0.2),
           (vecs, p) => sunion(vecs, p,
             (vecs, p) => sphere(vecs, p, center1, 0.2),
-            (vecs, p) => 0.5 - 0.02 * clamp(this.noise(vecs.get(p)[0] * 16, vecs.get(p)[1] * 16), -0.1, 1) - vecs.get(p)[2], 0.04), 0.004),
+            (vecs, p) => 0.5 - 0.05 * this.noise(vecs.get(p)[0] * 16, vecs.get(p)[1] * 16) - vecs.get(p)[2], 0.04), 0.004),
 
       color: (vecs: VecStack3d, pos: number) => {
         vecs.start();
@@ -318,21 +321,22 @@ class Painter {
       }
     }
 
-    let handle = yield;
-    const img = sdf(vecs.start(), 640, 640, s, 0);
-    drawToCanvas(img, ctx, grayRasterizer(10));
-    vecs.stop();
-    handle = yield;
-    for (let y = 0; y < 10; y++) {
-      for (let x = 0; x < 10; x++) {
-        const img = sdf(vecs.start(), 64, 64, s, 0, x * 64, y * 64, 10);
-        drawToCanvas(img, ctx, grayRasterizer(1), x * 64, y * 64);
-        vecs.stop();
-        handle = yield;
-      }
-    }
-    // const n = octaves2d(perlin2d, 4);
-    // drawToCanvas({ width: 640, height: 640, pixel: (x, y) => (1 + n(x / 64, y / 64)) * 127 }, ctx, grayRasterizer(1));
+    // let handle = yield;
+    // const img = sdf(vecs.start(), 640, 640, s, 0);
+    // drawToCanvas(img, ctx, grayRasterizer(10));
+    // vecs.stop();
+    // handle = yield;
+    // for (let y = 0; y < 10; y++) {
+    //   for (let x = 0; x < 10; x++) {
+    //     const img = sdf(vecs.start(), 64, 64, s, 0, x * 64, y * 64, 10);
+    //     drawToCanvas(img, ctx, grayRasterizer(1), x * 64, y * 64);
+    //     vecs.stop();
+    //     handle.setProgress(x + y * 10);
+    //     handle = yield;
+    //   }
+    // }
+    const n = biquad(16, 16, [...map(range(0, 16 * 16), i => Math.random())]);
+    drawToCanvas({ width: 640, height: 640, pixel: (x, y) => n(x / 640, y / 640) * 256 }, ctx, grayRasterizer(1));
   }
 
   public stop() { this.window.destroy() }

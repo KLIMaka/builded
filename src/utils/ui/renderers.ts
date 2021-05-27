@@ -92,7 +92,7 @@ interface SuggestionModel {
 }
 
 const suggestTemplate = h`
-<button class="btn btn-default btn-mini pull-right" #button>
+<button class="btn btn-default btn-mini dropdown-list" #button>
   <span class="icon hidden" #icon></span>
   <input type="text" class="toolbar-control" #input>
 </button>
@@ -107,6 +107,7 @@ export function search(hint: string, ico: string, oracle: Oracle<string>, handle
     icon.classList.remove('hidden');
     icon.classList.add(ico);
   }
+  if (!trackInput) button.classList.add('btn-dropdown');
   const suggestContainer = div('suggest').elem();
   let suggestModel: SuggestionModel = null;
   const suggestions = menu(input, suggestContainer);
@@ -124,6 +125,7 @@ export function search(hint: string, ico: string, oracle: Oracle<string>, handle
   }
   input.oninput = () => { if (trackInput) handle.set(input.value); update(oracle(input.value)); }
   input.placeholder = hint;
+  input.value = handle.get();
   input.addEventListener('keydown', e => {
     if (e.key == 'ArrowDown') suggestModel.shift(1)
     else if (e.key == 'ArrowUp') suggestModel.shift(-1)
@@ -259,10 +261,13 @@ export function textProp(label: string, handle: ValueHandle<string>): Property {
 
 export function rangeProp(label: string, min: number, max: number, handle: ValueHandle<number>): Property {
   const model: SliderModel = { min, max, handle, label: "" };
-  const widget = () => {
-    return sliderToolbarButton(model)
-  }
+  const widget = () => sliderToolbarButton(model)
   return { label, widget }
+}
+
+export function listProp(label: string, handle: ValueHandle<string>): Property {
+  const widget = () => search("", null, _ => ['One', 'Two', 'Three'], handle);
+  return { label, widget };
 }
 
 const propertiesTemplate = h`<div class="properties"></div>`;

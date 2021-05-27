@@ -2378,6 +2378,10 @@ td:last-child {
   margin-right:10px;
 }
 
+.dropdown-list input {
+  width:100px;
+}
+
 
 .menu {
   padding: 4px 0px;

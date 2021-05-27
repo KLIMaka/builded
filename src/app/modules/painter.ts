@@ -9,7 +9,7 @@ import { iter } from "../../utils/iter";
 import { bilinear, biquad, clamp, int, len2d, octaves2d, perlin2d } from "../../utils/mathutils";
 import { palRasterizer, Raster, Rasterizer, rect, resize, superResize, transform } from "../../utils/pixelprovider";
 import { DrawPanel, RasterProvider } from "../../utils/ui/drawpanel";
-import { menuButton, NavItem, NavItem1, navTree, NavTreeModel, properties, rangeProp, search, sliderToolbarButton, textProp, ValueHandleIml } from "../../utils/ui/renderers";
+import { listProp, menuButton, NavItem, NavItem1, navTree, NavTreeModel, properties, rangeProp, search, sliderToolbarButton, textProp, ValueHandleIml } from "../../utils/ui/renderers";
 import { addDragController, div, replaceContent } from "../../utils/ui/ui";
 import { ART, Scheduler, SCHEDULER, SchedulerTask, TaskHandle } from "../apis/app";
 import { BUS, busDisconnector } from "../apis/handler";
@@ -191,6 +191,7 @@ class Painter {
   private ambientValue = new ValueHandleIml(20);
   private lightValue = new ValueHandleIml(160);
   private shadowHardness = new ValueHandleIml(16);
+  private fff = new ValueHandleIml("One");
 
   private noise = octaves2d(perlin2d, 4);
 
@@ -250,7 +251,8 @@ class Painter {
       properties([
         rangeProp('Ambient', 0, 255, this.ambientValue),
         rangeProp('Light', 0, 255, this.lightValue),
-        rangeProp('Shadows', 1, 128, this.shadowHardness)
+        rangeProp('Shadows', 1, 128, this.shadowHardness),
+        listProp('List', this.fff)
       ]));
     return widget;
   }
@@ -278,13 +280,14 @@ class Painter {
     const center1 = vecs.pushVec(this.model.getPoint(this.center1));
     const center2 = vecs.pushVec(this.model.getPoint(this.center2));
     const light = vecs.pushVec(this.model.getPoint(this.light));
+
     const s: Sdf<number> = {
       dist: (vecs: VecStack3d, pos: number) =>
-        ssub(vecs, pos,
+        ssub(0.04)(vecs, pos,
           (vecs, p) => sphere(vecs, p, center2, 0.2),
-          (vecs, p) => sunion(vecs, p,
+          (vecs, p) => sunion(0.04)(vecs, p,
             (vecs, p) => sphere(vecs, p, center1, 0.2),
-            (vecs, p) => 0.5 - 0.05 * this.noise(vecs.get(p)[0] * 16, vecs.get(p)[1] * 16) - vecs.get(p)[2], 0.04), 0.004),
+            (vecs, p) => 0.5 - 0.05 * this.noise(vecs.get(p)[0] * 16, vecs.get(p)[1] * 16) - vecs.get(p)[2])),
 
       color: (vecs: VecStack3d, pos: number) => {
         vecs.start();

@@ -3,9 +3,7 @@ import { MenuBuilder } from "../../app/apis/ui";
 import { iter } from "../iter";
 import { div, Element, replaceContent, span, Table, tag } from "./ui";
 import h from "stage0";
-import { map } from "../collections";
-import { PreFrame } from "../../app/edit/messages";
-import { createVertexBuffer } from "../gl/bufferimpl";
+import { map, take } from "../collections";
 
 export type ColumnRenderer<T> = (value: T) => Element;
 
@@ -95,25 +93,36 @@ interface SuggestionModel {
 
 const suggestTemplate = h`
 <button class="btn btn-default btn-mini pull-right" #button>
-  <span class="icon icon-search"></span>
+  <span class="icon hidden" #icon></span>
   <input type="text" class="toolbar-control" #input>
 </button>
 `;
 
 export type Oracle<T> = (s: string) => Iterable<T>;
 
-export function search(hint: string, oracle: Oracle<string>): HTMLElement {
+export function search(hint: string, ico: string, oracle: Oracle<string>, handle: ValueHandle<string>, trackInput = false): HTMLElement {
   const root = suggestTemplate.cloneNode(true);
-  const { button, input } = suggestTemplate.collect(root);
+  const { button, input, icon } = suggestTemplate.collect(root);
+  if (ico != null) {
+    icon.classList.remove('hidden');
+    icon.classList.add(ico);
+  }
   const suggestContainer = div('suggest').elem();
   let suggestModel: SuggestionModel = null;
   const suggestions = menu(input, suggestContainer);
+  suggestions.setProps({ onHide: () => { input.value = handle.get() } })
+  const setValue = (value: string, handleChange = true) => {
+    input.value = value;
+    suggestions.hide();
+    if (handleChange) handle.set(value);
+  }
+  handle.addListener(v => setValue(v, false));
   const update = (items: Iterable<string>) => {
-    suggestModel = sugggestionsMenu(map(items, (i: string) => <[string, () => void]>[i, () => { input.value = i; oracle(i); suggestions.hide() }]));
+    suggestModel = sugggestionsMenu(map(items, (i: string) => <[string, () => void]>[i, () => setValue(i)]));
     replaceContent(suggestContainer, suggestModel.widget);
     suggestions.show();
   }
-  input.oninput = () => update(oracle(input.value));
+  input.oninput = () => { if (trackInput) handle.set(input.value); update(oracle(input.value)); }
   input.placeholder = hint;
   input.addEventListener('keydown', e => {
     if (e.key == 'ArrowDown') suggestModel.shift(1)
@@ -121,7 +130,7 @@ export function search(hint: string, oracle: Oracle<string>): HTMLElement {
     else if (e.key == 'Enter') suggestModel.select()
     else if (e.key == 'Escape') suggestions.hide()
   });
-  button.onclick = () => { input.value = ''; update(oracle('')) };
+  button.onclick = () => update(oracle(''));
   return button;
 }
 

@@ -1,35 +1,37 @@
-import { Raster } from '../../../utils/pixelprovider';
-import { vec3, Vec3Array } from '../../../libs_js/glmatrix';
+import { vec3 } from '../../../libs_js/glmatrix';
 import { clamp, mix } from '../../../utils/mathutils';
+import { Raster } from '../../../utils/pixelprovider';
 import { VecStack3d } from '../../../utils/vecstack';
 
-
 export type SdfShape = (vecs: VecStack3d, pos: number) => number;
+export type DistanceOperation = (d1: number, d2: number) => number;
 
-export function union(vecs: VecStack3d, pos: number, s1: SdfShape, s2: SdfShape) { return Math.min(s1(vecs, pos), s2(vecs, pos)) }
-export function sub(vecs: VecStack3d, pos: number, s1: SdfShape, s2: SdfShape) { return Math.max(-s1(vecs, pos), s2(vecs, pos)) }
-export function intersect(vecs: VecStack3d, pos: number, s1: SdfShape, s2: SdfShape) { return Math.max(s1(vecs, pos), s2(vecs, pos)) }
+export function SdfReducer(op: DistanceOperation) {
+  return (vecs: VecStack3d, pos: number, s1: SdfShape, s2: SdfShape) => {
+    const d1 = s1(vecs, pos);
+    const d2 = s2(vecs, pos);
+    return op(d1, d2);
+  }
+}
 
-export function sunion(vecs: VecStack3d, pos: number, s1: SdfShape, s2: SdfShape, k: number) {
-  const d1 = s1(vecs, pos);
-  const d2 = s2(vecs, pos);
+export const union = SdfReducer(Math.min);
+export const sub = SdfReducer((d1, d2) => Math.max(-d1, d2));
+export const intersect = SdfReducer(Math.max);
+
+export const sunion = (k: number) => SdfReducer((d1, d2) => {
   const h = clamp(0.5 + 0.5 * (d2 - d1) / k, 0, 1);
   return mix(d2, d1, h) - k * h * (1 - h);
-}
+});
 
-export function ssub(vecs: VecStack3d, pos: number, s1: SdfShape, s2: SdfShape, k: number) {
-  const d1 = s1(vecs, pos);
-  const d2 = s2(vecs, pos);
+export const ssub = (k: number) => SdfReducer((d1, d2) => {
   const h = clamp(0.5 - 0.5 * (d2 + d1) / k, 0, 1);
   return mix(d2, -d1, h) + k * h * (1 - h);
-}
+});
 
-export function sintersect(vecs: VecStack3d, pos: number, s1: SdfShape, s2: SdfShape, k: number) {
-  const d1 = s1(vecs, pos);
-  const d2 = s2(vecs, pos);
+export const sintersect = (k: number) => SdfReducer((d1, d2) => {
   const h = clamp(0.5 - 0.5 * (d2 - d1) / k, 0, 1);
   return mix(d2, d1, h) + k * h * (1 - h);
-}
+})
 
 export function sphere(vecs: VecStack3d, pos: number, center: number, r: number): number {
   return vecs.distance(pos, center) - r;

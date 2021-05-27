@@ -1,15 +1,13 @@
-import h from "stage0";
-import tippy from "tippy.js";
 import { art } from "../../build/artraster";
 import { animate, ArtInfoProvider } from "../../build/formats/art";
 import { enumerate, range } from "../../utils/collections";
 import { drawToCanvas } from "../../utils/imgutils";
 import { create, lifecycle, Module, plugin } from "../../utils/injector";
 import { iter } from "../../utils/iter";
-import { clamp, int } from "../../utils/mathutils";
+import { int } from "../../utils/mathutils";
 import { palRasterizer, Rasterizer, rect, resize, superResize, transform } from "../../utils/pixelprovider";
 import { DrawPanel, RasterProvider } from "../../utils/ui/drawpanel";
-import { menuButton, search } from "../../utils/ui/renderers";
+import { menuButton, search, sliderToolbarButton, ValueHandleIml } from "../../utils/ui/renderers";
 import { addDragController, div } from "../../utils/ui/ui";
 import { ART } from "../apis/app";
 import { BUS, busDisconnector } from "../apis/handler";
@@ -18,8 +16,6 @@ import { namedMessageHandler } from "../edit/messages";
 import { PicNumCallback } from "../edit/tools/selection";
 import { Palette, PicTags, PIC_TAGS, RAW_PAL, RAW_PLUs, TRANS_TABLE } from "./artselector";
 import { SHADOWSTEPS } from "./gl/buildgl";
-import { Sdf, sdf } from "../../app/modules/sdf/sdfraster";
-import { vec3, Vec3Array } from "../../libs_js/glmatrix";
 
 function createDrawPanel(arts: ArtInfoProvider, pal: Uint8Array, plu: (x: number) => number, canvas: HTMLCanvasElement, cb: PicNumCallback, iter: () => Iterable<number>) {
   const provider = new RasterProvider(1024 * 10, (i: number) => {
@@ -42,7 +38,7 @@ export async function ArtEditorModule(module: Module) {
 export class ArtEditor {
   private window: Window;
   private drawPanel: DrawPanel<number>;
-  private filter = "";
+  private filter = new ValueHandleIml("");
   private view: HTMLCanvasElement;
   private currentId = 0;
   private centerX = 320;
@@ -51,9 +47,9 @@ export class ArtEditor {
   private animationHandle = -1;
   private scale = 2.0;
   private currentPlu = 0;
-  private currentShadow = 0;
+  private currentShadow = new ValueHandleIml(0);
   private superSample = true;
-  private pluProvider = (x: number) => (x >= 255 || x < 0) ? 255 : this.plus[this.currentPlu].plu[this.currentShadow * 256 + x];
+  private pluProvider = (x: number) => (x >= 255 || x < 0) ? 255 : this.plus[this.currentPlu].plu[this.currentShadow.get() * 256 + x];
   private rasterizer: Rasterizer<number>;
   private closeBlend = (l: number, r: number, doff: number) => Math.abs(l - r) <= 4 ? this.blendColors(l, r, doff) : null;
   private blend = (l: number, r: number, doff: number) => this.blendColors(l, r, doff);
@@ -86,8 +82,11 @@ export class ArtEditor {
         .widget(this.createShadowLevels())
         .iconButton('icon-adjust', () => { this.superSample = !this.superSample; this.updateView(false) })
         .endGroup()
-        .widget(search('Search', s => this.oracle(s))))
+        .widget(search('Search', 'icon-search', s => this.oracle(s), this.filter, true)))
       .build();
+
+    this.filter.addListener(_ => this.updateFilter());
+    this.currentShadow.addListener(_ => this.redraw());
   }
 
   public stop() { this.window.destroy() }
@@ -104,54 +103,21 @@ export class ArtEditor {
   }
 
   private createShadowLevels() {
-    const widgetTemplate = h`<div class="popup-widget">
-      <label>Shadow Level</label>
-      <input type="range" min="0" value="0" style="vertical-align: middle; margin-right:10px" #range>
-      <input type="number" min="0" value="0" step="1" class="input-widget" #box>
-    </div>`;
-    const buttonTemplate = h`<button class="btn btn-default btn-dropdown">Shadow 0</button>`;
-    const widget = <HTMLElement>widgetTemplate.cloneNode(true);
-    const { range, box } = widgetTemplate.collect(widget);
-    const btn = <HTMLElement>buttonTemplate.cloneNode(true);
-    tippy(btn, {
-      content: widget,
-      allowHTML: true,
-      placement: 'bottom-start',
-      trigger: 'click',
-      interactive: true,
-      arrow: false,
-      offset: [0, 0],
-      duration: 100,
-      appendTo: document.body
-    });
-    const setShadow = (shadow: number) => {
-      this.currentShadow = shadow;
-      range.value = shadow;
-      box.value = shadow;
-      btn.textContent = `Shadow ${shadow}`;
-      this.redraw();
-    }
-    range.max = this.shadowsteps;
-    box.max = this.shadowsteps;
-    range.oninput = () => setShadow(range.value);
-    box.oninput = () => setShadow(box.value);
-    return btn;
+    return sliderToolbarButton({ min: 0, max: this.shadowsteps, label: "Shadow", handle: this.currentShadow });
   }
 
   private oracle(s: string) {
-    this.updateFilter(s);
     return iter(this.tags.allTags())
       .filter(t => t.toLowerCase().startsWith(s.toLowerCase()));
   }
 
-  private updateFilter(s: string) {
-    this.filter = s;
+  private updateFilter() {
     this.drawPanel.scrollToId(this.currentId);
     this.drawPanel.draw();
   }
 
   private applyFilter(id: number): boolean {
-    const filter = this.filter.toLowerCase();
+    const filter = this.filter.get().toLowerCase();
     if (filter.startsWith('*')) return (id + '').includes(filter.substr(1))
     return (id + '').startsWith(filter) || iter(this.tags.tags(id)).any(t => t.toLowerCase().includes(filter));
   }

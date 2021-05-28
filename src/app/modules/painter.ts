@@ -1,27 +1,18 @@
 import h from "stage0";
-import tippy from "tippy.js";
-import { art } from "../../build/artraster";
-import { animate, ArtInfoProvider } from "../../build/formats/art";
-import { enumerate, forEach, map, range } from "../../utils/collections";
+import { ambientOcclusion, lambert, normal, sdf, Sdf, softShadow, sphere, ssub, sunion } from "../../app/modules/sdf/sdfraster";
+import { vec3, Vec3Array } from "../../libs_js/glmatrix";
+import { map, range } from "../../utils/collections";
 import { drawToCanvas } from "../../utils/imgutils";
 import { create, lifecycle, Module, plugin } from "../../utils/injector";
-import { iter } from "../../utils/iter";
-import { bilinear, biquad, clamp, int, len2d, octaves2d, perlin2d } from "../../utils/mathutils";
-import { palRasterizer, Raster, Rasterizer, rect, resize, superResize, transform } from "../../utils/pixelprovider";
-import { DrawPanel, RasterProvider } from "../../utils/ui/drawpanel";
-import { menuButton, NavItem, NavItem1, navTree, NavTreeModel, properties, rangeProp, search, sliderToolbarButton, textProp, ValueHandleIml } from "../../utils/ui/renderers";
-import { addDragController, div, replaceContent } from "../../utils/ui/ui";
-import { ART, Scheduler, SCHEDULER, SchedulerTask, TaskHandle } from "../apis/app";
+import { clamp, int, len2d, octaves2d, perlin2d } from "../../utils/mathutils";
+import { Raster, Rasterizer, array, resize, rect } from "../../utils/pixelprovider";
+import { listProp, NavItem1, navTree, NavTreeModel, properties, rangeProp, sliderToolbarButton, ValueHandleIml } from "../../utils/ui/renderers";
+import { addDragController, replaceContent } from "../../utils/ui/ui";
+import { VecStack3d } from "../../utils/vecstack";
+import { Scheduler, SCHEDULER, SchedulerTask, TaskHandle } from "../apis/app";
 import { BUS, busDisconnector } from "../apis/handler";
 import { Ui, UI, Window } from "../apis/ui";
 import { namedMessageHandler } from "../edit/messages";
-import { PicNumCallback } from "../edit/tools/selection";
-import { Palette, PicTags, PIC_TAGS, RAW_PAL, RAW_PLUs, TRANS_TABLE } from "./artselector";
-import { SHADOWSTEPS } from "./gl/buildgl";
-import { Sdf, sdf, softShadow, sintersect, ssub, sub, sunion, union, ambientOcclusion, lambert, normal, sphere } from "../../app/modules/sdf/sdfraster";
-import { vec2, vec3, Vec3Array } from "../../libs_js/glmatrix";
-import { VecStack3d } from "../../utils/vecstack";
-import { NumberInterpolator } from "../../utils/interpolator";
 
 
 export async function PainterModule(module: Module) {
@@ -33,32 +24,22 @@ export async function PainterModule(module: Module) {
   }));
 }
 
-function grayRasterizer(scale: number): Rasterizer<number> {
-  return (raster, out) => {
-    const w = raster.width;
-    const h = raster.height;
-    for (let y = 0; y < h / scale; y++) {
-      for (let x = 0; x < w / scale; x++) {
-        set(raster, out, x * scale, y * scale, scale);
-      }
+function grayRasterizer(raster: Raster<number>, out: Uint8Array | Uint8ClampedArray | number[]) {
+  const w = raster.width;
+  const h = raster.height;
+  let off = 0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const pixel = raster.pixel(x, y);
+      out[off + 0] = pixel;
+      out[off + 1] = pixel;
+      out[off + 2] = pixel;
+      out[off + 3] = 255;
+      off += 4;
     }
   }
 }
 
-function set(raster: Raster<number>, out: Uint8Array | Uint8ClampedArray | number[], x: number, y: number, scale: number) {
-  const nx = x + int(scale / 2);
-  const ny = y + int(scale / 2);
-  const c = raster.pixel(nx, ny);
-  for (let dy = 0; dy < scale; dy++) {
-    for (let dx = 0; dx < scale; dx++) {
-      const off = (x + dx + (y + dy) * raster.width) * 4;
-      out[off + 0] = c;
-      out[off + 1] = c;
-      out[off + 2] = c;
-      out[off + 3] = 255;
-    }
-  }
-}
 
 class Model {
   private x = 0;
@@ -104,8 +85,8 @@ class Model {
     ctx.clearRect(0, 0, w, h);
 
     const point = this.findPoint();
-    ctx.fillStyle = 'rgba(127,127,127,1)';
-    ctx.strokeStyle = 'rgba(127,127,127,1)';
+    ctx.fillStyle = 'rgba(0,0,0,1)';
+    ctx.strokeStyle = 'rgba(255,255,255,1)';
     for (const p of this.points) {
       const x = p[0] * w;
       const y = p[1] * h;
@@ -153,7 +134,7 @@ class Model1Item implements NavItem1 {
   select(selected: boolean) { this.selectCallback(selected) }
 }
 
-class Model1 implements NavTreeModel {
+class ShapesModel implements NavTreeModel {
   items: NavItem1[] = [];
   title = "Shapes";
   private changeCallback: () => void;
@@ -172,7 +153,14 @@ class Model1 implements NavTreeModel {
     const item = new Model1Item(title);
     this.items.push(item);
     this.changeCallback();
+    return item;
   }
+}
+
+interface Shape {
+  attach(buff: number[], size: number, cb: () => void): void;
+  remove(): void;
+  readonly settings: HTMLElement;
 }
 
 
@@ -183,18 +171,22 @@ class Painter {
   private sidebarRight: HTMLElement;
   private sidebarLeft: HTMLElement;
   private model: Model;
-  private handle: TaskHandle;
-  private center1: number;
-  private center2: number;
-  private light: number;
 
-  private ambientValue = new ValueHandleIml(20);
-  private lightValue = new ValueHandleIml(160);
-  private shadowHardness = new ValueHandleIml(16);
+  private centerX = 320;
+  private centerY = 320;
+  private scale = 1.0;
 
-  private noise = octaves2d(perlin2d, 4);
+  private buffer: number[];
+  private bufferSize = 128;
+
+  private shapes: Shape[] = [];
+  private currentShape: string;
+  private shapesModel = new ShapesModel();
+  private shapeRefs: Model1Item[] = [];
 
   constructor(private ui: Ui, private scheduler: Scheduler) {
+    this.recreateBuffer();
+
     const view = this.createView();
     this.model = new Model(this.overlay, () => this.redraw());
     this.window = ui.builder.window()
@@ -204,22 +196,43 @@ class Painter {
       .centered(true)
       .size(1081, 640)
       .content(view)
-      .toolbar(ui.builder.toolbar()
-        .startGroup()
-        .widget(this.createAmbientSlider())
-        .widget(this.createLightSlider())
-        .widget(this.createShadowHardnessSlider())
-        .endGroup()
-      )
       .build();
+  }
 
-    this.center1 = this.model.addPoint(0.3, 0.5, 0.5);
-    this.center2 = this.model.addPoint(0.7, 0.5, 0.5);
-    this.light = this.model.addPoint(0.5, 0.0, 0.0);
+  private recreateBuffer() {
+    this.buffer = new Array<number>(this.bufferSize * this.bufferSize);
+    // this.buffer = [...map(range(0, this.bufferSize * this.bufferSize), i => {
+    //   const [x, y] = [i % this.bufferSize, i / this.bufferSize];
+    //   return 127 + 127 * perlin2d(x, y);
+    // })];
+  }
 
-    this.ambientValue.addListener(v => this.redraw());
-    this.lightValue.addListener(v => this.redraw());
-    this.shadowHardness.addListener(v => this.redraw());
+  private addShape(name: string, shape: Shape) {
+    this.shapes.push(shape);
+    this.shapeRefs.push(this.shapesModel.add(name));
+  }
+
+  private selectShape(name: string) {
+    const shape = this.shapes.get(name);
+    const lastShape = this.shapes.get(this.currentShape);
+    if (shape == undefined) return;
+    if (lastShape != undefined) lastShape.remove();
+    this.currentShape = name;
+    replaceContent(this.sidebarRight, shape.settings);
+    shape.attach(this.buffer, this.bufferSize, () => this.redraw());
+    this.shapesModel.select()
+  }
+
+  private redraw() {
+    const ctx = this.display.getContext('2d');
+    const img = array(this.buffer, this.bufferSize, this.bufferSize);
+    const scale = int(this.bufferSize * this.scale);
+    const scaled = resize(img, scale, scale);
+    const off = int((this.bufferSize / 2) * this.scale);
+    const x = this.centerX - off;
+    const y = this.centerY - off;
+    const framed = rect(scaled, -x, -y, this.display.width - x, this.display.height - y, 0);
+    drawToCanvas(framed, ctx, grayRasterizer);
   }
 
   private createView(): HTMLElement {
@@ -239,38 +252,25 @@ class Painter {
     this.sidebarLeft = sidebarleft;
     this.sidebarRight = sidebarright;
 
-    const shapes = new Model1();
-    navTree(sidebarleft, shapes);
-    shapes.add('Shape1')
-    shapes.add('Shape2')
-    shapes.add('Shape3')
-    shapes.add('Shape4')
+    addDragController(overlay, (dx, dy, dscale) => {
+      this.centerX += dx;
+      this.centerY += dy;
+      this.scale *= dscale;
+      this.redraw();
+    });
 
-    replaceContent(this.sidebarRight,
-      properties([
-        rangeProp('Ambient', 0, 255, this.ambientValue),
-        rangeProp('Light', 0, 255, this.lightValue),
-        rangeProp('Shadows', 1, 128, this.shadowHardness)
-      ]));
+    navTree(sidebarleft, this.shapesModel);
+
+    // replaceContent(this.sidebarRight,
+    //   properties([
+    //     rangeProp('Ambient', 0, 255, this.ambientValue),
+    //     rangeProp('Light', 0, 255, this.lightValue),
+    //     rangeProp('Shadows', 1, 128, this.shadowHardness),
+    //     listProp('List', this.fff)
+    //   ]));
     return widget;
   }
 
-  private createAmbientSlider() {
-    return sliderToolbarButton({ label: "Ambient", min: 0, max: 255, handle: this.ambientValue })
-  }
-
-  private createLightSlider() {
-    return sliderToolbarButton({ label: "Light", min: 0, max: 255, handle: this.lightValue })
-  }
-
-  private createShadowHardnessSlider() {
-    return sliderToolbarButton({ label: "Shadow Hardness", min: 1, max: 128, handle: this.shadowHardness })
-  }
-
-  private redraw() {
-    if (this.handle != null) this.handle.stop();
-    this.handle = this.scheduler.addTask(this.render());
-  }
 
   private * render(): SchedulerTask {
     const ctx = this.display.getContext('2d');
@@ -280,11 +280,11 @@ class Painter {
     const light = vecs.pushVec(this.model.getPoint(this.light));
     const s: Sdf<number> = {
       dist: (vecs: VecStack3d, pos: number) =>
-        ssub(vecs, pos,
+        ssub(0.04)(vecs, pos,
           (vecs, p) => sphere(vecs, p, center2, 0.2),
-          (vecs, p) => sunion(vecs, p,
+          (vecs, p) => sunion(0.04)(vecs, p,
             (vecs, p) => sphere(vecs, p, center1, 0.2),
-            (vecs, p) => 0.5 - 0.05 * this.noise(vecs.get(p)[0] * 16, vecs.get(p)[1] * 16) - vecs.get(p)[2], 0.04), 0.004),
+            (vecs, p) => 0.5 - 0.05 * this.noise(vecs.get(p)[0] * 16, vecs.get(p)[1] * 16) - vecs.get(p)[2])),
 
       color: (vecs: VecStack3d, pos: number) => {
         vecs.start();
@@ -300,22 +300,22 @@ class Painter {
       }
     }
 
-    // let handle = yield;
-    // const img = sdf(vecs.start(), 640, 640, s, 0);
-    // drawToCanvas(img, ctx, grayRasterizer(10));
-    // vecs.stop();
-    // handle = yield;
-    // for (let y = 0; y < 10; y++) {
-    //   for (let x = 0; x < 10; x++) {
-    //     const img = sdf(vecs.start(), 64, 64, s, 0, x * 64, y * 64, 10);
-    //     drawToCanvas(img, ctx, grayRasterizer(1), x * 64, y * 64);
-    //     vecs.stop();
-    //     handle.setProgress(x + y * 10);
-    //     handle = yield;
-    //   }
-    // }
-    const n = biquad(16, 16, [...map(range(0, 16 * 16), i => Math.random())]);
-    drawToCanvas({ width: 640, height: 640, pixel: (x, y) => n(x / 640, y / 640) * 256 }, ctx, grayRasterizer(1));
+    let handle = yield;
+    const img = sdf(vecs.start(), 640, 640, s, 0);
+    drawToCanvas(img, ctx, grayRasterizer(10));
+    vecs.stop();
+    handle = yield;
+    for (let y = 0; y < 10; y++) {
+      for (let x = 0; x < 10; x++) {
+        const img = sdf(vecs.start(), 64, 64, s, 0, x * 64, y * 64, 10);
+        drawToCanvas(img, ctx, grayRasterizer(1), x * 64, y * 64);
+        vecs.stop();
+        handle.setProgress(x + y * 10);
+        handle = yield;
+      }
+    }
+    // const n = biquad(16, 16, [...map(range(0, 16 * 16), i => Math.random())]);
+    // drawToCanvas({ width: 640, height: 640, pixel: (x, y) => n(x / 640, y / 640) * 256 }, ctx, grayRasterizer(1));
   }
 
   public stop() { this.window.destroy() }

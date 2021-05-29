@@ -261,7 +261,7 @@ export function textProp(label: string, handle: ValueHandle<string>): Property {
 
 export function rangeProp(label: string, min: number, max: number, handle: ValueHandle<number>): Property {
   const model: SliderModel = { min, max, handle, label: "" };
-  const widget = () => sliderToolbarButton(model)
+  const widget = () => sliderToolbarButton(model);
   return { label, widget }
 }
 

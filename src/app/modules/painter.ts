@@ -1,12 +1,12 @@
 import h from "stage0";
 import { ambientOcclusion, lambert, normal, sdf, Sdf, softShadow, sphere, ssub, sunion } from "../../app/modules/sdf/sdfraster";
 import { vec3, Vec3Array } from "../../libs_js/glmatrix";
-import { map, range } from "../../utils/collections";
+import { filter, map, range } from "../../utils/collections";
 import { drawToCanvas } from "../../utils/imgutils";
 import { create, lifecycle, Module, plugin } from "../../utils/injector";
 import { clamp, int, len2d, octaves2d, perlin2d } from "../../utils/mathutils";
 import { Raster, Rasterizer, array, resize, rect } from "../../utils/pixelprovider";
-import { listProp, NavItem1, navTree, NavTreeModel, properties, rangeProp, sliderToolbarButton, ValueHandleIml } from "../../utils/ui/renderers";
+import { listProp, NavItem1, navTree, NavTreeModel, Oracle, properties, rangeProp, sliderToolbarButton, ValueHandleIml } from "../../utils/ui/renderers";
 import { addDragController, replaceContent } from "../../utils/ui/ui";
 import { VecStack3d } from "../../utils/vecstack";
 import { Scheduler, SCHEDULER, SchedulerTask, TaskHandle } from "../apis/app";
@@ -126,12 +126,12 @@ class Model {
 }
 
 class Model1Item implements NavItem1 {
-  private selectCallback: (select: boolean) => void;
+  private selectCallback: ((select: boolean) => void)[] = [];
 
   constructor(public title: string) { }
 
-  setSelect(cb: (select: boolean) => void) { this.selectCallback = cb }
-  select(selected: boolean) { this.selectCallback(selected) }
+  setSelect(cb: (select: boolean) => void) { this.selectCallback.push(cb) }
+  select(selected: boolean) { this.selectCallback.forEach(cb => cb(selected)) }
 }
 
 class ShapesModel implements NavTreeModel {
@@ -163,6 +163,142 @@ interface Shape {
   readonly settings: HTMLElement;
 }
 
+interface Image {
+  pixel(x: number, y: number): number;
+  readonly settings: HTMLElement;
+  onchange(cb: () => void): void;
+}
+
+class ImageShape implements Shape {
+  private buff: number[];
+  private size: number;
+  private redrawCallback: () => void;
+
+  settings: HTMLElement;
+
+  constructor(readonly image: Image) {
+    this.settings = image.settings;
+    this.image.onchange(() => this.redraw());
+  }
+
+  private redraw() {
+    if (this.redrawCallback == null) return;
+
+    let off = 0;
+    const size = this.size;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        this.buff[off++] = this.image.pixel(x / size, y / size);
+      }
+    }
+    this.redrawCallback();
+  }
+
+  attach(buff: number[], size: number, cb: () => void): void {
+    this.redrawCallback = cb;
+    this.size = size;
+    this.buff = buff;
+    this.redraw();
+  }
+
+  remove(): void {
+    this.redrawCallback = null;
+    this.size = null;
+    this.buff = null;
+  }
+}
+
+function perlin(): Image {
+  let changecb: () => void;
+  const scale = new ValueHandleIml(1024);
+  const octaves = new ValueHandleIml(1);
+  scale.addListener(() => changecb());
+  octaves.addListener(() => changecb());
+  const settings = properties([
+    rangeProp('Scale', 0, 10 * 1024, scale),
+    rangeProp('Octaves', 1, 4, octaves)
+  ]);
+  const pixel = (x: number, y: number) => {
+    const noise = octaves2d(perlin2d, octaves.get());
+    const s = scale.get() / 100;
+    return 127 + 127 * noise(x * s, y * s);
+  }
+  const onchange = (cb: () => void) => changecb = cb;
+  return { pixel, settings, onchange }
+}
+
+function circle(): Image {
+  let changecb: () => void;
+  const radius = new ValueHandleIml(50);
+  radius.addListener(() => changecb());
+  const settings = properties([
+    rangeProp('Radius', 1, 100, radius),
+  ]);
+  const pixel = (x: number, y: number) => {
+    const r = radius.get() / 100;
+    const l = len2d(x - 0.5, y - 0.5);
+    return 256 * clamp(r - l, 0, r);
+  }
+  const onchange = (cb: () => void) => changecb = cb;
+  return { pixel, settings, onchange }
+}
+
+function select(p: (name: string) => Shape, oracle: Oracle<string>): Image {
+  let changecb: () => void;
+  const src = new ValueHandleIml('');
+  const from = new ValueHandleIml(0);
+  const to = new ValueHandleIml(255);
+  src.addListener(() => changecb());
+  from.addListener(() => changecb());
+  to.addListener(() => changecb());
+  const settings = properties([
+    listProp('Source', oracle, src),
+    rangeProp('From', 0, 255, from),
+    rangeProp('To', 0, 255, to),
+  ]);
+  const pixel = (x: number, y: number) => {
+    const shape = p(src.get());
+    if (!(shape instanceof ImageShape)) return 0;
+    const value = shape.image.pixel(x, y);
+    return value >= from.get() && value <= to.get() ? 255 : 0;
+  }
+  const onchange = (cb: () => void) => changecb = cb;
+  return { pixel, settings, onchange }
+}
+
+function displace(p: (name: string) => Shape, oracle: Oracle<string>): Image {
+  let changecb: () => void;
+  const src = new ValueHandleIml('');
+  const displace = new ValueHandleIml('');
+  const scale = new ValueHandleIml(0);
+  src.addListener(() => changecb());
+  displace.addListener(() => changecb());
+  scale.addListener(() => changecb());
+  const settings = properties([
+    listProp('Source', oracle, src),
+    listProp('Displace', oracle, displace),
+    rangeProp('Scale', -100, 100, scale),
+  ]);
+  const pixel = (x: number, y: number) => {
+    const source = p(src.get());
+    if (!(source instanceof ImageShape)) return 0;
+    const disp = p(displace.get());
+    if (!(disp instanceof ImageShape)) return 0;
+    const d = scale.get() / 1000;
+
+    const d1 = disp.image.pixel(x - d, y);
+    const d2 = disp.image.pixel(x + d, y);
+    const d3 = disp.image.pixel(x, y - d);
+    const d4 = disp.image.pixel(x, y + d);
+
+    const dx = (d1 - d2) / 256;
+    const dy = (d3 - d4) / 256;
+
+    return source.image.pixel(x + dx, y + dy);
+  }
+  const onchange = (cb: () => void) => changecb = cb;
+  return { pixel, settings, onchange }
+}
 
 class Painter {
   private window: Window;
@@ -177,12 +313,12 @@ class Painter {
   private scale = 1.0;
 
   private buffer: number[];
-  private bufferSize = 128;
+  private bufferSize = 512;
 
   private shapes: Shape[] = [];
-  private currentShape: string;
+  private currentShapeId: number;
   private shapesModel = new ShapesModel();
-  private shapeRefs: Model1Item[] = [];
+  private shapeMap = new Map<string, Shape>();
 
   constructor(private ui: Ui, private scheduler: Scheduler) {
     this.recreateBuffer();
@@ -197,30 +333,41 @@ class Painter {
       .size(1081, 640)
       .content(view)
       .build();
+
+    this.addShape('Circle', new ImageShape(circle()));
+    this.addShape('Perlin', new ImageShape(perlin()));
+    this.addShape('Select', new ImageShape(select(this.shapeProvider(), this.shapeOracle())));
+    this.addShape('Displace', new ImageShape(displace(this.shapeProvider(), this.shapeOracle())));
+  }
+
+  private shapeProvider(): (name: string) => Shape {
+    return s => this.shapeMap.get(s);
+  }
+
+  private shapeOracle(): Oracle<string> {
+    return s => filter(this.shapeMap.keys(), k => s.startsWith(s));
   }
 
   private recreateBuffer() {
     this.buffer = new Array<number>(this.bufferSize * this.bufferSize);
-    // this.buffer = [...map(range(0, this.bufferSize * this.bufferSize), i => {
-    //   const [x, y] = [i % this.bufferSize, i / this.bufferSize];
-    //   return 127 + 127 * perlin2d(x, y);
-    // })];
   }
 
   private addShape(name: string, shape: Shape) {
+    const id = this.shapes.length;
     this.shapes.push(shape);
-    this.shapeRefs.push(this.shapesModel.add(name));
+    const item = this.shapesModel.add(name);
+    item.setSelect(s => { if (s) this.selectShape(id) })
+    this.shapeMap.set(name, shape);
   }
 
-  private selectShape(name: string) {
-    const shape = this.shapes.get(name);
-    const lastShape = this.shapes.get(this.currentShape);
+  private selectShape(id: number) {
+    const shape = this.shapes[id];
+    const lastShape = this.shapes[this.currentShapeId];
     if (shape == undefined) return;
     if (lastShape != undefined) lastShape.remove();
-    this.currentShape = name;
+    this.currentShapeId = id;
     replaceContent(this.sidebarRight, shape.settings);
     shape.attach(this.buffer, this.bufferSize, () => this.redraw());
-    this.shapesModel.select()
   }
 
   private redraw() {
@@ -260,63 +407,7 @@ class Painter {
     });
 
     navTree(sidebarleft, this.shapesModel);
-
-    // replaceContent(this.sidebarRight,
-    //   properties([
-    //     rangeProp('Ambient', 0, 255, this.ambientValue),
-    //     rangeProp('Light', 0, 255, this.lightValue),
-    //     rangeProp('Shadows', 1, 128, this.shadowHardness),
-    //     listProp('List', this.fff)
-    //   ]));
     return widget;
-  }
-
-
-  private * render(): SchedulerTask {
-    const ctx = this.display.getContext('2d');
-    const vecs = new VecStack3d(128);
-    const center1 = vecs.pushVec(this.model.getPoint(this.center1));
-    const center2 = vecs.pushVec(this.model.getPoint(this.center2));
-    const light = vecs.pushVec(this.model.getPoint(this.light));
-
-    const s: Sdf<number> = {
-      dist: (vecs: VecStack3d, pos: number) =>
-        ssub(0.04)(vecs, pos,
-          (vecs, p) => sphere(vecs, p, center2, 0.2),
-          (vecs, p) => sunion(0.04)(vecs, p,
-            (vecs, p) => sphere(vecs, p, center1, 0.2),
-            (vecs, p) => 0.5 - 0.05 * this.noise(vecs.get(p)[0] * 16, vecs.get(p)[1] * 16) - vecs.get(p)[2])),
-
-      color: (vecs: VecStack3d, pos: number) => {
-        vecs.start();
-        const n = normal(vecs, pos, s.dist);
-        const toLight = vecs.normalized(vecs.sub(light, vecs.push(0.5, 0.5, 0.5)));
-        const shadow = softShadow(this.shadowHardness.get(), vecs, pos, toLight, s.dist);
-        const ao = ambientOcclusion(vecs, pos, n, s.dist);
-        const lamb = lambert(vecs, n, toLight);
-        vecs.stop();
-        const ambient = this.ambientValue.get() * ao;
-        const diffuse = this.lightValue.get() * shadow * lamb;
-        return int(clamp(ambient + diffuse, 0, 255));
-      }
-    }
-
-    let handle = yield;
-    const img = sdf(vecs.start(), 640, 640, s, 0);
-    drawToCanvas(img, ctx, grayRasterizer(10));
-    vecs.stop();
-    handle = yield;
-    for (let y = 0; y < 10; y++) {
-      for (let x = 0; x < 10; x++) {
-        const img = sdf(vecs.start(), 64, 64, s, 0, x * 64, y * 64, 10);
-        drawToCanvas(img, ctx, grayRasterizer(1), x * 64, y * 64);
-        vecs.stop();
-        handle.setProgress(x + y * 10);
-        handle = yield;
-      }
-    }
-    // const n = biquad(16, 16, [...map(range(0, 16 * 16), i => Math.random())]);
-    // drawToCanvas({ width: 640, height: 640, pixel: (x, y) => n(x / 640, y / 640) * 256 }, ctx, grayRasterizer(1));
   }
 
   public stop() { this.window.destroy() }

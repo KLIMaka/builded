@@ -265,8 +265,8 @@ export function rangeProp(label: string, min: number, max: number, handle: Value
   return { label, widget }
 }
 
-export function listProp(label: string, handle: ValueHandle<string>): Property {
-  const widget = () => search('', null, _ => ['One', 'Two', 'Three'], handle);
+export function listProp(label: string, oracle: Oracle<string>, handle: ValueHandle<string>): Property {
+  const widget = () => search('', null, oracle, handle);
   return { label, widget }
 }
 

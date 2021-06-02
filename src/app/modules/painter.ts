@@ -237,7 +237,7 @@ function circle(): Image {
   const pixel = (x: number, y: number) => {
     const r = radius.get() / 100;
     const l = len2d(x - 0.5, y - 0.5);
-    return 256 * clamp(r - l, 0, r);
+    return 256 * Math.sqrt(clamp(r - l, 0, r));
   }
   const onchange = (cb: () => void) => changecb = cb;
   return { pixel, settings, onchange }
@@ -270,21 +270,22 @@ function displace(p: (name: string) => Shape, oracle: Oracle<string>): Image {
   let changecb: () => void;
   const src = new ValueHandleIml('');
   const displace = new ValueHandleIml('');
-  const scale = new ValueHandleIml(0);
+  const scale = new ValueHandleIml(100);
   src.addListener(() => changecb());
   displace.addListener(() => changecb());
   scale.addListener(() => changecb());
   const settings = properties([
     listProp('Source', oracle, src),
     listProp('Displace', oracle, displace),
-    rangeProp('Scale', -100, 100, scale),
+    rangeProp('Scale', -1000, 1000, scale),
   ]);
   const pixel = (x: number, y: number) => {
     const source = p(src.get());
     if (!(source instanceof ImageShape)) return 0;
     const disp = p(displace.get());
     if (!(disp instanceof ImageShape)) return 0;
-    const d = scale.get() / 1000;
+    const d = 0.00001;
+    const s = scale.get() * 100;
 
     const d1 = disp.image.pixel(x - d, y);
     const d2 = disp.image.pixel(x + d, y);
@@ -294,7 +295,7 @@ function displace(p: (name: string) => Shape, oracle: Oracle<string>): Image {
     const dx = (d1 - d2) / 256;
     const dy = (d3 - d4) / 256;
 
-    return source.image.pixel(x + dx, y + dy);
+    return source.image.pixel(x + dx * s, y + dy * s);
   }
   const onchange = (cb: () => void) => changecb = cb;
   return { pixel, settings, onchange }

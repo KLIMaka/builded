@@ -4,7 +4,7 @@ import { vec3, Vec3Array } from "../../libs_js/glmatrix";
 import { filter, map, range } from "../../utils/collections";
 import { drawToCanvas } from "../../utils/imgutils";
 import { create, lifecycle, Module, plugin } from "../../utils/injector";
-import { clamp, int, len2d, octaves2d, perlin2d } from "../../utils/mathutils";
+import { clamp, fract, int, len2d, octaves2d, perlin2d } from "../../utils/mathutils";
 import { Raster, Rasterizer, array, resize, rect } from "../../utils/pixelprovider";
 import { listProp, NavItem1, navTree, NavTreeModel, Oracle, properties, rangeProp, sliderToolbarButton, ValueHandleIml } from "../../utils/ui/renderers";
 import { addDragController, replaceContent } from "../../utils/ui/ui";
@@ -173,22 +173,34 @@ class ImageShape implements Shape {
   private buff: number[];
   private size: number;
   private redrawCallback: () => void;
+  private scheduleHandle: TaskHandle;
 
   settings: HTMLElement;
 
-  constructor(readonly image: Image) {
+  constructor(private scheduler: Scheduler, readonly image: Image) {
     this.settings = image.settings;
-    this.image.onchange(() => this.redraw());
+    this.image.onchange(() => this.scheduleRedraw());
   }
 
-  private redraw() {
+  private scheduleRedraw() {
+    if (this.scheduleHandle != null) this.scheduleHandle.stop();
+    this.scheduleHandle = this.scheduler.addTask(this.redraw());
+  }
+
+  private * redraw() {
     if (this.redrawCallback == null) return;
 
+    let t = window.performance.now();
     let off = 0;
     const size = this.size;
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
         this.buff[off++] = this.image.pixel(x / size, y / size);
+      }
+      if (window.performance.now() - t > 100) {
+        t = window.performance.now();
+        this.redrawCallback();
+        yield;
       }
     }
     this.redrawCallback();
@@ -198,7 +210,7 @@ class ImageShape implements Shape {
     this.redrawCallback = cb;
     this.size = size;
     this.buff = buff;
-    this.redraw();
+    this.scheduleRedraw();
   }
 
   remove(): void {
@@ -230,14 +242,21 @@ function perlin(): Image {
 function circle(): Image {
   let changecb: () => void;
   const radius = new ValueHandleIml(50);
+  const pow = new ValueHandleIml(0);
   radius.addListener(() => changecb());
+  pow.addListener(() => changecb());
   const settings = properties([
     rangeProp('Radius', 1, 100, radius),
+    rangeProp('Power', -100, 100, pow),
   ]);
   const pixel = (x: number, y: number) => {
     const r = radius.get() / 100;
     const l = len2d(x - 0.5, y - 0.5);
-    return 256 * Math.sqrt(clamp(r - l, 0, r));
+    const v = clamp(r - l, 0, r);
+    const p = 1 + pow.get() / 10;
+    const pp = p >= 1 ? p : (1 / (2 - p))
+    const k = Math.pow(v / r, pp) * r;
+    return 256 * k;
   }
   const onchange = (cb: () => void) => changecb = cb;
   return { pixel, settings, onchange }
@@ -266,6 +285,100 @@ function select(p: (name: string) => Shape, oracle: Oracle<string>): Image {
   return { pixel, settings, onchange }
 }
 
+const CORE = [
+  [-1, -1], [0, -1], [1, -1],
+  [-1, 0], [0, 0], [1, 0],
+  [-1, 1], [0, 1], [1, 1],
+
+  [-2, -2], [-1, -2], [0, -2], [1, -2], [2, -2],
+  [-2, -1], [2, -1],
+  [-2, 0], [2, 0],
+  [-2, 1], [2, 1],
+  [-2, 2], [-1, 2], [0, 2], [1, 2], [2, 2],
+]
+
+function voronoi(p: (name: string) => Shape, oracle: Oracle<string>): Image {
+  let changecb: () => void;
+  const noise = new ValueHandleIml('');
+  const scale = new ValueHandleIml(4);
+  noise.addListener(() => changecb());
+  scale.addListener(() => changecb());
+  const settings = properties([
+    listProp('Noise', oracle, noise),
+    rangeProp('Scale', 1, 100, scale)
+  ]);
+  const pixel = (x: number, y: number) => {
+    const n = p(noise.get());
+    if (!(n instanceof ImageShape)) return 0;
+    const s = scale.get();
+    const nx = x * s;
+    const ny = y * s;
+    const cx = Math.floor(nx);
+    const cy = Math.floor(ny);
+    const fx = fract(nx);
+    const fy = fract(ny);
+    const img = (x: number, y: number) => n.image.pixel((cx + x) / s, (cy + y) / s);
+
+    let mind = 8;
+    let mini = 0;
+    let minrx = 0;
+    let minry = 0;
+
+    for (let i = 0; i < 9; i++) {
+      const [x, y] = CORE[i];
+      const [vx, vy] = grad(img, x, y, 0.0001);
+      const rx = x - fx + 0.5 + vx * 0.5;
+      const ry = y - fy + 0.5 + vy * 0.5;
+      const d = Math.hypot(rx, ry);
+
+      if (d < mind) {
+        mind = d;
+        mini = i;
+        minrx = rx;
+        minry = ry;
+      }
+    }
+
+    const [minx, miny] = CORE[mini];
+    mind = 8;
+    for (let i = 0; i < 16; i++) {
+      const [x, y] = CORE[i];
+      const xx = x + minx;
+      const yy = y + miny;
+      const [vx, vy] = grad(img, xx, yy, 0.0001);
+      const rx = xx - fx + 0.5 + vx * 0.5;
+      const ry = yy - fy + 0.5 + vy * 0.5;
+
+      const drx = rx - minrx;
+      const dry = ry - minry;
+      const drl = Math.hypot(drx, dry);
+      const ndrx = drl == 0 ? Number.MAX_VALUE : drx / drl;
+      const ndry = drl == 0 ? Number.MAX_VALUE : dry / drl;
+      const srx = (rx + minrx) * 0.5;
+      const sry = (ry + minry) * 0.5;
+
+      const d = Math.abs(ndrx * srx + ndry * sry);
+      mind = Math.min(d, mind);
+    }
+
+    return mind * 256;
+  }
+  const onchange = (cb: () => void) => changecb = cb;
+  return { pixel, settings, onchange }
+}
+
+function grad(f: (x: number, y: number) => number, x: number, y: number, d: number) {
+  const d1 = f(x - d, y);
+  const d2 = f(x + d, y);
+  const d3 = f(x, y - d);
+  const d4 = f(x, y + d);
+
+  const dx = (d1 - d2);
+  const dy = (d3 - d4);
+  const dl = Math.hypot(dx, dy);
+  return [dl == 0 ? 0 : dx / dl, dl == 0 ? 0 : dy / dl];
+}
+
 function displace(p: (name: string) => Shape, oracle: Oracle<string>): Image {
   let changecb: () => void;
   const src = new ValueHandleIml('');
@@ -279,22 +392,14 @@ function displace(p: (name: string) => Shape, oracle: Oracle<string>): Image {
     listProp('Displace', oracle, displace),
     rangeProp('Scale', -1000, 1000, scale),
   ]);
+  const d = 0.00001;
   const pixel = (x: number, y: number) => {
     const source = p(src.get());
     if (!(source instanceof ImageShape)) return 0;
     const disp = p(displace.get());
     if (!(disp instanceof ImageShape)) return 0;
-    const d = 0.00001;
-    const s = scale.get() * 100;
-
-    const d1 = disp.image.pixel(x - d, y);
-    const d2 = disp.image.pixel(x + d, y);
-    const d3 = disp.image.pixel(x, y - d);
-    const d4 = disp.image.pixel(x, y + d);
-
-    const dx = (d1 - d2) / 256;
-    const dy = (d3 - d4) / 256;
-
+    const s = scale.get() * 10000;
+    const [dx, dy] = grad(disp.image.pixel, x, y, d);
     return source.image.pixel(x + dx * s, y + dy * s);
   }
   const onchange = (cb: () => void) => changecb = cb;
@@ -335,10 +440,11 @@ class Painter {
       .content(view)
       .build();
 
-    this.addShape('Circle', new ImageShape(circle()));
-    this.addShape('Perlin', new ImageShape(perlin()));
-    this.addShape('Select', new ImageShape(select(this.shapeProvider(), this.shapeOracle())));
-    this.addShape('Displace', new ImageShape(displace(this.shapeProvider(), this.shapeOracle())));
+    this.addShape('Circle', new ImageShape(this.scheduler, circle()));
+    this.addShape('Perlin', new ImageShape(this.scheduler, perlin()));
+    this.addShape('Select', new ImageShape(this.scheduler, select(this.shapeProvider(), this.shapeOracle())));
+    this.addShape('Displace', new ImageShape(this.scheduler, displace(this.shapeProvider(), this.shapeOracle())));
+    this.addShape('Voronoi', new ImageShape(this.scheduler, voronoi(this.shapeProvider(), this.shapeOracle())));
   }
 
   private shapeProvider(): (name: string) => Shape {

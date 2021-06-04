@@ -201,7 +201,7 @@ export function sliderToolbarButton(model: SliderModel) {
     range.value = value;
     box.value = value;
     btn.textContent = `${model.label} ${value}`;
-    if (handle) model.handle.set(value);
+    if (handle) model.handle.set(+value);
   }
   model.handle.addListener(v => setValue(v, false))
   range.oninput = () => setValue(range.value);

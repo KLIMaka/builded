@@ -224,8 +224,8 @@ function perlin(): Image {
   let changecb: () => void;
   const scale = new ValueHandleIml(1024);
   const octaves = new ValueHandleIml(1);
-  scale.addListener(() => changecb());
-  octaves.addListener(() => changecb());
+  scale.addListener(_ => changecb());
+  octaves.addListener(_ => changecb());
   const settings = properties([
     rangeProp('Scale', 0, 10 * 1024, scale),
     rangeProp('Octaves', 1, 4, octaves)
@@ -243,8 +243,8 @@ function circle(): Image {
   let changecb: () => void;
   const radius = new ValueHandleIml(50);
   const pow = new ValueHandleIml(0);
-  radius.addListener(() => changecb());
-  pow.addListener(() => changecb());
+  radius.addListener(_ => changecb());
+  pow.addListener(_ => changecb());
   const settings = properties([
     rangeProp('Radius', 1, 100, radius),
     rangeProp('Power', -100, 100, pow),
@@ -267,9 +267,9 @@ function select(p: (name: string) => Shape, oracle: Oracle<string>): Image {
   const src = new ValueHandleIml('');
   const from = new ValueHandleIml(0);
   const to = new ValueHandleIml(255);
-  src.addListener(() => changecb());
-  from.addListener(() => changecb());
-  to.addListener(() => changecb());
+  src.addListener(_ => changecb());
+  from.addListener(_ => changecb());
+  to.addListener(_ => changecb());
   const settings = properties([
     listProp('Source', oracle, src),
     rangeProp('From', 0, 255, from),
@@ -301,8 +301,8 @@ function voronoi(p: (name: string) => Shape, oracle: Oracle<string>): Image {
   let changecb: () => void;
   const noise = new ValueHandleIml('');
   const scale = new ValueHandleIml(4);
-  noise.addListener(() => changecb());
-  scale.addListener(() => changecb());
+  noise.addListener(_ => changecb());
+  scale.addListener(_ => changecb());
   const settings = properties([
     listProp('Noise', oracle, noise),
     rangeProp('Scale', 1, 100, scale)
@@ -319,6 +319,8 @@ function voronoi(p: (name: string) => Shape, oracle: Oracle<string>): Image {
     const fy = fract(ny);
     const img = (x: number, y: number) => n.image.pixel((cx + x) / s, (cy + y) / s);
 
+    // if (len2d(fx, fy) < 0.01) return 256;
+
     let mind = 8;
     let mini = 0;
     let minrx = 0;
@@ -326,10 +328,11 @@ function voronoi(p: (name: string) => Shape, oracle: Oracle<string>): Image {
 
     for (let i = 0; i < 9; i++) {
       const [x, y] = CORE[i];
-      const [vx, vy] = grad(img, x, y, 0.0001);
-      const rx = x - fx + 0.5 + vx * 0.5;
-      const ry = y - fy + 0.5 + vy * 0.5;
-      const d = Math.hypot(rx, ry);
+      const v = img(x, y);
+      const [vx, vy] = hash(v);
+      const rx = x - fx + vx;
+      const ry = y - fy + vy;
+      const d = len2d(rx, ry);
 
       if (d < mind) {
         mind = d;
@@ -337,6 +340,8 @@ function voronoi(p: (name: string) => Shape, oracle: Oracle<string>): Image {
         minrx = rx;
         minry = ry;
       }
+
+      // if (len2d(rx, ry) < 0.08) return 256;
     }
 
     const [minx, miny] = CORE[mini];
@@ -345,13 +350,13 @@ function voronoi(p: (name: string) => Shape, oracle: Oracle<string>): Image {
       const [x, y] = CORE[i];
       const xx = x + minx;
       const yy = y + miny;
-      const [vx, vy] = grad(img, xx, yy, 0.0001);
-      const rx = xx - fx + 0.5 + vx * 0.5;
-      const ry = yy - fy + 0.5 + vy * 0.5;
+      const [vx, vy] = hash(img(xx, yy));
+      const rx = xx - fx + vx;
+      const ry = yy - fy + vy;
 
       const drx = rx - minrx;
       const dry = ry - minry;
-      const drl = Math.hypot(drx, dry);
+      const drl = len2d(drx, dry);
       const ndrx = drl == 0 ? Number.MAX_VALUE : drx / drl;
       const ndry = drl == 0 ? Number.MAX_VALUE : dry / drl;
       const srx = (rx + minrx) * 0.5;
@@ -367,6 +372,11 @@ function voronoi(p: (name: string) => Shape, oracle: Oracle<string>): Image {
   return { pixel, settings, onchange }
 }
 
+function hash(x: number): [number, number] {
+  const nx = x / 255;
+  return [(0.5 + Math.sin(x) * 0.5) * nx, (0.5 + Math.cos(x) * 0.5) * nx]
+}
+
 function grad(f: (x: number, y: number) => number, x: number, y: number, d: number) {
   const d1 = f(x - d, y);
   const d2 = f(x + d, y);
@@ -375,7 +385,7 @@ function grad(f: (x: number, y: number) => number, x: number, y: number, d: numb
 
   const dx = (d1 - d2);
   const dy = (d3 - d4);
-  const dl = Math.hypot(dx, dy);
+  const dl = len2d(dx, dy);
   return [dl == 0 ? 0 : dx / dl, dl == 0 ? 0 : dy / dl];
 }
 
@@ -384,9 +394,9 @@ function displace(p: (name: string) => Shape, oracle: Oracle<string>): Image {
   const src = new ValueHandleIml('');
   const displace = new ValueHandleIml('');
   const scale = new ValueHandleIml(100);
-  src.addListener(() => changecb());
-  displace.addListener(() => changecb());
-  scale.addListener(() => changecb());
+  src.addListener(_ => changecb());
+  displace.addListener(_ => changecb());
+  scale.addListener(_ => changecb());
   const settings = properties([
     listProp('Source', oracle, src),
     listProp('Displace', oracle, displace),

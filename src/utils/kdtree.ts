@@ -1,5 +1,6 @@
+import { vec2 } from "../libs_js/glmatrix";
 import { range } from "./collections";
-import { sqrLen2d } from "./mathutils";
+import { len2d, sqrLen2d } from "./mathutils";
 
 export class KDTree {
   private tree: number[] = [];
@@ -31,6 +32,11 @@ export class KDTree {
     return this.tree[closestNode];
   }
 
+  public distance(x: number, y: number): number {
+    const [cx, cy] = this.points[this.closest([x, y])];
+    return len2d(x - cx, y - cy);
+  }
+
   private findClosest(pos: [number, number], node: number, mind: number, depth: number): number {
     const p = this.points[this.tree[node]];
     const left = this.tree[node + 1];
@@ -43,7 +49,17 @@ export class KDTree {
     if (nextNode == -1) return d < mind ? node : -1;
     const nmind = Math.min(mind, d);
     const closest = this.findClosest(pos, nextNode, nmind, depth + 1);
-    if (closest != -1) return closest;
+
+    if (closest != -1) {
+      const p = this.points[this.tree[closest]];
+      const d = sqrLen2d(p[0] - pos[0], p[1] - pos[1]);
+      const nmind = Math.min(mind, d);
+      const nextNextNode = nextNode == right ? left : right;
+      if (nextNextNode != -1 && Math.abs(dz) < Math.sqrt(d)) {
+      }
+
+      return closest;
+    }
     const nextNextNode = nextNode == right ? left : right;
     if (nextNextNode != -1 && Math.abs(dz) < Math.sqrt(d)) {
       const closest = this.findClosest(pos, nextNextNode, nmind, depth + 1);

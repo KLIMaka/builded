@@ -86,6 +86,12 @@ export class VecStack2d {
     return result;
   }
 
+  mul(lh: number, rh: number): number {
+    const result = this.allocate();
+    vec2.mul(this.stack[result], this.stack[lh], this.stack[rh]);
+    return result;
+  }
+
   scale(id: number, scale: number): number {
     const result = this.allocate();
     vec2.scale(this.stack[result], this.stack[id], scale);

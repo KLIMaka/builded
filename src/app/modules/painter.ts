@@ -1,6 +1,6 @@
 import h from "stage0";
 import { vec3, Vec3Array } from "../../libs_js/glmatrix";
-import { filter } from "../../utils/collections";
+import { filter, map, range } from "../../utils/collections";
 import { drawToCanvas } from "../../utils/imgutils";
 import { create, lifecycle, Module, plugin } from "../../utils/injector";
 import { clamp, fract, int, len2d, octaves2d, perlin2d } from "../../utils/mathutils";
@@ -11,6 +11,9 @@ import { Scheduler, SCHEDULER, TaskHandle } from "../apis/app";
 import { BUS, busDisconnector } from "../apis/handler";
 import { Ui, UI, Window } from "../apis/ui";
 import { namedMessageHandler } from "../edit/messages";
+import { VecStack2d } from "../../utils/vecstack";
+import { SdfShape } from "../modules/sdf/sdf";
+import { KDTree } from "../../utils/kdtree";
 
 
 export async function PainterModule(module: Module) {
@@ -222,8 +225,8 @@ function perlin(): Image {
   let changecb: () => void;
   const scale = new ValueHandleIml(1024);
   const octaves = new ValueHandleIml(1);
-  scale.addListener(_ => changecb());
-  octaves.addListener(_ => changecb());
+  scale.addListener(() => changecb());
+  octaves.addListener(() => changecb());
   const settings = properties([
     rangeProp('Scale', 0, 10 * 1024, scale),
     rangeProp('Octaves', 1, 4, octaves)
@@ -241,8 +244,8 @@ function circle(): Image {
   let changecb: () => void;
   const radius = new ValueHandleIml(50);
   const pow = new ValueHandleIml(0);
-  radius.addListener(_ => changecb());
-  pow.addListener(_ => changecb());
+  radius.addListener(() => changecb());
+  pow.addListener(() => changecb());
   const settings = properties([
     rangeProp('Radius', 1, 100, radius),
     rangeProp('Power', -100, 100, pow),
@@ -265,9 +268,9 @@ function select(p: (name: string) => Shape, oracle: Oracle<string>): Image {
   const src = new ValueHandleIml('');
   const from = new ValueHandleIml(0);
   const to = new ValueHandleIml(255);
-  src.addListener(_ => changecb());
-  from.addListener(_ => changecb());
-  to.addListener(_ => changecb());
+  src.addListener(() => changecb());
+  from.addListener(() => changecb());
+  to.addListener(() => changecb());
   const settings = properties([
     listProp('Source', oracle, src),
     rangeProp('From', 0, 255, from),
@@ -299,8 +302,8 @@ function voronoi(p: (name: string) => Shape, oracle: Oracle<string>): Image {
   let changecb: () => void;
   const noise = new ValueHandleIml('');
   const scale = new ValueHandleIml(4);
-  noise.addListener(_ => changecb());
-  scale.addListener(_ => changecb());
+  noise.addListener(() => changecb());
+  scale.addListener(() => changecb());
   const settings = properties([
     listProp('Noise', oracle, noise),
     rangeProp('Scale', 1, 100, scale)
@@ -317,8 +320,6 @@ function voronoi(p: (name: string) => Shape, oracle: Oracle<string>): Image {
     const fy = fract(ny);
     const img = (x: number, y: number) => n.image.pixel((cx + x) / s, (cy + y) / s);
 
-    // if (len2d(fx, fy) < 0.01) return 256;
-
     let mind = 8;
     let mini = 0;
     let minrx = 0;
@@ -326,11 +327,10 @@ function voronoi(p: (name: string) => Shape, oracle: Oracle<string>): Image {
 
     for (let i = 0; i < 9; i++) {
       const [x, y] = CORE[i];
-      const v = img(x, y);
-      const [vx, vy] = hash(v);
-      const rx = x - fx + vx;
-      const ry = y - fy + vy;
-      const d = len2d(rx, ry);
+      const [vx, vy] = grad(img, x, y, 0.0001);
+      const rx = x - fx + 0.5 + vx * 0.5;
+      const ry = y - fy + 0.5 + vy * 0.5;
+      const d = Math.hypot(rx, ry);
 
       if (d < mind) {
         mind = d;
@@ -338,8 +338,6 @@ function voronoi(p: (name: string) => Shape, oracle: Oracle<string>): Image {
         minrx = rx;
         minry = ry;
       }
-
-      // if (len2d(rx, ry) < 0.08) return 256;
     }
 
     const [minx, miny] = CORE[mini];
@@ -348,13 +346,13 @@ function voronoi(p: (name: string) => Shape, oracle: Oracle<string>): Image {
       const [x, y] = CORE[i];
       const xx = x + minx;
       const yy = y + miny;
-      const [vx, vy] = hash(img(xx, yy));
-      const rx = xx - fx + vx;
-      const ry = yy - fy + vy;
+      const [vx, vy] = grad(img, xx, yy, 0.0001);
+      const rx = xx - fx + 0.5 + vx * 0.5;
+      const ry = yy - fy + 0.5 + vy * 0.5;
 
       const drx = rx - minrx;
       const dry = ry - minry;
-      const drl = len2d(drx, dry);
+      const drl = Math.hypot(drx, dry);
       const ndrx = drl == 0 ? Number.MAX_VALUE : drx / drl;
       const ndry = drl == 0 ? Number.MAX_VALUE : dry / drl;
       const srx = (rx + minrx) * 0.5;
@@ -370,11 +368,6 @@ function voronoi(p: (name: string) => Shape, oracle: Oracle<string>): Image {
   return { pixel, settings, onchange }
 }
 
-function hash(x: number): [number, number] {
-  const nx = x / 255;
-  return [(0.5 + Math.sin(x) * 0.5) * nx, (0.5 + Math.cos(x) * 0.5) * nx]
-}
-
 function grad(f: (x: number, y: number) => number, x: number, y: number, d: number) {
   const d1 = f(x - d, y);
   const d2 = f(x + d, y);
@@ -383,7 +376,7 @@ function grad(f: (x: number, y: number) => number, x: number, y: number, d: numb
 
   const dx = (d1 - d2);
   const dy = (d3 - d4);
-  const dl = len2d(dx, dy);
+  const dl = Math.hypot(dx, dy);
   return [dl == 0 ? 0 : dx / dl, dl == 0 ? 0 : dy / dl];
 }
 
@@ -392,9 +385,9 @@ function displace(p: (name: string) => Shape, oracle: Oracle<string>): Image {
   const src = new ValueHandleIml('');
   const displace = new ValueHandleIml('');
   const scale = new ValueHandleIml(100);
-  src.addListener(_ => changecb());
-  displace.addListener(_ => changecb());
-  scale.addListener(_ => changecb());
+  src.addListener(() => changecb());
+  displace.addListener(() => changecb());
+  scale.addListener(() => changecb());
   const settings = properties([
     listProp('Source', oracle, src),
     listProp('Displace', oracle, displace),
@@ -410,6 +403,27 @@ function displace(p: (name: string) => Shape, oracle: Oracle<string>): Image {
     const [dx, dy] = grad(disp.image.pixel, x, y, d);
     return source.image.pixel(x + dx * s, y + dy * s);
   }
+  const onchange = (cb: () => void) => changecb = cb;
+  return { pixel, settings, onchange }
+}
+
+function distance2d(sdf: SdfShape<VecStack2d>): Image {
+  let changecb: () => void;
+  const scale = new ValueHandleIml(100);
+  scale.addListener(() => changecb());
+  const settings = properties([
+    rangeProp('Scale', 1, 1000, scale),
+  ]);
+
+  const stack = new VecStack2d(16);
+  const pos = stack.allocate();
+  const pixel = (x: number, y: number) => {
+    stack.set(pos, x, y);
+    const s = scale.get() / 100;
+    const d = sdf(stack, pos) * s;
+    return fract(d) * 256;
+  }
+
   const onchange = (cb: () => void) => changecb = cb;
   return { pixel, settings, onchange }
 }
@@ -448,11 +462,15 @@ class Painter {
       .content(view)
       .build();
 
+    // const kdtree = new KDTree([...map(range(0, 3), _ => <[number, number]>[Math.random(), Math.random()])]);
+    const kdtree = new KDTree([[0.1, 0.1], [0.1, 0.9], [0.9, 0.2]]);
+
     this.addShape('Circle', new ImageShape(this.scheduler, circle()));
     this.addShape('Perlin', new ImageShape(this.scheduler, perlin()));
     this.addShape('Select', new ImageShape(this.scheduler, select(this.shapeProvider(), this.shapeOracle())));
     this.addShape('Displace', new ImageShape(this.scheduler, displace(this.shapeProvider(), this.shapeOracle())));
     this.addShape('Voronoi', new ImageShape(this.scheduler, voronoi(this.shapeProvider(), this.shapeOracle())));
+    this.addShape('Distance', new ImageShape(this.scheduler, distance2d((stack, p) => kdtree.distance(stack.get(p)[0], stack.get(p)[1]))));
   }
 
   private shapeProvider(): (name: string) => Shape {

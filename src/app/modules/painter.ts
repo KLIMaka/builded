@@ -326,8 +326,7 @@ function voronoi(p: (name: string) => Shape, oracle: Oracle<string>): Image {
 
     for (let i = 0; i < 9; i++) {
       const [x, y] = CORE[i];
-      const v = img(x, y);
-      const [vx, vy] = hash(v);
+      const [vx, vy] = hash(img(x, y));
       const rx = x - fx + vx;
       const ry = y - fy + vy;
       const d = len2d(rx, ry);
@@ -344,7 +343,7 @@ function voronoi(p: (name: string) => Shape, oracle: Oracle<string>): Image {
 
     const [minx, miny] = CORE[mini];
     mind = 8;
-    for (let i = 0; i < 16; i++) {
+    for (let i = 0; i < 9; i++) {
       const [x, y] = CORE[i];
       const xx = x + minx;
       const yy = y + miny;
@@ -372,7 +371,8 @@ function voronoi(p: (name: string) => Shape, oracle: Oracle<string>): Image {
 
 function hash(x: number): [number, number] {
   const nx = x / 255;
-  return [(0.5 + Math.sin(x) * 0.5) * nx, (0.5 + Math.cos(x) * 0.5) * nx]
+  return [(0.5 + Math.sin(x) * 0.5) * 0.8, (0.5 + Math.cos(x) * 0.5) * 0.8];
+  // return [perlin2d(nx, 0), perlin2d(0, nx)];
 }
 
 function grad(f: (x: number, y: number) => number, x: number, y: number, d: number) {

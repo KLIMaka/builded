@@ -1,4 +1,4 @@
-import { clamp, mix } from "../../../utils/mathutils";
+import { clamp, fract, mix } from "../../../utils/mathutils";
 import { VecStack2d, VecStack3d } from '../../../utils/vecstack';
 
 export type SdfShape<T> = (stack: T, pos: number) => number;
@@ -38,10 +38,30 @@ export function sdf2d(f: (x: number, y: number) => number) {
   };
 }
 
-export function pointGrid(stack: VecStack2d, pos: number) {
+export function pointGrid(stack: VecStack2d, pos: number, scale: number, offset: number) {
   stack.start();
-  const scaled = stack.scale(stack.add(pos, stack.push(1, 1)), 2);
+  const scaled = stack.mul(stack.add(pos, offset), scale);
+  const gridPos = stack.apply(scaled, Math.floor);
+  const f = stack.get(stack.apply(scaled, fract));
+  const closest = stack.add(gridPos, stack.push(f[0] < 0.5 ? 0 : 1, f[1] < 0.5 ? 0 : 1));
   stack.stop();
+  return stack.distance(pos, closest);
+}
+
+export function displacedPointGrid(stack: VecStack2d, pos: number, scale: number, offset: number, displacement: (stack: VecStack2d, pos: number) => number) {
+  stack.start();
+  const scaled = stack.mul(stack.add(pos, offset), scale);
+  const gridPos = stack.apply(scaled, Math.floor);
+  let mind = Number.MAX_VALUE;
+  for (let y = -1; y < 1; y++) {
+    for (let x = -1; x < 1; x++) {
+      const p = stack.add(gridPos, stack.push(x, y));
+      const displaced = stack.add(p, displacement(stack, p));
+      mind = Math.min(mind, stack.distance(displaced, pos))
+    }
+  }
+  stack.stop();
+  return mind;
 }
 
 

@@ -412,7 +412,7 @@ function distance2d(sdf: SdfShape<VecStack2d>): Image {
   const scale = new ValueHandleIml(100);
   scale.addListener(() => changecb());
   const settings = properties([
-    rangeProp('Scale', 1, 1000, scale),
+    rangeProp('Scale', 1, 10000, scale),
   ]);
 
   const stack = new VecStack2d(16);
@@ -462,8 +462,7 @@ class Painter {
       .content(view)
       .build();
 
-    // const kdtree = new KDTree([...map(range(0, 3), _ => <[number, number]>[Math.random(), Math.random()])]);
-    const kdtree = new KDTree([[0.1, 0.1], [0.1, 0.9], [0.9, 0.2]]);
+    const kdtree = new KDTree([...map(range(0, 100), _ => <[number, number]>[Math.random(), Math.random()])]);
 
     this.addShape('Circle', new ImageShape(this.scheduler, circle()));
     this.addShape('Perlin', new ImageShape(this.scheduler, perlin()));

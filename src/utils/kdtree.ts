@@ -1,4 +1,3 @@
-import { vec2 } from "../libs_js/glmatrix";
 import { range } from "./collections";
 import { len2d, sqrLen2d } from "./mathutils";
 
@@ -28,8 +27,21 @@ export class KDTree {
   }
 
   public closest(pos: [number, number]): number {
-    const closestNode = this.findClosest(pos, this.top, Number.MAX_VALUE, 0);
-    return this.tree[closestNode];
+    const estIdx = this.closestEstimation(pos, this.top, Number.MAX_VALUE, 0);
+    const p = this.points[estIdx];
+    const dsqr = sqrLen2d(p[0] - pos[0], p[1] - pos[1]);
+    const d = Math.sqrt(dsqr);
+    let mindsqr = dsqr;
+    let minIdx = estIdx;
+    for (const idx of this.inRange(pos[0] - d, pos[1] - d, pos[0] + d, pos[1] + d)) {
+      const p = this.points[idx];
+      const dsqr = sqrLen2d(pos[0] - p[0], pos[1] - p[1]);
+      if (dsqr < mindsqr) {
+        mindsqr = dsqr;
+        minIdx = idx;
+      }
+    }
+    return minIdx;
   }
 
   public distance(x: number, y: number): number {
@@ -37,34 +49,40 @@ export class KDTree {
     return len2d(x - cx, y - cy);
   }
 
-  private findClosest(pos: [number, number], node: number, mind: number, depth: number): number {
-    const p = this.points[this.tree[node]];
+  public inRange(minx: number, miny: number, maxx: number, maxy: number): number[] {
+    const result = [];
+    this.rangeSearch([minx, miny], [maxx, maxy], this.top, 0, result);
+    return result;
+  }
+
+  private closestEstimation(pos: [number, number], node: number, mind: number, depth: number): number {
+    if (node == -1) return -1;
+    const idx = this.tree[node];
+    const p = this.points[idx];
     const left = this.tree[node + 1];
     const right = this.tree[node + 2];
     const d = sqrLen2d(p[0] - pos[0], p[1] - pos[1]);
-    if (left == -1 && right == -1) return d < mind ? node : -1;
     const z = depth & 1;
     const dz = pos[z] - p[z];
     const nextNode = dz <= 0 ? left : right;
-    if (nextNode == -1) return d < mind ? node : -1;
     const nmind = Math.min(mind, d);
-    const closest = this.findClosest(pos, nextNode, nmind, depth + 1);
+    const closest = this.closestEstimation(pos, nextNode, nmind, depth + 1);
+    return closest == -1 ? idx : closest;
+  }
 
-    if (closest != -1) {
-      const p = this.points[this.tree[closest]];
-      const d = sqrLen2d(p[0] - pos[0], p[1] - pos[1]);
-      const nmind = Math.min(mind, d);
-      const nextNextNode = nextNode == right ? left : right;
-      if (nextNextNode != -1 && Math.abs(dz) < Math.sqrt(d)) {
-      }
+  private rangeSearch(min: [number, number], max: [number, number], node: number, depth: number, result: number[]): void {
+    if (node == -1) return;
+    const idx = this.tree[node];
+    const p = this.points[idx];
+    const left = this.tree[node + 1];
+    const right = this.tree[node + 2];
+    const z = depth & 1;
 
-      return closest;
-    }
-    const nextNextNode = nextNode == right ? left : right;
-    if (nextNextNode != -1 && Math.abs(dz) < Math.sqrt(d)) {
-      const closest = this.findClosest(pos, nextNextNode, nmind, depth + 1);
-      if (closest != -1) return closest;
-    }
-    return d < mind ? node : -1;
+    if (p[z] > min[z] && p[z] > max[z]) return this.rangeSearch(min, max, left, depth + 1, result);
+    if (p[z] < min[z] && p[z] < max[z]) return this.rangeSearch(min, max, right, depth + 1, result);
+
+    if (p[0] >= min[0] && p[1] >= min[1] && p[0] <= max[0] && p[1] <= max[1]) result.push(idx);
+    this.rangeSearch(min, max, left, depth + 1, result);
+    this.rangeSearch(min, max, right, depth + 1, result);
   }
 }

@@ -1,5 +1,5 @@
 import h from "stage0";
-import { vec3, Vec3Array } from "../../libs_js/glmatrix";
+import { Vec2Array, vec3, Vec3Array } from "../../libs_js/glmatrix";
 import { filter, map, range } from "../../utils/collections";
 import { drawToCanvas } from "../../utils/imgutils";
 import { create, lifecycle, Module, plugin } from "../../utils/injector";
@@ -12,8 +12,9 @@ import { BUS, busDisconnector } from "../apis/handler";
 import { Ui, UI, Window } from "../apis/ui";
 import { namedMessageHandler } from "../edit/messages";
 import { VecStack2d } from "../../utils/vecstack";
-import { SdfShape } from "../modules/sdf/sdf";
+import { circularArray, lineSegment, SdfShape, sunion, union } from "../modules/sdf/sdf";
 import { KDTree } from "../../utils/kdtree";
+import { FastList, List } from "../../utils/list";
 
 
 export async function PainterModule(module: Module) {
@@ -158,29 +159,46 @@ class ShapesModel implements NavTreeModel {
   }
 }
 
+enum Type {
+  NORMALIZED,
+  VALUE,
+  VECTOR2,
+  VECTOR2_NORMALIZED,
+}
+
 interface Shape {
   attach(buff: number[], size: number, cb: () => void): void;
   remove(): void;
   readonly settings: HTMLElement;
 }
 
-interface Image {
-  pixel(x: number, y: number): number;
+interface Image2d {
+  pixel(stack: VecStack2d, pos: number): number;
   readonly settings: HTMLElement;
-  onchange(cb: () => void): void;
+  readonly type: Type;
+  addListener(cb: (img: Image2d) => void): number;
+  removeListener(id: number): void;
 }
 
-class ImageShape implements Shape {
+class Image2dRenderer {
   private buff: number[];
   private size: number;
   private redrawCallback: () => void;
   private scheduleHandle: TaskHandle;
+  private image: Image2d;
+  private imageHandle: number;
+  private stack = new VecStack2d(128);
 
-  settings: HTMLElement;
+  private position: number;
 
-  constructor(private scheduler: Scheduler, readonly image: Image) {
-    this.settings = image.settings;
-    this.image.onchange(() => this.scheduleRedraw());
+  constructor(private scheduler: Scheduler) {
+    this.position = this.stack.push(0, 0);
+  }
+
+  public set(img: Image2d) {
+    if (this.image != null) this.image.removeListener(this.imageHandle);
+    this.image = img;
+    this.imageHandle = img.addListener(img => this.scheduleRedraw());
   }
 
   private scheduleRedraw() {
@@ -196,7 +214,9 @@ class ImageShape implements Shape {
     const size = this.size;
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
-        this.buff[off++] = this.image.pixel(x / size, y / size);
+        this.stack.set(this.position, x / size, y / size);
+        const res = this.image.pixel(this.stack, this.position);
+        this.buff[off++] = this.stack.get(res)[0];
       }
       if (window.performance.now() - t > 100) {
         t = window.performance.now();
@@ -221,69 +241,80 @@ class ImageShape implements Shape {
   }
 }
 
-function perlin(): Image {
-  let changecb: () => void;
+class Callbacks<T> {
+  private cbs = new FastList<(t: T) => void>();
+
+  notify(t: T) { for (const cb of this.cbs) cb(t) }
+  add(cb: (t: T) => void): number { return this.cbs.push(cb) }
+  remove(id: number): void { this.cbs.remove(id) }
+}
+
+function perlin(): Image2d {
+  const cbs = new Callbacks<Image2d>();
   const scale = new ValueHandleIml(1024);
   const octaves = new ValueHandleIml(1);
-  scale.addListener(() => changecb());
-  octaves.addListener(() => changecb());
+  scale.addListener(() => cbs.notify(null));
+  octaves.addListener(() => cbs.notify(null));
   const settings = properties([
     rangeProp('Scale', 0, 10 * 1024, scale),
     rangeProp('Octaves', 1, 4, octaves)
   ]);
-  const pixel = (x: number, y: number) => {
+  const pixel = (stack: VecStack2d, pos: number) => {
     const noise = octaves2d(perlin2d, octaves.get());
     const s = scale.get() / 100;
-    return 127 + 127 * noise(x * s, y * s);
+    return stack.push(noise(stack.get(pos)[0] * s, stack.get(pos)[1] * s), 0);
   }
-  const onchange = (cb: () => void) => changecb = cb;
-  return { pixel, settings, onchange }
+  const addListener = (cb: (v: Image2d) => void) => cbs.add(cb);
+  const removeListener = (id: number) => cbs.remove(id);
+  return { pixel, settings, addListener, removeListener, type: Type.VALUE }
 }
 
-function circle(): Image {
-  let changecb: () => void;
+function circle(): Image2d {
+  const cbs = new Callbacks<Image2d>();
   const radius = new ValueHandleIml(50);
   const pow = new ValueHandleIml(0);
-  radius.addListener(() => changecb());
-  pow.addListener(() => changecb());
+  radius.addListener(() => cbs.notify(null));
+  pow.addListener(() => cbs.notify(null));
   const settings = properties([
     rangeProp('Radius', 1, 100, radius),
     rangeProp('Power', -100, 100, pow),
   ]);
-  const pixel = (x: number, y: number) => {
+  const pixel = (stack: VecStack2d, pos: number) => {
+    stack.start();
     const r = radius.get() / 100;
-    const l = len2d(x - 0.5, y - 0.5);
+    const l = stack.sub(pos, stack.push(0.5, 0.5));
     const v = clamp(r - l, 0, r);
     const p = 1 + pow.get() / 10;
     const pp = p >= 1 ? p : (1 / (2 - p))
     const k = Math.pow(v / r, pp) * r;
-    return 256 * k;
+    return stack.return(stack.push(k, 0));
   }
-  const onchange = (cb: () => void) => changecb = cb;
-  return { pixel, settings, onchange }
+  const addListener = (cb: (v: Image2d) => void) => cbs.add(cb);
+  const removeListener = (id: number) => cbs.remove(id);
+  return { pixel, settings, addListener, removeListener, type: Type.VALUE }
 }
 
-function select(p: (name: string) => Shape, oracle: Oracle<string>): Image {
-  let changecb: () => void;
+function select(p: (name: string) => Image2d, oracle: Oracle<string>): Image2d {
+  const cbs = new Callbacks<Image2d>();
   const src = new ValueHandleIml('');
   const from = new ValueHandleIml(0);
   const to = new ValueHandleIml(255);
-  src.addListener(() => changecb());
-  from.addListener(() => changecb());
-  to.addListener(() => changecb());
+  src.addListener(() => cbs.notify(null));
+  from.addListener(() => cbs.notify(null));
+  to.addListener(() => cbs.notify(null));
   const settings = properties([
     listProp('Source', oracle, src),
     rangeProp('From', 0, 255, from),
     rangeProp('To', 0, 255, to),
   ]);
-  const pixel = (x: number, y: number) => {
-    const shape = p(src.get());
-    if (!(shape instanceof ImageShape)) return 0;
-    const value = shape.image.pixel(x, y);
-    return value >= from.get() && value <= to.get() ? 255 : 0;
+  const pixel = (stack: VecStack2d, pos: number) => {
+    const img = p(src.get());
+    const value = img.pixel(stack, pos);
+    return stack.push(value >= from.get() && value <= to.get() ? 1 : 0, 0);
   }
-  const onchange = (cb: () => void) => changecb = cb;
-  return { pixel, settings, onchange }
+  const addListener = (cb: (v: Image2d) => void) => cbs.add(cb);
+  const removeListener = (id: number) => cbs.remove(id);
+  return { pixel, settings, addListener, removeListener, type: Type.VALUE }
 }
 
 const CORE = [
@@ -298,55 +329,53 @@ const CORE = [
   [-2, 2], [-1, 2], [0, 2], [1, 2], [2, 2],
 ]
 
-function voronoi(p: (name: string) => Shape, oracle: Oracle<string>): Image {
-  let changecb: () => void;
+function voronoi(p: (name: string) => Image2d, oracle: Oracle<string>): Image2d {
+  const cbs = new Callbacks<Image2d>();
   const noise = new ValueHandleIml('');
   const scale = new ValueHandleIml(4);
-  noise.addListener(() => changecb());
-  scale.addListener(() => changecb());
+  noise.addListener(() => cbs.notify(null));
+  scale.addListener(() => cbs.notify(null));
   const settings = properties([
     listProp('Noise', oracle, noise),
     rangeProp('Scale', 1, 100, scale)
   ]);
-  const pixel = (x: number, y: number) => {
-    const n = p(noise.get());
-    if (!(n instanceof ImageShape)) return 0;
+  const pixel = (stack: VecStack2d, pos: number) => {
+    stack.start();
+    const noiseImage = p(noise.get());
     const s = scale.get();
-    const nx = x * s;
-    const ny = y * s;
-    const cx = Math.floor(nx);
-    const cy = Math.floor(ny);
-    const fx = fract(nx);
-    const fy = fract(ny);
-    const img = (x: number, y: number) => n.image.pixel((cx + x) / s, (cy + y) / s);
+    const n = stack.scale(pos, s);
+    const c = stack.apply(n, Math.floor);
+    const f = stack.apply(n, fract);
+    const half = stack.push(0.5, 0.5);
+    const img = (stack: VecStack2d, pos: number) => noiseImage.pixel(stack, stack.scale(stack.add(c, pos), 1 / s));
 
     let mind = 8;
     let mini = 0;
-    let minrx = 0;
-    let minry = 0;
+    const minr = stack.allocate();
 
     for (let i = 0; i < 9; i++) {
-      const [x, y] = CORE[i];
-      const [vx, vy] = hash(img(x, y));
-      const rx = x - fx + vx;
-      const ry = y - fy + vy;
-      const d = len2d(rx, ry);
+      stack.start();
+      const xy = stack.pushVec(CORE[i]);
+      const v = stack.pushVec(hash(img(stack, xy)));
+      const r = stack.sub(xy, stack.add(f, v))
+      const d = stack.length(r);
 
       if (d < mind) {
         mind = d;
         mini = i;
-        minrx = rx;
-        minry = ry;
+        stack.copy(minr, r);
       }
+      stack.stop();
     }
 
-    const [minx, miny] = CORE[mini];
+    const minxy = stack.pushVec(CORE[mini]);
     mind = 8;
     for (let i = 0; i < 9; i++) {
-      const [x, y] = CORE[i];
-      const xx = x + minx;
-      const yy = y + miny;
-      const [vx, vy] = grad(img, xx, yy, 0.0001);
+      stack.start();
+      const xy = stack.add(minxy, stack.pushVec(CORE[i]));
+      const v = grad(img, stack, xy, 0.0001);
+
+      const r = stack.sub(xy, stack.add(stack.add(f, stack.add(half, stack.scale(v, 0.5)))));
       const rx = xx - fx + 0.5 + vx * 0.5;
       const ry = yy - fy + 0.5 + vy * 0.5;
 
@@ -360,12 +389,14 @@ function voronoi(p: (name: string) => Shape, oracle: Oracle<string>): Image {
 
       const d = Math.abs(ndrx * srx + ndry * sry);
       mind = Math.min(d, mind);
+      stack.stop();
     }
 
     return mind * 256;
   }
-  const onchange = (cb: () => void) => changecb = cb;
-  return { pixel, settings, onchange }
+  const addListener = (cb: (v: Image2d) => void) => cbs.add(cb);
+  const removeListener = (id: number) => cbs.remove(id);
+  return { pixel, settings, addListener, removeListener, type: Type.VALUE }
 }
 
 function hash(x: number): [number, number] {
@@ -374,16 +405,13 @@ function hash(x: number): [number, number] {
   // return [perlin2d(nx, 0), perlin2d(0, nx)];
 }
 
-function grad(f: (x: number, y: number) => number, x: number, y: number, d: number) {
-  const d1 = f(x - d, y);
-  const d2 = f(x + d, y);
-  const d3 = f(x, y - d);
-  const d4 = f(x, y + d);
-
-  const dx = (d1 - d2);
-  const dy = (d3 - d4);
-  const dl = Math.hypot(dx, dy);
-  return [dl == 0 ? 0 : dx / dl, dl == 0 ? 0 : dy / dl];
+function grad(f: (stack: VecStack2d, pos: number) => number, stack: VecStack2d, pos: number, d: number) {
+  stack.start();
+  const d1 = f(stack, stack.add(pos, stack.push(-d, 0)));
+  const d2 = f(stack, stack.add(pos, stack.push(d, 0)));
+  const d3 = f(stack, stack.add(pos, stack.push(0, -d)));
+  const d4 = f(stack, stack.add(pos, stack.push(0, d)));
+  return stack.return(stack.push(stack.sub(d1, d2)[0], stack.sub(d3, d4)[0]));
 }
 
 function displace(p: (name: string) => Shape, oracle: Oracle<string>): Image {
@@ -448,14 +476,16 @@ class Painter {
 
   private buffer: number[];
   private bufferSize = 512;
+  private renderer: Image2dRenderer;
 
-  private shapes: Shape[] = [];
-  private currentShapeId: number;
-  private shapesModel = new ShapesModel();
-  private shapeMap = new Map<string, Shape>();
+  private images: Image2d[] = [];
+  private imagesModel = new ShapesModel();
+  private imageMap = new Map<string, Image2d>();
 
   constructor(private ui: Ui, private scheduler: Scheduler) {
     this.recreateBuffer();
+    this.renderer = new Image2dRenderer(scheduler);
+    this.renderer.attach(this.buffer, this.bufferSize, () => this.redraw());
 
     const view = this.createView();
     this.model = new Model(this.overlay, () => this.redraw());
@@ -470,42 +500,52 @@ class Painter {
 
     const kdtree = new KDTree([...map(range(0, 100), _ => <[number, number]>[Math.random(), Math.random()])]);
 
-    this.addShape('Circle', new ImageShape(this.scheduler, circle()));
-    this.addShape('Perlin', new ImageShape(this.scheduler, perlin()));
-    this.addShape('Select', new ImageShape(this.scheduler, select(this.shapeProvider(), this.shapeOracle())));
-    this.addShape('Displace', new ImageShape(this.scheduler, displace(this.shapeProvider(), this.shapeOracle())));
-    this.addShape('Voronoi', new ImageShape(this.scheduler, voronoi(this.shapeProvider(), this.shapeOracle())));
-    this.addShape('Distance', new ImageShape(this.scheduler, distance2d((stack, p) => kdtree.distance(stack.get(p)[0], stack.get(p)[1]))));
+    this.addShape('Circle', circle());
+    this.addShape('Perlin', perlin());
+    this.addShape('Select', select(this.imageProvider(), this.shapeOracle()));
+    this.addShape('Displace', displace(this.imageProvider(), this.shapeOracle()));
+    this.addShape('Voronoi', voronoi(this.imageProvider(), this.shapeOracle()));
+    this.addShape('Distance', distance2d((stack, p) => kdtree.distance(stack.get(p)[0], stack.get(p)[1])));
+    this.addShape('Line', distance2d((stack, p) => {
+      stack.start();
+      const p1 = stack.push(0.5, 0.0);
+      const p2 = stack.push(0.5, 1.0);
+      const p3 = stack.push(0.0, 0.6);
+      const p4 = stack.push(1.0, 0.6);
+      const line = (stack: VecStack2d, p: number) => union(stack, p,
+        (stack: VecStack2d, p: number) => lineSegment(stack, p, p1, p2) - 0.01,
+        (stack: VecStack2d, p: number) => lineSegment(stack, p, p3, p4));
+      const d = circularArray(stack, p, 6, line);
+      stack.stop();
+      return d;
+    }));
   }
 
-  private shapeProvider(): (name: string) => Shape {
-    return s => this.shapeMap.get(s);
+  private imageProvider(): (name: string) => Image2d {
+    return s => this.imageMap.get(s);
   }
 
   private shapeOracle(): Oracle<string> {
-    return s => filter(this.shapeMap.keys(), k => s.startsWith(s));
+    return s => filter(this.imageMap.keys(), k => s.startsWith(s));
   }
 
   private recreateBuffer() {
     this.buffer = new Array<number>(this.bufferSize * this.bufferSize);
   }
 
-  private addShape(name: string, shape: Shape) {
-    const id = this.shapes.length;
-    this.shapes.push(shape);
-    const item = this.shapesModel.add(name);
-    item.setSelect(s => { if (s) this.selectShape(id) })
-    this.shapeMap.set(name, shape);
+  private addShape(name: string, img: Image2d) {
+    const id = this.images.length;
+    this.images.push(img);
+    const item = this.imagesModel.add(name);
+    item.setSelect(s => { if (s) this.selectImage(id) })
+    this.imageMap.set(name, img);
   }
 
-  private selectShape(id: number) {
-    const shape = this.shapes[id];
-    const lastShape = this.shapes[this.currentShapeId];
-    if (shape == undefined) return;
-    if (lastShape != undefined) lastShape.remove();
-    this.currentShapeId = id;
-    replaceContent(this.sidebarRight, shape.settings);
-    shape.attach(this.buffer, this.bufferSize, () => this.redraw());
+  private selectImage(id: number) {
+    const img = this.images[id];
+    if (img == undefined) return;
+    replaceContent(this.sidebarRight, img.settings);
+    this.renderer.set(img);
   }
 
   private redraw() {
@@ -544,7 +584,7 @@ class Painter {
       this.redraw();
     });
 
-    navTree(sidebarleft, this.shapesModel);
+    navTree(sidebarleft, this.imagesModel);
     return widget;
   }
 

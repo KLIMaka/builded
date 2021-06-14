@@ -44,9 +44,9 @@ export class KDTree {
     return minIdx;
   }
 
-  public distance(x: number, y: number): number {
+  public distance(x: number, y: number, lenf = len2d): number {
     const [cx, cy] = this.points[this.closest([x, y])];
-    return len2d(x - cx, y - cy);
+    return lenf(x - cx, y - cy);
   }
 
   public inRange(minx: number, miny: number, maxx: number, maxy: number): number[] {

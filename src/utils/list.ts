@@ -151,7 +151,7 @@ export class FastList<T> implements Iterable<T> {
   public get(idx: number): T { return this.elements.get(idx) }
   public next(idx: number): number { return this.nextIdx.get(idx) }
   public last(idx: number): number { return this.lastIdx.get(idx) }
-  public push(value: T) { this.insertAfter(value) }
+  public push(value: T): number { return this.insertAfter(value) }
   public first() { return this.next(0) }
 
   public clear() {

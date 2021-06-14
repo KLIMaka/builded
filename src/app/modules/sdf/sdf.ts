@@ -1,4 +1,4 @@
-import { clamp, fract, mix } from "../../../utils/mathutils";
+import { clamp, fract, mix, monoatan2 } from "../../../utils/mathutils";
 import { VecStack2d, VecStack3d } from '../../../utils/vecstack';
 
 export type SdfShape<T> = (stack: T, pos: number) => number;
@@ -64,6 +64,33 @@ export function displacedPointGrid(stack: VecStack2d, pos: number, scale: number
   return mind;
 }
 
+export function lineSegment(stack: VecStack2d, pos: number, p1: number, p2: number) {
+  stack.start();
+  const p1p2 = stack.sub(p2, p1);
+  const p1pos = stack.sub(pos, p1);
+  const p1p2sqrLen = stack.dot(p1p2, p1p2);
+  const dot = stack.dot(p1p2, p1pos);
+  const t = dot / p1p2sqrLen;
+  let res = 0;
+  if (dot < 0) res = stack.distance(p1, pos)
+  else if (t > 1) res = stack.distance(p2, pos);
+  else res = stack.distance(pos, stack.add(p1, stack.scale(p1p2, t)));
+  stack.stop();
+  return res;
+}
+
+export function circularArray(stack: VecStack2d, pos: number, segments: number, sdf: SdfShape<VecStack2d>): number {
+  stack.start();
+  const p = stack.sub(pos, stack.push(0.5, 0.5));
+  const ang = monoatan2(stack.get(p)[1], stack.get(p)[0]);
+  const angn = ang / (2 * Math.PI);
+  const x = fract(angn * segments);
+  const y = 1 - stack.length(p);
+  const npos = stack.push(x, y);
+  const d = sdf(stack, npos);
+  stack.stop();
+  return d;
+}
 
 export function sdf3d(f: (x: number, y: number, z: number) => number) {
   return (stack: VecStack3d, pos: number) => {

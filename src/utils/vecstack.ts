@@ -99,7 +99,7 @@ export class VecStack2d {
   }
 
   apply(id: number, f: (x: number) => number): number {
-    return this.push(f(this.start[id][0]), f(this.start[id][1]));
+    return this.push(f(this.stack[id][0]), f(this.stack[id][1]));
   }
 
   normalized(id: number): number {

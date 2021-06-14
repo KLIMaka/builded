@@ -32,7 +32,7 @@ function grayRasterizer(raster: Raster<number>, out: Uint8Array | Uint8ClampedAr
   let off = 0;
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      const pixel = raster.pixel(x, y);
+      const pixel = int(raster.pixel(x, y));
       out[off + 0] = pixel;
       out[off + 1] = pixel;
       out[off + 2] = pixel;
@@ -214,9 +214,11 @@ class Image2dRenderer {
     const size = this.size;
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
+        this.stack.start();
         this.stack.set(this.position, x / size, y / size);
         const res = this.image.pixel(this.stack, this.position);
-        this.buff[off++] = this.stack.get(res)[0];
+        this.buff[off++] = 256 * this.stack.get(res)[0];
+        this.stack.stop();
       }
       if (window.performance.now() - t > 100) {
         t = window.performance.now();
@@ -374,20 +376,12 @@ function voronoi(p: (name: string) => Image2d, oracle: Oracle<string>): Image2d 
       stack.start();
       const xy = stack.add(minxy, stack.pushVec(CORE[i]));
       const v = grad(img, stack, xy, 0.0001);
-
-      const r = stack.sub(xy, stack.add(stack.add(f, stack.add(half, stack.scale(v, 0.5)))));
-      const rx = xx - fx + 0.5 + vx * 0.5;
-      const ry = yy - fy + 0.5 + vy * 0.5;
-
-      const drx = rx - minrx;
-      const dry = ry - minry;
-      const drl = Math.hypot(drx, dry);
-      const ndrx = drl == 0 ? Number.MAX_VALUE : drx / drl;
-      const ndry = drl == 0 ? Number.MAX_VALUE : dry / drl;
-      const srx = (rx + minrx) * 0.5;
-      const sry = (ry + minry) * 0.5;
-
-      const d = Math.abs(ndrx * srx + ndry * sry);
+      const r = stack.sub(xy, stack.add(f, stack.add(half, stack.scale(v, 0.5))));
+      const dr = stack.sub(r, minr);
+      const drl = stack.length(r);
+      const nd = drl == 0 ? stack.push(Number.MAX_VALUE, Number.MAX_VALUE) : stack.scale(dr, 1 / drl);
+      const sr = stack.scale(stack.add(r, minr), 0.5);
+      const d = Math.abs(stack.dot(nd, sr));
       mind = Math.min(d, mind);
       stack.stop();
     }
@@ -414,52 +408,49 @@ function grad(f: (stack: VecStack2d, pos: number) => number, stack: VecStack2d, 
   return stack.return(stack.push(stack.sub(d1, d2)[0], stack.sub(d3, d4)[0]));
 }
 
-function displace(p: (name: string) => Shape, oracle: Oracle<string>): Image {
-  let changecb: () => void;
+function displace(p: (name: string) => Image2d, oracle: Oracle<string>): Image2d {
+  const cbs = new Callbacks<Image2d>();
   const src = new ValueHandleIml('');
   const displace = new ValueHandleIml('');
   const scale = new ValueHandleIml(100);
-  src.addListener(() => changecb());
-  displace.addListener(() => changecb());
-  scale.addListener(() => changecb());
+  src.addListener(() => cbs.notify(null));
+  displace.addListener(() => cbs.notify(null));
+  scale.addListener(() => cbs.notify(null));
   const settings = properties([
     listProp('Source', oracle, src),
     listProp('Displace', oracle, displace),
     rangeProp('Scale', -1000, 1000, scale),
   ]);
-  const d = 0.00001;
-  const pixel = (x: number, y: number) => {
+  const pixel = (stack: VecStack2d, pos: number) => {
     const source = p(src.get());
-    if (!(source instanceof ImageShape)) return 0;
     const disp = p(displace.get());
-    if (!(disp instanceof ImageShape)) return 0;
     const s = scale.get() * 10000;
-    const [dx, dy] = grad(disp.image.pixel, x, y, d);
-    return source.image.pixel(x + dx * s, y + dy * s);
+    const d = grad(disp.pixel, stack, pos, 0.00001);
+    return source.pixel(stack, stack.scale(stack.add(pos, d), s));
   }
-  const onchange = (cb: () => void) => changecb = cb;
-  return { pixel, settings, onchange }
+  const addListener = (cb: (v: Image2d) => void) => cbs.add(cb);
+  const removeListener = (id: number) => cbs.remove(id);
+  return { pixel, settings, addListener, removeListener, type: Type.VALUE }
 }
 
-function distance2d(sdf: SdfShape<VecStack2d>): Image {
-  let changecb: () => void;
+function distance2d(sdf: SdfShape<VecStack2d>): Image2d {
+  const cbs = new Callbacks<Image2d>();
   const scale = new ValueHandleIml(100);
-  scale.addListener(() => changecb());
+  scale.addListener(() => cbs.notify(null));
   const settings = properties([
     rangeProp('Scale', 1, 10000, scale),
   ]);
 
-  const stack = new VecStack2d(16);
-  const pos = stack.allocate();
-  const pixel = (x: number, y: number) => {
-    stack.set(pos, x, y);
+  const pixel = (stack: VecStack2d, pos: number) => {
+    stack.start();
     const s = scale.get() / 100;
-    const d = sdf(stack, pos) * s;
-    return fract(d) * 256;
+    const d = sdf(stack, pos);
+    return stack.return(stack.apply(stack.scale(d, s), fract));
   }
 
-  const onchange = (cb: () => void) => changecb = cb;
-  return { pixel, settings, onchange }
+  const addListener = (cb: (v: Image2d) => void) => cbs.add(cb);
+  const removeListener = (id: number) => cbs.remove(id);
+  return { pixel, settings, addListener, removeListener, type: Type.VALUE }
 }
 
 class Painter {
@@ -516,8 +507,7 @@ class Painter {
         (stack: VecStack2d, p: number) => lineSegment(stack, p, p1, p2) - 0.01,
         (stack: VecStack2d, p: number) => lineSegment(stack, p, p3, p4));
       const d = circularArray(stack, p, 6, line);
-      stack.stop();
-      return d;
+      return stack.return(stack.push(d, 0));
     }));
   }
 

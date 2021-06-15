@@ -3,18 +3,16 @@ import { } from './mathutils';
 
 export class VecStack3d {
   private stack: Vec3Array[] = [];
-  private lastTop = 0;
-  private currentTop = 0;
-  private tops = [];
+  private sp = 0;
+  private sps = [];
 
   constructor(private size: number) {
     for (let i = 0; i < size; i++) this.stack.push(vec3.create());
   }
 
-  start(): VecStack3d { this.tops.push(this.currentTop); this.lastTop = this.currentTop; return this }
-  stop() { this.currentTop = this.tops.pop(); this.lastTop = this.currentTop }
+  start(): VecStack3d { this.sps.push(this.sp); return this }
+  stop() { this.sp = this.sps.pop(); }
   return(id: number): number { this.stop(); return this.pushVec(this.stack[id]) }
-  reset() { this.currentTop = this.lastTop }
   get(id: number): Vec3Array { return this.stack[id] }
   set(id: number, x: number, y: number, z: number) { vec3.set(this.stack[id], x, y, z) }
   copy(lh: number, rh: number): number { vec3.copy(this.stack[lh], this.stack[rh]); return lh }
@@ -23,7 +21,7 @@ export class VecStack3d {
   length(id: number): number { return vec3.len(this.stack[id]) }
   distance(lh: number, rh: number) { return vec3.dist(this.stack[lh], this.stack[rh]) }
   dot(lh: number, rh: number): number { return vec3.dot(this.stack[lh], this.stack[rh]) }
-  allocate(): number { return this.currentTop++ }
+  allocate(): number { return this.sp++ }
 
   add(lh: number, rh: number): number {
     const result = this.allocate();
@@ -52,18 +50,16 @@ export class VecStack3d {
 
 export class VecStack2d {
   private stack: Vec2Array[] = [];
-  private lastTop = 0;
-  private currentTop = 0;
-  private tops = [];
+  private sp = 0;
+  private sps = [];
 
   constructor(private size: number) {
     for (let i = 0; i < size; i++) this.stack.push(vec2.create());
   }
 
-  start(): VecStack2d { this.tops.push(this.currentTop); this.lastTop = this.currentTop; return this }
-  stop() { this.currentTop = this.tops.pop(); this.lastTop = this.currentTop }
+  start(): VecStack2d { this.sps.push(this.sp); return this }
+  stop() { this.sp = this.sps.pop(); }
   return(id: number): number { this.stop(); return this.pushVec(this.stack[id]) }
-  reset() { this.currentTop = this.lastTop }
   get(id: number): Vec2Array { return this.stack[id] }
   set(id: number, x: number, y: number) { vec2.set(this.stack[id], x, y) }
   copy(lh: number, rh: number): number { vec2.copy(this.stack[lh], this.stack[rh]); return lh }
@@ -72,7 +68,7 @@ export class VecStack2d {
   length(id: number): number { return vec2.len(this.stack[id]) }
   distance(lh: number, rh: number) { return vec2.dist(this.stack[lh], this.stack[rh]) }
   dot(lh: number, rh: number): number { return vec2.dot(this.stack[lh], this.stack[rh]) }
-  allocate(): number { return this.currentTop++ }
+  allocate(): number { return this.sp++ }
 
   add(lh: number, rh: number): number {
     const result = this.allocate();

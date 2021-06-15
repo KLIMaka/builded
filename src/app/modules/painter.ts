@@ -199,6 +199,7 @@ class Image2dRenderer {
     if (this.image != null) this.image.removeListener(this.imageHandle);
     this.image = img;
     this.imageHandle = img.addListener(img => this.scheduleRedraw());
+    this.scheduleRedraw();
   }
 
   private scheduleRedraw() {
@@ -209,6 +210,7 @@ class Image2dRenderer {
   private * redraw() {
     if (this.redrawCallback == null) return;
 
+    let time = 0;
     let t = window.performance.now();
     let off = 0;
     const size = this.size;
@@ -220,13 +222,16 @@ class Image2dRenderer {
         this.buff[off++] = 256 * this.stack.get(res)[0];
         this.stack.stop();
       }
-      if (window.performance.now() - t > 100) {
+      const dt = window.performance.now() - t;
+      if (dt > 100) {
         t = window.performance.now();
+        time += dt;
         this.redrawCallback();
         yield;
       }
     }
     this.redrawCallback();
+    console.log(time);
   }
 
   attach(buff: number[], size: number, cb: () => void): void {
@@ -375,7 +380,7 @@ function voronoi(p: (name: string) => Image2d, oracle: Oracle<string>): Image2d 
     for (let i = 0; i < 9; i++) {
       stack.start();
       const xy = stack.add(minxy, stack.pushVec(CORE[i]));
-      const v = grad(img, stack, xy, 0.0001);
+      const v = stack.pushVec(hash(img(stack, xy)));
       const r = stack.sub(xy, stack.add(f, stack.add(half, stack.scale(v, 0.5))));
       const dr = stack.sub(r, minr);
       const drl = stack.length(r);
@@ -386,7 +391,7 @@ function voronoi(p: (name: string) => Image2d, oracle: Oracle<string>): Image2d 
       stack.stop();
     }
 
-    return mind * 256;
+    return stack.return(stack.push(mind, 0));
   }
   const addListener = (cb: (v: Image2d) => void) => cbs.add(cb);
   const removeListener = (id: number) => cbs.remove(id);
@@ -395,17 +400,17 @@ function voronoi(p: (name: string) => Image2d, oracle: Oracle<string>): Image2d 
 
 function hash(x: number): [number, number] {
   const nx = x / 255;
-  return [(0.5 + Math.sin(x) * 0.5) * 0.8, (0.5 + Math.cos(x) * 0.5) * 0.8];
+  return [(0.5 + Math.sin(nx) * 0.5) * 0.8, (0.5 + Math.cos(nx) * 0.5) * 0.8];
   // return [perlin2d(nx, 0), perlin2d(0, nx)];
 }
 
 function grad(f: (stack: VecStack2d, pos: number) => number, stack: VecStack2d, pos: number, d: number) {
   stack.start();
-  const d1 = f(stack, stack.add(pos, stack.push(-d, 0)));
-  const d2 = f(stack, stack.add(pos, stack.push(d, 0)));
-  const d3 = f(stack, stack.add(pos, stack.push(0, -d)));
-  const d4 = f(stack, stack.add(pos, stack.push(0, d)));
-  return stack.return(stack.push(stack.sub(d1, d2)[0], stack.sub(d3, d4)[0]));
+  const d1 = stack.get(f(stack, stack.add(pos, stack.push(-d, 0))))[0];
+  const d2 = stack.get(f(stack, stack.add(pos, stack.push(d, 0))))[0];
+  const d3 = stack.get(f(stack, stack.add(pos, stack.push(0, -d))))[0];
+  const d4 = stack.get(f(stack, stack.add(pos, stack.push(0, d))))[0];
+  return stack.return(stack.push(d1 - d2, d3 - d4));
 }
 
 function displace(p: (name: string) => Image2d, oracle: Oracle<string>): Image2d {
@@ -491,13 +496,13 @@ class Painter {
 
     const kdtree = new KDTree([...map(range(0, 100), _ => <[number, number]>[Math.random(), Math.random()])]);
 
-    this.addShape('Circle', circle());
-    this.addShape('Perlin', perlin());
-    this.addShape('Select', select(this.imageProvider(), this.shapeOracle()));
-    this.addShape('Displace', displace(this.imageProvider(), this.shapeOracle()));
-    this.addShape('Voronoi', voronoi(this.imageProvider(), this.shapeOracle()));
-    this.addShape('Distance', distance2d((stack, p) => kdtree.distance(stack.get(p)[0], stack.get(p)[1])));
-    this.addShape('Line', distance2d((stack, p) => {
+    this.addImage('Circle', circle());
+    this.addImage('Perlin', perlin());
+    this.addImage('Select', select(this.imageProvider(), this.shapeOracle()));
+    this.addImage('Displace', displace(this.imageProvider(), this.shapeOracle()));
+    this.addImage('Voronoi', voronoi(this.imageProvider(), this.shapeOracle()));
+    this.addImage('Distance', distance2d((stack, p) => stack.push(kdtree.distance(stack.get(p)[0], stack.get(p)[1]), 0)));
+    this.addImage('Line', distance2d((stack, p) => {
       stack.start();
       const p1 = stack.push(0.5, 0.0);
       const p2 = stack.push(0.5, 1.0);
@@ -523,7 +528,7 @@ class Painter {
     this.buffer = new Array<number>(this.bufferSize * this.bufferSize);
   }
 
-  private addShape(name: string, img: Image2d) {
+  private addImage(name: string, img: Image2d) {
     const id = this.images.length;
     this.images.push(img);
     const item = this.imagesModel.add(name);

@@ -219,7 +219,7 @@ class Image2dRenderer {
         this.stack.start();
         this.stack.set(this.position, x / size, y / size);
         const res = this.image.pixel(this.stack, this.position);
-        this.buff[off++] = 256 * this.stack.get(res)[0];
+        this.buff[off++] = 256 * this.stack.get(res);
         this.stack.stop();
       }
       const dt = window.performance.now() - t;
@@ -269,7 +269,7 @@ function perlin(): Image2d {
   const pixel = (stack: VecStack2d, pos: number) => {
     const noise = octaves2d(perlin2d, octaves.get());
     const s = scale.get() / 100;
-    return stack.push(noise(stack.get(pos)[0] * s, stack.get(pos)[1] * s), 0);
+    return stack.push(noise(stack.get(pos) * s, stack.get(pos + 1) * s), 0);
   }
   const addListener = (cb: (v: Image2d) => void) => cbs.add(cb);
   const removeListener = (id: number) => cbs.remove(id);
@@ -472,6 +472,8 @@ class Painter {
 
   private buffer: number[];
   private bufferSize = 512;
+  private data: Uint8ClampedArray;
+  private id: ImageData;
   private renderer: Image2dRenderer;
 
   private images: Image2d[] = [];
@@ -495,6 +497,24 @@ class Painter {
       .build();
 
     const kdtree = new KDTree([...map(range(0, 100), _ => <[number, number]>[Math.random(), Math.random()])]);
+    const line1 = (stack: VecStack2d, p: number) => {
+      stack.start();
+      const p1 = stack.push(0.5, 0.0);
+      const p2 = stack.push(0.5, 1.0);
+      const d = lineSegment(stack, p, p1, p2) - 0.01;
+      stack.stop();
+      return d;
+    }
+    const line2 = (stack: VecStack2d, p: number) => {
+      stack.start();
+      const p1 = stack.push(0.0, 0.6);
+      const p2 = stack.push(1.0, 0.6);
+      const d = lineSegment(stack, p, p1, p2);
+      stack.stop();
+      return d;
+    }
+    const lines = (stack: VecStack2d, p: number) => union(stack, p, line1, line2);
+    const circular = (stack: VecStack2d, p: number) => { stack.start(); return stack.return(stack.push(circularArray(stack, p, 6, lines), 0)) }
 
     this.addImage('Circle', circle());
     this.addImage('Perlin', perlin());
@@ -502,18 +522,7 @@ class Painter {
     this.addImage('Displace', displace(this.imageProvider(), this.shapeOracle()));
     this.addImage('Voronoi', voronoi(this.imageProvider(), this.shapeOracle()));
     this.addImage('Distance', distance2d((stack, p) => stack.push(kdtree.distance(stack.get(p)[0], stack.get(p)[1]), 0)));
-    this.addImage('Line', distance2d((stack, p) => {
-      stack.start();
-      const p1 = stack.push(0.5, 0.0);
-      const p2 = stack.push(0.5, 1.0);
-      const p3 = stack.push(0.0, 0.6);
-      const p4 = stack.push(1.0, 0.6);
-      const line = (stack: VecStack2d, p: number) => union(stack, p,
-        (stack: VecStack2d, p: number) => lineSegment(stack, p, p1, p2) - 0.01,
-        (stack: VecStack2d, p: number) => lineSegment(stack, p, p3, p4));
-      const d = circularArray(stack, p, 6, line);
-      return stack.return(stack.push(d, 0));
-    }));
+    this.addImage('Line', distance2d(circular));
   }
 
   private imageProvider(): (name: string) => Image2d {
@@ -526,6 +535,8 @@ class Painter {
 
   private recreateBuffer() {
     this.buffer = new Array<number>(this.bufferSize * this.bufferSize);
+    this.data = new Uint8ClampedArray(640 * 640 * 4);
+    this.id = new ImageData(this.data, 640, 640);
   }
 
   private addImage(name: string, img: Image2d) {
@@ -552,7 +563,8 @@ class Painter {
     const x = this.centerX - off;
     const y = this.centerY - off;
     const framed = rect(scaled, -x, -y, this.display.width - x, this.display.height - y, 0);
-    drawToCanvas(framed, ctx, grayRasterizer);
+    grayRasterizer(framed, this.data);
+    ctx.putImageData(this.id, 0, 0);
   }
 
   private createView(): HTMLElement {

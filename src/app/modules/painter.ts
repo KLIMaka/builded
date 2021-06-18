@@ -1,21 +1,23 @@
 import h from "stage0";
-import { Vec2Array, vec3, Vec3Array } from "../../libs_js/glmatrix";
+import { vec3, Vec3Array } from "../../libs_js/glmatrix";
 import { filter, map, range } from "../../utils/collections";
 import { drawToCanvas } from "../../utils/imgutils";
 import { create, lifecycle, Module, plugin } from "../../utils/injector";
+import { KDTree } from "../../utils/kdtree";
+import { FastList } from "../../utils/list";
 import { clamp, fract, int, len2d, octaves2d, perlin2d } from "../../utils/mathutils";
 import { array, Raster, rect, resize } from "../../utils/pixelprovider";
 import { listProp, NavItem1, navTree, NavTreeModel, Oracle, properties, rangeProp, ValueHandleIml } from "../../utils/ui/renderers";
 import { addDragController, replaceContent } from "../../utils/ui/ui";
+import { VecStack2d } from "../../utils/vecstack";
+import { loadWasm } from "../../utils/wasm/wasm";
 import { Scheduler, SCHEDULER, TaskHandle } from "../apis/app";
 import { BUS, busDisconnector } from "../apis/handler";
 import { Ui, UI, Window } from "../apis/ui";
 import { namedMessageHandler } from "../edit/messages";
-import { VecStack2d } from "../../utils/vecstack";
-import { circularArray, lineSegment, SdfShape, sunion, union } from "../modules/sdf/sdf";
-import { KDTree } from "../../utils/kdtree";
-import { FastList, List } from "../../utils/list";
+import { circularArray, lineSegment, SdfShape, union } from "../modules/sdf/sdf";
 
+let lineSegment1: (x: number, y: number, p1x: number, p1y: number, p2x: number, p2y: number) => number;
 
 export async function PainterModule(module: Module) {
   module.bind(plugin('Painter'), lifecycle(async (injector, lifecycle) => {
@@ -23,6 +25,22 @@ export async function PainterModule(module: Module) {
     const editor = await create(injector, Painter, UI, SCHEDULER);
     lifecycle(bus.connect(namedMessageHandler('show_painter', () => editor.show())), busDisconnector(bus));
     lifecycle(editor, async e => e.stop());
+
+    const wasm = await loadWasm('./resources/test.wasm');
+    const floats = new Float32Array(wasm.memory);
+    lineSegment1 = (x, y, p1x, p1y, p2x, p2y) => {
+      floats[0] = x;
+      floats[1] = y;
+
+      floats[4] = p1x;
+      floats[5] = p1y;
+
+      floats[8] = p2x;
+      floats[9] = p2y;
+
+      return wasm.exports.line(0);
+    }
+
   }));
 }
 
@@ -504,13 +522,9 @@ class Painter {
     this.addImage('Distance', distance2d((stack, p) => stack.push(kdtree.distance(stack.get(p)[0], stack.get(p)[1]), 0)));
     this.addImage('Line', distance2d((stack, p) => {
       stack.start();
-      const p1 = stack.push(0.5, 0.0);
-      const p2 = stack.push(0.5, 1.0);
-      const p3 = stack.push(0.0, 0.6);
-      const p4 = stack.push(1.0, 0.6);
       const line = (stack: VecStack2d, p: number) => union(stack, p,
-        (stack: VecStack2d, p: number) => lineSegment(stack, p, p1, p2) - 0.01,
-        (stack: VecStack2d, p: number) => lineSegment(stack, p, p3, p4));
+        (stack: VecStack2d, p: number) => lineSegment1(stack.get(p)[0], stack.get(p)[1], 0.5, 0.0, 0.5, 1.0) - 0.01,
+        (stack: VecStack2d, p: number) => lineSegment1(stack.get(p)[0], stack.get(p)[1], 0.0, 0.6, 1.0, 0.6));
       const d = circularArray(stack, p, 6, line);
       return stack.return(stack.push(d, 0));
     }));

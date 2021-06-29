@@ -525,6 +525,31 @@ function transform(p: (name: string) => Image2d, oracle: Oracle<string>): Image2
   return { pixel, settings, addListener, removeListener, type: Type.VALUE }
 }
 
+function grid(stack: VecStack, p: (name: string) => Image2d, oracle: Oracle<string>): Image2d {
+  const cbs = new Callbacks<Image2d>();
+  const offx = new ValueHandleIml(0);
+  const offy = new ValueHandleIml(0);
+  const scale = new ValueHandleIml(1);
+  const off = stack.pushGlobal(0, 0, 0, 0);
+  const s = stack.pushGlobal(1, 1, 1, 1);
+  offx.addListener(v => { stack.setx(off, v / 100); cbs.notify(null) });
+  offy.addListener(v => { stack.sety(off, v / 100); cbs.notify(null) });
+  scale.addListener(v => { stack.set(s, v, v, v, v); cbs.notify(null) });
+  const settings = properties([
+    rangeProp('X Offset', -100, 100, offx),
+    rangeProp('Y Offset', -100, 100, offy),
+    rangeProp("Scale", 1, 100, scale)
+  ]);
+  const f = pointGrid(s, off);
+  const pixel = (stack: VecStack, pos: number) => {
+    return stack.call(f, pos);
+  }
+
+  const addListener = (cb: (v: Image2d) => void) => cbs.add(cb);
+  const removeListener = (id: number) => cbs.remove(id);
+  return { pixel, settings, addListener, removeListener, type: Type.VALUE }
+}
+
 class Painter {
   private window: Window;
   private display: HTMLCanvasElement;
@@ -568,7 +593,7 @@ class Painter {
     const line1 = lineSegment(this.stack.pushGlobal(0.5, 0.0, 0, 0), this.stack.pushGlobal(0.5, 1.0, 0, 0));
     const line2 = lineSegment(this.stack.pushGlobal(0.0, 0.6, 0, 0), this.stack.pushGlobal(1.0, 0.6, 0, 0));
     const lines = union(line1, line2);
-    const grid = pointGrid(this.stack.pushGlobal(1, 1, 1, 1), this.stack.pushGlobal(0.5, 0, 0, 0))
+    // const grid = pointGrid(this.stack.pushGlobal(1, 1, 1, 1), this.stack.pushGlobal(0.5, 0, 0, 0))
     const _hash = (stack: VecStack, p: number) => hash(stack, perlin2d(stack.x(p) * 13.123, stack.y(p) * 13.123))
     const points = displacedPointGrid(this.stack.pushGlobal(10, 10, 1, 1), this.stack.pushGlobal(0, 0, 0, 0), _hash);
 
@@ -582,6 +607,7 @@ class Painter {
     // this.addImage('Line', distance2d(circular));
     this.addImage('Circular', circular(this.imageProvider(), this.shapeOracle()));
     this.addImage('Transform', transform(this.imageProvider(), this.shapeOracle()));
+    this.addImage('Grid', grid(this.stack, this.imageProvider(), this.shapeOracle()));
   }
 
   private imageProvider(): (name: string) => Image2d {

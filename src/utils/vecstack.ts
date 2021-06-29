@@ -31,6 +31,10 @@ export class VecStack {
   y(ptr: number) { return this.stack[ptr + 1] }
   z(ptr: number) { return this.stack[ptr + 2] }
   w(ptr: number) { return this.stack[ptr + 3] }
+  setx(ptr: number, v: number): VecStack { this.stack[ptr] = v; return this }
+  sety(ptr: number, v: number): VecStack { this.stack[ptr + 1] = v; return this }
+  setz(ptr: number, v: number): VecStack { this.stack[ptr + 2] = v; return this }
+  setw(ptr: number, v: number): VecStack { this.stack[ptr + 3] = v; return this }
 
   copy(lh: number, rh: number): number {
     this.stack[lh] = this.stack[rh];

@@ -33,9 +33,9 @@ export const sintersect = (k: number) => SdfReducer((d1, d2) => {
 
 export function pointGrid(scale: number, offset: number) {
   return (stack: VecStack, pos: number) => {
-    const scaled = stack.mul(stack.add(pos, offset), scale);
-    const gridPos = stack.apply(scaled, Math.floor);
-    const f = stack.apply(scaled, fract);
+    const scaled = stack.mul(pos, scale);
+    const gridPos = stack.add(stack.apply(scaled, Math.floor), offset);
+    const f = stack.sub(stack.apply(scaled, fract), offset);
     const closest = stack.div(stack.add(gridPos, stack.push(stack.x(f) < 0.5 ? 0 : 1, stack.y(f) < 0.5 ? 0 : 1, 0, 0)), scale);
     return stack.push(stack.distance(pos, closest), 0, 0, 0);
   }

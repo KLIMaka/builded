@@ -286,7 +286,7 @@ function circle(): Image2d {
   ]);
   const pixel = (stack: VecStack, pos: number) => {
     const r = radius.get() / 100;
-    const l = stack.sub(pos, stack.push(0.5, 0.5, 0, 0));
+    const l = stack.distance(pos, stack.push(0.5, 0.5, 0, 0));
     const v = clamp(r - l, 0, r);
     const p = 1 + pow.get() / 10;
     const pp = p >= 1 ? p : (1 / (2 - p))
@@ -471,6 +471,60 @@ function repeat(p: (name: string) => Image2d, oracle: Oracle<string>): Image2d {
   return { pixel, settings, addListener, removeListener, type: Type.VALUE }
 }
 
+function circular(p: (name: string) => Image2d, oracle: Oracle<string>): Image2d {
+  const cbs = new Callbacks<Image2d>();
+  const count = new ValueHandleIml(4);
+  const src = new ValueHandleIml('');
+  count.addListener(() => cbs.notify(null));
+  src.addListener(() => cbs.notify(null));
+  const settings = properties([
+    listProp('Source', oracle, src),
+    rangeProp('Count', 1, 100, count),
+  ]);
+
+  const pixel = (stack: VecStack, pos: number) => {
+    const source = p(src.get());
+    return stack.call(circularArray(count.get(), source.pixel), pos);
+  }
+
+  const addListener = (cb: (v: Image2d) => void) => cbs.add(cb);
+  const removeListener = (id: number) => cbs.remove(id);
+  return { pixel, settings, addListener, removeListener, type: Type.VALUE }
+}
+
+function transform(p: (name: string) => Image2d, oracle: Oracle<string>): Image2d {
+  const cbs = new Callbacks<Image2d>();
+  const scale = new ValueHandleIml(1);
+  const offx = new ValueHandleIml(0);
+  const offy = new ValueHandleIml(0);
+  const src = new ValueHandleIml('');
+  src.addListener(() => cbs.notify(null));
+  scale.addListener(() => cbs.notify(null));
+  offx.addListener(() => cbs.notify(null));
+  offy.addListener(() => cbs.notify(null));
+  const settings = properties([
+    listProp('Source', oracle, src),
+    rangeProp('Scale', -100, 100, scale),
+    rangeProp('X Offset', -100, 100, offx),
+    rangeProp('Y Offset', -100, 100, offy),
+  ]);
+
+  const pixel = (stack: VecStack, pos: number) => {
+    const source = p(src.get());
+    const x = offx.get() / 10;
+    const y = offy.get() / 10;
+    const s = scale.get() / 10;
+    const half = stack.push(0.5, 0.5, 0, 0);
+    const off = stack.push(x, y, 0, 0);
+    const np = stack.add(stack.add(stack.scale(stack.sub(pos, half), s < 0 ? s : (1 / -s)), half), off);
+    return stack.call(source.pixel, np);
+  }
+
+  const addListener = (cb: (v: Image2d) => void) => cbs.add(cb);
+  const removeListener = (id: number) => cbs.remove(id);
+  return { pixel, settings, addListener, removeListener, type: Type.VALUE }
+}
+
 class Painter {
   private window: Window;
   private display: HTMLCanvasElement;
@@ -514,10 +568,9 @@ class Painter {
     const line1 = lineSegment(this.stack.pushGlobal(0.5, 0.0, 0, 0), this.stack.pushGlobal(0.5, 1.0, 0, 0));
     const line2 = lineSegment(this.stack.pushGlobal(0.0, 0.6, 0, 0), this.stack.pushGlobal(1.0, 0.6, 0, 0));
     const lines = union(line1, line2);
-    const grid = pointGrid(this.stack.pushGlobal(2, 2, 1, 1), this.stack.pushGlobal(0, 0, 0, 0))
+    const grid = pointGrid(this.stack.pushGlobal(1, 1, 1, 1), this.stack.pushGlobal(0.5, 0, 0, 0))
     const _hash = (stack: VecStack, p: number) => hash(stack, perlin2d(stack.x(p) * 13.123, stack.y(p) * 13.123))
     const points = displacedPointGrid(this.stack.pushGlobal(10, 10, 1, 1), this.stack.pushGlobal(0, 0, 0, 0), _hash);
-    const circular = circularArray(4, grid);
 
     this.addImage('Circle', circle());
     this.addImage('Perlin', perlin());
@@ -526,7 +579,9 @@ class Painter {
     this.addImage('Repeat', repeat(this.imageProvider(), this.shapeOracle()));
     this.addImage('Voronoi', voronoi(this.stack, this.imageProvider(), this.shapeOracle()));
     this.addImage('Distance', distance2d((stack, p) => stack.push(kdtree.distance(stack.x(p), stack.y(p)), 0, 0, 0)));
-    this.addImage('Line', distance2d(circular));
+    // this.addImage('Line', distance2d(circular));
+    this.addImage('Circular', circular(this.imageProvider(), this.shapeOracle()));
+    this.addImage('Transform', transform(this.imageProvider(), this.shapeOracle()));
   }
 
   private imageProvider(): (name: string) => Image2d {

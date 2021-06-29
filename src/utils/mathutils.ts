@@ -119,6 +119,16 @@ export function cyclic(x: number, max: number): number {
   return x >= 0 ? mod : mod == 0 ? max - 1 : max + mod;
 }
 
+export function cubic(x: number): number {
+  return 3 * x * x - 2 * x * x * x;
+}
+
+export function smothstep(x: number, min: number, max: number) {
+  if (x < min) return 0;
+  if (x > max) return 1;
+  return cubic((x - min) / (max - min));
+}
+
 export function ubyte2byte(n: number) {
   var minus = (n & 0x80) != 0;
   return minus ? -(~n & 0xFF) - 1 : n;

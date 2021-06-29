@@ -1,23 +1,21 @@
 import h from "stage0";
-import { vec3, Vec3Array } from "../../libs_js/glmatrix";
+import { Vec2Array, vec3, Vec3Array } from "../../libs_js/glmatrix";
 import { filter, map, range } from "../../utils/collections";
 import { drawToCanvas } from "../../utils/imgutils";
 import { create, lifecycle, Module, plugin } from "../../utils/injector";
 import { KDTree } from "../../utils/kdtree";
 import { FastList } from "../../utils/list";
-import { clamp, fract, int, len2d, octaves2d, perlin2d } from "../../utils/mathutils";
+import { clamp, fract, int, len2d, octaves2d, perlin2d, smothstep } from "../../utils/mathutils";
 import { array, Raster, rect, resize } from "../../utils/pixelprovider";
 import { listProp, NavItem1, navTree, NavTreeModel, Oracle, properties, rangeProp, ValueHandleIml } from "../../utils/ui/renderers";
 import { addDragController, replaceContent } from "../../utils/ui/ui";
-import { VecStack2d } from "../../utils/vecstack";
+import { VecStack } from "../../utils/vecstack";
 import { loadWasm } from "../../utils/wasm/wasm";
 import { Scheduler, SCHEDULER, TaskHandle } from "../apis/app";
 import { BUS, busDisconnector } from "../apis/handler";
 import { Ui, UI, Window } from "../apis/ui";
 import { namedMessageHandler } from "../edit/messages";
-import { circularArray, lineSegment, SdfShape, union } from "../modules/sdf/sdf";
-
-let lineSegment1: (x: number, y: number, p1x: number, p1y: number, p2x: number, p2y: number) => number;
+import { circularArray, displacedPointGrid, lineSegment, pointGrid, SdfShape, union } from "../modules/sdf/sdf";
 
 export async function PainterModule(module: Module) {
   module.bind(plugin('Painter'), lifecycle(async (injector, lifecycle) => {
@@ -25,22 +23,6 @@ export async function PainterModule(module: Module) {
     const editor = await create(injector, Painter, UI, SCHEDULER);
     lifecycle(bus.connect(namedMessageHandler('show_painter', () => editor.show())), busDisconnector(bus));
     lifecycle(editor, async e => e.stop());
-
-    const wasm = await loadWasm('./resources/test.wasm');
-    const floats = new Float32Array(wasm.memory);
-    lineSegment1 = (x, y, p1x, p1y, p2x, p2y) => {
-      floats[0] = x;
-      floats[1] = y;
-
-      floats[4] = p1x;
-      floats[5] = p1y;
-
-      floats[8] = p2x;
-      floats[9] = p2y;
-
-      return wasm.exports.line(0);
-    }
-
   }));
 }
 
@@ -191,7 +173,7 @@ interface Shape {
 }
 
 interface Image2d {
-  pixel(stack: VecStack2d, pos: number): number;
+  pixel(stack: VecStack, pos: number): number;
   readonly settings: HTMLElement;
   readonly type: Type;
   addListener(cb: (img: Image2d) => void): number;
@@ -205,12 +187,10 @@ class Image2dRenderer {
   private scheduleHandle: TaskHandle;
   private image: Image2d;
   private imageHandle: number;
-  private stack = new VecStack2d(128);
-
   private position: number;
 
-  constructor(private scheduler: Scheduler) {
-    this.position = this.stack.push(0, 0);
+  constructor(private scheduler: Scheduler, private stack: VecStack) {
+    this.position = this.stack.pushGlobal(0, 0, 0, 0);
   }
 
   public set(img: Image2d) {
@@ -234,11 +214,11 @@ class Image2dRenderer {
     const size = this.size;
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
-        this.stack.start();
-        this.stack.set(this.position, x / size, y / size);
-        const res = this.image.pixel(this.stack, this.position);
-        this.buff[off++] = 256 * this.stack.get(res);
-        this.stack.stop();
+        this.stack.begin();
+        this.stack.set(this.position, x / size, y / size, 0, 0);
+        const res = this.stack.call(this.image.pixel, this.position);
+        this.buff[off++] = 256 * this.stack.x(res);
+        this.stack.end();
       }
       const dt = window.performance.now() - t;
       if (dt > 100) {
@@ -278,16 +258,16 @@ function perlin(): Image2d {
   const cbs = new Callbacks<Image2d>();
   const scale = new ValueHandleIml(1024);
   const octaves = new ValueHandleIml(1);
+  let noise = octaves2d(perlin2d, 1);
   scale.addListener(() => cbs.notify(null));
-  octaves.addListener(() => cbs.notify(null));
+  octaves.addListener(o => { noise = octaves2d(perlin2d, o); cbs.notify(null) });
   const settings = properties([
     rangeProp('Scale', 0, 10 * 1024, scale),
     rangeProp('Octaves', 1, 4, octaves)
   ]);
-  const pixel = (stack: VecStack2d, pos: number) => {
-    const noise = octaves2d(perlin2d, octaves.get());
+  const pixel = (stack: VecStack, pos: number) => {
     const s = scale.get() / 100;
-    return stack.push(noise(stack.get(pos) * s, stack.get(pos + 1) * s), 0);
+    return stack.push(noise(stack.x(pos) * s, stack.y(pos) * s), 0, 0, 0);
   }
   const addListener = (cb: (v: Image2d) => void) => cbs.add(cb);
   const removeListener = (id: number) => cbs.remove(id);
@@ -304,15 +284,14 @@ function circle(): Image2d {
     rangeProp('Radius', 1, 100, radius),
     rangeProp('Power', -100, 100, pow),
   ]);
-  const pixel = (stack: VecStack2d, pos: number) => {
-    stack.start();
+  const pixel = (stack: VecStack, pos: number) => {
     const r = radius.get() / 100;
-    const l = stack.sub(pos, stack.push(0.5, 0.5));
+    const l = stack.sub(pos, stack.push(0.5, 0.5, 0, 0));
     const v = clamp(r - l, 0, r);
     const p = 1 + pow.get() / 10;
     const pp = p >= 1 ? p : (1 / (2 - p))
     const k = Math.pow(v / r, pp) * r;
-    return stack.return(stack.push(k, 0));
+    return stack.push(k, 0, 0, 0);
   }
   const addListener = (cb: (v: Image2d) => void) => cbs.add(cb);
   const removeListener = (id: number) => cbs.remove(id);
@@ -324,37 +303,35 @@ function select(p: (name: string) => Image2d, oracle: Oracle<string>): Image2d {
   const src = new ValueHandleIml('');
   const from = new ValueHandleIml(0);
   const to = new ValueHandleIml(255);
+  const smoth = new ValueHandleIml(0);
   src.addListener(() => cbs.notify(null));
   from.addListener(() => cbs.notify(null));
   to.addListener(() => cbs.notify(null));
+  smoth.addListener(() => cbs.notify(null));
   const settings = properties([
     listProp('Source', oracle, src),
     rangeProp('From', 0, 255, from),
     rangeProp('To', 0, 255, to),
+    rangeProp('Smoth', 0, 100, smoth),
   ]);
-  const pixel = (stack: VecStack2d, pos: number) => {
+  const pixel = (stack: VecStack, pos: number) => {
     const img = p(src.get());
-    const value = img.pixel(stack, pos);
-    return stack.push(value >= from.get() && value <= to.get() ? 1 : 0, 0);
+    const value = stack.x(stack.call(img.pixel, pos));
+    const f = from.get() / 255;
+    const t = to.get() / 255;
+    const s = smoth.get() / 100;
+    const l = smothstep(value, f - s, f);
+    const r = 1 - smothstep(value, t, t + s);
+    return stack.push(Math.min(l, r), 0, 0, 0);
   }
   const addListener = (cb: (v: Image2d) => void) => cbs.add(cb);
   const removeListener = (id: number) => cbs.remove(id);
   return { pixel, settings, addListener, removeListener, type: Type.VALUE }
 }
 
-const CORE = [
-  [-1, -1], [0, -1], [1, -1],
-  [-1, 0], [0, 0], [1, 0],
-  [-1, 1], [0, 1], [1, 1],
+const CORE: [number, number][] = [[-1, -1], [0, -1], [1, -1], [-1, 0], [0, 0], [1, 0], [-1, 1], [0, 1], [1, 1]]
 
-  [-2, -2], [-1, -2], [0, -2], [1, -2], [2, -2],
-  [-2, -1], [2, -1],
-  [-2, 0], [2, 0],
-  [-2, 1], [2, 1],
-  [-2, 2], [-1, 2], [0, 2], [1, 2], [2, 2],
-]
-
-function voronoi(p: (name: string) => Image2d, oracle: Oracle<string>): Image2d {
+function voronoi(stack: VecStack, p: (name: string) => Image2d, oracle: Oracle<string>): Image2d {
   const cbs = new Callbacks<Image2d>();
   const noise = new ValueHandleIml('');
   const scale = new ValueHandleIml(4);
@@ -364,71 +341,65 @@ function voronoi(p: (name: string) => Image2d, oracle: Oracle<string>): Image2d 
     listProp('Noise', oracle, noise),
     rangeProp('Scale', 1, 100, scale)
   ]);
-  const pixel = (stack: VecStack2d, pos: number) => {
-    stack.start();
+  const core = [...map(CORE, c => stack.pushGlobal(c[0], c[1], 0, 0))];
+  const pixel = (stack: VecStack, pos: number) => {
     const noiseImage = p(noise.get());
-    const s = scale.get();
-    const n = stack.scale(pos, s);
+    const s = 1 / scale.get();
+    const n = stack.scale(pos, 1 / s);
     const c = stack.apply(n, Math.floor);
     const f = stack.apply(n, fract);
-    const half = stack.push(0.5, 0.5);
-    const img = (stack: VecStack2d, pos: number) => noiseImage.pixel(stack, stack.scale(stack.add(c, pos), 1 / s));
+    const img = (stack: VecStack, pos: number) => stack.call(noiseImage.pixel, stack.scale(stack.add(c, pos), s));
 
     let mind = 8;
     let mini = 0;
     const minr = stack.allocate();
 
     for (let i = 0; i < 9; i++) {
-      stack.start();
-      const xy = stack.pushVec(CORE[i]);
-      const v = stack.pushVec(hash(img(stack, xy)));
-      const r = stack.sub(xy, stack.add(f, v))
-      const d = stack.length(r);
-
+      stack.begin();
+      const xy = core[i];
+      const v = hash(stack, img(stack, xy));
+      const r = stack.add(xy, stack.sub(v, f));
+      const d = stack.dot(r, r);
       if (d < mind) {
         mind = d;
         mini = i;
         stack.copy(minr, r);
       }
-      stack.stop();
+      stack.end();
     }
 
-    const minxy = stack.pushVec(CORE[mini]);
+    const minxy = core[mini];
     mind = 8;
     for (let i = 0; i < 9; i++) {
-      stack.start();
-      const xy = stack.add(minxy, stack.pushVec(CORE[i]));
-      const v = stack.pushVec(hash(img(stack, xy)));
-      const r = stack.sub(xy, stack.add(f, stack.add(half, stack.scale(v, 0.5))));
+      stack.begin();
+      const xy = stack.add(minxy, core[i]);
+      const v = hash(stack, img(stack, xy));
+      const r = stack.add(xy, stack.sub(v, f));
       const dr = stack.sub(r, minr);
-      const drl = stack.length(r);
-      const nd = drl == 0 ? stack.push(Number.MAX_VALUE, Number.MAX_VALUE) : stack.scale(dr, 1 / drl);
+      if (stack.eqz(dr)) { stack.end(); continue }
       const sr = stack.scale(stack.add(r, minr), 0.5);
-      const d = Math.abs(stack.dot(nd, sr));
+      const d = Math.abs(stack.dot(sr, dr));
       mind = Math.min(d, mind);
-      stack.stop();
+      stack.end();
     }
 
-    return stack.return(stack.push(mind, 0));
+    return stack.push(mind, 0, 0, 0);
   }
   const addListener = (cb: (v: Image2d) => void) => cbs.add(cb);
   const removeListener = (id: number) => cbs.remove(id);
   return { pixel, settings, addListener, removeListener, type: Type.VALUE }
 }
 
-function hash(x: number): [number, number] {
-  const nx = x / 255;
-  return [(0.5 + Math.sin(nx) * 0.5) * 0.8, (0.5 + Math.cos(nx) * 0.5) * 0.8];
-  // return [perlin2d(nx, 0), perlin2d(0, nx)];
+function hash(stack: VecStack, x: number): number {
+  return stack.push((0.5 + Math.sin(x * Math.PI) * 0.5), (0.5 + Math.cos(x * Math.PI) * 0.5), 0, 0);
 }
 
-function grad(f: (stack: VecStack2d, pos: number) => number, stack: VecStack2d, pos: number, d: number) {
-  stack.start();
-  const d1 = stack.get(f(stack, stack.add(pos, stack.push(-d, 0))))[0];
-  const d2 = stack.get(f(stack, stack.add(pos, stack.push(d, 0))))[0];
-  const d3 = stack.get(f(stack, stack.add(pos, stack.push(0, -d))))[0];
-  const d4 = stack.get(f(stack, stack.add(pos, stack.push(0, d))))[0];
-  return stack.return(stack.push(d1 - d2, d3 - d4));
+function grad(f: (stack: VecStack, pos: number) => number, stack: VecStack, pos: number, d: number) {
+  const d1 = stack.x(f(stack, stack.add(pos, stack.push(-d, 0, 0, 0))));
+  const d2 = stack.x(f(stack, stack.add(pos, stack.push(d, 0, 0, 0))));
+  const d3 = stack.x(f(stack, stack.add(pos, stack.push(0, -d, 0, 0))));
+  const d4 = stack.x(f(stack, stack.add(pos, stack.push(0, d, 0, 0))));
+  return stack.push(d1 - d2, d3 - d4, 0, 0);
 }
 
 function displace(p: (name: string) => Image2d, oracle: Oracle<string>): Image2d {
@@ -444,7 +415,7 @@ function displace(p: (name: string) => Image2d, oracle: Oracle<string>): Image2d
     listProp('Displace', oracle, displace),
     rangeProp('Scale', -1000, 1000, scale),
   ]);
-  const pixel = (stack: VecStack2d, pos: number) => {
+  const pixel = (stack: VecStack, pos: number) => {
     const source = p(src.get());
     const disp = p(displace.get());
     const s = scale.get() * 10000;
@@ -456,7 +427,7 @@ function displace(p: (name: string) => Image2d, oracle: Oracle<string>): Image2d
   return { pixel, settings, addListener, removeListener, type: Type.VALUE }
 }
 
-function distance2d(sdf: SdfShape<VecStack2d>): Image2d {
+function distance2d(sdf: SdfShape): Image2d {
   const cbs = new Callbacks<Image2d>();
   const scale = new ValueHandleIml(100);
   scale.addListener(() => cbs.notify(null));
@@ -464,11 +435,35 @@ function distance2d(sdf: SdfShape<VecStack2d>): Image2d {
     rangeProp('Scale', 1, 10000, scale),
   ]);
 
-  const pixel = (stack: VecStack2d, pos: number) => {
-    stack.start();
+  const pixel = (stack: VecStack, pos: number) => {
     const s = scale.get() / 100;
-    const d = sdf(stack, pos);
-    return stack.return(stack.apply(stack.scale(d, s), fract));
+    const d = stack.call(sdf, pos);
+    return stack.apply(stack.scale(d, s), fract);
+  }
+
+  const addListener = (cb: (v: Image2d) => void) => cbs.add(cb);
+  const removeListener = (id: number) => cbs.remove(id);
+  return { pixel, settings, addListener, removeListener, type: Type.VALUE }
+}
+
+function repeat(p: (name: string) => Image2d, oracle: Oracle<string>): Image2d {
+  const cbs = new Callbacks<Image2d>();
+  const scalex = new ValueHandleIml(3);
+  const scaley = new ValueHandleIml(3);
+  const src = new ValueHandleIml('');
+  scalex.addListener(() => cbs.notify(null));
+  scaley.addListener(() => cbs.notify(null));
+  src.addListener(() => cbs.notify(null));
+  const settings = properties([
+    listProp('Source', oracle, src),
+    rangeProp('Scale X', 1, 100, scalex),
+    rangeProp('Scale Y', 1, 100, scaley),
+  ]);
+
+  const pixel = (stack: VecStack, pos: number) => {
+    const source = p(src.get());
+    const s = stack.push(scalex.get(), scaley.get(), 0, 0);
+    return stack.call(source.pixel, stack.apply(stack.mul(pos, s), fract));
   }
 
   const addListener = (cb: (v: Image2d) => void) => cbs.add(cb);
@@ -493,6 +488,7 @@ class Painter {
   private data: Uint8ClampedArray;
   private id: ImageData;
   private renderer: Image2dRenderer;
+  private stack = new VecStack(1024);
 
   private images: Image2d[] = [];
   private imagesModel = new ShapesModel();
@@ -500,7 +496,7 @@ class Painter {
 
   constructor(private ui: Ui, private scheduler: Scheduler) {
     this.recreateBuffer();
-    this.renderer = new Image2dRenderer(scheduler);
+    this.renderer = new Image2dRenderer(scheduler, this.stack);
     this.renderer.attach(this.buffer, this.bufferSize, () => this.redraw());
 
     const view = this.createView();
@@ -515,31 +511,21 @@ class Painter {
       .build();
 
     const kdtree = new KDTree([...map(range(0, 100), _ => <[number, number]>[Math.random(), Math.random()])]);
-    const line1 = (stack: VecStack2d, p: number) => {
-      stack.start();
-      const p1 = stack.push(0.5, 0.0);
-      const p2 = stack.push(0.5, 1.0);
-      const d = lineSegment(stack, p, p1, p2) - 0.01;
-      stack.stop();
-      return d;
-    }
-    const line2 = (stack: VecStack2d, p: number) => {
-      stack.start();
-      const p1 = stack.push(0.0, 0.6);
-      const p2 = stack.push(1.0, 0.6);
-      const d = lineSegment(stack, p, p1, p2);
-      stack.stop();
-      return d;
-    }
-    const lines = (stack: VecStack2d, p: number) => union(stack, p, line1, line2);
-    const circular = (stack: VecStack2d, p: number) => { stack.start(); return stack.return(stack.push(circularArray(stack, p, 6, lines), 0)) }
+    const line1 = lineSegment(this.stack.pushGlobal(0.5, 0.0, 0, 0), this.stack.pushGlobal(0.5, 1.0, 0, 0));
+    const line2 = lineSegment(this.stack.pushGlobal(0.0, 0.6, 0, 0), this.stack.pushGlobal(1.0, 0.6, 0, 0));
+    const lines = union(line1, line2);
+    const grid = pointGrid(this.stack.pushGlobal(2, 2, 1, 1), this.stack.pushGlobal(0, 0, 0, 0))
+    const _hash = (stack: VecStack, p: number) => hash(stack, perlin2d(stack.x(p) * 13.123, stack.y(p) * 13.123))
+    const points = displacedPointGrid(this.stack.pushGlobal(10, 10, 1, 1), this.stack.pushGlobal(0, 0, 0, 0), _hash);
+    const circular = circularArray(4, grid);
 
     this.addImage('Circle', circle());
     this.addImage('Perlin', perlin());
     this.addImage('Select', select(this.imageProvider(), this.shapeOracle()));
     this.addImage('Displace', displace(this.imageProvider(), this.shapeOracle()));
-    this.addImage('Voronoi', voronoi(this.imageProvider(), this.shapeOracle()));
-    this.addImage('Distance', distance2d((stack, p) => stack.push(kdtree.distance(stack.get(p)[0], stack.get(p)[1]), 0)));
+    this.addImage('Repeat', repeat(this.imageProvider(), this.shapeOracle()));
+    this.addImage('Voronoi', voronoi(this.stack, this.imageProvider(), this.shapeOracle()));
+    this.addImage('Distance', distance2d((stack, p) => stack.push(kdtree.distance(stack.x(p), stack.y(p)), 0, 0, 0)));
     this.addImage('Line', distance2d(circular));
   }
 

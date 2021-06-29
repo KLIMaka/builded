@@ -1,25 +1,14 @@
-import { vec2 } from "../../../libs_js/glmatrix";
-import { clamp, fract, mix, monoatan2 } from "../../../utils/mathutils";
-import { VecStack2d, VecStack3d } from '../../../utils/vecstack';
+import { clamp, cyclic, fract, mix, monoatan2 } from "../../../utils/mathutils";
+import { VecStack } from '../../../utils/vecstack';
 
-export interface Output {
-  spread(x: number): void;
-  x(x: number): void;
-  xy(x: number, y: number): void;
-  xyz(x: number, y: number, z: number): void;
-  xyzw(x: number, y: number, z: number, w: number): void;
-}
-
-export type A = (x: number, y: number, out: Output) => void;
-
-export type SdfShape<T> = (stack: T, pos: number) => number;
+export type SdfShape = (stack: VecStack, pos: number) => number;
 export type DistanceOperation = (d1: number, d2: number) => number;
 
-export function SdfReducer<T>(op: DistanceOperation) {
-  return (stack: T, pos: number, s1: SdfShape<T>, s2: SdfShape<T>) => {
-    const d1 = s1(stack, pos);
-    const d2 = s2(stack, pos);
-    return op(d1, d2);
+export function SdfReducer(op: DistanceOperation) {
+  return (s1: SdfShape, s2: SdfShape) => (stack: VecStack, pos: number) => {
+    const d1 = stack.call(s1, pos);
+    const d2 = stack.call(s2, pos);
+    return stack.push(op(stack.x(d1), stack.x(d2)), 0, 0, 0);
   }
 }
 
@@ -42,96 +31,60 @@ export const sintersect = (k: number) => SdfReducer((d1, d2) => {
   return mix(d2, d1, h) + k * h * (1 - h);
 })
 
-export function sdf2d(f: (x: number, y: number) => number) {
-  return (stack: VecStack2d, pos: number) => {
-    return f(stack.get(pos), stack.get(pos + 1));
-  };
-}
-
-export function pointGrid(stack: VecStack2d, pos: number, scale: number, offset: number) {
-  stack.start();
-  const scaled = stack.mul(stack.add(pos, offset), scale);
-  const gridPos = stack.apply(scaled, Math.floor);
-  const f = stack.get(stack.apply(scaled, fract));
-  const closest = stack.add(gridPos, stack.push(f[0] < 0.5 ? 0 : 1, f[1] < 0.5 ? 0 : 1));
-  stack.stop();
-  return stack.distance(pos, closest);
-}
-
-export function displacedPointGrid(stack: VecStack2d, pos: number, scale: number, offset: number, displacement: (stack: VecStack2d, pos: number) => number) {
-  stack.start();
-  const scaled = stack.mul(stack.add(pos, offset), scale);
-  const gridPos = stack.apply(scaled, Math.floor);
-  let mind = Number.MAX_VALUE;
-  for (let y = -1; y < 1; y++) {
-    for (let x = -1; x < 1; x++) {
-      const p = stack.add(gridPos, stack.push(x, y));
-      const displaced = stack.add(p, displacement(stack, p));
-      mind = Math.min(mind, stack.distance(displaced, pos))
-    }
+export function pointGrid(scale: number, offset: number) {
+  return (stack: VecStack, pos: number) => {
+    const scaled = stack.mul(stack.add(pos, offset), scale);
+    const gridPos = stack.apply(scaled, Math.floor);
+    const f = stack.apply(scaled, fract);
+    const closest = stack.div(stack.add(gridPos, stack.push(stack.x(f) < 0.5 ? 0 : 1, stack.y(f) < 0.5 ? 0 : 1, 0, 0)), scale);
+    return stack.push(stack.distance(pos, closest), 0, 0, 0);
   }
-  stack.stop();
-  return mind;
 }
 
-const t1 = vec2.create();
-const t2 = vec2.create();
-const t3 = vec2.create();
-
-export function lineSegment(stack: VecStack2d, posId: number, p1Id: number, p2Id: number) {
-  stack.start();
-  const p1p2 = stack.sub(p2Id, p1Id);
-  const p1pos = stack.sub(posId, p1Id);
-  const p1p2sqrLen = stack.dot(p1p2, p1p2);
-  const dot = stack.dot(p1p2, p1pos);
-  const t = dot / p1p2sqrLen;
-  let res = 0;
-  if (dot < 0) res = stack.distance(p1Id, posId)
-  else if (t > 1) res = stack.distance(p2Id, posId);
-  else res = stack.distance(posId, stack.add(p1Id, stack.scale(p1p2, t)));
-  stack.stop();
-  return res;
-
-  // const pos = stack.get(posId);
-  // const p1 = stack.get(p1Id);
-  // const p2 = stack.get(p2Id);
-
-  // const p1p2x = p2[0] - p1[0];
-  // const p1p2y = p2[1] - p1[1];
-  // const p1posx = pos[0] - p1[0];
-  // const p1posy = pos[1] - p1[1];
-  // const p1p2sqrLen = p1p2x * p1p2x + p1p2y * p1p2y;
-  // const dot = p1p2x * p1posx + p1p2y * p1posy;
-  // const t = dot / p1p2sqrLen;
-  // let res = 0;
-  // if (dot < 0) res = Math.sqrt(p1p2sqrLen);
-  // else if (t > 1) res = Math.hypot(pos[0] - p2[0], pos[1] - p2[1]);
-  // else res = Math.hypot(p1posx - p1p2x * t, p1posy - p1p2y * t);
-  // return res;
-
-  // const p1p2 = vec2.sub(t1, p2, p1);
-  // const p1pos = vec2.sub(t2, pos, p1);
-  // const p1p2sqrLen = vec2.dot(p1p2, p1p2);
-  // const dot = vec2.dot(p1p2, p1pos);
-  // const t = dot / p1p2sqrLen;
-  // let res = 0;
-  // if (dot < 0) res = vec2.len(p1pos);
-  // else if (t > 1) res = vec2.len(vec2.sub(t3, pos, p2));
-  // else res = vec2.len(vec2.sub(t3, pos, vec2.add(t3, vec2.scale(t3, p1p2, t), p1)));
-  // return res;
+export function displacedPointGrid(scale: number, offset: number, displacement: (stack: VecStack, pos: number) => number) {
+  return (stack: VecStack, pos: number) => {
+    const scaled = stack.mul(stack.add(pos, offset), scale);
+    const gridPos = stack.apply(scaled, Math.floor);
+    const wrap = (x: number) => cyclic(x, stack.x(scale))
+    let mind = Number.MAX_VALUE;
+    for (let y = -1; y <= 1; y++) {
+      for (let x = -1; x <= 1; x++) {
+        stack.begin();
+        const p = stack.add(gridPos, stack.push(x, y, 0, 0));
+        const displaced = stack.div(stack.add(p, stack.call(displacement, stack.apply(p, wrap))), scale);
+        mind = Math.min(mind, stack.sqrdistance(displaced, pos));
+        stack.end();
+      }
+    }
+    return stack.push(Math.sqrt(mind), 0, 0, 0);
+  }
 }
 
-export function circularArray(stack: VecStack2d, pos: number, segments: number, sdf: SdfShape<VecStack2d>): number {
-  stack.start();
-  const p = stack.sub(pos, stack.push(0.5, 0.5));
-  const ang = monoatan2(stack.get(p), stack.get(p + 1));
-  const angn = ang / (2 * Math.PI);
-  const x = fract(angn * segments);
-  const y = 1 - stack.length(p);
-  const npos = stack.push(x, y);
-  const d = sdf(stack, npos);
-  stack.stop();
-  return d;
+export function lineSegment(p1: number, p2: number) {
+  return (stack: VecStack, pos: number) => {
+    const p1p2 = stack.sub(p2, p1);
+    const p1pos = stack.sub(pos, p1);
+    const p1p2sqrLen = stack.dot(p1p2, p1p2);
+    const dot = stack.dot(p1p2, p1pos);
+    const t = dot / p1p2sqrLen;
+    let res = 0;
+    if (dot < 0) res = stack.distance(p1, pos)
+    else if (t > 1) res = stack.distance(p2, pos);
+    else res = stack.distance(pos, stack.add(p1, stack.scale(p1p2, t)));
+    return stack.push(res, 0, 0, 0);
+  }
+}
+
+export function circularArray(segments: number, sdf: SdfShape) {
+  return (stack: VecStack, pos: number) => {
+    const p = stack.sub(pos, stack.push(0.5, 0.5, 0, 0));
+    const ang = monoatan2(stack.x(p), stack.y(p));
+    const angn = ang / (2 * Math.PI);
+    const x = fract(angn * segments);
+    const y = 1 - stack.length(p);
+    const npos = stack.push(x, y, 0, 0);
+    return stack.call(sdf, npos);
+  }
 }
 
 export function sdf3d(f: (x: number, y: number, z: number) => number) {

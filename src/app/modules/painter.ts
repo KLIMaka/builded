@@ -15,7 +15,7 @@ import { Scheduler, SCHEDULER, TaskHandle } from "../apis/app";
 import { BUS, busDisconnector } from "../apis/handler";
 import { Ui, UI, Window } from "../apis/ui";
 import { namedMessageHandler } from "../edit/messages";
-import { circularArray, displacedPointGrid, lineSegment, pointGrid, SdfShape, union } from "../modules/sdf/sdf";
+import { circularArray, decircular, displacedPointGrid, lineSegment, pointGrid, SdfShape, union } from "../modules/sdf/sdf";
 
 export async function PainterModule(module: Module) {
   module.bind(plugin('Painter'), lifecycle(async (injector, lifecycle) => {
@@ -507,6 +507,24 @@ function circular(p: (name: string) => Image2d, oracle: Oracle<string>): Image2d
   return { pixel, settings, addListener, removeListener, type: Type.VALUE }
 }
 
+function decircular1(p: (name: string) => Image2d, oracle: Oracle<string>): Image2d {
+  const cbs = new Callbacks<Image2d>();
+  const src = new ValueHandleIml('');
+  src.addListener(() => cbs.notify(null));
+  const settings = properties([
+    listProp('Source', oracle, src),
+  ]);
+
+  const pixel = (stack: VecStack, pos: number) => {
+    const source = p(src.get());
+    return stack.call(decircular(source.pixel), pos);
+  }
+
+  const addListener = (cb: (v: Image2d) => void) => cbs.add(cb);
+  const removeListener = (id: number) => cbs.remove(id);
+  return { pixel, settings, addListener, removeListener, type: Type.VALUE }
+}
+
 function transform(p: (name: string) => Image2d, oracle: Oracle<string>): Image2d {
   const cbs = new Callbacks<Image2d>();
   const scale = new ValueHandleIml(1);
@@ -624,6 +642,7 @@ class Painter {
     this.addImage('Transform', transform(this.imageProvider(), this.shapeOracle()));
     this.addImage('Grid', grid(this.stack, this.imageProvider(), this.shapeOracle()));
     this.addImage('Apply', apply(this.stack, this.imageProvider(), this.shapeOracle()));
+    this.addImage('Decircular', decircular1(this.imageProvider(), this.shapeOracle()));
   }
 
   private imageProvider(): (name: string) => Image2d {

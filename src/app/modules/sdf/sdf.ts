@@ -87,6 +87,17 @@ export function circularArray(segments: number, sdf: SdfShape) {
   }
 }
 
+export function decircular(sdf: SdfShape) {
+  return (stack: VecStack, pos: number) => {
+    const ang = stack.x(pos) * Math.PI * 2;
+    const l = 1 - stack.y(pos);
+    const x = Math.cos(ang);
+    const y = Math.sin(ang);
+    return stack.call(sdf, stack.add(stack.push(0.5, 0.5, 0, 0), stack.push(x * l, y * l, 0, 0)));
+  }
+}
+
+
 export function sdf3d(f: (x: number, y: number, z: number) => number) {
   return (stack: VecStack3d, pos: number) => {
     const p = stack.get(pos);

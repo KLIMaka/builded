@@ -186,10 +186,12 @@ export type SliderModel = {
   handle: ValueHandle<number>,
 }
 
+
+const NUMBER_FMT = Intl.NumberFormat('en-US', { maximumFractionDigits: 4, useGrouping: false, });
 export function sliderToolbarButton(model: SliderModel) {
   const widgetTemplate = h`<div class="popup-widget">
   <input type="range" min="${model.min}" max="${model.max}" value="${model.handle.get()}" style="vertical-align: middle; margin-right:10px" #range>
-  <input type="number" min="${model.min}" max="${model.max}" value="${model.handle.get()}" step="1" class="input-widget" #box></div>`;
+  <input type="text" value="${model.handle.get()}" class="input-widget" #box></div>`;
   const buttonTemplate = h`<button class="btn btn-default btn-dropdown">${model.label} ${model.handle.get()}</button>`;
   const widget = <HTMLElement>widgetTemplate.cloneNode(true);
   const { range, box } = widgetTemplate.collect(widget);
@@ -198,14 +200,27 @@ export function sliderToolbarButton(model: SliderModel) {
     content: widget, maxWidth: 500, allowHTML: true, placement: 'bottom-start', trigger: 'click', interactive: true, arrow: false, offset: [0, 0], duration: 100, appendTo: document.body
   });
   const setValue = (value: number, handle = true) => {
-    range.value = value;
-    box.value = value;
-    btn.textContent = `${model.label} ${value}`;
-    if (handle) model.handle.set(+value);
+    const valueStirng = NUMBER_FMT.format(value);
+    range.value = valueStirng;
+    box.value = valueStirng;
+    btn.textContent = `${model.label} ${valueStirng}`;
+    if (handle) model.handle.set(value);
   }
-  model.handle.addListener(v => setValue(v, false))
-  range.oninput = () => setValue(range.value);
-  box.oninput = () => setValue(box.value);
+  model.handle.addListener(v => setValue(+v, false))
+  range.oninput = () => setValue(+range.value);
+  box.oninput = () => setValue(+box.value);
+  box.onkeydown = (e: KeyboardEvent) => {
+    const scale = e.altKey ? 0.1 : e.shiftKey ? 10 : 1;
+    if (e.code == 'ArrowUp') { setValue(model.handle.get() + scale); e.preventDefault() }
+    if (e.code == 'ArrowDown') { setValue(model.handle.get() - scale); e.preventDefault() }
+  }
+  const wheel = (e: WheelEvent) => {
+    const scale = e.altKey ? 0.1 : e.shiftKey ? 10 : 1;
+    if (e.deltaY < 0) { setValue(model.handle.get() + scale); e.preventDefault() }
+    if (e.deltaY > 0) { setValue(model.handle.get() - scale); e.preventDefault() }
+  }
+  box.onwheel = wheel;
+  btn.onwheel = wheel;
   return btn;
 }
 

@@ -427,20 +427,35 @@ function displace(p: (name: string) => Image2d, oracle: Oracle<string>): Image2d
   return { pixel, settings, addListener, removeListener, type: Type.VALUE }
 }
 
-function distance2d(sdf: SdfShape): Image2d {
-  const cbs = new Callbacks<Image2d>();
-  const scale = new ValueHandleIml(100);
-  scale.addListener(() => cbs.notify(null));
-  const settings = properties([
-    rangeProp('Scale', 1, 10000, scale),
-  ]);
-
-  const pixel = (stack: VecStack, pos: number) => {
-    const s = scale.get() / 100;
-    const d = stack.call(sdf, pos);
-    return stack.apply(stack.scale(d, s), fract);
+function apply(stack: VecStack, p: (name: string) => Image2d, oracle: Oracle<string>): Image2d {
+  const funcs = {
+    "Fract": fract,
+    "Sin": Math.sin,
+    "Ident": (x: number) => x,
+    "Sin1": (x: number) => smothstep(x, 0, Math.PI * 2) * Math.sin(x),
   }
 
+  const cbs = new Callbacks<Image2d>();
+  const src = new ValueHandleIml('');
+  const func = new ValueHandleIml('');
+  const scale = new ValueHandleIml(1);
+  const offset = new ValueHandleIml(0);
+  const off = stack.pushGlobal(0, 0, 0, 0);
+  const s = stack.pushGlobal(1, 1, 1, 1);
+  src.addListener(() => cbs.notify(null));
+  func.addListener(() => cbs.notify(null));
+  scale.addListener(v => { stack.set(s, v, v, v, v); cbs.notify(null) });
+  offset.addListener(v => { stack.set(off, v, v, v, v); cbs.notify(null) });
+  const settings = properties([
+    listProp('Source', oracle, src),
+    listProp('Function', _ => Object.keys(funcs), func),
+    rangeProp('Scale', -10000, 10000, scale),
+    rangeProp('Offset', -1000, 1000, offset),
+  ]);
+  const pixel = (stack: VecStack, pos: number) => {
+    const source = p(src.get());
+    return stack.apply(stack.add(stack.mul(stack.call(source.pixel, pos), s), off), funcs[func.get()]);
+  }
   const addListener = (cb: (v: Image2d) => void) => cbs.add(cb);
   const removeListener = (id: number) => cbs.remove(id);
   return { pixel, settings, addListener, removeListener, type: Type.VALUE }
@@ -603,11 +618,12 @@ class Painter {
     this.addImage('Displace', displace(this.imageProvider(), this.shapeOracle()));
     this.addImage('Repeat', repeat(this.imageProvider(), this.shapeOracle()));
     this.addImage('Voronoi', voronoi(this.stack, this.imageProvider(), this.shapeOracle()));
-    this.addImage('Distance', distance2d((stack, p) => stack.push(kdtree.distance(stack.x(p), stack.y(p)), 0, 0, 0)));
+    // this.addImage('Distance', distance2d((stack, p) => stack.push(kdtree.distance(stack.x(p), stack.y(p)), 0, 0, 0)));
     // this.addImage('Line', distance2d(circular));
     this.addImage('Circular', circular(this.imageProvider(), this.shapeOracle()));
     this.addImage('Transform', transform(this.imageProvider(), this.shapeOracle()));
     this.addImage('Grid', grid(this.stack, this.imageProvider(), this.shapeOracle()));
+    this.addImage('Apply', apply(this.stack, this.imageProvider(), this.shapeOracle()));
   }
 
   private imageProvider(): (name: string) => Image2d {

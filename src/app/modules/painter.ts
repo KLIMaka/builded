@@ -15,7 +15,7 @@ import { Scheduler, SCHEDULER, TaskHandle } from "../apis/app";
 import { BUS, busDisconnector } from "../apis/handler";
 import { Ui, UI, Window } from "../apis/ui";
 import { namedMessageHandler } from "../edit/messages";
-import { circularArray, displacedPointGrid, lineSegment, pointGrid, SdfShape, union } from "../modules/sdf/sdf";
+import { circularArray, decircular, displacedPointGrid, lineSegment, pointGrid, SdfShape, union } from "../modules/sdf/sdf";
 
 export async function PainterModule(module: Module) {
   module.bind(plugin('Painter'), lifecycle(async (injector, lifecycle) => {
@@ -432,20 +432,20 @@ function apply(stack: VecStack, p: (name: string) => Image2d, oracle: Oracle<str
     "Fract": fract,
     "Sin": Math.sin,
     "Ident": (x: number) => x,
-    "Sin1": (x: number) => smothstep(x, 0, Math.PI * 2) * Math.sin(x),
+    "Sin1": (x: number) => (1 - smothstep(x, 0, Math.PI * 2)) * Math.sin(x),
   }
 
   const cbs = new Callbacks<Image2d>();
   const src = new ValueHandleIml('');
-  const func = new ValueHandleIml('');
+  const func = new ValueHandleIml('Ident');
   const scale = new ValueHandleIml(1);
   const offset = new ValueHandleIml(0);
   const off = stack.pushGlobal(0, 0, 0, 0);
   const s = stack.pushGlobal(1, 1, 1, 1);
   src.addListener(() => cbs.notify(null));
   func.addListener(() => cbs.notify(null));
-  scale.addListener(v => { stack.set(s, v, v, v, v); cbs.notify(null) });
-  offset.addListener(v => { stack.set(off, v, v, v, v); cbs.notify(null) });
+  scale.addListener(v => { stack.spread(s, v); cbs.notify(null) });
+  offset.addListener(v => { stack.spread(off, v); cbs.notify(null) });
   const settings = properties([
     listProp('Source', oracle, src),
     listProp('Function', _ => Object.keys(funcs), func),
@@ -500,6 +500,31 @@ function circular(p: (name: string) => Image2d, oracle: Oracle<string>): Image2d
   const pixel = (stack: VecStack, pos: number) => {
     const source = p(src.get());
     return stack.call(circularArray(count.get(), source.pixel), pos);
+  }
+
+  const addListener = (cb: (v: Image2d) => void) => cbs.add(cb);
+  const removeListener = (id: number) => cbs.remove(id);
+  return { pixel, settings, addListener, removeListener, type: Type.VALUE }
+}
+
+function decircular1(stack: VecStack, p: (name: string) => Image2d, oracle: Oracle<string>): Image2d {
+  const cbs = new Callbacks<Image2d>();
+  const src = new ValueHandleIml('');
+  const scale = new ValueHandleIml(1);
+  const off = new ValueHandleIml(0);
+  const params = stack.pushGlobal(1, 0, 0, 0);
+  src.addListener(() => cbs.notify(null));
+  scale.addListener(v => { stack.setx(params, v); cbs.notify(null) });
+  off.addListener(v => { stack.sety(params, v); cbs.notify(null) });
+  const settings = properties([
+    listProp('Source', oracle, src),
+    rangeProp('Scale', -100, 100, scale),
+    rangeProp('Offset', -100, 100, off),
+  ]);
+
+  const pixel = (stack: VecStack, pos: number) => {
+    const source = p(src.get());
+    return stack.call(decircular(params, source.pixel), pos);
   }
 
   const addListener = (cb: (v: Image2d) => void) => cbs.add(cb);
@@ -565,6 +590,25 @@ function grid(stack: VecStack, p: (name: string) => Image2d, oracle: Oracle<stri
   return { pixel, settings, addListener, removeListener, type: Type.VALUE }
 }
 
+function displacedGrid(stack: VecStack, p: (name: string) => Image2d, oracle: Oracle<string>): Image2d {
+  const cbs = new Callbacks<Image2d>();
+  const src = new ValueHandleIml('');
+  const scale = new ValueHandleIml(1);
+  const s = stack.pushGlobal(1, 1, 1, 1);
+  scale.addListener(v => { stack.set(s, v, v, v, v); cbs.notify(null) });
+  const settings = properties([
+    listProp('Source', oracle, src),
+    rangeProp("Scale", 1, 100, scale)
+  ]);
+  const pixel = (stack: VecStack, pos: number) => {
+    return stack.call(displacedPointGrid(s, stack.zero, p(src.get()).pixel), pos);
+  }
+
+  const addListener = (cb: (v: Image2d) => void) => cbs.add(cb);
+  const removeListener = (id: number) => cbs.remove(id);
+  return { pixel, settings, addListener, removeListener, type: Type.VALUE }
+}
+
 class Painter {
   private window: Window;
   private display: HTMLCanvasElement;
@@ -623,7 +667,9 @@ class Painter {
     this.addImage('Circular', circular(this.imageProvider(), this.shapeOracle()));
     this.addImage('Transform', transform(this.imageProvider(), this.shapeOracle()));
     this.addImage('Grid', grid(this.stack, this.imageProvider(), this.shapeOracle()));
+    this.addImage('Displaced Grid', displacedGrid(this.stack, this.imageProvider(), this.shapeOracle()));
     this.addImage('Apply', apply(this.stack, this.imageProvider(), this.shapeOracle()));
+    this.addImage('Decircular', decircular1(this.stack, this.imageProvider(), this.shapeOracle()));
   }
 
   private imageProvider(): (name: string) => Image2d {

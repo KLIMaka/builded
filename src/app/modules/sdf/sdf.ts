@@ -35,7 +35,7 @@ export function pointGrid(scale: number, offset: number) {
   return (stack: VecStack, pos: number) => {
     const scaled = stack.mul(pos, scale);
     const gridPos = stack.add(stack.apply(scaled, Math.floor), offset);
-    const f = stack.sub(stack.apply(scaled, fract), offset);
+    const f = stack.sub(stack.apply(stack.sub(scaled, gridPos), Math.abs), offset);
     const closest = stack.div(stack.add(gridPos, stack.push(stack.x(f) < 0.5 ? 0 : 1, stack.y(f) < 0.5 ? 0 : 1, 0, 0)), scale);
     return stack.push(stack.distance(pos, closest), 0, 0, 0);
   }
@@ -71,29 +71,29 @@ export function lineSegment(p1: number, p2: number) {
     if (dot < 0) res = stack.distance(p1, pos)
     else if (t > 1) res = stack.distance(p2, pos);
     else res = stack.distance(pos, stack.add(p1, stack.scale(p1p2, t)));
-    return stack.push(res, 0, 0, 0);
+    return stack.pushSpread(res);
   }
 }
 
-export function circularArray(segments: number, sdf: SdfShape) {
+export function circularArray(segments: number, img: SdfShape) {
   return (stack: VecStack, pos: number) => {
-    const p = stack.sub(pos, stack.push(0.5, 0.5, 0, 0));
+    const p = stack.sub(pos, stack.half);
     const ang = monoatan2(stack.x(p), stack.y(p));
     const angn = ang / (2 * Math.PI);
     const x = fract(angn * segments);
     const y = 1 - stack.length(p);
     const npos = stack.push(x, y, 0, 0);
-    return stack.call(sdf, npos);
+    return stack.call(img, npos);
   }
 }
 
-export function decircular(sdf: SdfShape) {
+export function decircular(scale: number, img: SdfShape) {
   return (stack: VecStack, pos: number) => {
-    const ang = stack.x(pos) * Math.PI * 2;
-    const l = 1 - stack.y(pos);
-    const x = Math.cos(ang);
-    const y = Math.sin(ang);
-    return stack.call(sdf, stack.add(stack.push(0.5, 0.5, 0, 0), stack.push(x * l, y * l, 0, 0)));
+    const ang = stack.x(pos) * Math.PI * 2 * stack.x(scale) + stack.y(scale) * Math.PI * 2;
+    const l = stack.y(pos);
+    const x = Math.sin(ang);
+    const y = Math.cos(ang);
+    return stack.call(img, stack.add(stack.push(0.5, 0.5, 0, 0), stack.push(x * l, y * l, 0, 0)));
   }
 }
 

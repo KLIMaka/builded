@@ -6,9 +6,18 @@ export class VecStack {
   private ssp = 0;
   private gp: number;
 
+  readonly one: number;
+  readonly zero: number;
+  readonly half: number;
+
+
   constructor(size: number) {
     this.stack = new Float32Array(size * 4);
     this.gp = (size - 1) * 4;
+
+    this.one = this.pushGlobal(1, 1, 1, 1);
+    this.zero = this.pushGlobal(0, 0, 0, 0);
+    this.half = this.pushGlobal(0.5, 0.5, 0.5, 0.5);
   }
 
   allocate(): number { const id = this.sp; this.sp += 4; return id }
@@ -18,6 +27,8 @@ export class VecStack {
   end() { this.sp = this.spStack[--this.ssp] }
   return(id: number): number { this.end(); return this.copy(this.allocate(), id) }
   push(x: number, y: number, z: number, w: number): number { return this.set(this.allocate(), x, y, z, w); }
+  pushSpread(x: number): number { return this.spread(this.allocate(), x); }
+  spread(v: number, x: number): number { return this.set(v, x, x, x, x) }
   pushGlobal(x: number, y: number, z: number, w: number) { return this.set(this.allocateGlobal(), x, y, z, w); }
   length(id: number): number { return Math.hypot(this.stack[id], this.stack[id + 1], this.stack[id + 2], this.stack[id + 3]) }
   sqrlength(id: number): number { return this.dot(id, id) }

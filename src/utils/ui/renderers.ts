@@ -157,7 +157,7 @@ function sugggestionsMenu(items: Iterable<[string, () => void]>): SuggestionMode
     options[newSelected][0].elem().classList.add('selected');
     selected = newSelected;
   }
-  select(0);
+  // select(0);
   return {
     widget: menu.elem(),
     shift(d: number) { select(Math.min(Math.max(0, selected + d), options.length - 1)) },

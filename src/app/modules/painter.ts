@@ -1,21 +1,19 @@
 import h from "stage0";
-import { Vec2Array, vec3, Vec3Array } from "../../libs_js/glmatrix";
+import { vec3, Vec3Array } from "../../libs_js/glmatrix";
+import { Callbacks, CallbacksImpl, CallbacksStub } from "../../utils/callbacks";
 import { filter, map, range } from "../../utils/collections";
-import { drawToCanvas } from "../../utils/imgutils";
 import { create, lifecycle, Module, plugin } from "../../utils/injector";
 import { KDTree } from "../../utils/kdtree";
-import { FastList } from "../../utils/list";
 import { clamp, fract, int, len2d, octaves2d, perlin2d, smothstep } from "../../utils/mathutils";
 import { array, Raster, rect, resize } from "../../utils/pixelprovider";
 import { listProp, NavItem1, navTree, NavTreeModel, Oracle, properties, rangeProp, ValueHandleIml } from "../../utils/ui/renderers";
 import { addDragController, replaceContent } from "../../utils/ui/ui";
 import { VecStack } from "../../utils/vecstack";
-import { loadWasm } from "../../utils/wasm/wasm";
 import { Scheduler, SCHEDULER, TaskHandle } from "../apis/app";
 import { BUS, busDisconnector } from "../apis/handler";
 import { Ui, UI, Window } from "../apis/ui";
 import { namedMessageHandler } from "../edit/messages";
-import { circularArray, decircular, displacedPointGrid, lineSegment, pointGrid, SdfShape, union } from "../modules/sdf/sdf";
+import { circularArray, decircular, displacedPointGrid, lineSegment, pointGrid, union } from "../modules/sdf/sdf";
 
 export async function PainterModule(module: Module) {
   module.bind(plugin('Painter'), lifecycle(async (injector, lifecycle) => {
@@ -166,18 +164,12 @@ enum Type {
   VECTOR2_NORMALIZED,
 }
 
-interface Shape {
-  attach(buff: number[], size: number, cb: () => void): void;
-  remove(): void;
-  readonly settings: HTMLElement;
-}
 
 interface Image2d {
   pixel(stack: VecStack, pos: number): number;
-  readonly settings: HTMLElement;
-  readonly type: Type;
-  addListener(cb: (img: Image2d) => void): number;
-  removeListener(id: number): void;
+  getSettings(): HTMLElement;
+  readonly value: Callbacks<[], number>;
+  readonly settings: Callbacks<[], number>;
 }
 
 class Image2dRenderer {
@@ -194,9 +186,9 @@ class Image2dRenderer {
   }
 
   public set(img: Image2d) {
-    if (this.image != null) this.image.removeListener(this.imageHandle);
+    if (this.image != null) this.image.value.remove(this.imageHandle);
     this.image = img;
-    this.imageHandle = img.addListener(img => this.scheduleRedraw());
+    this.imageHandle = img.value.add(() => this.scheduleRedraw());
     this.scheduleRedraw();
   }
 
@@ -246,44 +238,40 @@ class Image2dRenderer {
   }
 }
 
-class Callbacks<T> {
-  private cbs = new FastList<(t: T) => void>();
-
-  notify(t: T) { for (const cb of this.cbs) cb(t) }
-  add(cb: (t: T) => void): number { return this.cbs.push(cb) }
-  remove(id: number): void { this.cbs.remove(id) }
-}
-
 function perlin(): Image2d {
-  const cbs = new Callbacks<Image2d>();
-  const scale = new ValueHandleIml(1024);
+  const value = new CallbacksImpl<void>();
+  const settings = new CallbacksStub<void>();
+  const scale = new ValueHandleIml(1);
   const octaves = new ValueHandleIml(1);
   let noise = octaves2d(perlin2d, 1);
-  scale.addListener(() => cbs.notify(null));
-  octaves.addListener(o => { noise = octaves2d(perlin2d, o); cbs.notify(null) });
-  const settings = properties([
+  scale.addListener(() => value.notify());
+  octaves.addListener(o => { noise = octaves2d(perlin2d, o); value.notify() });
+  const props = properties([
     rangeProp('Scale', 0, 10 * 1024, scale),
     rangeProp('Octaves', 1, 4, octaves)
   ]);
+  const getSettings = () => props;
   const pixel = (stack: VecStack, pos: number) => {
-    const s = scale.get() / 100;
-    return stack.push(noise(stack.x(pos) * s, stack.y(pos) * s), 0, 0, 0);
+    const s = scale.get();
+    const nx = noise(stack.x(pos) * s, stack.y(pos) * s);
+    const ny = noise(stack.y(pos) * s, stack.x(pos) * s);
+    return stack.push(nx, ny, 0, 0);
   }
-  const addListener = (cb: (v: Image2d) => void) => cbs.add(cb);
-  const removeListener = (id: number) => cbs.remove(id);
-  return { pixel, settings, addListener, removeListener, type: Type.VALUE }
+  return { pixel, getSettings, value, settings }
 }
 
 function circle(): Image2d {
-  const cbs = new Callbacks<Image2d>();
-  const radius = new ValueHandleIml(50);
+  const value = new CallbacksImpl<void>();
+  const settings = new CallbacksStub<void>();
+  const radius = new ValueHandleIml(0.5);
   const pow = new ValueHandleIml(0);
-  radius.addListener(() => cbs.notify(null));
-  pow.addListener(() => cbs.notify(null));
-  const settings = properties([
+  radius.addListener(() => value.notify());
+  pow.addListener(() => value.notify());
+  const props = properties([
     rangeProp('Radius', 1, 100, radius),
     rangeProp('Power', -100, 100, pow),
   ]);
+  const getSettings = () => props;
   const pixel = (stack: VecStack, pos: number) => {
     const r = radius.get() / 100;
     const l = stack.distance(pos, stack.push(0.5, 0.5, 0, 0));
@@ -293,40 +281,43 @@ function circle(): Image2d {
     const k = Math.pow(v / r, pp) * r;
     return stack.push(k, 0, 0, 0);
   }
-  const addListener = (cb: (v: Image2d) => void) => cbs.add(cb);
-  const removeListener = (id: number) => cbs.remove(id);
-  return { pixel, settings, addListener, removeListener, type: Type.VALUE }
+  return { pixel, getSettings, value, settings }
 }
 
 function select(p: (name: string) => Image2d, oracle: Oracle<string>): Image2d {
-  const cbs = new Callbacks<Image2d>();
+  const value = new CallbacksImpl<void>();
+  const settings = new CallbacksImpl<void>();
   const src = new ValueHandleIml('');
   const from = new ValueHandleIml(0);
-  const to = new ValueHandleIml(255);
+  const to = new ValueHandleIml(1);
   const smoth = new ValueHandleIml(0);
-  src.addListener(() => cbs.notify(null));
-  from.addListener(() => cbs.notify(null));
-  to.addListener(() => cbs.notify(null));
-  smoth.addListener(() => cbs.notify(null));
-  const settings = properties([
+  let srcHandle = -1;
+  src.addListener(s => {
+    const img = p(s);
+    img.settings.add(() => settings.notify());
+    value.notify();
+  });
+  from.addListener(() => value.notify());
+  to.addListener(() => value.notify());
+  smoth.addListener(() => value.notify());
+  const props = properties([
     listProp('Source', oracle, src),
     rangeProp('From', 0, 255, from),
     rangeProp('To', 0, 255, to),
     rangeProp('Smoth', 0, 100, smoth),
   ]);
+  const getSettings = () => props;
   const pixel = (stack: VecStack, pos: number) => {
     const img = p(src.get());
     const value = stack.x(stack.call(img.pixel, pos));
-    const f = from.get() / 255;
-    const t = to.get() / 255;
-    const s = smoth.get() / 100;
+    const f = from.get();
+    const t = to.get();
+    const s = smoth.get();
     const l = smothstep(value, f - s, f);
     const r = 1 - smothstep(value, t, t + s);
     return stack.push(Math.min(l, r), 0, 0, 0);
   }
-  const addListener = (cb: (v: Image2d) => void) => cbs.add(cb);
-  const removeListener = (id: number) => cbs.remove(id);
-  return { pixel, settings, addListener, removeListener, type: Type.VALUE }
+  return { pixel, getSettings, value, settings }
 }
 
 const CORE: [number, number][] = [[-1, -1], [0, -1], [1, -1], [-1, 0], [0, 0], [1, 0], [-1, 1], [0, 1], [1, 1]]

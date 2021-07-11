@@ -4,6 +4,7 @@ import { iter } from "../iter";
 import { div, Element, replaceContent, span, Table, tag } from "./ui";
 import h from "stage0";
 import { map, take } from "../collections";
+import { Callbacks, ValueSetterCallbacksImpl } from "../callbacks";
 
 export type ColumnRenderer<T> = (value: T) => Element;
 
@@ -117,7 +118,7 @@ export function search(hint: string, ico: string, oracle: Oracle<string>, handle
     suggestions.hide();
     if (handleChange) handle.set(value);
   }
-  handle.addListener(v => setValue(v, false));
+  handle.add((_, v) => setValue(v, false));
   const update = (items: Iterable<string>) => {
     suggestModel = sugggestionsMenu(map(items, (i: string) => <[string, () => void]>[i, () => setValue(i)]));
     replaceContent(suggestContainer, suggestModel.widget);
@@ -206,7 +207,7 @@ export function sliderToolbarButton(model: SliderModel) {
     btn.textContent = `${model.label} ${valueStirng}`;
     if (handle) model.handle.set(value);
   }
-  model.handle.addListener(v => setValue(+v, false))
+  model.handle.add((_, v) => setValue(+v, false))
   range.oninput = () => setValue(+range.value);
   box.oninput = () => setValue(+box.value);
   box.onkeydown = (e: KeyboardEvent) => {
@@ -268,7 +269,7 @@ export function textProp(label: string, handle: ValueHandle<string>): Property {
   const widget = () => {
     const root = <HTMLInputElement>template.cloneNode(true);
     root.oninput = () => handle.set(root.value);
-    handle.addListener(v => root.value = v);
+    handle.add((_, v) => root.value = v);
     return root;
   }
   return { label, widget }
@@ -316,24 +317,20 @@ export function closeable(label: string, closed: boolean) {
   return { root, container };
 }
 
-export type ChangeCallback<T> = (value: T) => void;
-export type ValueHandle<T> = {
+export interface ValueHandle<T> extends Callbacks<[T, T], number> {
   set(value: T): void;
   get(): T;
-  addListener(cb: ChangeCallback<T>): void;
 }
 
-export class ValueHandleIml<T> implements ValueHandle<T> {
-  private cbs: ChangeCallback<T>[] = [];
-
-  constructor(private value: T) { }
+export class ValueHandleImpl<T> extends ValueSetterCallbacksImpl<T> implements ValueHandle<T> {
+  constructor(private value: T) { super() }
 
   set(value: T): void {
-    this.value = value;
-    this.cbs.forEach(cb => cb(value));
+    const o = this.value;
+    const n = value;
+    this.value = n;
+    this.notify(o, n);
   }
 
   get(): T { return this.value }
-  addListener(cb: ChangeCallback<T>): void { this.cbs.push(cb) }
 }
-

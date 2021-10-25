@@ -5,7 +5,7 @@ import { create, Dependency, lifecycle } from "../../utils/injector";
 import { iter } from "../../utils/iter";
 import { palRasterizer } from "../../utils/pixelprovider";
 import { DrawPanel, RasterProvider } from "../../utils/ui/drawpanel";
-import { menuButton, search } from "../../utils/ui/renderers";
+import { menuButton, search, ValueHandleImpl } from "../../utils/ui/renderers";
 import { ART } from "../apis/app";
 import { Ui, UI, Window } from "../apis/ui";
 import { PicNumCallback } from "../edit/tools/selection";
@@ -43,7 +43,7 @@ export class Selector {
   private window: Window;
   private drawPanel: DrawPanel<number>;
   private cb: PicNumCallback;
-  private filter = "";
+  private filter = new ValueHandleImpl("");
 
   constructor(private ui: Ui, arts: ArtInfoProvider, pal: Uint8Array, private tags: PicTags) {
     const canvas = document.createElement('canvas');
@@ -59,34 +59,34 @@ export class Selector {
           .item('32', () => { this.drawPanel.setCellSize(32, 32) })
           .item('64', () => { this.drawPanel.setCellSize(64, 64) })
           .item('128', () => { this.drawPanel.setCellSize(128, 128) })))
-        .widget(search('Search', s => this.oracle(s)))
+        .widget(search('Search', 'icon-search', s => this.oracle(s), this.filter))
       )
       .onclose(() => this.select(-1))
       .content(canvas)
       .build();
 
+    this.filter.add(_ => this.updateFilter());
     this.drawPanel = createDrawPanel(arts, pal, canvas, (id: number) => this.select(id), () => this.pics());
     this.hide();
   }
 
   public stop() { this.window.destroy() }
 
-  private updateFilter(s: string) {
-    this.filter = s;
+  private updateFilter() {
     this.drawPanel.seOffset(0);
     this.drawPanel.draw();
   }
 
   private oracle(s: string) {
-    this.updateFilter(s);
     return iter(this.tags.allTags())
       .filter(t => t.toLowerCase().startsWith(s.toLowerCase()));
   }
 
   private applyFilter(id: number): boolean {
     const tags = iter(this.tags.tags(id));
-    if (this.filter.startsWith('*')) return (id + '').includes(this.filter.substr(1))
-    return (id + '').startsWith(this.filter) || tags.any(t => t.toLowerCase() == this.filter.toLowerCase());
+    const filter = this.filter.get().toLowerCase();
+    if (filter.startsWith('*')) return (id + '').includes(filter.substr(1))
+    return (id + '').startsWith(filter) || tags.any(t => t.toLowerCase() == filter);
   }
 
   private pics(): Iterable<number> {

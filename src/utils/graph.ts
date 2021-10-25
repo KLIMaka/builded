@@ -41,7 +41,7 @@ export class DirecredGraph<T> {
     const result = new Set<T>();
     result.add(node);
     for (const n of result)
-      iter(this.nodes.entries()).filter(e => e[1].has(n)).map(e => e[0]).forEach(e => result.add(e));
+      iter(this.nodes.entries()).filter(([_, value]) => value.has(n)).map(([key, _]) => key).forEach(e => result.add(e));
     const order = memoize((n: T) => this.order(n));
     return [...result].sort((l, r) => order(r) - order(l));
   }

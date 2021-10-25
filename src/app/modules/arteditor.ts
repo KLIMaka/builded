@@ -1,5 +1,6 @@
 import { art } from "../../build/artraster";
 import { animate, ArtInfoProvider } from "../../build/formats/art";
+import { transformed, tuple, value } from "../../utils/callbacks";
 import { enumerate, range } from "../../utils/collections";
 import { drawToCanvas } from "../../utils/imgutils";
 import { create, lifecycle, Module, plugin } from "../../utils/injector";
@@ -7,8 +8,9 @@ import { iter } from "../../utils/iter";
 import { int } from "../../utils/mathutils";
 import { palRasterizer, Rasterizer, rect, resize, superResize, transform } from "../../utils/pixelprovider";
 import { DrawPanel, RasterProvider } from "../../utils/ui/drawpanel";
-import { menuButton, search, sliderToolbarButton, ValueHandleIml } from "../../utils/ui/renderers";
+import { menuButton, search, sliderToolbarButton, ValueHandleImpl } from "../../utils/ui/renderers";
 import { addDragController, div } from "../../utils/ui/ui";
+import { intValue, numberRangeValidator } from "../../utils/value";
 import { ART } from "../apis/app";
 import { BUS, busDisconnector } from "../apis/handler";
 import { Ui, UI, Window } from "../apis/ui";
@@ -38,18 +40,21 @@ export async function ArtEditorModule(module: Module) {
 export class ArtEditor {
   private window: Window;
   private drawPanel: DrawPanel<number>;
-  private filter = new ValueHandleIml("");
+  private filter = value("");
   private view: HTMLCanvasElement;
-  private currentId = 0;
-  private centerX = 320;
-  private centerY = 320;
-  private frame = 0;
+  private currentId = value(0);
+  private mainFrameInfo = transformed(this.currentId, id => this.arts.getInfo(id));
+  private animationFrame = value(0);
+  private currentFrameInfo = transformed(tuple(this.currentId, this.animationFrame), ([id, frame]) => this.arts.getInfo(id + animate(frame, this.arts.getInfo(id))))
+
+  private centerX = value(320);
+  private centerY = value(320);
+  private scale = value(2.0);
   private animationHandle = -1;
-  private scale = 2.0;
-  private currentPlu = 0;
-  private currentShadow = new ValueHandleIml(0);
-  private superSample = true;
-  private pluProvider = (x: number) => (x >= 255 || x < 0) ? 255 : this.plus[this.currentPlu].plu[this.currentShadow.get() * 256 + x];
+  private currentPlu = value(0);
+  private currentShadow = value(0);
+  private superSample = value(true);
+  private pluProvider = (x: number) => (x >= 255 || x < 0) ? 255 : this.plus[this.currentPlu.get()].plu[this.currentShadow.get() * 256 + x];
   private rasterizer: Rasterizer<number>;
   private closeBlend = (l: number, r: number, doff: number) => Math.abs(l - r) <= 4 ? this.blendColors(l, r, doff) : null;
   private blend = (l: number, r: number, doff: number) => this.blendColors(l, r, doff);
@@ -85,8 +90,8 @@ export class ArtEditor {
         .widget(search('Search', 'icon-search', s => this.oracle(s), this.filter, true)))
       .build();
 
-    this.filter.addListener(_ => this.updateFilter());
-    this.currentShadow.addListener(_ => this.redraw());
+    this.filter.add(_ => this.updateFilter());
+    this.currentShadow.add(_ => this.redraw());
   }
 
   public stop() { this.window.destroy() }
@@ -103,7 +108,7 @@ export class ArtEditor {
   }
 
   private createShadowLevels() {
-    return sliderToolbarButton({ min: 0, max: this.shadowsteps, label: "Shadow", handle: this.currentShadow });
+    return sliderToolbarButton({ label: "Shadow", handle: this.currentShadow, value: intValue(0, numberRangeValidator(0, this.shadowsteps)) });
   }
 
   private oracle(s: string) {
@@ -154,9 +159,7 @@ export class ArtEditor {
     const info = this.arts.getInfo(id);
     if (info != null && info.attrs.frames > 0) iter(range(0, info.attrs.frames + 1)).forEach(i => this.drawPanel.select(id + i));
     this.drawPanel.draw();
-    this.currentId = id;
-    this.resetAnimation();
-    this.updateView();
+    this.currentId.set(id);
   }
 
   private resetAnimation() {

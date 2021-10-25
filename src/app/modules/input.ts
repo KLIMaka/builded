@@ -15,9 +15,9 @@ export function InputModule(module: Module) {
     const [gl, bus, state] = await getInstances(injector, GL, BUS, STATE);
     const keybinds = await loadString('builded_binds.txt');
     const consumer = loadBinds(keybinds, messageParser);
-
-    const keyup = (e: KeyboardEvent) => { if (e.target != document.body) return true; bus.handle(new Key(e.key.toLowerCase(), false)); e.preventDefault(); return false; }
-    const keydown = (e: KeyboardEvent) => { if (e.target != document.body) return true; bus.handle(new Key(e.key.toLowerCase(), true)); e.preventDefault(); return false; }
+    const kbe = (handler: (key: string) => void) => (e: KeyboardEvent) => { if (e.target != document.body) return true; handler(e.key.toLowerCase()); e.preventDefault(); return false; }
+    const keyup = kbe(key => bus.handle(new Key(key, false)));
+    const keydown = kbe(key => bus.handle(new Key(key, true)));
     const mousedown = (e: MouseEvent) => bus.handle(new Key(`mouse${e.button}`, true));
     const mousesp = (e: MouseEvent) => bus.handle(new Key(`mouse${e.button}`, false));
     const musemove = (e: MouseEvent) => { MOUSE.x = e.offsetX; MOUSE.y = e.offsetY; }
@@ -42,7 +42,9 @@ export function InputModule(module: Module) {
 
       PreFrame(msg: PreFrame) {
         bus.handle(MOUSE);
-        forEach(queue, e => forEach(consumer.consume(e, state), m => bus.handle(m)));
+        forEach(queue, e =>
+          forEach(consumer.consume(e, state), m =>
+            bus.handle(m)));
         queue.clear();
       }
     }), busDisconnector(bus));

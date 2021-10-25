@@ -46,7 +46,17 @@ test('order', () => {
   graph.add('g', 'h');
   graph.add('d', 'x');
 
-  expect(['a', 'b', 'c', 'd', 'e', 'f'].map(e => graph.order(e))).toStrictEqual([2, 2, 1, 1, 0, 2]);
+  expect(['a', 'b', 'c', 'd', 'e', 'f', 'x'].map(e => graph.order(e))).toStrictEqual([2, 2, 1, 1, 0, 2, 0]);
   expect(graph.orderedTo('e')).toStrictEqual(['a', 'b', 'f', 'd', 'c', 'e']);
+  expect(graph.orderedTo('x')).toStrictEqual(['a', 'b', 'f', 'd', 'x']);
   expect(graph.orderedAll()).toStrictEqual(['a', 'b', 'f', 'd', 'c', 'g', 'e', 'h', 'x']);
+});
+
+test('value dependency', () => {
+  const graph = new DirecredGraph<string>();
+  graph.add('a', 'b');
+  graph.add('b', 'c');
+  graph.add('e', 'x');
+  expect(['a', 'c', 'x'].map(e => graph.order(e))).toStrictEqual([2, 0, 0]);
+
 });

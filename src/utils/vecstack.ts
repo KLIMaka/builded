@@ -109,10 +109,20 @@ export class VecStack {
   }
 
   apply(id: number, f: (x: number) => number): number {
-    return this.push(f(this.stack[id]), f(this.stack[id + 1]), f(this.stack[id + 2]), f(this.stack[id + 3]));
+    return this.push(
+      f(this.stack[id]),
+      f(this.stack[id + 1]),
+      f(this.stack[id + 2]),
+      f(this.stack[id + 3])
+    );
   }
 
   apply2(lh: number, rh: number, f: (x: number, y: number) => number): number {
-    return this.push(f(this.stack[lh], this.stack[rh]), f(this.stack[lh + 1], this.stack[rh + 1]), f(this.stack[lh + 2], this.stack[rh + 2]), f(this.stack[lh + 3], this.stack[rh + 3]));
+    return this.push(
+      f(this.stack[lh], this.stack[rh]),
+      f(this.stack[lh + 1], this.stack[rh + 1]),
+      f(this.stack[lh + 2], this.stack[rh + 2]),
+      f(this.stack[lh + 3], this.stack[rh + 3])
+    );
   }
 }

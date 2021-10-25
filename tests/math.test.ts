@@ -1,6 +1,5 @@
-import { map, range } from "../src/utils/collections";
 import { NumberInterpolator } from "../src/utils/interpolator";
-import { bilinear, perlin2d, quadratic } from "../src/utils/mathutils";
+import { bilinear, quadratic } from "../src/utils/mathutils";
 
 test('interpolator', () => {
   const arr = [1, 2, 2, 1];

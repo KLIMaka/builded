@@ -1,10 +1,11 @@
-import tippy from "tippy.js";
+import tippy, { Props } from "tippy.js";
 import { MenuBuilder } from "../../app/apis/ui";
 import { iter } from "../iter";
 import { div, Element, replaceContent, span, Table, tag } from "./ui";
 import h from "stage0";
 import { map, take } from "../collections";
-import { Callbacks, ValueSetterCallbacksImpl } from "../callbacks";
+import { CallbackChannel, CallbackChannelImpl, CallbackHandle, Destenation, Source } from "../callbacks";
+import { BasicValue } from "../value";
 
 export type ColumnRenderer<T> = (value: T) => Element;
 
@@ -72,17 +73,7 @@ export function menuButton(icon: string, menu: MenuBuilder): HTMLElement {
 
 export function widgetButton(icon: string, widget: HTMLElement): HTMLElement {
   const btn = tag('button').className('btn btn-default btn-dropdown').append(span().className('icon ' + icon)).elem();
-  tippy(btn, {
-    content: widget,
-    allowHTML: true,
-    placement: 'bottom-start',
-    trigger: 'click',
-    interactive: true,
-    arrow: false,
-    offset: [0, 0],
-    duration: 100,
-    appendTo: document.body
-  });
+  tippy(btn, widgetPopup(widget));
   return btn;
 }
 
@@ -127,7 +118,7 @@ export function search(hint: string, ico: string, oracle: Oracle<string>, handle
   input.oninput = () => { if (trackInput) handle.set(input.value); update(oracle(input.value)); }
   input.placeholder = hint;
   input.value = handle.get();
-  input.addEventListener('keydown', e => {
+  input.addEventListener('keydown', (e: KeyboardEvent) => {
     if (e.key == 'ArrowDown') suggestModel.shift(1)
     else if (e.key == 'ArrowUp') suggestModel.shift(-1)
     else if (e.key == 'Enter') suggestModel.select()
@@ -182,43 +173,51 @@ function menu(input: HTMLElement, suggestContainer: HTMLElement) {
 
 export type SliderModel = {
   label: string,
-  min: number,
-  max: number,
-  handle: ValueHandle<number>,
+  value: BasicValue<number>,
+  handle: Source<number> & Destenation<number> & CallbackChannel<[]>,
 }
 
+const widgetPopup = (widget: HTMLElement, opts = {}): Partial<Props> => {
+  return {
+    ...opts,
+    content: widget,
+    allowHTML: true,
+    placement: 'bottom-start',
+    trigger: 'click',
+    interactive: true,
+    arrow: false,
+    offset: [0, 0],
+    duration: 100,
+    appendTo: document.body
+  }
+}
 
-const NUMBER_FMT = Intl.NumberFormat('en-US', { maximumFractionDigits: 4, useGrouping: false, });
 export function sliderToolbarButton(model: SliderModel) {
-  const widgetTemplate = h`<div class="popup-widget">
-  <input type="range" min="${model.min}" max="${model.max}" value="${model.handle.get()}" style="vertical-align: middle; margin-right:10px" #range>
-  <input type="text" value="${model.handle.get()}" class="input-widget" #box></div>`;
+  const widgetTemplate = h`<div class="popup-widget"><input type="text" value="${model.handle.get()}" class="input-widget" #box></div>`;
   const buttonTemplate = h`<button class="btn btn-default btn-dropdown">${model.label} ${model.handle.get()}</button>`;
   const widget = <HTMLElement>widgetTemplate.cloneNode(true);
-  const { range, box } = widgetTemplate.collect(widget);
+  const { box } = widgetTemplate.collect(widget);
   const btn = <HTMLElement>buttonTemplate.cloneNode(true);
-  tippy(btn, {
-    content: widget, maxWidth: 500, allowHTML: true, placement: 'bottom-start', trigger: 'click', interactive: true, arrow: false, offset: [0, 0], duration: 100, appendTo: document.body
-  });
-  const setValue = (value: number, handle = true) => {
-    const valueStirng = NUMBER_FMT.format(value);
-    range.value = valueStirng;
-    box.value = valueStirng;
-    btn.textContent = `${model.label} ${valueStirng}`;
-    if (handle) model.handle.set(value);
+  const currentValue = () => model.value.formatter(model.handle.get());
+  tippy(btn, widgetPopup(widget));
+
+  model.handle.add(() => { btn.textContent = `${model.label} ${currentValue()}`; box.value = currentValue() });
+
+  const set = (value: number) => {
+    if (!model.value.validator(value)) return;
+    model.handle.set(value);
   }
-  model.handle.add((_, v) => setValue(+v, false))
-  range.oninput = () => setValue(+range.value);
-  box.oninput = () => setValue(+box.value);
+
+  box.oninput = () => { if (model.value.parseValidator(box.value)) set(model.value.parser(box.value)) }
   box.onkeydown = (e: KeyboardEvent) => {
     const scale = e.altKey ? 0.1 : e.shiftKey ? 10 : 1;
-    if (e.code == 'ArrowUp') { setValue(model.handle.get() + scale); e.preventDefault() }
-    if (e.code == 'ArrowDown') { setValue(model.handle.get() - scale); e.preventDefault() }
+    if (e.code == 'ArrowUp') { set(model.handle.get() + scale); e.preventDefault() }
+    if (e.code == 'ArrowDown') { set(model.handle.get() - scale); e.preventDefault() }
   }
   const wheel = (e: WheelEvent) => {
     const scale = e.altKey ? 0.1 : e.shiftKey ? 10 : 1;
-    if (e.deltaY < 0) { setValue(model.handle.get() + scale); e.preventDefault() }
-    if (e.deltaY > 0) { setValue(model.handle.get() - scale); e.preventDefault() }
+    if (e.deltaY < 0) { set(model.handle.get() + scale); e.preventDefault() }
+    if (e.deltaY > 0) { set(model.handle.get() - scale); e.preventDefault() }
   }
   box.onwheel = wheel;
   btn.onwheel = wheel;
@@ -275,8 +274,8 @@ export function textProp(label: string, handle: ValueHandle<string>): Property {
   return { label, widget }
 }
 
-export function rangeProp(label: string, min: number, max: number, handle: ValueHandle<number>): Property {
-  const model: SliderModel = { min, max, handle, label: "" };
+export function rangeProp(label: string, handle: ValueHandle<number>, value: BasicValue<number>): Property {
+  const model: SliderModel = { handle, label: "", value };
   const widget = () => sliderToolbarButton(model);
   return { label, widget }
 }
@@ -317,12 +316,12 @@ export function closeable(label: string, closed: boolean) {
   return { root, container };
 }
 
-export interface ValueHandle<T> extends Callbacks<[T, T], number> {
+export interface ValueHandle<T> extends CallbackChannel<[T, T]> {
   set(value: T): void;
   get(): T;
 }
 
-export class ValueHandleImpl<T> extends ValueSetterCallbacksImpl<T> implements ValueHandle<T> {
+export class ValueHandleImpl<T> extends CallbackChannelImpl<[T, T]> implements ValueHandle<T> {
   constructor(private value: T) { super() }
 
   set(value: T): void {

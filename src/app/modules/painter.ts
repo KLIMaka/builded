@@ -1,12 +1,12 @@
 import h from "stage0";
 import { vec3, Vec3Array } from "../../libs_js/glmatrix";
-import { Callbacks, CallbacksImpl, CallbacksStub } from "../../utils/callbacks";
+import { CallbackChannel, CallbackChannelImpl, CallbackChannelStub, CallbackHandlerImpl, Callbacks } from "../../utils/callbacks";
 import { filter, map, range } from "../../utils/collections";
 import { create, lifecycle, Module, plugin } from "../../utils/injector";
 import { KDTree } from "../../utils/kdtree";
 import { clamp, fract, int, len2d, octaves2d, perlin2d, smothstep } from "../../utils/mathutils";
 import { array, Raster, rect, resize } from "../../utils/pixelprovider";
-import { listProp, NavItem1, navTree, NavTreeModel, Oracle, properties, rangeProp, ValueHandleIml } from "../../utils/ui/renderers";
+import { listProp, NavItem1, navTree, NavTreeModel, Oracle, properties, rangeProp, ValueHandleImpl } from "../../utils/ui/renderers";
 import { addDragController, replaceContent } from "../../utils/ui/ui";
 import { VecStack } from "../../utils/vecstack";
 import { Scheduler, SCHEDULER, TaskHandle } from "../apis/app";
@@ -157,19 +157,11 @@ class ShapesModel implements NavTreeModel {
   }
 }
 
-enum Type {
-  NORMALIZED,
-  VALUE,
-  VECTOR2,
-  VECTOR2_NORMALIZED,
-}
-
-
 interface Image2d {
   pixel(stack: VecStack, pos: number): number;
   getSettings(): HTMLElement;
-  readonly value: Callbacks<[], number>;
-  readonly settings: Callbacks<[], number>;
+  readonly value: CallbackChannel<[]>;
+  readonly settings: CallbackChannel<[]>;
 }
 
 class Image2dRenderer {
@@ -178,7 +170,7 @@ class Image2dRenderer {
   private redrawCallback: () => void;
   private scheduleHandle: TaskHandle;
   private image: Image2d;
-  private imageHandle: number;
+  private imageHandler = new CallbackHandlerImpl(() => this.scheduleRedraw());
   private position: number;
 
   constructor(private scheduler: Scheduler, private stack: VecStack) {
@@ -186,9 +178,8 @@ class Image2dRenderer {
   }
 
   public set(img: Image2d) {
-    if (this.image != null) this.image.value.remove(this.imageHandle);
+    this.imageHandler.connect(img.value);
     this.image = img;
-    this.imageHandle = img.value.add(() => this.scheduleRedraw());
     this.scheduleRedraw();
   }
 
@@ -238,14 +229,16 @@ class Image2dRenderer {
   }
 }
 
+const NULL_CHANNEL = new CallbackChannelStub<[]>();
+
 function perlin(): Image2d {
-  const value = new CallbacksImpl<void>();
-  const settings = new CallbacksStub<void>();
-  const scale = new ValueHandleIml(1);
-  const octaves = new ValueHandleIml(1);
+  const value = new CallbackChannelImpl<[]>();
+  const settings = NULL_CHANNEL;
+  const scale = new ValueHandleImpl(1);
+  const octaves = new ValueHandleImpl(1);
   let noise = octaves2d(perlin2d, 1);
-  scale.addListener(() => value.notify());
-  octaves.addListener(o => { noise = octaves2d(perlin2d, o); value.notify() });
+  scale.add(() => value.notify());
+  octaves.add((_, n) => { noise = octaves2d(perlin2d, n); value.notify() });
   const props = properties([
     rangeProp('Scale', 0, 10 * 1024, scale),
     rangeProp('Octaves', 1, 4, octaves)
@@ -263,7 +256,7 @@ function perlin(): Image2d {
 function circle(): Image2d {
   const value = new CallbacksImpl<void>();
   const settings = new CallbacksStub<void>();
-  const radius = new ValueHandleIml(0.5);
+  const radius = new ValueHandleImlp(0.5);
   const pow = new ValueHandleIml(0);
   radius.addListener(() => value.notify());
   pow.addListener(() => value.notify());

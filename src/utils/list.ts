@@ -1,4 +1,4 @@
-import { TERMINAL_ITERATOR_RESULT, EMPTY_ITERATOR, Deck } from "./collections";
+import { TERMINAL_ITERATOR_RESULT, EMPTY_ITERATOR, Deck, ITERATOR_RESULT } from "./collections";
 
 export class Node<T> {
   constructor(
@@ -93,11 +93,11 @@ export class List<T> implements Iterable<T>{
       : {
         next: () => {
           if (pointer == this.terminator())
-            return <IteratorResult<T>>TERMINAL_ITERATOR_RESULT;
+            return TERMINAL_ITERATOR_RESULT;
           else {
             let obj = pointer.obj;
             pointer = pointer.next;
-            return <IteratorResult<T>>{ done: false, value: obj }
+            return ITERATOR_RESULT(obj);
           }
         }
       }
@@ -134,7 +134,7 @@ export class FastList<T> implements Iterable<T> {
   }
 
   public remove(idx: number): T {
-    if (idx <= 0 || idx >= this.elements.length() - 1 || this.nextIdx.get(idx) == -1) return null;
+    if (idx <= 0 || idx >= this.elements.length() || this.nextIdx.get(idx) == -1) return null;
     this.nextIdx.set(this.lastIdx.get(idx), this.nextIdx.get(idx));
     this.lastIdx.set(this.nextIdx.get(idx), this.lastIdx.get(idx));
     this.nextIdx.set(idx, -1);
@@ -170,7 +170,7 @@ export class FastList<T> implements Iterable<T> {
           else {
             const obj = this.get(pointer);
             pointer = this.next(pointer);
-            return { done: false, value: obj }
+            return ITERATOR_RESULT(obj);
           }
         }
       }

@@ -14,6 +14,7 @@ export interface MutableCollection<T> extends Collection<T> {
   set(idx: number, value: T): void;
 }
 
+export function ITERATOR_RESULT<T>(value: T): IteratorResult<T> { return { value, done: false } };
 export const TERMINAL_ITERATOR_RESULT: IteratorResult<any> = { value: null, done: true };
 export const EMPTY_ITERATOR = { next: () => TERMINAL_ITERATOR_RESULT };
 export const EMPTY_COLLECTION: MutableCollection<any> = {
@@ -24,7 +25,7 @@ export const EMPTY_COLLECTION: MutableCollection<any> = {
 }
 
 export function iteratorResult<T>(isDone: boolean, val: T): IteratorResult<T> {
-  return isDone ? TERMINAL_ITERATOR_RESULT : { done: false, value: val };
+  return isDone ? TERMINAL_ITERATOR_RESULT : ITERATOR_RESULT(val);
 }
 
 export class ArrayWrapper<T> implements MutableCollection<T> {
@@ -221,6 +222,7 @@ export function* range(start: number, end: number): Generator<number> {
   const di = start > end ? -1 : 1;
   for (let i = start; i != end; i += di) yield i;
 }
+
 export function rangeIter(start: number, end: number): Iter<number> {
   return Iter.of(range(start, end));
 }

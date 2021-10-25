@@ -199,9 +199,11 @@ export function memoize<T, U>(f: (t: T) => U) {
 }
 
 export function quadratic(x0: number, x1: number, x2: number, t: number) {
-  const a2 = (x2 - x0) * 2 - (x1 - x0) * 4;
-  const a1 = (x1 - x0) * 2 - a2 * 0.5;
+  // const a2 = (x2 - x0) * 2 - (x1 - x0) * 4;
+  // const a1 = (x1 - x0) * 2 - a2 * 0.5;
   const a0 = x0;
+  const a1 = x0 * -3 + x1 * 4 - x2;
+  const a2 = x0 * 2 - x1 * 4 + x2 * 2;
   return a0 + a1 * t + a2 * t * t;
 }
 
@@ -249,7 +251,7 @@ export function bilinear<T>(w: number, h: number, data: T[], inter: Interpolator
   }
 }
 
-const permutation = [151, 160, 137, 91, 90, 15,
+const PERMUTATIONS = [151, 160, 137, 91, 90, 15,
   131, 13, 201, 95, 96, 53, 194, 233, 7, 225, 140, 36, 103, 30, 69, 142, 8, 99, 37, 240, 21, 10, 23,
   190, 6, 148, 247, 120, 234, 75, 0, 26, 197, 62, 94, 252, 219, 203, 117, 35, 11, 32, 57, 177, 33,
   88, 237, 149, 56, 87, 174, 20, 125, 136, 171, 168, 68, 175, 74, 165, 71, 134, 139, 48, 27, 166,
@@ -263,7 +265,7 @@ const permutation = [151, 160, 137, 91, 90, 15,
   49, 192, 214, 31, 181, 199, 106, 157, 184, 84, 204, 176, 115, 121, 50, 45, 127, 4, 150, 254,
   138, 236, 205, 93, 222, 114, 67, 29, 24, 72, 243, 141, 128, 195, 78, 66, 215, 61, 156, 180
 ];
-const perlin = [...permutation, ...permutation];
+const PERLIN = [...PERMUTATIONS, ...PERMUTATIONS];
 
 function fade(t: number): number {
   return t * t * t * (t * (t * 6 - 15) + 10);
@@ -287,15 +289,15 @@ export function perlin2d(x: number, y: number) {
   y -= inty;
   const u = fade(x);
   const v = fade(y);
-  const A = perlin[X] + Y;
-  const AA = perlin[A];
-  const AB = perlin[A + 1];
-  const B = perlin[X + 1] + Y;
-  const BA = perlin[B];
-  const BB = perlin[B + 1];
+  const A = PERLIN[X] + Y;
+  const AA = PERLIN[A];
+  const AB = PERLIN[A + 1];
+  const B = PERLIN[X + 1] + Y;
+  const BA = PERLIN[B];
+  const BB = PERLIN[B + 1];
   return NumberInterpolator(
-    NumberInterpolator(grad2d(perlin[AA], x, y), grad2d(perlin[BA], x - 1, y), u),
-    NumberInterpolator(grad2d(perlin[AB], x, y - 1), grad2d(perlin[BB], x - 1, y - 1), u),
+    NumberInterpolator(grad2d(PERLIN[AA], x, y), grad2d(PERLIN[BA], x - 1, y), u),
+    NumberInterpolator(grad2d(PERLIN[AB], x, y - 1), grad2d(PERLIN[BB], x - 1, y - 1), u),
     v);
 }
 
@@ -305,8 +307,9 @@ export function octaves2d(f: (x: number, y: number) => number, octaves: number) 
     let sum = 0;
     let norm = 0;
     for (let i = 1; i <= octaves; i++) {
-      sum += f(x * i, y * i) * (1 / Math.pow(2, i - 1));
-      norm += (1 / Math.pow(2, i - 1));
+      const k = 1 / Math.pow(2, i - 1);
+      sum += f(x * i, y * i) * k;
+      norm += k;
     }
     return sum / norm;
   }

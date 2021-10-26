@@ -77,11 +77,11 @@ test('delay', async done => {
 test('tuple', async done => {
   const a = value(1);
   const b = value(2);
+  const t = tuple(a, b);
+  const d = delay(t);
 
   const log1: [number, number][] = [];
   const log2: [number, number][] = [];
-  const t = tuple(a, b);
-  const d = delay(t);
   t.add(() => log1.push(t.get()));
   d.add(() => log2.push(d.get()));
 
@@ -96,4 +96,17 @@ test('tuple', async done => {
     expect(log2).toStrictEqual([[42, 42]]);
     done();
   });
+});
+
+test('tuple1', () => {
+  const a = value(1);
+  const tr = transformed(a, x => x + 1);
+  const t = tuple(a, tr);
+  const tr1 = transformed(tuple(a, t), x => x.toString());
+
+  const log: string[] = [];
+  tr1.add(() => log.push(tr1.get()));
+
+  a.set(42);
+  expect(log).toStrictEqual(["42,42,43", "42,42,43", "42,42,43"]);
 });

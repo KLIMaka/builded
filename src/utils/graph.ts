@@ -1,36 +1,36 @@
-import { forEach } from './collections';
+import { forEach, wrap, pairs, chain, map, flatten, filter } from './collections';
 import { iter } from './iter';
 import { memoize } from './mathutils';
 
+export type Links<T> = { to: Set<T>, from: Set<T> };
 export class DirecredGraph<T> {
-  readonly nodes = new Map<T, Set<T>>();
+  readonly nodes = new Map<T, Links<T>>();
 
   private ensureNode(label: T) {
     let links = this.nodes.get(label);
     if (links == undefined) {
-      links = new Set();
+      links = { to: new Set(), from: new Set() };
       this.nodes.set(label, links);
     }
     return links;
   }
 
   public add(from: T, to: T) {
-    this.ensureNode(to)
-    this.ensureNode(from).add(to);
+    this.ensureNode(to).from.add(from)
+    this.ensureNode(from).to.add(to);
   }
 
   public addChain(chain: T[]) {
-    for (let i = 0; i < chain.length - 1; i++)
-      this.add(chain[i], chain[i + 1]);
+    for (const [c1, c2] of pairs(wrap(chain))) this.add(c1, c2);
   }
 
   public remove(n: T) {
-    forEach(this.nodes.entries(), e => e[1].delete(n));
+    forEach(this.nodes.entries(), ([, links]) => { links.from.delete(n); links.to.delete(n) });
     this.nodes.delete(n);
   }
 
   public order(node: T): number {
-    const links = this.nodes.get(node);
+    const links = this.nodes.get(node).to;
     if (links.size == 0) return 0;
     let maxorder = 0;
     for (const l of links) maxorder = Math.max(this.order(l), maxorder);
@@ -41,7 +41,7 @@ export class DirecredGraph<T> {
     const result = new Set<T>();
     result.add(node);
     for (const n of result)
-      iter(this.nodes.entries()).filter(([_, value]) => value.has(n)).map(([key, _]) => key).forEach(e => result.add(e));
+      iter(this.nodes.entries()).filter(([, links]) => links.to.has(n)).map(([key,]) => key).forEach(e => result.add(e));
     const order = memoize((n: T) => this.order(n));
     return [...result].sort((l, r) => order(r) - order(l));
   }
@@ -56,7 +56,8 @@ export class DirecredGraph<T> {
     const nodes = this.nodes;
     const paint = function (node: T): T[] {
       colors.set(node, 'gray');
-      for (const child of nodes.get(node)) {
+      const links = nodes.get(node);
+      for (const child of links.to) {
         const c = colors.get(child);
         if (c == undefined) {
           const cycle = paint(child);
@@ -72,5 +73,18 @@ export class DirecredGraph<T> {
       if (cycle != null) return cycle;
     }
     return null;
+  }
+
+  public supgraphs(): T[][] {
+    const visited = new Set();
+    const nodes = this.nodes;
+    const collect = function (node: T) {
+      if (visited.has(node)) return [];
+      const links = nodes.get(node);
+      visited.add(node);
+      return [node, ...flatten(map(chain(links.to, links.from), collect))];
+    }
+
+    return [...map(filter(this.nodes.keys(), n => !visited.has(n)), collect)];
   }
 }

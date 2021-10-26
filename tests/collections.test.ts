@@ -1,4 +1,4 @@
-import { Deck, IndexedDeck, first, last, map, reduce, sub, wrap, reversed, enumerate, range, cyclicRange, cyclicPairs, rect, all, take, isEmpty } from "../src/utils/collections";
+import { Deck, IndexedDeck, first, last, map, reduce, sub, wrap, reversed, enumerate, range, cyclicRange, cyclicPairs, rect, all, take, isEmpty, flatten } from "../src/utils/collections";
 
 
 test('Deck', () => {
@@ -103,4 +103,5 @@ test('Utils', () => {
   expect([...rect(1, 1)]).toStrictEqual([[0, 0]]);
   expect([...rect(2, 2)]).toStrictEqual([[0, 0], [1, 0], [0, 1], [1, 1]]);
   expect(() => [...rect(-2, 2)]).toThrow();
+  expect([...flatten([[1, 2, 3], [4], [], [5, [6, 7]]])]).toStrictEqual([1, 2, 3, 4, 5, [6, 7]]);
 });

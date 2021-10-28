@@ -46,11 +46,21 @@ export interface SourceCallbacklChannel<T> extends Source<T>, CallbackChannel<[]
 export class Value<T> extends CallbackChannelImpl<[]> implements Destenation<T>, Source<T> {
   constructor(private value: T) { super() }
   get(): T { return this.value }
-  set(newValue: T) { this.value = newValue; this.notify(); }
+  set(newValue: T) { if (this.value != newValue) { this.value = newValue; this.notify() } }
 }
 
 export function value<T>(value: T): Value<T> {
   return new Value<T>(value);
+}
+
+export class Reference<T> extends CallbackChannelImpl<[]> implements Source<T>  {
+  constructor(private value: T) { super() }
+  get(): T { return this.value }
+  modify(): void { this.notify() }
+}
+
+export function reference<T>(ref: T): Reference<T> {
+  return new Reference<T>(ref);
 }
 
 export class TransformValue<T, U> extends CallbackChannelImpl<[]> implements Source<T> {

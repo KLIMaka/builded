@@ -91,8 +91,9 @@ const suggestTemplate = h`
 `;
 
 export type Oracle<T> = (s: string) => Iterable<T>;
+export type Handle<T> = Source<T> & Destenation<T> & CallbackChannel<[]>;
 
-export function search(hint: string, ico: string, oracle: Oracle<string>, handle: ValueHandle<string>, trackInput = false): HTMLElement {
+export function search(hint: string, ico: string, oracle: Oracle<string>, handle: Handle<string>, trackInput = false): HTMLElement {
   const root = suggestTemplate.cloneNode(true);
   const { button, input, icon } = suggestTemplate.collect(root);
   if (ico != null) {
@@ -104,14 +105,9 @@ export function search(hint: string, ico: string, oracle: Oracle<string>, handle
   let suggestModel: SuggestionModel = null;
   const suggestions = menu(input, suggestContainer);
   suggestions.setProps({ onHide: () => { input.value = handle.get() } })
-  const setValue = (value: string, handleChange = true) => {
-    input.value = value;
-    suggestions.hide();
-    if (handleChange) handle.set(value);
-  }
-  handle.add((_, v) => setValue(v, false));
+  handle.add(() => { input.value = handle.get(); suggestions.hide(); });
   const update = (items: Iterable<string>) => {
-    suggestModel = sugggestionsMenu(map(items, (i: string) => <[string, () => void]>[i, () => setValue(i)]));
+    suggestModel = sugggestionsMenu(map(items, (i: string) => <[string, () => void]>[i, () => handle.set(i)]));
     replaceContent(suggestContainer, suggestModel.widget);
     suggestions.show();
   }

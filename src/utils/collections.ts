@@ -340,3 +340,7 @@ export function* flatten<T>(i: Iterable<T[]>): Generator<T> {
     item = ii.next();
   }
 }
+
+export function or<T>(lh: T, rh: T): T {
+  return lh ? lh : rh;
+}

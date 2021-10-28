@@ -2,17 +2,8 @@ import { Deck, isEmpty, map } from "../collections";
 import { drawToCanvas } from "../imgutils";
 import { iter } from "../iter";
 import { int } from "../mathutils";
-import { BlendAlpha, fit, PixelProvider, Raster, Rasterizer } from "../pixelprovider";
+import { fit, Raster, Rasterizer } from "../pixelprovider";
 import { drawGrid } from "./canvasgrid";
-
-export class RasterProvider<P> {
-  constructor(
-    private s: number,
-    private f: (i: number) => Raster<P>
-  ) { }
-  public size(): number { return this.s }
-  public get(i: number): Raster<P> { return this.f(i) }
-}
 
 export enum ScrollType {
   ITEM,
@@ -28,7 +19,7 @@ export class DrawPanel<P> {
   constructor(
     readonly canvas: HTMLCanvasElement,
     private idsProvider: () => Iterable<number>,
-    private provider: RasterProvider<P>,
+    private rasters: (id: number) => Raster<P>,
     private rasterizer: Rasterizer<P>,
     private padd: P,
     private selectCallback: (id: number) => void,
@@ -48,6 +39,10 @@ export class DrawPanel<P> {
       } else if (e.deltaY > 0) this.scroll(1, e.shiftKey ? ScrollType.PAGE : ScrollType.ROW);
       else if (e.deltaY < 0) this.scroll(-1, e.shiftKey ? ScrollType.PAGE : ScrollType.ROW);
     }
+  }
+
+  public setSource(src: (id: number) => Raster<P>) {
+    this.rasters = src;
   }
 
   private prepareIds() {
@@ -125,7 +120,7 @@ export class DrawPanel<P> {
       ctx.fillStyle = 'white';
       ctx.strokeStyle = 'white';
       ctx.textAlign = "center";
-      const img = this.provider.get(id);
+      const img = this.rasters(id);
       if (img != null) {
         const pixels = fit(cw, ch - 10, img, this.padd);
         drawToCanvas(pixels, ctx, this.rasterizer, x, y);

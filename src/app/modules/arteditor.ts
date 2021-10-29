@@ -1,14 +1,14 @@
 import { art } from "../../build/artraster";
-import { animate, ArtInfoProvider } from "../../build/formats/art";
-import { transformed, tuple, value } from "../../utils/callbacks";
-import { enumerate, range } from "../../utils/collections";
+import { animate, ArtInfo, ArtInfoProvider, Attributes } from "../../build/formats/art";
+import { CallbackChannel, handle, reference, Source, transformed, tuple, value } from "../../utils/callbacks";
+import { enumerate, or, range } from "../../utils/collections";
 import { drawToCanvas } from "../../utils/imgutils";
 import { create, lifecycle, Module, plugin } from "../../utils/injector";
 import { iter } from "../../utils/iter";
 import { int } from "../../utils/mathutils";
-import { palRasterizer, Rasterizer, rect, resize, superResize, transform } from "../../utils/pixelprovider";
-import { DrawPanel, RasterProvider } from "../../utils/ui/drawpanel";
-import { menuButton, search, sliderToolbarButton, ValueHandleImpl } from "../../utils/ui/renderers";
+import { palRasterizer, Raster, Rasterizer, rect, resize, superResize, transform } from "../../utils/pixelprovider";
+import { DrawPanel } from "../../utils/ui/drawpanel";
+import { menuButton, search, sliderToolbarButton } from "../../utils/ui/renderers";
 import { addDragController, div } from "../../utils/ui/ui";
 import { intValue, numberRangeValidator } from "../../utils/value";
 import { ART } from "../apis/app";
@@ -19,13 +19,11 @@ import { PicNumCallback } from "../edit/tools/selection";
 import { Palette, PicTags, PIC_TAGS, RAW_PAL, RAW_PLUs, TRANS_TABLE } from "./artselector";
 import { SHADOWSTEPS } from "./gl/buildgl";
 
-function createDrawPanel(arts: ArtInfoProvider, pal: Uint8Array, plu: (x: number) => number, canvas: HTMLCanvasElement, cb: PicNumCallback, iter: () => Iterable<number>) {
-  const provider = new RasterProvider(1024 * 10, (i: number) => {
-    const info = arts.getInfo(i);
-    return info == null ? null : transform(art(info), plu);
-  });
-  const rasterizer = palRasterizer(pal);
-  return new DrawPanel(canvas, iter, provider, rasterizer, 0, cb);
+function createDrawPanel(rasterizer: Rasterizer<number>, rasterProvider: Source<(id: number) => Raster<number>> & CallbackChannel<[]>, canvas: HTMLCanvasElement, cb: PicNumCallback, iter: () => Iterable<number>) {
+  const rasters = rasterProvider.get();
+  const panel = new DrawPanel(canvas, iter, rasters, rasterizer, 0, cb);
+  rasterProvider.add(() => panel.setSource(rasterProvider.get()));
+  return panel;
 }
 
 export async function ArtEditorModule(module: Module) {
@@ -37,27 +35,29 @@ export async function ArtEditorModule(module: Module) {
   }));
 }
 
+const VOID_ART_INFO = new ArtInfo(0, 0, new Attributes(), new Uint8Array());
+
 export class ArtEditor {
   private window: Window;
   private drawPanel: DrawPanel<number>;
-  private filter = value("");
   private view: HTMLCanvasElement;
+  private filter = value("");
   private currentId = value(0);
-  private mainFrameInfo = transformed(this.currentId, id => this.arts.getInfo(id));
-  private animationFrame = value(0);
-  private currentFrameInfo = transformed(tuple(this.currentId, this.animationFrame), ([id, frame]) => this.arts.getInfo(id + animate(frame, this.arts.getInfo(id))))
-
-  private centerX = value(320);
-  private centerY = value(320);
-  private scale = value(2.0);
-  private animationHandle = -1;
   private currentPlu = value(0);
   private currentShadow = value(0);
+  private animationFrame = value(0);
+  private controls = reference({ x: 320, y: 320, scale: 2 });
   private superSample = value(true);
-  private pluProvider = (x: number) => (x >= 255 || x < 0) ? 255 : this.plus[this.currentPlu.get()].plu[this.currentShadow.get() * 256 + x];
-  private rasterizer: Rasterizer<number>;
+  private mainFrameInfo = transformed(this.currentId, id => or(this.arts.getInfo(id), VOID_ART_INFO));
+  private currentFrameInfo = transformed(tuple(this.currentId, this.animationFrame, this.mainFrameInfo),
+    ([id, frame, mainFrame]) => or(this.arts.getInfo(id + animate(frame, mainFrame)), VOID_ART_INFO));
+  private pluProvider = transformed(tuple(this.currentShadow, this.currentPlu),
+    ([shadow, plu]) => (x: number) => (x >= 255 || x < 0) ? 255 : this.plus[plu].plu[shadow * 256 + x]);
+  private rasterProvider = transformed(this.pluProvider, plu => (i: number) => transform(art(or(this.arts.getInfo(i), VOID_ART_INFO)), plu));
+
   private closeBlend = (l: number, r: number, doff: number) => Math.abs(l - r) <= 4 ? this.blendColors(l, r, doff) : null;
   private blend = (l: number, r: number, doff: number) => this.blendColors(l, r, doff);
+  private rasterizer: Rasterizer<number>;
 
   constructor(
     private ui: Ui,
@@ -69,7 +69,7 @@ export class ArtEditor {
     private shadowsteps: number) {
 
     this.rasterizer = palRasterizer(pal);
-    this.drawPanel = createDrawPanel(arts, pal, this.pluProvider, this.createBrowser(), (id: number) => this.select(id), () => this.pics());
+    this.drawPanel = createDrawPanel(this.rasterizer, this.rasterProvider, this.createBrowser(), id => this.select(id), () => this.pics());
     this.view = this.createView();
     this.window = ui.builder.window()
       .title('ART Edit')
@@ -85,13 +85,40 @@ export class ArtEditor {
         .startGroup()
         .widget(this.createPalSelectingMenu())
         .widget(this.createShadowLevels())
-        .iconButton('icon-adjust', () => { this.superSample = !this.superSample; this.updateView(false) })
+        .iconButton('icon-adjust', () => { this.superSample.set(!this.superSample.get()) })
         .endGroup()
         .widget(search('Search', 'icon-search', s => this.oracle(s), this.filter, true)))
       .build();
 
-    this.filter.add(_ => this.updateFilter());
-    this.currentShadow.add(_ => this.redraw());
+    this.filter.add(() => this.updateFilter());
+
+    let animHandle = -1;
+    handle(null, (p, mainFrame) => {
+      this.animationFrame.set(0);
+      if (animHandle != -1) clearTimeout(animHandle);
+      if (mainFrame.attrs.frames == 0) return;
+      const speed = mainFrame.attrs.speed * 50;
+      animHandle = window.setInterval(() => this.animationFrame.set(this.animationFrame.get() + 1), speed);
+      p.add(() => { if (animHandle != -1) clearTimeout(animHandle) });
+    }, this.mainFrameInfo);
+
+    handle(null, (p, frameInfo, ctl, supersample, plu) => {
+      const ctx = this.view.getContext('2d');
+      ctx.fillStyle = 'black';
+      ctx.strokeStyle = 'white';
+      ctx.fillRect(0, 0, this.view.clientWidth, this.view.clientHeight);
+
+      const scaledW = int(frameInfo.w * ctl.scale);
+      const scaledH = int(frameInfo.h * ctl.scale);
+
+      const plued = transform(art(frameInfo), plu);
+      const img = supersample
+        ? superResize(plued, scaledW, scaledH, this.closeBlend, this.blend)
+        : resize(plued, scaledW, scaledH);
+      const x = ctl.x - int(((frameInfo.attrs.xoff | 0) + frameInfo.w / 2) * ctl.scale);
+      const y = ctl.y - int(((frameInfo.attrs.yoff | 0) + frameInfo.h / 2) * ctl.scale);
+      drawToCanvas(rect(img, - x, - y, this.view.width - x, this.view.height - y, 0), ctx, this.rasterizer);
+    }, this.currentFrameInfo, this.controls, this.superSample, this.pluProvider);
   }
 
   public stop() { this.window.destroy() }
@@ -103,7 +130,7 @@ export class ArtEditor {
 
   private createPalSelectingMenu() {
     const menu = this.ui.builder.menu();
-    iter(enumerate(this.plus)).forEach(([plu, i]) => menu.item(plu.name, () => { this.currentPlu = i; this.redraw() }))
+    iter(enumerate(this.plus)).forEach(([plu, i]) => menu.item(plu.name, () => { this.currentPlu.set(i) }))
     return menuButton('icon-adjust', menu);
   }
 
@@ -112,12 +139,13 @@ export class ArtEditor {
   }
 
   private oracle(s: string) {
+    const str = s.toLowerCase();
     return iter(this.tags.allTags())
-      .filter(t => t.toLowerCase().startsWith(s.toLowerCase()));
+      .filter(t => t.toLowerCase().startsWith(str));
   }
 
   private updateFilter() {
-    this.drawPanel.scrollToId(this.currentId);
+    this.drawPanel.scrollToId(this.currentId.get());
     this.drawPanel.draw();
   }
 
@@ -145,10 +173,11 @@ export class ArtEditor {
     canvas.height = 640 - 192;
     canvas.style.display = 'block';
     addDragController(canvas, (dx, dy, dscale) => {
-      this.centerX += dx;
-      this.centerY += dy;
-      this.scale *= dscale;
-      this.updateView(false);
+      const ctl = this.controls.get();
+      ctl.x += dx;
+      ctl.y += dy;
+      ctl.scale *= dscale;
+      this.controls.modify();
     });
     return canvas;
   }
@@ -162,47 +191,9 @@ export class ArtEditor {
     this.currentId.set(id);
   }
 
-  private resetAnimation() {
-    window.clearTimeout(this.animationHandle);
-    this.animationHandle = -1;
-    this.frame = 0;
-  }
-
-  private updateView(anim = true) {
-    if (this.currentId < 0) return;
-
-    const ctx = this.view.getContext('2d');
-    ctx.fillStyle = 'black';
-    ctx.strokeStyle = 'white';
-    ctx.fillRect(0, 0, this.view.clientWidth, this.view.clientHeight);
-
-    const mainInfo = this.arts.getInfo(this.currentId);
-    const frameInfo = this.arts.getInfo(this.currentId + animate(this.frame, mainInfo));
-    if (mainInfo == null || frameInfo == null) return;
-    const scaledW = int(frameInfo.w * this.scale);
-    const scaledH = int(frameInfo.h * this.scale);
-
-    const plued = transform(art(frameInfo), this.pluProvider);
-    const img = this.superSample
-      ? superResize(plued, scaledW, scaledH, this.closeBlend, this.blend)
-      : resize(plued, scaledW, scaledH);
-    const x = this.centerX - int(((frameInfo.attrs.xoff | 0) + frameInfo.w / 2) * this.scale);
-    const y = this.centerY - int(((frameInfo.attrs.yoff | 0) + frameInfo.h / 2) * this.scale);
-    drawToCanvas(rect(img, - x, - y, this.view.width - x, this.view.height - y, 0), ctx, this.rasterizer);
-
-    if (anim && (mainInfo.attrs.frames | 0) != 0) {
-      this.frame++;
-      this.animationHandle = window.setTimeout(() => this.updateView(), mainInfo.attrs.speed * 50);
-    }
-  }
-
-  private redraw() {
-    this.drawPanel.draw();
-    this.updateView(false);
-  }
-
   public show() {
     this.window.show();
-    this.redraw();
+    this.currentId.notify();
+    this.drawPanel.draw();
   }
 }

@@ -1,5 +1,21 @@
 import { Value, handle, value, transformed, delay, tuple } from "../src/utils/callbacks";
 
+test('value', () => {
+  const a = value(1);
+  const log: number[] = [];
+  a.add(() => log.push(a.get()));
+
+  a.set(1);
+  a.set(1);
+  a.set(1);
+  expect(log.length).toBe(0);
+
+  a.set(2);
+  a.set(2);
+  a.set(2);
+  expect(log).toStrictEqual([2]);
+});
+
 test('handler', () => {
   const a = value(1);
   const b = value(2);

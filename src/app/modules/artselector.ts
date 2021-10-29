@@ -4,17 +4,17 @@ import { range } from "../../utils/collections";
 import { create, Dependency, lifecycle } from "../../utils/injector";
 import { iter } from "../../utils/iter";
 import { palRasterizer } from "../../utils/pixelprovider";
-import { DrawPanel, RasterProvider } from "../../utils/ui/drawpanel";
+import { DrawPanel } from "../../utils/ui/drawpanel";
 import { menuButton, search, ValueHandleImpl } from "../../utils/ui/renderers";
 import { ART } from "../apis/app";
 import { Ui, UI, Window } from "../apis/ui";
 import { PicNumCallback } from "../edit/tools/selection";
 
 function createDrawPanel(arts: ArtInfoProvider, pal: Uint8Array, canvas: HTMLCanvasElement, cb: PicNumCallback, iter: () => Iterable<number>) {
-  const provider = new RasterProvider(1024 * 10, (i: number) => {
+  const provider = (i: number) => {
     const info = arts.getInfo(i);
     return info == null ? null : art(info);
-  });
+  };
   const rasterizer = palRasterizer(pal);
   return new DrawPanel(canvas, iter, provider, rasterizer, 0, cb);
 }

@@ -91,8 +91,9 @@ const suggestTemplate = h`
 `;
 
 export type Oracle<T> = (s: string) => Iterable<T>;
+export type Handle<T> = Source<T> & Destenation<T> & CallbackChannel<[]>;
 
-export function search(hint: string, ico: string, oracle: Oracle<string>, handle: ValueHandle<string>, trackInput = false): HTMLElement {
+export function search(hint: string, ico: string, oracle: Oracle<string>, handle: Handle<string>, trackInput = false): HTMLElement {
   const root = suggestTemplate.cloneNode(true);
   const { button, input, icon } = suggestTemplate.collect(root);
   if (ico != null) {
@@ -104,14 +105,9 @@ export function search(hint: string, ico: string, oracle: Oracle<string>, handle
   let suggestModel: SuggestionModel = null;
   const suggestions = menu(input, suggestContainer);
   suggestions.setProps({ onHide: () => { input.value = handle.get() } })
-  const setValue = (value: string, handleChange = true) => {
-    input.value = value;
-    suggestions.hide();
-    if (handleChange) handle.set(value);
-  }
-  handle.add((_, v) => setValue(v, false));
+  handle.add(() => { input.value = handle.get(); suggestions.hide(); });
   const update = (items: Iterable<string>) => {
-    suggestModel = sugggestionsMenu(map(items, (i: string) => <[string, () => void]>[i, () => setValue(i)]));
+    suggestModel = sugggestionsMenu(map(items, (i: string) => <[string, () => void]>[i, () => handle.set(i)]));
     replaceContent(suggestContainer, suggestModel.widget);
     suggestions.show();
   }
@@ -260,29 +256,24 @@ export function navTree(root: HTMLElement, model: NavTreeModel): void {
 
 export type Property = {
   label: string,
-  widget: () => HTMLElement
+  widget: HTMLElement
 }
 
 export function textProp(label: string, handle: ValueHandle<string>): Property {
   const template = h`<input type="text" value="${handle.get()}" class="input-widget" style="max-width:100px">`;
-  const widget = () => {
-    const root = <HTMLInputElement>template.cloneNode(true);
-    root.oninput = () => handle.set(root.value);
-    handle.add((_, v) => root.value = v);
-    return root;
-  }
-  return { label, widget }
+  const root = <HTMLInputElement>template.cloneNode(true);
+  root.oninput = () => handle.set(root.value);
+  handle.add((_, v) => root.value = v);
+  return { label, widget: root }
 }
 
-export function rangeProp(label: string, handle: ValueHandle<number>, value: BasicValue<number>): Property {
+export function rangeProp(label: string, handle: Source<number> & Destenation<number> & CallbackChannel<[]>, value: BasicValue<number>): Property {
   const model: SliderModel = { handle, label: "", value };
-  const widget = () => sliderToolbarButton(model);
-  return { label, widget }
+  return { label, widget: sliderToolbarButton(model) }
 }
 
-export function listProp(label: string, oracle: Oracle<string>, handle: ValueHandle<string>): Property {
-  const widget = () => search('', null, oracle, handle);
-  return { label, widget }
+export function listProp(label: string, oracle: Oracle<string>, handle: Source<string> & Destenation<string> & CallbackChannel<[]>): Property {
+  return { label, widget: search('', null, oracle, handle) }
 }
 
 const propertiesTemplate = h`<div class="properties"></div>`;
@@ -295,7 +286,7 @@ export function properties(properties: Property[]): HTMLElement {
     const { label } = propertyLabel.collect(labelRoot);
     const widgetRoot = propertyWidget.cloneNode(true);
     label.nodeValue = p.label;
-    widgetRoot.appendChild(p.widget());
+    widgetRoot.appendChild(p.widget);
     props.appendChild(labelRoot);
     props.appendChild(widgetRoot);
   }

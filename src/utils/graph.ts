@@ -1,5 +1,4 @@
-import { forEach, wrap, pairs, chain, map, flatten, filter } from './collections';
-import { iter } from './iter';
+import { chain, filter, flatten, map, pairs, reduce, wrap } from './collections';
 import { memoize } from './mathutils';
 
 export type Links<T> = { to: Set<T>, from: Set<T> };
@@ -25,16 +24,17 @@ export class DirecredGraph<T> {
   }
 
   public remove(n: T) {
-    forEach(this.nodes.entries(), ([, links]) => { links.from.delete(n); links.to.delete(n) });
+    const node = this.nodes.get(n);
+    if (node == undefined) return;
+    node.to.forEach(n1 => this.nodes.get(n1).from.delete(n));
+    node.from.forEach(n1 => this.nodes.get(n1).to.delete(n));
     this.nodes.delete(n);
   }
 
   public order(node: T): number {
     const links = this.nodes.get(node).to;
     if (links.size == 0) return 0;
-    let maxorder = 0;
-    for (const l of links) maxorder = Math.max(this.order(l), maxorder);
-    return maxorder + 1;
+    return reduce(map(links, n => this.order(n)), Math.max, 0) + 1
   }
 
   public orderedTo(node: T) {

@@ -350,3 +350,7 @@ export function getOrCreate<K, V>(map: Map<K, V>, key: K, value: (k: K) => V) {
   }
   return v;
 }
+
+export function or<T>(lh: T, rh: T): T {
+  return lh ? lh : rh;
+}

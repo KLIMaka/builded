@@ -40,8 +40,7 @@ export class DirecredGraph<T> {
   public orderedTo(node: T) {
     const result = new Set<T>();
     result.add(node);
-    for (const n of result)
-      iter(this.nodes.entries()).filter(([, links]) => links.to.has(n)).map(([key,]) => key).forEach(e => result.add(e));
+    for (const n of result) this.nodes.get(n).from.forEach(n => result.add(n));
     const order = memoize((n: T) => this.order(n));
     return [...result].sort((l, r) => order(r) - order(l));
   }
@@ -84,7 +83,6 @@ export class DirecredGraph<T> {
       visited.add(node);
       return [node, ...flatten(map(chain(links.to, links.from), collect))];
     }
-
     return [...map(filter(this.nodes.keys(), n => !visited.has(n)), collect)];
   }
 }

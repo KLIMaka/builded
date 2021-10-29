@@ -1,4 +1,4 @@
-import { map } from "./collections";
+import { getOrCreate, map } from "./collections";
 import { DirecredGraph } from "./graph";
 import { iter } from "./iter";
 
@@ -52,8 +52,7 @@ export class App implements Module {
   private plugins = new Map<Dependency<any>, Plugin<any>>();
 
   public bind<T>(dependency: Dependency<T>, plugin: Plugin<T>): void {
-    const p = this.plugins.get(dependency);
-    if (p != undefined) throw new Error(`Multiple bindings to dependency ${dependency.name}`);
+    if (this.plugins.has(dependency)) throw new Error(`Multiple bindings to dependency ${dependency.name}`);
     this.plugins.set(dependency, plugin);
   }
 
@@ -65,7 +64,11 @@ export class App implements Module {
     const injector = new RootInjector(this.plugins);
     try {
       const start = performance.now();
-      await Promise.all(iter(this.plugins.entries()).filter(e => e[0].isVoid).map(e => injector.getInstance(e[0])).collect());
+      const voidDeps = iter(this.plugins.keys())
+        .filter(dep => dep.isVoid)
+        .map(dep => injector.getInstance(dep))
+        .collect();
+      await Promise.all(voidDeps);
       console.info(`App started in ${(performance.now() - start).toFixed(2)}ms`);
       return injector;
     } catch (e) {
@@ -107,12 +110,7 @@ class RootInjector implements ParentInjector, Runtime {
 
   public getInstanceParent<T>(dependency: Dependency<T>, injector: ParentInjector): Promise<T> {
     this.add(dependency, injector);
-    let instance = this.instances.get(dependency);
-    if (instance == undefined) {
-      instance = this.create(dependency, injector);
-      this.instances.set(dependency, instance);
-    }
-    return instance;
+    return getOrCreate(this.instances, dependency, d => this.create(d, injector));
   }
 
   public getInstance<T>(dependency: Dependency<T>): Promise<T> {
@@ -128,7 +126,7 @@ class RootInjector implements ParentInjector, Runtime {
 
   private async create<T>(dependency: Dependency<T>, parent: ParentInjector) {
     const provider = this.providers.get(dependency);
-    if (provider == null) throw new Error(`No provider bound to ${dependency.name}`);
+    if (provider == undefined) throw new Error(`No provider bound to ${dependency.name}`);
     const injector = new ChildInjector(dependency, parent);
     try {
       const start = performance.now();

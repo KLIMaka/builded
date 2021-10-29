@@ -1,5 +1,6 @@
 import { cyclic } from "./mathutils";
 import { Iter } from "./iter";
+import { App } from "./injector";
 
 export interface Collection<T> extends Iterable<T> {
   get(i: number): T;
@@ -339,4 +340,13 @@ export function* flatten<T>(i: Iterable<T[]>): Generator<T> {
     for (const v of item.value) yield v;
     item = ii.next();
   }
+}
+
+export function getOrCreate<K, V>(map: Map<K, V>, key: K, value: (k: K) => V) {
+  let v = map.get(key);
+  if (v == undefined) {
+    v = value(key);
+    map.set(key, v);
+  }
+  return v;
 }

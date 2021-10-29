@@ -256,29 +256,24 @@ export function navTree(root: HTMLElement, model: NavTreeModel): void {
 
 export type Property = {
   label: string,
-  widget: () => HTMLElement
+  widget: HTMLElement
 }
 
 export function textProp(label: string, handle: ValueHandle<string>): Property {
   const template = h`<input type="text" value="${handle.get()}" class="input-widget" style="max-width:100px">`;
-  const widget = () => {
-    const root = <HTMLInputElement>template.cloneNode(true);
-    root.oninput = () => handle.set(root.value);
-    handle.add((_, v) => root.value = v);
-    return root;
-  }
-  return { label, widget }
+  const root = <HTMLInputElement>template.cloneNode(true);
+  root.oninput = () => handle.set(root.value);
+  handle.add((_, v) => root.value = v);
+  return { label, widget: root }
 }
 
-export function rangeProp(label: string, handle: ValueHandle<number>, value: BasicValue<number>): Property {
+export function rangeProp(label: string, handle: Source<number> & Destenation<number> & CallbackChannel<[]>, value: BasicValue<number>): Property {
   const model: SliderModel = { handle, label: "", value };
-  const widget = () => sliderToolbarButton(model);
-  return { label, widget }
+  return { label, widget: sliderToolbarButton(model) }
 }
 
-export function listProp(label: string, oracle: Oracle<string>, handle: ValueHandle<string>): Property {
-  const widget = () => search('', null, oracle, handle);
-  return { label, widget }
+export function listProp(label: string, oracle: Oracle<string>, handle: Source<string> & Destenation<string> & CallbackChannel<[]>): Property {
+  return { label, widget: search('', null, oracle, handle) }
 }
 
 const propertiesTemplate = h`<div class="properties"></div>`;
@@ -291,7 +286,7 @@ export function properties(properties: Property[]): HTMLElement {
     const { label } = propertyLabel.collect(labelRoot);
     const widgetRoot = propertyWidget.cloneNode(true);
     label.nodeValue = p.label;
-    widgetRoot.appendChild(p.widget());
+    widgetRoot.appendChild(p.widget);
     props.appendChild(labelRoot);
     props.appendChild(widgetRoot);
   }

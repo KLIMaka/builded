@@ -29,3 +29,7 @@ const NUMBER_FMT = Intl.NumberFormat('en-US', { maximumFractionDigits: 4, useGro
 export function intValue(def: number, validator: Validator<number>): BasicValue<number> {
   return { default: () => def, validator: and(intNumberValidator, validator), parseValidator: IntParseValidator, parser: IntParser, formatter: NUMBER_FMT };
 }
+
+export function floatValue(def: number, validator: Validator<number>): BasicValue<number> {
+  return { default: () => def, validator: validator, parseValidator: FloatParseValidator, parser: FloatParser, formatter: NUMBER_FMT };
+}

@@ -1,13 +1,14 @@
 import h from "stage0";
 import { vec3, Vec3Array } from "../../libs_js/glmatrix";
-import { CallbackChannel, CallbackChannelImpl, CallbackChannelStub, CallbackHandlerImpl, Callbacks } from "../../utils/callbacks";
+import { CallbackChannel, CallbackChannelImpl, CallbackChannelStub, CallbackHandler, CallbackHandlerImpl, Handle, handle, Source, value, tuple, transformed, reference } from "../../utils/callbacks";
 import { filter, map, range } from "../../utils/collections";
 import { create, lifecycle, Module, plugin } from "../../utils/injector";
 import { KDTree } from "../../utils/kdtree";
 import { clamp, fract, int, len2d, octaves2d, perlin2d, smothstep } from "../../utils/mathutils";
 import { array, Raster, rect, resize } from "../../utils/pixelprovider";
-import { listProp, NavItem1, navTree, NavTreeModel, Oracle, properties, rangeProp, ValueHandleImpl } from "../../utils/ui/renderers";
+import { listProp, NavItem1, navTree, NavTreeModel, Oracle, properties, Property, rangeProp, ValueHandleImpl } from "../../utils/ui/renderers";
 import { addDragController, replaceContent } from "../../utils/ui/ui";
+import { floatValue, intNumberValidator, intValue, numberRangeValidator } from "../../utils/value";
 import { VecStack } from "../../utils/vecstack";
 import { Scheduler, SCHEDULER, TaskHandle } from "../apis/app";
 import { BUS, busDisconnector } from "../apis/handler";
@@ -157,40 +158,31 @@ class ShapesModel implements NavTreeModel {
   }
 }
 
-interface Image2d {
-  pixel(stack: VecStack, pos: number): number;
-  getSettings(): HTMLElement;
-  readonly value: CallbackChannel<[]>;
-  readonly settings: CallbackChannel<[]>;
-}
+type Renderer = (stack: VecStack, pos: number) => number;
+type Value<T> = Source<T> & CallbackChannel<[]>;
+type Image = { renderer: Value<Renderer>, settings: Value<Property[]> }
 
-class Image2dRenderer {
-  private buff: number[];
-  private size: number;
-  private redrawCallback: () => void;
+class Image2dRenderer extends CallbackChannelImpl<[]> {
   private scheduleHandle: TaskHandle;
-  private image: Image2d;
-  private imageHandler = new CallbackHandlerImpl(() => this.scheduleRedraw());
   private position: number;
+  private handler: Handle;
 
-  constructor(private scheduler: Scheduler, private stack: VecStack) {
+  constructor(private scheduler: Scheduler, private stack: VecStack, private buff: number[], private size: number) {
+    super();
     this.position = this.stack.pushGlobal(0, 0, 0, 0);
   }
 
-  public set(img: Image2d) {
-    this.imageHandler.connect(img.value);
-    this.image = img;
-    this.scheduleRedraw();
+  public set(renderer: Value<Renderer>) {
+    if (this.handler != null) this.handler.stop();
+    this.handler = handle(null, (p, renderer) => this.scheduleRedraw(renderer), renderer);
   }
 
-  private scheduleRedraw() {
+  private scheduleRedraw(renderer: Renderer) {
     if (this.scheduleHandle != null) this.scheduleHandle.stop();
-    this.scheduleHandle = this.scheduler.addTask(this.redraw());
+    this.scheduleHandle = this.scheduler.addTask(this.redraw(renderer));
   }
 
-  private * redraw() {
-    if (this.redrawCallback == null) return;
-
+  private * redraw(renderer: Renderer) {
     let time = 0;
     let t = window.performance.now();
     let off = 0;
@@ -199,7 +191,7 @@ class Image2dRenderer {
       for (let x = 0; x < size; x++) {
         this.stack.begin();
         this.stack.set(this.position, x / size, y / size, 0, 0);
-        const res = this.stack.call(this.image.pixel, this.position);
+        const res = this.stack.call(renderer, this.position);
         this.buff[off++] = 256 * this.stack.x(res);
         this.stack.end();
       }
@@ -207,110 +199,92 @@ class Image2dRenderer {
       if (dt > 100) {
         t = window.performance.now();
         time += dt;
-        this.redrawCallback();
+        this.notify();
         yield;
       }
     }
-    this.redrawCallback();
+    this.notify();
     console.log(time);
   }
-
-  attach(buff: number[], size: number, cb: () => void): void {
-    this.redrawCallback = cb;
-    this.size = size;
-    this.buff = buff;
-    this.scheduleRedraw();
-  }
-
-  remove(): void {
-    this.redrawCallback = null;
-    this.size = null;
-    this.buff = null;
-  }
 }
 
-const NULL_CHANNEL = new CallbackChannelStub<[]>();
+function perlin(): Image {
+  const scale = value(1);
+  const octaves = value(1);
+  const scaleProp = rangeProp('Scale', scale, floatValue(1, _ => true));
+  const octavesProp = rangeProp('Octaves', octaves, intValue(1, numberRangeValidator(1, 4)));
 
-function perlin(): Image2d {
-  const value = new CallbackChannelImpl<[]>();
-  const settings = NULL_CHANNEL;
-  const scale = new ValueHandleImpl(1);
-  const octaves = new ValueHandleImpl(1);
-  let noise = octaves2d(perlin2d, 1);
-  scale.add(() => value.notify());
-  octaves.add((_, n) => { noise = octaves2d(perlin2d, n); value.notify() });
-  const props = properties([
-    rangeProp('Scale', 0, 10 * 1024, scale),
-    rangeProp('Octaves', 1, 4, octaves)
-  ]);
-  const getSettings = () => props;
-  const pixel = (stack: VecStack, pos: number) => {
-    const s = scale.get();
-    const nx = noise(stack.x(pos) * s, stack.y(pos) * s);
-    const ny = noise(stack.y(pos) * s, stack.x(pos) * s);
-    return stack.push(nx, ny, 0, 0);
-  }
-  return { pixel, getSettings, value, settings }
-}
-
-function circle(): Image2d {
-  const value = new CallbacksImpl<void>();
-  const settings = new CallbacksStub<void>();
-  const radius = new ValueHandleImlp(0.5);
-  const pow = new ValueHandleIml(0);
-  radius.addListener(() => value.notify());
-  pow.addListener(() => value.notify());
-  const props = properties([
-    rangeProp('Radius', 1, 100, radius),
-    rangeProp('Power', -100, 100, pow),
-  ]);
-  const getSettings = () => props;
-  const pixel = (stack: VecStack, pos: number) => {
-    const r = radius.get() / 100;
-    const l = stack.distance(pos, stack.push(0.5, 0.5, 0, 0));
-    const v = clamp(r - l, 0, r);
-    const p = 1 + pow.get() / 10;
-    const pp = p >= 1 ? p : (1 / (2 - p))
-    const k = Math.pow(v / r, pp) * r;
-    return stack.push(k, 0, 0, 0);
-  }
-  return { pixel, getSettings, value, settings }
-}
-
-function select(p: (name: string) => Image2d, oracle: Oracle<string>): Image2d {
-  const value = new CallbacksImpl<void>();
-  const settings = new CallbacksImpl<void>();
-  const src = new ValueHandleIml('');
-  const from = new ValueHandleIml(0);
-  const to = new ValueHandleIml(1);
-  const smoth = new ValueHandleIml(0);
-  let srcHandle = -1;
-  src.addListener(s => {
-    const img = p(s);
-    img.settings.add(() => settings.notify());
-    value.notify();
+  const renderer = transformed(tuple(scale, octaves), ([s, o]) => {
+    const noise = octaves2d(perlin2d, o);
+    return (stack: VecStack, pos: number) => {
+      const nx = noise(stack.x(pos) * s, stack.y(pos) * s);
+      const ny = noise(stack.y(pos) * s, stack.x(pos) * s);
+      return stack.push(nx, ny, 0, 0);
+    }
   });
-  from.addListener(() => value.notify());
-  to.addListener(() => value.notify());
-  smoth.addListener(() => value.notify());
-  const props = properties([
-    listProp('Source', oracle, src),
-    rangeProp('From', 0, 255, from),
-    rangeProp('To', 0, 255, to),
-    rangeProp('Smoth', 0, 100, smoth),
-  ]);
-  const getSettings = () => props;
-  const pixel = (stack: VecStack, pos: number) => {
-    const img = p(src.get());
-    const value = stack.x(stack.call(img.pixel, pos));
-    const f = from.get();
-    const t = to.get();
-    const s = smoth.get();
-    const l = smothstep(value, f - s, f);
-    const r = 1 - smothstep(value, t, t + s);
-    return stack.push(Math.min(l, r), 0, 0, 0);
-  }
-  return { pixel, getSettings, value, settings }
+  return { renderer, settings: value([scaleProp, octavesProp]) }
+}
+
+function circle(): Image {
+  const radius = value(0.5);
+  const pow = value(0);
+  const radiusProp = rangeProp('Radius', radius, floatValue(0.5, _ => true));
+  const powProp = rangeProp('Power', pow, floatValue(0, _ => true));
+
+  const renderer = transformed(tuple(radius, pow), ([radius, pow]) => {
+    return (stack: VecStack, pos: number) => {
+      const l = stack.distance(pos, stack.push(0.5, 0.5, 0, 0));
+      const v = clamp(radius - l, 0, radius);
+      const p = 1 + pow;
+      const pp = p >= 1 ? p : (1 / (2 - p))
+      const k = Math.pow(v / radius, pp) * radius;
+      return stack.push(k, 0, 0, 0);
+    }
+  });
+  return { renderer, settings: value([radiusProp, powProp]) }
+}
+
+const VOID_RENDERER = (stack: VecStack, pos: number) => stack.push(0, 0, 0, 0);
+
+function select(p: (name: string) => Image, oracle: Oracle<string>): Image {
+  const srcName = value('');
+  const src = transformed(srcName, s => p(s));
+  const from = value(0);
+  const to = value(1);
+  const smoth = value(0);
+
+  const srcProp = listProp('Source', oracle, srcName);
+  const fromProp = rangeProp('From', from, floatValue(0, _ => true));
+  const toProp = rangeProp('To', to, floatValue(0, _ => true));
+  const smothProp = rangeProp('Smoth', smoth, floatValue(0, _ => true));
+  const props = [srcProp, fromProp, toProp, smothProp];
+
+  const renderer = value(VOID_RENDERER);
+  const settings = value(props);
+
+  handle(null, (p, src) => {
+    if (src == null) {
+      renderer.set(VOID_RENDERER);
+      settings.set(props);
+      return
+    }
+
+    handle(p, (p, src, from, to, smoth) => {
+      renderer.set((stack: VecStack, pos: number) => {
+        const value = stack.x(stack.call(src, pos));
+        const l = smothstep(value, from - smoth, from);
+        const r = 1 - smothstep(value, to, to + smoth);
+        return stack.push(Math.min(l, r), 0, 0, 0);
+      });
+    }, src.renderer, from, to, smoth);
+
+    handle(p, (p, s) => {
+      settings.set([...props, ...s]);
+    }, src.settings);
+
+  }, src);
+
+  return { renderer, settings }
 }
 
 const CORE: [number, number][] = [[-1, -1], [0, -1], [1, -1], [-1, 0], [0, 0], [1, 0], [-1, 1], [0, 1], [1, 1]]
@@ -612,14 +586,17 @@ class Painter {
   private renderer: Image2dRenderer;
   private stack = new VecStack(1024);
 
-  private images: Image2d[] = [];
+  private images: Image[] = [];
   private imagesModel = new ShapesModel();
-  private imageMap = new Map<string, Image2d>();
+  private imageMap = new Map<string, Image>();
+  private currentImage = value(<Image>null);
+  private settingsHandle = new CallbackHandlerImpl(() => replaceContent(this.sidebarRight, properties(this.currentImage.get().settings.get())))
 
   constructor(private ui: Ui, private scheduler: Scheduler) {
     this.recreateBuffer();
-    this.renderer = new Image2dRenderer(scheduler, this.stack);
-    this.renderer.attach(this.buffer, this.bufferSize, () => this.redraw());
+    this.renderer = new Image2dRenderer(scheduler, this.stack, this.buffer, this.bufferSize);
+    this.renderer.add(() => this.redraw());
+    this.currentImage.add(() => this.renderer.set(this.currentImage.get().renderer))
 
     const view = this.createView();
     this.model = new Model(this.overlay, () => this.redraw());
@@ -632,31 +609,31 @@ class Painter {
       .content(view)
       .build();
 
-    const kdtree = new KDTree([...map(range(0, 100), _ => <[number, number]>[Math.random(), Math.random()])]);
-    const line1 = lineSegment(this.stack.pushGlobal(0.5, 0.0, 0, 0), this.stack.pushGlobal(0.5, 1.0, 0, 0));
-    const line2 = lineSegment(this.stack.pushGlobal(0.0, 0.6, 0, 0), this.stack.pushGlobal(1.0, 0.6, 0, 0));
-    const lines = union(line1, line2);
+    // const kdtree = new KDTree([...map(range(0, 100), _ => <[number, number]>[Math.random(), Math.random()])]);
+    // const line1 = lineSegment(this.stack.pushGlobal(0.5, 0.0, 0, 0), this.stack.pushGlobal(0.5, 1.0, 0, 0));
+    // const line2 = lineSegment(this.stack.pushGlobal(0.0, 0.6, 0, 0), this.stack.pushGlobal(1.0, 0.6, 0, 0));
+    // const lines = union(line1, line2);
     // const grid = pointGrid(this.stack.pushGlobal(1, 1, 1, 1), this.stack.pushGlobal(0.5, 0, 0, 0))
-    const _hash = (stack: VecStack, p: number) => hash(stack, perlin2d(stack.x(p) * 13.123, stack.y(p) * 13.123))
-    const points = displacedPointGrid(this.stack.pushGlobal(10, 10, 1, 1), this.stack.pushGlobal(0, 0, 0, 0), _hash);
+    // const _hash = (stack: VecStack, p: number) => hash(stack, perlin2d(stack.x(p) * 13.123, stack.y(p) * 13.123))
+    // const points = displacedPointGrid(this.stack.pushGlobal(10, 10, 1, 1), this.stack.pushGlobal(0, 0, 0, 0), _hash);
 
     this.addImage('Circle', circle());
     this.addImage('Perlin', perlin());
     this.addImage('Select', select(this.imageProvider(), this.shapeOracle()));
-    this.addImage('Displace', displace(this.imageProvider(), this.shapeOracle()));
-    this.addImage('Repeat', repeat(this.imageProvider(), this.shapeOracle()));
-    this.addImage('Voronoi', voronoi(this.stack, this.imageProvider(), this.shapeOracle()));
+    // this.addImage('Displace', displace(this.imageProvider(), this.shapeOracle()));
+    // this.addImage('Repeat', repeat(this.imageProvider(), this.shapeOracle()));
+    // this.addImage('Voronoi', voronoi(this.stack, this.imageProvider(), this.shapeOracle()));
     // this.addImage('Distance', distance2d((stack, p) => stack.push(kdtree.distance(stack.x(p), stack.y(p)), 0, 0, 0)));
     // this.addImage('Line', distance2d(circular));
-    this.addImage('Circular', circular(this.imageProvider(), this.shapeOracle()));
-    this.addImage('Transform', transform(this.imageProvider(), this.shapeOracle()));
-    this.addImage('Grid', grid(this.stack, this.imageProvider(), this.shapeOracle()));
-    this.addImage('Displaced Grid', displacedGrid(this.stack, this.imageProvider(), this.shapeOracle()));
-    this.addImage('Apply', apply(this.stack, this.imageProvider(), this.shapeOracle()));
-    this.addImage('Decircular', decircular1(this.stack, this.imageProvider(), this.shapeOracle()));
+    // this.addImage('Circular', circular(this.imageProvider(), this.shapeOracle()));
+    // this.addImage('Transform', transform(this.imageProvider(), this.shapeOracle()));
+    // this.addImage('Grid', grid(this.stack, this.imageProvider(), this.shapeOracle()));
+    // this.addImage('Displaced Grid', displacedGrid(this.stack, this.imageProvider(), this.shapeOracle()));
+    // this.addImage('Apply', apply(this.stack, this.imageProvider(), this.shapeOracle()));
+    // this.addImage('Decircular', decircular1(this.stack, this.imageProvider(), this.shapeOracle()));
   }
 
-  private imageProvider(): (name: string) => Image2d {
+  private imageProvider(): (name: string) => Image {
     return s => this.imageMap.get(s);
   }
 
@@ -670,7 +647,7 @@ class Painter {
     this.id = new ImageData(this.data, 640, 640);
   }
 
-  private addImage(name: string, img: Image2d) {
+  private addImage(name: string, img: Image) {
     const id = this.images.length;
     this.images.push(img);
     const item = this.imagesModel.add(name);
@@ -681,8 +658,9 @@ class Painter {
   private selectImage(id: number) {
     const img = this.images[id];
     if (img == undefined) return;
-    replaceContent(this.sidebarRight, img.settings);
-    this.renderer.set(img);
+    this.currentImage.set(img);
+    this.settingsHandle.connect(img.settings);
+    replaceContent(this.sidebarRight, properties(img.settings.get()));
   }
 
   private redraw() {

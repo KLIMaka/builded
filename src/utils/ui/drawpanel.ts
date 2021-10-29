@@ -43,6 +43,7 @@ export class DrawPanel<P> {
 
   public setSource(src: (id: number) => Raster<P>) {
     this.rasters = src;
+    this.draw();
   }
 
   private prepareIds() {

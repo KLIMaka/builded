@@ -108,6 +108,16 @@ export class VecStack {
     return result;
   }
 
+  lerp(lh: number, rh: number, t: number): number {
+    const result = this.allocate();
+    const t1 = 1 - t;
+    this.stack[result] = this.stack[rh] * t + this.stack[lh] * t1;
+    this.stack[result + 1] = this.stack[rh + 1] * t + this.stack[lh + 1] * t1;
+    this.stack[result + 2] = this.stack[rh + 2] * t + this.stack[lh + 2] * t1;
+    this.stack[result + 3] = this.stack[rh + 3] * t + this.stack[lh + 3] * t1;
+    return result;
+  }
+
   apply(id: number, f: (x: number) => number): number {
     return this.push(
       f(this.stack[id]),

@@ -160,10 +160,10 @@ type Image = { renderer: Value<Renderer>, settings: Value<Property[]> }
 type Postprocessor = (stack: VecStack, pos: number) => number;
 
 const NORMAL = (stack: VecStack, res: number) => {
-  const r = 255 * stack.x(res);
-  const g = 255 * stack.y(res);
-  const b = 255 * stack.z(res);
-  const a = 255 * stack.w(res);
+  const r = 255 * clamp(stack.x(res), 0, 1);
+  const g = 255 * clamp(stack.y(res), 0, 1);
+  const b = 255 * clamp(stack.z(res), 0, 1);
+  const a = 255 * clamp(stack.w(res), 0, 1);
   return r | (g << 8) | (b << 16) | (a << 24);
 }
 
@@ -254,14 +254,13 @@ function transformedParam<T>(name: string, trans: (name: string) => T, oracle: O
 
 function perlin(): Image {
   const scale = param('Scale', 1);
-  const octaves = param('Octaves', 1, intValue(1, numberRangeValidator(1, 4)));
+  const octaves = param('Octaves', 1, intValue(1, numberRangeValidator(1, 8)));
 
   const renderer = transformed(tuple(scale.value, octaves.value), ([s, o]) => {
     const noise = octaves2d(perlin2d, o);
     return (stack: VecStack, pos: number) => {
       const nx = noise(stack.x(pos) * s, stack.y(pos) * s);
-      const ny = noise(stack.y(pos) * s, stack.x(pos) * s);
-      return stack.push(nx, ny, 0, 1);
+      return stack.push(nx, 0, 0, 1);
     }
   });
   return { renderer, settings: value([scale.prop, octaves.prop]) }
@@ -464,7 +463,7 @@ function displace(p: (name: string) => Image, oracle: Oracle<string>): Image {
 
     handle(p, (p, src, displace, scale) => {
       renderer.set((stack: VecStack, pos: number) => {
-        return stack.call(src, stack.scale(stack.add(stack.call(displace, pos), pos), scale));
+        return stack.call(src, stack.add(stack.scale(stack.call(displace, pos), scale), pos));
       });
     }, src.renderer, displace.renderer, scale.value);
 
@@ -473,6 +472,47 @@ function displace(p: (name: string) => Image, oracle: Oracle<string>): Image {
     }, src.settings, displace.settings);
 
   }, src.value, displace.value);
+
+  return { renderer, settings };
+}
+
+function blend(p: (name: string) => Image, oracle: Oracle<string>): Image {
+  const funcs = {
+    "Blend": (stack: VecStack, lh: number, rh: number, t: number) => stack.lerp(lh, rh, t),
+    "Max": (stack: VecStack, lh: number, rh: number, t: number) => stack.apply2(lh, rh, Math.max),
+    "Min": (stack: VecStack, lh: number, rh: number, t: number) => stack.apply2(lh, rh, Math.min),
+    "Add": (stack: VecStack, lh: number, rh: number, t: number) => stack.add(lh, rh),
+  }
+
+  const src1 = transformedParam('Source 1', p, oracle);
+  const src2 = transformedParam('Source 2', p, oracle);
+  const func = transformedParam('Function', f => funcs[f], _ => Object.keys(funcs), 'Blend');
+  const t = param('Delta', 0.5);
+  const props = [src1.prop, src2.prop, func.prop, t.prop];
+
+  const renderer = value(VOID_RENDERER);
+  const settings = value(props);
+
+  handle(null, (p, src1, src2) => {
+    if (src1 == null || src2 == null) {
+      renderer.set(VOID_RENDERER);
+      settings.set(props);
+      return
+    }
+
+    handle(p, (p, src1, src2, func, t) => {
+      renderer.set((stack: VecStack, pos: number) => {
+        const s1 = stack.call(src1, pos);
+        const s2 = stack.call(src2, pos);
+        return func(stack, s1, s2, t);
+      });
+    }, src1.renderer, src2.renderer, func.value, t.value);
+
+    handle(p, (p, s1, s2) => {
+      settings.set([...props, ...s1, ...s2]);
+    }, src1.settings, src2.settings);
+
+  }, src1.value, src2.value);
 
   return { renderer, settings };
 }
@@ -770,6 +810,7 @@ class Painter {
     this.addImage('Apply', apply(this.stack, this.imageProvider(), this.shapeOracle()));
     // this.addImage('Decircular', decircular1(this.stack, this.imageProvider(), this.shapeOracle()));
     this.addImage('Gradient', gradient(this.imageProvider(), this.shapeOracle()));
+    this.addImage('Blend', blend(this.imageProvider(), this.shapeOracle()));
   }
 
   private imageProvider(): (name: string) => Image {

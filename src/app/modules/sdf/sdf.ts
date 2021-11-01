@@ -37,7 +37,7 @@ export function pointGrid(scale: number, offset: number) {
     const gridPos = stack.add(stack.apply(scaled, Math.floor), offset);
     const f = stack.sub(stack.apply(stack.sub(scaled, gridPos), Math.abs), offset);
     const closest = stack.div(stack.add(gridPos, stack.push(stack.x(f) < 0.5 ? 0 : 1, stack.y(f) < 0.5 ? 0 : 1, 0, 0)), scale);
-    return stack.push(stack.distance(pos, closest), 0, 0, 0);
+    return stack.push(stack.distance(pos, closest), 0, 0, 1);
   }
 }
 
@@ -56,7 +56,7 @@ export function displacedPointGrid(scale: number, offset: number, displacement: 
         stack.end();
       }
     }
-    return stack.push(Math.sqrt(mind), 0, 0, 0);
+    return stack.push(Math.sqrt(mind), 0, 0, 1);
   }
 }
 

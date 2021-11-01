@@ -3,12 +3,13 @@ import { vec3, Vec3Array } from "../../libs_js/glmatrix";
 import { CallbackChannel, CallbackChannelImpl, CallbackChannelStub, CallbackHandler, CallbackHandlerImpl, Handle, handle, Source, value, tuple, transformed, reference } from "../../utils/callbacks";
 import { filter, map, range } from "../../utils/collections";
 import { create, lifecycle, Module, plugin } from "../../utils/injector";
+import { Range, Vec3Interpolator } from "../../utils/interpolator";
 import { KDTree } from "../../utils/kdtree";
 import { clamp, fract, int, len2d, octaves2d, perlin2d, smothstep } from "../../utils/mathutils";
 import { array, Raster, rect, resize } from "../../utils/pixelprovider";
-import { listProp, NavItem1, navTree, NavTreeModel, Oracle, properties, Property, rangeProp, ValueHandleImpl } from "../../utils/ui/renderers";
+import { listProp, menuButton, NavItem1, navTree, NavTreeModel, Oracle, properties, Property, rangeProp, ValueHandleImpl } from "../../utils/ui/renderers";
 import { addDragController, replaceContent } from "../../utils/ui/ui";
-import { floatValue, intNumberValidator, intValue, numberRangeValidator } from "../../utils/value";
+import { BasicValue, floatValue, intNumberValidator, intValue, numberRangeValidator } from "../../utils/value";
 import { VecStack } from "../../utils/vecstack";
 import { Scheduler, SCHEDULER, TaskHandle } from "../apis/app";
 import { BUS, busDisconnector } from "../apis/handler";
@@ -25,18 +26,13 @@ export async function PainterModule(module: Module) {
   }));
 }
 
-function grayRasterizer(raster: Raster<number>, out: Uint8Array | Uint8ClampedArray | number[]) {
+function rasterizer(raster: Raster<number>, out: Uint32Array) {
   const w = raster.width;
   const h = raster.height;
   let off = 0;
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      const pixel = int(raster.pixel(x, y));
-      out[off + 0] = pixel;
-      out[off + 1] = pixel;
-      out[off + 2] = pixel;
-      out[off + 3] = 255;
-      off += 4;
+      out[off++] = raster.pixel(x, y);
     }
   }
 }
@@ -161,28 +157,57 @@ class ShapesModel implements NavTreeModel {
 type Renderer = (stack: VecStack, pos: number) => number;
 type Value<T> = Source<T> & CallbackChannel<[]>;
 type Image = { renderer: Value<Renderer>, settings: Value<Property[]> }
+type Postprocessor = (stack: VecStack, pos: number) => number;
+
+const NORMAL = (stack: VecStack, res: number) => {
+  const r = 255 * stack.x(res);
+  const g = 255 * stack.y(res);
+  const b = 255 * stack.z(res);
+  const a = 255 * stack.w(res);
+  return r | (g << 8) | (b << 16) | (a << 24);
+}
+
+const GRAY_R = (stack: VecStack, res: number) => {
+  const r = 255 * clamp(stack.x(res), 0, 1);
+  return r | (r << 8) | (r << 16) | (255 << 24);
+}
+
+const BLUE_RED = new Range([0, 0, 255], [255, 0, 0], Vec3Interpolator);
+const PLUS_MINUS_ONE_R = (stack: VecStack, res: number) => {
+  const i = (stack.x(res) + 1) * 0.5;
+  const [r, g, b] = BLUE_RED.get(i);
+  return r | (g << 8) | (b << 16) | (255 << 24);
+}
+
+const VECTOR = (stack: VecStack, res: number) => {
+  const r = 255 * (stack.x(res) + 1) * 0.5;
+  const g = 255 * (stack.y(res) + 1) * 0.5;
+  const b = 255 * (stack.z(res) + 1) * 0.5;
+  return r | (g << 8) | (b << 16) | (255 << 24);
+}
+
 
 class Image2dRenderer extends CallbackChannelImpl<[]> {
   private scheduleHandle: TaskHandle;
   private position: number;
   private handler: Handle;
 
-  constructor(private scheduler: Scheduler, private stack: VecStack, private buff: number[], private size: number) {
+  constructor(private scheduler: Scheduler, private stack: VecStack, private buff: Uint32Array, private size: number, private pp: Value<Postprocessor>) {
     super();
     this.position = this.stack.pushGlobal(0, 0, 0, 0);
   }
 
   public set(renderer: Value<Renderer>) {
     if (this.handler != null) this.handler.stop();
-    this.handler = handle(null, (p, renderer) => this.scheduleRedraw(renderer), renderer);
+    this.handler = handle(null, (p, renderer, pp) => this.scheduleRedraw(renderer, pp), renderer, this.pp);
   }
 
-  private scheduleRedraw(renderer: Renderer) {
+  private scheduleRedraw(renderer: Renderer, pp: Postprocessor) {
     if (this.scheduleHandle != null) this.scheduleHandle.stop();
-    this.scheduleHandle = this.scheduler.addTask(this.redraw(renderer));
+    this.scheduleHandle = this.scheduler.addTask(this.redraw(renderer, pp));
   }
 
-  private * redraw(renderer: Renderer) {
+  private * redraw(renderer: Renderer, pp: Postprocessor) {
     let time = 0;
     let t = window.performance.now();
     let off = 0;
@@ -192,7 +217,7 @@ class Image2dRenderer extends CallbackChannelImpl<[]> {
         this.stack.begin();
         this.stack.set(this.position, x / size, y / size, 0, 0);
         const res = this.stack.call(renderer, this.position);
-        this.buff[off++] = 256 * this.stack.x(res);
+        this.buff[off++] = pp(this.stack, res);
         this.stack.end();
       }
       const dt = window.performance.now() - t;
@@ -208,21 +233,38 @@ class Image2dRenderer extends CallbackChannelImpl<[]> {
   }
 }
 
-function perlin(): Image {
-  const scale = value(1);
-  const octaves = value(1);
-  const scaleProp = rangeProp('Scale', scale, floatValue(1, _ => true));
-  const octavesProp = rangeProp('Octaves', octaves, intValue(1, numberRangeValidator(1, 4)));
+type Parameter<T> = { value: Value<T>, prop: Property };
+function param(name: string, def: number, valueParams: BasicValue<number> = floatValue(def, _ => true)): Parameter<number> {
+  const val = value(def);
+  return {
+    value: val,
+    prop: rangeProp(name, val, valueParams)
+  }
+}
 
-  const renderer = transformed(tuple(scale, octaves), ([s, o]) => {
+function transformedParam<T>(name: string, trans: (name: string) => T, oracle: Oracle<string>, def = ''): Parameter<T> {
+  const valueName = value(def);
+  const val = transformed(valueName, trans);
+  return {
+    value: val,
+    prop: listProp(name, oracle, valueName)
+  }
+}
+
+
+function perlin(): Image {
+  const scale = param('Scale', 1);
+  const octaves = param('Octaves', 1, intValue(1, numberRangeValidator(1, 4)));
+
+  const renderer = transformed(tuple(scale.value, octaves.value), ([s, o]) => {
     const noise = octaves2d(perlin2d, o);
     return (stack: VecStack, pos: number) => {
       const nx = noise(stack.x(pos) * s, stack.y(pos) * s);
       const ny = noise(stack.y(pos) * s, stack.x(pos) * s);
-      return stack.push(nx, ny, 0, 0);
+      return stack.push(nx, ny, 0, 1);
     }
   });
-  return { renderer, settings: value([scaleProp, octavesProp]) }
+  return { renderer, settings: value([scale.prop, octaves.prop]) }
 }
 
 function circle(): Image {
@@ -231,33 +273,45 @@ function circle(): Image {
   const radiusProp = rangeProp('Radius', radius, floatValue(0.5, _ => true));
   const powProp = rangeProp('Power', pow, floatValue(0, _ => true));
 
-  const renderer = transformed(tuple(radius, pow), ([radius, pow]) => {
-    return (stack: VecStack, pos: number) => {
-      const l = stack.distance(pos, stack.push(0.5, 0.5, 0, 0));
-      const v = clamp(radius - l, 0, radius);
-      const p = 1 + pow;
-      const pp = p >= 1 ? p : (1 / (2 - p))
-      const k = Math.pow(v / radius, pp) * radius;
-      return stack.push(k, 0, 0, 0);
-    }
+  const renderer = transformed(tuple(radius, pow), ([radius, pow]) => (stack: VecStack, pos: number) => {
+    const l = stack.distance(pos, stack.push(0.5, 0.5, 0, 0));
+    const v = clamp(radius - l, 0, radius);
+    const p = 1 + pow;
+    const pp = p >= 1 ? p : (1 / (2 - p))
+    const k = Math.pow(v / radius, pp) * radius;
+    return stack.push(k, 0, 0, 1);
   });
   return { renderer, settings: value([radiusProp, powProp]) }
+}
+
+function box(): Image {
+  const w = param('Width', 0.5);
+  const h = param('Height', 0.5);
+  const r = param('Radius', 0.1);
+  const pow = param('Power', 0);
+
+  const renderer = transformed(tuple(w.value, h.value, r.value, pow.value), ([w, h, r, pow]) => (stack: VecStack, pos: number) => {
+    const dc = stack.apply(stack.sub(pos, stack.half), Math.abs);
+    const d = stack.sub(dc, stack.push(w / 2, h / 2, 0, 0));
+    const dist = Math.max(stack.x(d), stack.y(d));
+    const cdist = 1 - clamp(dist, 0, r) / r;
+    const p = 1 + pow;
+    const pp = p >= 1 ? p : (1 / (2 - p))
+    return stack.push(Math.pow(cdist, pp), 0, 0, 1);
+  });
+
+  return { renderer, settings: value([w.prop, h.prop, r.prop, pow.prop]) };
 }
 
 const VOID_RENDERER = (stack: VecStack, pos: number) => stack.push(0, 0, 0, 0);
 
 function select(p: (name: string) => Image, oracle: Oracle<string>): Image {
-  const srcName = value('');
-  const src = transformed(srcName, s => p(s));
-  const from = value(0);
-  const to = value(1);
-  const smoth = value(0);
+  const src = transformedParam('Source', p, oracle);
+  const from = param('From', 0);
+  const to = param('To', 0);
+  const smoth = param('Smoth', 0);
 
-  const srcProp = listProp('Source', oracle, srcName);
-  const fromProp = rangeProp('From', from, floatValue(0, _ => true));
-  const toProp = rangeProp('To', to, floatValue(0, _ => true));
-  const smothProp = rangeProp('Smoth', smoth, floatValue(0, _ => true));
-  const props = [srcProp, fromProp, toProp, smothProp];
+  const props = [src.prop, from.prop, to.prop, smoth.prop];
 
   const renderer = value(VOID_RENDERER);
   const settings = value(props);
@@ -274,15 +328,15 @@ function select(p: (name: string) => Image, oracle: Oracle<string>): Image {
         const value = stack.x(stack.call(src, pos));
         const l = smothstep(value, from - smoth, from);
         const r = 1 - smothstep(value, to, to + smoth);
-        return stack.push(Math.min(l, r), 0, 0, 0);
+        return stack.push(Math.min(l, r), 0, 0, 1);
       });
-    }, src.renderer, from, to, smoth);
+    }, src.renderer, from.value, to.value, smoth.value);
 
     handle(p, (p, s) => {
       settings.set([...props, ...s]);
     }, src.settings);
 
-  }, src);
+  }, src.value);
 
   return { renderer, settings }
 }
@@ -357,35 +411,73 @@ function grad(f: (stack: VecStack, pos: number) => number, stack: VecStack, pos:
   const d2 = stack.x(f(stack, stack.add(pos, stack.push(d, 0, 0, 0))));
   const d3 = stack.x(f(stack, stack.add(pos, stack.push(0, -d, 0, 0))));
   const d4 = stack.x(f(stack, stack.add(pos, stack.push(0, d, 0, 0))));
-  return stack.push(d1 - d2, d3 - d4, 0, 0);
+  return stack.normalize(stack.push(d1 - d2, d3 - d4, d, 0));
 }
 
-function displace(p: (name: string) => Image2d, oracle: Oracle<string>): Image2d {
-  const cbs = new Callbacks<Image2d>();
-  const src = new ValueHandleIml('');
-  const displace = new ValueHandleIml('');
-  const scale = new ValueHandleIml(100);
-  src.addListener(() => cbs.notify(null));
-  displace.addListener(() => cbs.notify(null));
-  scale.addListener(() => cbs.notify(null));
-  const settings = properties([
-    listProp('Source', oracle, src),
-    listProp('Displace', oracle, displace),
-    rangeProp('Scale', -1000, 1000, scale),
-  ]);
-  const pixel = (stack: VecStack, pos: number) => {
-    const source = p(src.get());
-    const disp = p(displace.get());
-    const s = scale.get() * 10000;
-    const d = grad(disp.pixel, stack, pos, 0.00001);
-    return source.pixel(stack, stack.scale(stack.add(pos, d), s));
-  }
-  const addListener = (cb: (v: Image2d) => void) => cbs.add(cb);
-  const removeListener = (id: number) => cbs.remove(id);
-  return { pixel, settings, addListener, removeListener, type: Type.VALUE }
+function gradient(p: (name: string) => Image, oracle: Oracle<string>): Image {
+  const src = transformedParam('Source', p, oracle);
+  const scale = param('Scale', 1);
+  const sample = param('Samle Scale', 0.0001);
+  const props = [src.prop, scale.prop, sample.prop];
+
+  const renderer = value(VOID_RENDERER);
+  const settings = value(props);
+
+  handle(null, (p, src) => {
+    if (src == null) {
+      renderer.set(VOID_RENDERER);
+      settings.set(props);
+      return
+    }
+
+    handle(p, (p, src, scale, sample) => {
+      renderer.set((stack: VecStack, pos: number) => {
+        return stack.scale(grad(src, stack, pos, sample), scale);
+      });
+    }, src.renderer, scale.value, sample.value);
+
+    handle(p, (p, s) => {
+      settings.set([...props, ...s]);
+    }, src.settings);
+
+  }, src.value);
+
+  return { renderer, settings };
+
 }
 
-function apply(stack: VecStack, p: (name: string) => Image2d, oracle: Oracle<string>): Image2d {
+function displace(p: (name: string) => Image, oracle: Oracle<string>): Image {
+  const src = transformedParam('Source', p, oracle);
+  const displace = transformedParam('Displace', p, oracle);
+  const scale = param('Scale', 1);
+  const props = [src.prop, displace.prop, scale.prop];
+
+  const renderer = value(VOID_RENDERER);
+  const settings = value(props);
+
+  handle(null, (p, src, displace) => {
+    if (src == null || displace == null) {
+      renderer.set(VOID_RENDERER);
+      settings.set(props);
+      return
+    }
+
+    handle(p, (p, src, displace, scale) => {
+      renderer.set((stack: VecStack, pos: number) => {
+        return stack.call(src, stack.scale(stack.add(stack.call(displace, pos), pos), scale));
+      });
+    }, src.renderer, displace.renderer, scale.value);
+
+    handle(p, (p, s, d) => {
+      settings.set([...props, ...s, ...d]);
+    }, src.settings, displace.settings);
+
+  }, src.value, displace.value);
+
+  return { renderer, settings };
+}
+
+function apply(stack: VecStack, p: (name: string) => Image, oracle: Oracle<string>): Image {
   const funcs = {
     "Fract": fract,
     "Sin": Math.sin,
@@ -393,76 +485,104 @@ function apply(stack: VecStack, p: (name: string) => Image2d, oracle: Oracle<str
     "Sin1": (x: number) => (1 - smothstep(x, 0, Math.PI * 2)) * Math.sin(x),
   }
 
-  const cbs = new Callbacks<Image2d>();
-  const src = new ValueHandleIml('');
-  const func = new ValueHandleIml('Ident');
-  const scale = new ValueHandleIml(1);
-  const offset = new ValueHandleIml(0);
+  const src = transformedParam('Source', p, oracle);
+  const func = transformedParam('Function', f => funcs[f], _ => Object.keys(funcs), 'Ident');
+  const scale = param('Scale', 1);
+  const offset = param('Offset', 0);
+
   const off = stack.pushGlobal(0, 0, 0, 0);
   const s = stack.pushGlobal(1, 1, 1, 1);
-  src.addListener(() => cbs.notify(null));
-  func.addListener(() => cbs.notify(null));
-  scale.addListener(v => { stack.spread(s, v); cbs.notify(null) });
-  offset.addListener(v => { stack.spread(off, v); cbs.notify(null) });
-  const settings = properties([
-    listProp('Source', oracle, src),
-    listProp('Function', _ => Object.keys(funcs), func),
-    rangeProp('Scale', -10000, 10000, scale),
-    rangeProp('Offset', -1000, 1000, offset),
-  ]);
-  const pixel = (stack: VecStack, pos: number) => {
-    const source = p(src.get());
-    return stack.apply(stack.add(stack.mul(stack.call(source.pixel, pos), s), off), funcs[func.get()]);
-  }
-  const addListener = (cb: (v: Image2d) => void) => cbs.add(cb);
-  const removeListener = (id: number) => cbs.remove(id);
-  return { pixel, settings, addListener, removeListener, type: Type.VALUE }
+
+  const props = [src.prop, func.prop, scale.prop, offset.prop];
+
+  const renderer = value(VOID_RENDERER);
+  const settings = value(props);
+
+  handle(null, (p, src) => {
+    if (src == null) {
+      renderer.set(VOID_RENDERER);
+      settings.set(props);
+      return
+    }
+
+    handle(p, (p, src, func, scale, offset) => {
+      stack.spread(off, offset);
+      stack.spread(s, scale);
+      renderer.set((stack: VecStack, pos: number) => {
+        return stack.apply(stack.add(stack.mul(stack.call(src, pos), s), off), func);
+      });
+    }, src.renderer, func.value, scale.value, offset.value);
+
+    handle(p, (p, s) => {
+      settings.set([...props, ...s]);
+    }, src.settings);
+
+  }, src.value);
+
+  return { renderer, settings };
 }
 
-function repeat(p: (name: string) => Image2d, oracle: Oracle<string>): Image2d {
-  const cbs = new Callbacks<Image2d>();
-  const scalex = new ValueHandleIml(3);
-  const scaley = new ValueHandleIml(3);
-  const src = new ValueHandleIml('');
-  scalex.addListener(() => cbs.notify(null));
-  scaley.addListener(() => cbs.notify(null));
-  src.addListener(() => cbs.notify(null));
-  const settings = properties([
-    listProp('Source', oracle, src),
-    rangeProp('Scale X', 1, 100, scalex),
-    rangeProp('Scale Y', 1, 100, scaley),
-  ]);
+function repeat(p: (name: string) => Image, oracle: Oracle<string>): Image {
+  const src = transformedParam('Source', p, oracle);
+  const scalex = param('Scale X', 3);
+  const scaley = param('Scale Y', 3);
+  const props = [src.prop, scalex.prop, scaley.prop];
 
-  const pixel = (stack: VecStack, pos: number) => {
-    const source = p(src.get());
-    const s = stack.push(scalex.get(), scaley.get(), 0, 0);
-    return stack.call(source.pixel, stack.apply(stack.mul(pos, s), fract));
-  }
+  const renderer = value(VOID_RENDERER);
+  const settings = value(props);
 
-  const addListener = (cb: (v: Image2d) => void) => cbs.add(cb);
-  const removeListener = (id: number) => cbs.remove(id);
-  return { pixel, settings, addListener, removeListener, type: Type.VALUE }
+  handle(null, (p, src) => {
+    if (src == null) {
+      renderer.set(VOID_RENDERER);
+      settings.set(props);
+      return
+    }
+
+    handle(p, (p, src, scalex, scaley) => {
+      renderer.set((stack: VecStack, pos: number) => {
+        const s = stack.push(scalex, scaley, 0, 0);
+        return stack.call(src, stack.apply(stack.mul(pos, s), fract));
+      });
+    }, src.renderer, scalex.value, scaley.value);
+
+    handle(p, (p, s) => {
+      settings.set([...props, ...s]);
+    }, src.settings);
+
+  }, src.value);
+
+  return { renderer, settings };
 }
 
-function circular(p: (name: string) => Image2d, oracle: Oracle<string>): Image2d {
-  const cbs = new Callbacks<Image2d>();
-  const count = new ValueHandleIml(4);
-  const src = new ValueHandleIml('');
-  count.addListener(() => cbs.notify(null));
-  src.addListener(() => cbs.notify(null));
-  const settings = properties([
-    listProp('Source', oracle, src),
-    rangeProp('Count', 1, 100, count),
-  ]);
+function circular(p: (name: string) => Image, oracle: Oracle<string>): Image {
+  const src = transformedParam('Source', p, oracle);
+  const count = param('Count', 1);
 
-  const pixel = (stack: VecStack, pos: number) => {
-    const source = p(src.get());
-    return stack.call(circularArray(count.get(), source.pixel), pos);
-  }
+  const props = [src.prop, count.prop];
 
-  const addListener = (cb: (v: Image2d) => void) => cbs.add(cb);
-  const removeListener = (id: number) => cbs.remove(id);
-  return { pixel, settings, addListener, removeListener, type: Type.VALUE }
+  const renderer = value(VOID_RENDERER);
+  const settings = value(props);
+
+  handle(null, (p, src) => {
+    if (src == null) {
+      renderer.set(VOID_RENDERER);
+      settings.set(props);
+      return
+    }
+
+    handle(p, (p, src, count) => {
+      renderer.set((stack: VecStack, pos: number) => {
+        return stack.call(circularArray(count, src), pos);
+      });
+    }, src.renderer, count.value);
+
+    handle(p, (p, s) => {
+      settings.set([...props, ...s]);
+    }, src.settings);
+
+  }, src.value);
+
+  return { renderer, settings };
 }
 
 function decircular1(stack: VecStack, p: (name: string) => Image2d, oracle: Oracle<string>): Image2d {
@@ -490,81 +610,92 @@ function decircular1(stack: VecStack, p: (name: string) => Image2d, oracle: Orac
   return { pixel, settings, addListener, removeListener, type: Type.VALUE }
 }
 
-function transform(p: (name: string) => Image2d, oracle: Oracle<string>): Image2d {
-  const cbs = new Callbacks<Image2d>();
-  const scale = new ValueHandleIml(1);
-  const offx = new ValueHandleIml(0);
-  const offy = new ValueHandleIml(0);
-  const src = new ValueHandleIml('');
-  src.addListener(() => cbs.notify(null));
-  scale.addListener(() => cbs.notify(null));
-  offx.addListener(() => cbs.notify(null));
-  offy.addListener(() => cbs.notify(null));
-  const settings = properties([
-    listProp('Source', oracle, src),
-    rangeProp('Scale', -100, 100, scale),
-    rangeProp('X Offset', -100, 100, offx),
-    rangeProp('Y Offset', -100, 100, offy),
-  ]);
+function transform(p: (name: string) => Image, oracle: Oracle<string>): Image {
+  const src = transformedParam('Source', p, oracle);
+  const scale = param('Scale', 1);
+  const offx = param('X Offset', 0);
+  const offy = param('Y Offset', 0);
+  const props = [src.prop, scale.prop, offx.prop, offy.prop];
 
-  const pixel = (stack: VecStack, pos: number) => {
-    const source = p(src.get());
-    const x = offx.get() / 10;
-    const y = offy.get() / 10;
-    const s = scale.get() / 10;
-    const half = stack.push(0.5, 0.5, 0, 0);
-    const off = stack.push(x, y, 0, 0);
-    const np = stack.add(stack.add(stack.scale(stack.sub(pos, half), s < 0 ? s : (1 / -s)), half), off);
-    return stack.call(source.pixel, np);
-  }
+  const renderer = value(VOID_RENDERER);
+  const settings = value(props);
 
-  const addListener = (cb: (v: Image2d) => void) => cbs.add(cb);
-  const removeListener = (id: number) => cbs.remove(id);
-  return { pixel, settings, addListener, removeListener, type: Type.VALUE }
+  handle(null, (p, src) => {
+    if (src == null) {
+      renderer.set(VOID_RENDERER);
+      settings.set(props);
+      return
+    }
+
+    handle(p, (p, src, scale, offx, offy) => {
+      renderer.set((stack: VecStack, pos: number) => {
+        const half = stack.push(0.5, 0.5, 0, 0);
+        const off = stack.push(offx, offy, 0, 0);
+        const np = stack.add(stack.add(stack.scale(stack.sub(pos, half), scale < 0 ? scale : (1 / -scale)), half), off);
+        return stack.call(src, np);
+      });
+    }, src.renderer, scale.value, offx.value, offy.value);
+
+    handle(p, (p, s) => {
+      settings.set([...props, ...s]);
+    }, src.settings);
+
+  }, src.value);
+
+  return { renderer, settings };
 }
 
-function grid(stack: VecStack, p: (name: string) => Image2d, oracle: Oracle<string>): Image2d {
-  const cbs = new Callbacks<Image2d>();
-  const offx = new ValueHandleIml(0);
-  const offy = new ValueHandleIml(0);
-  const scale = new ValueHandleIml(1);
+function grid(stack: VecStack): Image {
+  const offx = param('X Offset', 0)
+  const offy = param('Y Offset', 0);
+  const scale = param('Scale', 1);
+
   const off = stack.pushGlobal(0, 0, 0, 0);
   const s = stack.pushGlobal(1, 1, 1, 1);
-  offx.addListener(v => { stack.setx(off, v / 100); cbs.notify(null) });
-  offy.addListener(v => { stack.sety(off, v / 100); cbs.notify(null) });
-  scale.addListener(v => { stack.set(s, v, v, v, v); cbs.notify(null) });
-  const settings = properties([
-    rangeProp('X Offset', -100, 100, offx),
-    rangeProp('Y Offset', -100, 100, offy),
-    rangeProp("Scale", 1, 100, scale)
-  ]);
-  const f = pointGrid(s, off);
-  const pixel = (stack: VecStack, pos: number) => {
-    return stack.call(f, pos);
-  }
 
-  const addListener = (cb: (v: Image2d) => void) => cbs.add(cb);
-  const removeListener = (id: number) => cbs.remove(id);
-  return { pixel, settings, addListener, removeListener, type: Type.VALUE }
+  const props = [offx.prop, offy.prop, scale.prop];
+
+  const renderer = transformed(tuple(offx.value, offy.value, scale.value), ([offx, offy, scale]) => {
+    stack.set(off, offx, offy, 0, 0);
+    stack.spread(s, scale);
+    const f = pointGrid(s, off);
+    return (stack: VecStack, pos: number) => stack.call(f, pos);
+  });
+
+  return { renderer, settings: value(props) };
 }
 
-function displacedGrid(stack: VecStack, p: (name: string) => Image2d, oracle: Oracle<string>): Image2d {
-  const cbs = new Callbacks<Image2d>();
-  const src = new ValueHandleIml('');
-  const scale = new ValueHandleIml(1);
-  const s = stack.pushGlobal(1, 1, 1, 1);
-  scale.addListener(v => { stack.set(s, v, v, v, v); cbs.notify(null) });
-  const settings = properties([
-    listProp('Source', oracle, src),
-    rangeProp("Scale", 1, 100, scale)
-  ]);
-  const pixel = (stack: VecStack, pos: number) => {
-    return stack.call(displacedPointGrid(s, stack.zero, p(src.get()).pixel), pos);
-  }
+function displacedGrid(stack: VecStack, p: (name: string) => Image, oracle: Oracle<string>): Image {
+  const src = transformedParam('Source', p, oracle);
+  const scale = param('Scale', 1);
+  const props = [src.prop, scale.prop];
 
-  const addListener = (cb: (v: Image2d) => void) => cbs.add(cb);
-  const removeListener = (id: number) => cbs.remove(id);
-  return { pixel, settings, addListener, removeListener, type: Type.VALUE }
+  const s = stack.pushGlobal(1, 1, 1, 1);
+
+  const renderer = value(VOID_RENDERER);
+  const settings = value(props);
+
+  handle(null, (p, src) => {
+    if (src == null) {
+      renderer.set(VOID_RENDERER);
+      settings.set(props);
+      return
+    }
+
+    handle(p, (p, src, scale) => {
+      stack.spread(s, scale);
+      renderer.set((stack: VecStack, pos: number) => {
+        return stack.call(displacedPointGrid(s, stack.zero, src), pos);
+      });
+    }, src.renderer, scale.value);
+
+    handle(p, (p, s) => {
+      settings.set([...props, ...s]);
+    }, src.settings);
+
+  }, src.value);
+
+  return { renderer, settings };
 }
 
 class Painter {
@@ -579,9 +710,10 @@ class Painter {
   private centerY = 320;
   private scale = 1.0;
 
-  private buffer: number[];
+  private buffer: Uint32Array;
   private bufferSize = 512;
   private data: Uint8ClampedArray;
+  private dataView: Uint32Array;
   private id: ImageData;
   private renderer: Image2dRenderer;
   private stack = new VecStack(1024);
@@ -590,11 +722,12 @@ class Painter {
   private imagesModel = new ShapesModel();
   private imageMap = new Map<string, Image>();
   private currentImage = value(<Image>null);
-  private settingsHandle = new CallbackHandlerImpl(() => replaceContent(this.sidebarRight, properties(this.currentImage.get().settings.get())))
+  private settingsHandle = new CallbackHandlerImpl(() => replaceContent(this.sidebarRight, properties(this.currentImage.get().settings.get())));
+  private postrocessor = value(NORMAL);
 
   constructor(private ui: Ui, private scheduler: Scheduler) {
     this.recreateBuffer();
-    this.renderer = new Image2dRenderer(scheduler, this.stack, this.buffer, this.bufferSize);
+    this.renderer = new Image2dRenderer(scheduler, this.stack, this.buffer, this.bufferSize, this.postrocessor);
     this.renderer.add(() => this.redraw());
     this.currentImage.add(() => this.renderer.set(this.currentImage.get().renderer))
 
@@ -607,6 +740,10 @@ class Painter {
       .centered(true)
       .size(1081, 640)
       .content(view)
+      .toolbar(ui.builder.toolbar()
+        .startGroup()
+        .widget(this.createPPMenu())
+        .endGroup())
       .build();
 
     // const kdtree = new KDTree([...map(range(0, 100), _ => <[number, number]>[Math.random(), Math.random()])]);
@@ -618,19 +755,21 @@ class Painter {
     // const points = displacedPointGrid(this.stack.pushGlobal(10, 10, 1, 1), this.stack.pushGlobal(0, 0, 0, 0), _hash);
 
     this.addImage('Circle', circle());
+    this.addImage('Box', box());
     this.addImage('Perlin', perlin());
     this.addImage('Select', select(this.imageProvider(), this.shapeOracle()));
-    // this.addImage('Displace', displace(this.imageProvider(), this.shapeOracle()));
-    // this.addImage('Repeat', repeat(this.imageProvider(), this.shapeOracle()));
+    this.addImage('Displace', displace(this.imageProvider(), this.shapeOracle()));
+    this.addImage('Repeat', repeat(this.imageProvider(), this.shapeOracle()));
     // this.addImage('Voronoi', voronoi(this.stack, this.imageProvider(), this.shapeOracle()));
     // this.addImage('Distance', distance2d((stack, p) => stack.push(kdtree.distance(stack.x(p), stack.y(p)), 0, 0, 0)));
     // this.addImage('Line', distance2d(circular));
-    // this.addImage('Circular', circular(this.imageProvider(), this.shapeOracle()));
-    // this.addImage('Transform', transform(this.imageProvider(), this.shapeOracle()));
-    // this.addImage('Grid', grid(this.stack, this.imageProvider(), this.shapeOracle()));
-    // this.addImage('Displaced Grid', displacedGrid(this.stack, this.imageProvider(), this.shapeOracle()));
-    // this.addImage('Apply', apply(this.stack, this.imageProvider(), this.shapeOracle()));
+    this.addImage('Circular', circular(this.imageProvider(), this.shapeOracle()));
+    this.addImage('Transform', transform(this.imageProvider(), this.shapeOracle()));
+    this.addImage('Grid', grid(this.stack));
+    this.addImage('Displaced Grid', displacedGrid(this.stack, this.imageProvider(), this.shapeOracle()));
+    this.addImage('Apply', apply(this.stack, this.imageProvider(), this.shapeOracle()));
     // this.addImage('Decircular', decircular1(this.stack, this.imageProvider(), this.shapeOracle()));
+    this.addImage('Gradient', gradient(this.imageProvider(), this.shapeOracle()));
   }
 
   private imageProvider(): (name: string) => Image {
@@ -641,9 +780,19 @@ class Painter {
     return s => filter(this.imageMap.keys(), k => s.startsWith(s));
   }
 
+  private createPPMenu() {
+    const menu = this.ui.builder.menu();
+    menu.item('Normal', () => this.postrocessor.set(NORMAL));
+    menu.item('Gray R', () => this.postrocessor.set(GRAY_R));
+    menu.item('+/-1 R', () => this.postrocessor.set(PLUS_MINUS_ONE_R));
+    menu.item('Vector', () => this.postrocessor.set(VECTOR));
+    return menuButton('icon-adjust', menu);
+  }
+
   private recreateBuffer() {
-    this.buffer = new Array<number>(this.bufferSize * this.bufferSize);
+    this.buffer = new Uint32Array(this.bufferSize * this.bufferSize);
     this.data = new Uint8ClampedArray(640 * 640 * 4);
+    this.dataView = new Uint32Array(this.data.buffer);
     this.id = new ImageData(this.data, 640, 640);
   }
 
@@ -672,7 +821,7 @@ class Painter {
     const x = this.centerX - off;
     const y = this.centerY - off;
     const framed = rect(scaled, -x, -y, this.display.width - x, this.display.height - y, 0);
-    grayRasterizer(framed, this.data);
+    rasterizer(framed, this.dataView);
     ctx.putImageData(this.id, 0, 0);
   }
 

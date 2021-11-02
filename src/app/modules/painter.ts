@@ -251,6 +251,37 @@ function transformedParam<T>(name: string, trans: (name: string) => T, oracle: O
   }
 }
 
+function profile(p: (name: string) => Image, oracle: Oracle<string>): Image {
+  const src = transformedParam('Profile', p, oracle);
+  const y = param('Y', 0.5);
+
+  const props = [src.prop, y.prop];
+
+  const renderer = value(VOID_RENDERER);
+  const settings = value(props);
+
+  handle(null, (p, src) => {
+    if (src == null) {
+      renderer.set(VOID_RENDERER);
+      settings.set(props);
+      return
+    }
+
+    handle(p, (p, src, y) => {
+      renderer.set((stack: VecStack, pos: number) => {
+        const value = stack.x(stack.call(src, stack.push(stack.x(pos), y, 0, 0)));
+        return stack.push(1 - stack.y(pos) > value ? 0 : 1, 0, 0, 1);
+      });
+    }, src.renderer, y.value);
+
+    handle(p, (p, s) => {
+      settings.set([...props, ...s]);
+    }, src.settings);
+
+  }, src.value);
+
+  return { renderer, settings }
+}
 
 function perlin(): Image {
   const scale = param('Scale', 1);
@@ -283,23 +314,103 @@ function circle(): Image {
   return { renderer, settings: value([radiusProp, powProp]) }
 }
 
-function box(): Image {
+
+function profiles(): Image {
+  const profiles = {
+    'Identity': (x: number) => x,
+    'Sin': (x: number) => Math.sin(x),
+    'Cos': (x: number) => Math.cos(x),
+    'Step': (x: number) => x <= 0 ? 1 : x <= 0.5 ? 0.5 : 0,
+    'Circle': (x: number) => Math.abs(x) > 1 ? Number.NEGATIVE_INFINITY : Math.sqrt(1 - x * x),
+    'Anti Circle': (x: number) => Math.abs(x) > 1 ? Number.NEGATIVE_INFINITY : 1 - Math.sqrt(1 - x * x),
+  }
+  const profileKeys = Object.keys(profiles);
+  const profile = transformedParam('Profile', s => profiles[s], _ => profileKeys, 'Identity');
+  const xoff = param('X Offset', 0);
+  const yoff = param('Y Offset', 0);
+  const xscale = param('X Scale', 1);
+  const yscale = param('Y Scale', 1);
+
+  const renderer = transformed(tuple(profile.value, xoff.value, yoff.value, xscale.value, yscale.value), ([profile, xoff, yoff, xscale, yscale]) => (stack: VecStack, pos: number) => {
+    const x = stack.x(stack.add(stack.scale(pos, xscale), stack.push(xoff, 0, 0, 0)));
+    return stack.push(yoff + profile(x) * yscale, 0, 0, 1);
+  });
+
+  return { renderer, settings: value([profile.prop, xoff.prop, yoff.prop, xscale.prop, yscale.prop]) };
+}
+
+function pointDistance(): Image {
+  return { renderer: value((stack: VecStack, pos: number) => stack.push(stack.distance(stack.push(0.5, 0.5, 0, 0), pos), 0, 0, 1)), settings: value([]) };
+}
+
+function sdf(p: (name: string) => Image, oracle: Oracle<string>): Image {
+  const distance = transformedParam('SDF', p, oracle);
+  const profile = transformedParam('Profile', p, oracle);
+
+  const props = [distance.prop, profile.prop];
+
+  const renderer = value(VOID_RENDERER);
+  const settings = value(props);
+
+  handle(null, (p, distance, profile) => {
+    if (profile == null || distance == null) {
+      renderer.set(VOID_RENDERER);
+      settings.set(props);
+      return
+    }
+
+    handle(p, (p, distance, profile) => {
+      renderer.set((stack: VecStack, pos: number) => {
+        const dist = stack.x(stack.call(distance, pos));
+        return stack.push(stack.x(stack.call(profile, stack.push(dist, 0, 0, 0))), 0, 0, 0);
+      });
+    }, distance.renderer, profile.renderer);
+
+    handle(p, (p, d, pr) => {
+      settings.set([...props, ...d, ...pr]);
+    }, distance.settings, profile.settings);
+
+  }, distance.value, profile.value);
+
+  return { renderer, settings }
+}
+
+function box(p: (name: string) => Image, oracle: Oracle<string>): Image {
   const w = param('Width', 0.5);
   const h = param('Height', 0.5);
   const r = param('Radius', 0.1);
-  const pow = param('Power', 0);
+  const max = param('Max', 1);
+  const profile = transformedParam('Profile', p, oracle);
 
-  const renderer = transformed(tuple(w.value, h.value, r.value, pow.value), ([w, h, r, pow]) => (stack: VecStack, pos: number) => {
-    const dc = stack.apply(stack.sub(pos, stack.half), Math.abs);
-    const d = stack.sub(dc, stack.push(w / 2, h / 2, 0, 0));
-    const dist = Math.max(stack.x(d), stack.y(d));
-    const cdist = 1 - clamp(dist, 0, r) / r;
-    const p = 1 + pow;
-    const pp = p >= 1 ? p : (1 / (2 - p))
-    return stack.push(Math.pow(cdist, pp), 0, 0, 1);
-  });
+  const props = [w.prop, h.prop, r.prop, max.prop, profile.prop];
 
-  return { renderer, settings: value([w.prop, h.prop, r.prop, pow.prop]) };
+  const renderer = value(VOID_RENDERER);
+  const settings = value(props);
+
+  handle(null, (p, profile) => {
+    if (profile == null) {
+      renderer.set(VOID_RENDERER);
+      settings.set(props);
+      return
+    }
+
+    handle(p, (p, profile, w, h, r, max) => {
+      renderer.set((stack: VecStack, pos: number) => {
+        const dc = stack.apply(stack.sub(pos, stack.half), Math.abs);
+        const d = stack.sub(dc, stack.push(w / 2, h / 2, 0, 0));
+        const dist = Math.max(stack.x(d), stack.y(d));
+        const cdist = clamp(dist, 0, r) / r;
+        return stack.push(stack.x(stack.call(profile, stack.push(cdist, 0, 0, 0))) * max, 0, 0, 1);
+      });
+    }, profile.renderer, w.value, h.value, r.value, max.value);
+
+    handle(p, (p, s) => {
+      settings.set([...props, ...s]);
+    }, profile.settings);
+
+  }, profile.value);
+
+  return { renderer, settings }
 }
 
 const VOID_RENDERER = (stack: VecStack, pos: number) => stack.push(0, 0, 0, 0);
@@ -794,8 +905,13 @@ class Painter {
     // const _hash = (stack: VecStack, p: number) => hash(stack, perlin2d(stack.x(p) * 13.123, stack.y(p) * 13.123))
     // const points = displacedPointGrid(this.stack.pushGlobal(10, 10, 1, 1), this.stack.pushGlobal(0, 0, 0, 0), _hash);
 
+    this.addImage('Profiles', profiles());
+    this.addImage('Profiles1', profiles());
+    this.addImage('Point', pointDistance());
+    this.addImage('SDF', sdf(this.imageProvider(), this.shapeOracle()));
+    this.addImage('Profile', profile(this.imageProvider(), this.shapeOracle()));
     this.addImage('Circle', circle());
-    this.addImage('Box', box());
+    this.addImage('Box', box(this.imageProvider(), this.shapeOracle()));
     this.addImage('Perlin', perlin());
     this.addImage('Select', select(this.imageProvider(), this.shapeOracle()));
     this.addImage('Displace', displace(this.imageProvider(), this.shapeOracle()));

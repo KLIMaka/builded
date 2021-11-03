@@ -1,21 +1,20 @@
 import h from "stage0";
 import { vec3, Vec3Array } from "../../libs_js/glmatrix";
-import { CallbackChannel, CallbackChannelImpl, CallbackChannelStub, CallbackHandler, CallbackHandlerImpl, Handle, handle, Source, value, tuple, transformed, reference } from "../../utils/callbacks";
-import { filter, map, range } from "../../utils/collections";
+import { CallbackChannel, CallbackChannelImpl, CallbackHandlerImpl, Handle, handle, Source, transformed, tuple, value } from "../../utils/callbacks";
+import { filter, map } from "../../utils/collections";
 import { create, lifecycle, Module, plugin } from "../../utils/injector";
 import { Range, Vec3Interpolator } from "../../utils/interpolator";
-import { KDTree } from "../../utils/kdtree";
 import { clamp, fract, int, len2d, octaves2d, perlin2d, smothstep } from "../../utils/mathutils";
 import { array, Raster, rect, resize } from "../../utils/pixelprovider";
-import { listProp, menuButton, NavItem1, navTree, NavTreeModel, Oracle, properties, Property, rangeProp, ValueHandleImpl } from "../../utils/ui/renderers";
+import { listProp, menuButton, NavItem1, navTree, NavTreeModel, Oracle, properties, Property, rangeProp } from "../../utils/ui/renderers";
 import { addDragController, replaceContent } from "../../utils/ui/ui";
-import { BasicValue, floatValue, intNumberValidator, intValue, numberRangeValidator } from "../../utils/value";
+import { BasicValue, floatValue, intValue, numberRangeValidator } from "../../utils/value";
 import { VecStack } from "../../utils/vecstack";
 import { Scheduler, SCHEDULER, TaskHandle } from "../apis/app";
 import { BUS, busDisconnector } from "../apis/handler";
 import { Ui, UI, Window } from "../apis/ui";
 import { namedMessageHandler } from "../edit/messages";
-import { circularArray, decircular, displacedPointGrid, lineSegment, pointGrid, sdf3d, union } from "../modules/sdf/sdf";
+import { circularArray, decircular, displacedPointGrid, pointGrid, sdf3d } from "../modules/sdf/sdf";
 
 export async function PainterModule(module: Module) {
   module.bind(plugin('Painter'), lifecycle(async (injector, lifecycle) => {
@@ -378,20 +377,49 @@ function sdf(p: (name: string) => Image, oracle: Oracle<string>): Image {
   return { renderer, settings }
 }
 
-function sphere(stack: VecStack): Image {
-  const center = stack.pushGlobal(0.5, 0.5, 0, 0);
-  const toLight = stack.pushGlobal(1, 1, 0, 0);
+function render(stack: VecStack, p: (name: string) => Image, oracle: Oracle<string>): Image {
+  const hmap = transformedParam('Height Map', p, oracle);
+  const lightX = param('Light X', 0.7);
+  const lightY = param('Light Y', 0);
+  const lightZ = param('Light Z', -0.5);
+  const props = [hmap.prop, lightX.prop, lightY.prop, lightZ.prop];
 
-  const sphere = sdf3d(stack,
-    (stack: VecStack, pos: number) => {
-      return stack.push(stack.distance(pos, center) - 0.3, 0, 0, 0);
-    },
-    (stack: VecStack, pos: number, normal: number) => {
-      return stack.push(clamp(stack.dot(normal, toLight), 0, 1), 0, 0, 1);
+  const toLight = stack.pushGlobal(0, 0, 0, 0);
+
+  const renderer = value(VOID_RENDERER);
+  const settings = value(props);
+
+  handle(null, (p, hmap) => {
+    if (hmap == null) {
+      renderer.set(VOID_RENDERER);
+      settings.set(props);
+      return
     }
-  )
-  const renderer = value((stack: VecStack, pos: number) => stack.call(sphere, pos));
-  return { renderer, settings: value([]) };
+
+    handle(p, (p, hmap, lightX, lightY, lightZ) => {
+      stack.begin();
+      stack.copy(toLight, stack.normalize(stack.sub(stack.push(lightX, lightY, lightZ, 0), stack.push(0.5, 0.5, 0, 0))));
+      stack.end();
+      const plane = sdf3d(stack,
+        (stack: VecStack, pos: number) => {
+          const v = stack.x(stack.call(hmap, pos));
+          return stack.push(-v - stack.z(pos), 0, 0, 0);
+        },
+        (stack: VecStack, pos: number, normal: number) => {
+          // return stack.push(clamp(stack.dot(normal, toLight), 0, 1), 0, 0, 1);
+          return normal;
+        }
+      )
+      renderer.set((stack: VecStack, pos: number) => stack.call(plane, pos));
+    }, hmap.renderer, lightX.value, lightY.value, lightZ.value);
+
+    handle(p, (p, s) => {
+      settings.set([...props, ...s]);
+    }, hmap.settings);
+
+  }, hmap.value);
+
+  return { renderer, settings };
 }
 
 function box(p: (name: string) => Image, oracle: Oracle<string>): Image {
@@ -986,7 +1014,7 @@ class Painter {
     menu.item('Apply', () => this.addImage(`Apply${counter++}`, apply(this.stack, this.imageProvider(), this.shapeOracle())));
     menu.item('Gradient', () => this.addImage(`Gradient${counter++}`, gradient(this.imageProvider(), this.shapeOracle())));
     menu.item('Blend', () => this.addImage(`Blend${counter++}`, blend(this.imageProvider(), this.shapeOracle())));
-    menu.item('Sphere', () => this.addImage(`Sphere${counter++}`, sphere(this.stack)));
+    menu.item('Sphere', () => this.addImage(`Sphere${counter++}`, render(this.stack, this.imageProvider(), this.shapeOracle())));
     return menuButton('icon-plus', menu);
   }
 

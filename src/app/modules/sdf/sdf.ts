@@ -98,11 +98,10 @@ export function decircular(scale: number, img: SdfShape) {
   }
 }
 
-const DN = 0.0001;
+const DN = 0.00001;
 export function sdf3d(stack: VecStack, shape: SdfShape, renderer: SdfShapeRenderer): SdfShape {
-  const searchPoint = stack.pushGlobal(0, 0, 0, 0);
   return (stack: VecStack, pos: number) => {
-    stack.copy(searchPoint, pos);
+    const searchPoint = stack.copy(stack.allocate(), pos);
     let z = -1;
     let dist = Number.MAX_VALUE;
     let iters = 100;
@@ -138,7 +137,7 @@ export function sdf3d(stack: VecStack, shape: SdfShape, renderer: SdfShapeRender
 export const sphere = (center: number, r: number) => (vecs: VecStack3d, pos: number) => vecs.distance(pos, center) - r;
 
 export function softShadow(penumbra: number, vecs: VecStack3d, pos: number, toLight: number, s: SdfShape<VecStack3d>): number {
-  let shadow = 1.0;
+  let shadow = 1;
   let ph = 1e20;
   let l = 0.01;
   let radius = l;
@@ -161,8 +160,8 @@ export function softShadow(penumbra: number, vecs: VecStack3d, pos: number, toLi
     if (l > 1) break;
 
   }
-  const r = clamp(shadow, 0.0, 1.0);
-  return r * r * (3.0 - 2.0 * r);
+  const r = clamp(shadow, 0, 1);
+  return r * r * (3 - 2 * r);
 }
 
 export function ambientOcclusion(vecs: VecStack3d, pos: number, normal: number, s: SdfShape<VecStack3d>): number {
@@ -178,18 +177,4 @@ export function ambientOcclusion(vecs: VecStack3d, pos: number, normal: number, 
   return clamp(1 - 1.5 * occ, 0, 1);
 }
 
-export function lambert(vecs: VecStack3d, normal: number, toLight: number): number {
-  return clamp(vecs.dot(normal, toLight), 0, 1)
-}
-
-const H = 0.0001;
-export function normal(vecs: VecStack3d, pos: number, s: SdfShape<VecStack3d>): number {
-  return vecs.start().return(vecs.normalized(
-    vecs.push(
-      s(vecs, vecs.add(pos, vecs.push(H, 0, 0))) - s(vecs, vecs.add(pos, vecs.push(-H, 0, 0))),
-      s(vecs, vecs.add(pos, vecs.push(0, H, 0))) - s(vecs, vecs.add(pos, vecs.push(0, -H, 0))),
-      s(vecs, vecs.add(pos, vecs.push(0, 0, H))) - s(vecs, vecs.add(pos, vecs.push(0, 0, -H))),
-    )
-  ));
-}
 

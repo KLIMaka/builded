@@ -2,6 +2,7 @@ import { clamp, cyclic, fract, mix, monoatan2 } from "../../../utils/mathutils";
 import { VecStack } from '../../../utils/vecstack';
 
 export type SdfShape = (stack: VecStack, pos: number) => number;
+export type SdfShapeRenderer = (stack: VecStack, pos: number, normal: number) => number;
 export type DistanceOperation = (d1: number, d2: number) => number;
 
 export function SdfReducer(op: DistanceOperation) {
@@ -97,12 +98,41 @@ export function decircular(scale: number, img: SdfShape) {
   }
 }
 
+const DN = 0.0001;
+export function sdf3d(stack: VecStack, shape: SdfShape, renderer: SdfShapeRenderer): SdfShape {
+  const searchPoint = stack.pushGlobal(0, 0, 0, 0);
+  return (stack: VecStack, pos: number) => {
+    stack.copy(searchPoint, pos);
+    let z = -1;
+    let dist = Number.MAX_VALUE;
+    let iters = 100;
+    while (dist > 0.0001 && iters > 0 && z < 1) {
+      stack.begin();
+      stack.setz(searchPoint, z);
+      dist = stack.x(stack.call(shape, searchPoint));
+      z += dist;
+      iters--;
+      stack.end();
+    }
+    if (dist > 0.0001) return stack.push(0, 0, 0, 1);
 
-export function sdf3d(f: (x: number, y: number, z: number) => number) {
-  return (stack: VecStack3d, pos: number) => {
-    const p = stack.get(pos);
-    return f(p[0], p[1], p[2]);
-  };
+    const normal = stack.allocate();
+    stack.begin();
+    stack.set(normal,
+      stack.x(stack.call(shape, stack.add(searchPoint, stack.push(DN, 0, 0, 0)))) - stack.x(stack.call(shape, stack.add(searchPoint, stack.push(-DN, 0, 0, 0)))),
+      stack.x(stack.call(shape, stack.add(searchPoint, stack.push(0, DN, 0, 0)))) - stack.x(stack.call(shape, stack.add(searchPoint, stack.push(0, -DN, 0, 0)))),
+      stack.x(stack.call(shape, stack.add(searchPoint, stack.push(0, 0, DN, 0)))) - stack.x(stack.call(shape, stack.add(searchPoint, stack.push(0, 0, -DN, 0)))),
+      0);
+    stack.copy(normal, stack.normalize(normal));
+    stack.end();
+
+    const result = stack.allocate();
+    stack.begin();
+    stack.copy(result, renderer(stack, searchPoint, normal));
+    stack.end();
+
+    return result;
+  }
 }
 
 export const sphere = (center: number, r: number) => (vecs: VecStack3d, pos: number) => vecs.distance(pos, center) - r;

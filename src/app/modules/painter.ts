@@ -15,7 +15,7 @@ import { Scheduler, SCHEDULER, TaskHandle } from "../apis/app";
 import { BUS, busDisconnector } from "../apis/handler";
 import { Ui, UI, Window } from "../apis/ui";
 import { namedMessageHandler } from "../edit/messages";
-import { circularArray, decircular, displacedPointGrid, lineSegment, pointGrid, union } from "../modules/sdf/sdf";
+import { circularArray, decircular, displacedPointGrid, lineSegment, pointGrid, sdf3d, union } from "../modules/sdf/sdf";
 
 export async function PainterModule(module: Module) {
   module.bind(plugin('Painter'), lifecycle(async (injector, lifecycle) => {
@@ -323,8 +323,8 @@ function profiles(): Image {
     'Sin': (x: number) => Math.sin(x),
     'Cos': (x: number) => Math.cos(x),
     'Step': (x: number) => x <= 0 ? 1 : x <= 0.5 ? 0.5 : 0,
-    'Circle': (x: number) => Math.abs(x) > 1 ? Number.NEGATIVE_INFINITY : Math.sqrt(1 - x * x),
-    'Anti Circle': (x: number) => Math.abs(x) > 1 ? Number.NEGATIVE_INFINITY : 1 - Math.sqrt(1 - x * x),
+    'Circle': (x: number) => Math.abs(x) > 1 ? 0 : Math.sqrt(1 - x * x),
+    'Anti Circle': (x: number) => Math.abs(x) > 1 ? 0 : 1 - Math.sqrt(1 - x * x),
   }
   const profileKeys = Object.keys(profiles);
   const profile = transformedParam('Profile', s => profiles[s], _ => profileKeys, 'Identity');
@@ -364,7 +364,8 @@ function sdf(p: (name: string) => Image, oracle: Oracle<string>): Image {
     handle(p, (p, distance, profile) => {
       renderer.set((stack: VecStack, pos: number) => {
         const dist = stack.x(stack.call(distance, pos));
-        return stack.push(stack.x(stack.call(profile, stack.push(dist, 0, 0, 0))), 0, 0, 0);
+        const v = stack.x(stack.call(profile, stack.push(dist, 0, 0, 0)));
+        return stack.push(v, 0, 0, 1);
       });
     }, distance.renderer, profile.renderer);
 
@@ -375,6 +376,22 @@ function sdf(p: (name: string) => Image, oracle: Oracle<string>): Image {
   }, distance.value, profile.value);
 
   return { renderer, settings }
+}
+
+function sphere(stack: VecStack): Image {
+  const center = stack.pushGlobal(0.5, 0.5, 0, 0);
+  const toLight = stack.pushGlobal(1, 1, 0, 0);
+
+  const sphere = sdf3d(stack,
+    (stack: VecStack, pos: number) => {
+      return stack.push(stack.distance(pos, center) - 0.3, 0, 0, 0);
+    },
+    (stack: VecStack, pos: number, normal: number) => {
+      return stack.push(clamp(stack.dot(normal, toLight), 0, 1), 0, 0, 1);
+    }
+  )
+  const renderer = value((stack: VecStack, pos: number) => stack.call(sphere, pos));
+  return { renderer, settings: value([]) };
 }
 
 function box(p: (name: string) => Image, oracle: Oracle<string>): Image {
@@ -636,6 +653,7 @@ function apply(stack: VecStack, p: (name: string) => Image, oracle: Oracle<strin
     "Sin": Math.sin,
     "Ident": (x: number) => x,
     "Sin1": (x: number) => (1 - smothstep(x, 0, Math.PI * 2)) * Math.sin(x),
+    "Clamp": (x: number) => clamp(x, 0, 1)
   }
 
   const src = transformedParam('Source', p, oracle);
@@ -968,6 +986,7 @@ class Painter {
     menu.item('Apply', () => this.addImage(`Apply${counter++}`, apply(this.stack, this.imageProvider(), this.shapeOracle())));
     menu.item('Gradient', () => this.addImage(`Gradient${counter++}`, gradient(this.imageProvider(), this.shapeOracle())));
     menu.item('Blend', () => this.addImage(`Blend${counter++}`, blend(this.imageProvider(), this.shapeOracle())));
+    menu.item('Sphere', () => this.addImage(`Sphere${counter++}`, sphere(this.stack)));
     return menuButton('icon-plus', menu);
   }
 

@@ -305,7 +305,7 @@ function circle(): Image {
   const powProp = rangeProp('Power', pow, floatValue(0, _ => true));
 
   const renderer = transformed(tuple(radius, pow), ([radius, pow]) => (stack: VecStack, pos: number) => {
-    const l = stack.distance(pos, stack.push(0.5, 0.5, 0, 0));
+    const l = stack.distance(stack.push(stack.x(pos), stack.y(pos), 0, 0), stack.push(0.5, 0.5, 0, 0));
     const v = clamp(radius - l, 0, radius);
     const p = 1 + pow;
     const pp = p >= 1 ? p : (1 / (2 - p))
@@ -402,12 +402,16 @@ function render(stack: VecStack, p: (name: string) => Image, oracle: Oracle<stri
       stack.end();
       const plane = sdf3d(stack,
         (stack: VecStack, pos: number) => {
-          const v = stack.x(stack.call(hmap, pos));
-          return stack.push(-v - stack.z(pos), 0, 0, 0);
+          const x = stack.x(pos);
+          const y = stack.y(pos);
+          const z = stack.z(pos);
+          const v = stack.x(stack.call(hmap, stack.push(x, y, 0, 0)));
+          return stack.push(-v - z, 0, 0, 0);
         },
         (stack: VecStack, pos: number, normal: number) => {
-          // return stack.push(clamp(stack.dot(normal, toLight), 0, 1), 0, 0, 1);
-          return normal;
+          const toEye = stack.push(0, 0, -1, 0);
+          const reflect = stack.normalize(stack.sub(stack.scale(normal, stack.dot(toEye, normal) * 2), toEye));
+          return stack.push(clamp(stack.dot(normal, toLight) + Math.pow(stack.dot(toLight, reflect), 20), 0, 1), 0, 0, 1);
         }
       )
       renderer.set((stack: VecStack, pos: number) => stack.call(plane, pos));
@@ -681,7 +685,8 @@ function apply(stack: VecStack, p: (name: string) => Image, oracle: Oracle<strin
     "Sin": Math.sin,
     "Ident": (x: number) => x,
     "Sin1": (x: number) => (1 - smothstep(x, 0, Math.PI * 2)) * Math.sin(x),
-    "Clamp": (x: number) => clamp(x, 0, 1)
+    "Clamp": (x: number) => clamp(x, 0, 1),
+    "Max 0.5": (x: number) => Math.max(x, 0.5)
   }
 
   const src = transformedParam('Source', p, oracle);
@@ -884,7 +889,7 @@ function displacedGrid(stack: VecStack, p: (name: string) => Image, oracle: Orac
     handle(p, (p, src, scale) => {
       stack.spread(s, scale);
       renderer.set((stack: VecStack, pos: number) => {
-        return stack.call(displacedPointGrid(s, stack.zero, src), pos);
+        return stack.call(displacedPointGrid(s, stack.zero, src), stack.push(stack.x(pos), stack.y(pos), 0, 0));
       });
     }, src.renderer, scale.value);
 

@@ -82,7 +82,7 @@ export function circularArray(segments: number, img: SdfShape) {
     const ang = monoatan2(stack.x(p), stack.y(p));
     const angn = ang / (2 * Math.PI);
     const x = fract(angn * segments);
-    const y = 1 - stack.length(p);
+    const y = 1 - Math.hypot(stack.x(p), stack.y(p));
     const npos = stack.push(x, y, 0, 0);
     return stack.call(img, npos);
   }
@@ -98,17 +98,20 @@ export function decircular(scale: number, img: SdfShape) {
   }
 }
 
-const DN = 0.00001;
+const D = 0.0001;
 export function sdf3d(stack: VecStack, shape: SdfShape, renderer: SdfShapeRenderer): SdfShape {
   return (stack: VecStack, pos: number) => {
-    const searchPoint = stack.copy(stack.allocate(), pos);
+    const p = stack.copy(stack.allocate(), pos);
+    const dx = stack.push(D, 0, 0, 0);
+    const dy = stack.push(0, D, 0, 0);
+    const dz = stack.push(0, 0, D, 0);
     let z = -1;
     let dist = Number.MAX_VALUE;
     let iters = 100;
     while (dist > 0.0001 && iters > 0 && z < 1) {
       stack.begin();
-      stack.setz(searchPoint, z);
-      dist = stack.x(stack.call(shape, searchPoint));
+      stack.setz(p, z);
+      dist = stack.x(stack.call(shape, p));
       z += dist;
       iters--;
       stack.end();
@@ -118,16 +121,16 @@ export function sdf3d(stack: VecStack, shape: SdfShape, renderer: SdfShapeRender
     const normal = stack.allocate();
     stack.begin();
     stack.set(normal,
-      stack.x(stack.call(shape, stack.add(searchPoint, stack.push(DN, 0, 0, 0)))) - stack.x(stack.call(shape, stack.add(searchPoint, stack.push(-DN, 0, 0, 0)))),
-      stack.x(stack.call(shape, stack.add(searchPoint, stack.push(0, DN, 0, 0)))) - stack.x(stack.call(shape, stack.add(searchPoint, stack.push(0, -DN, 0, 0)))),
-      stack.x(stack.call(shape, stack.add(searchPoint, stack.push(0, 0, DN, 0)))) - stack.x(stack.call(shape, stack.add(searchPoint, stack.push(0, 0, -DN, 0)))),
+      stack.x(stack.call(shape, stack.add(p, dx))) - stack.x(stack.call(shape, stack.sub(p, dx))),
+      stack.x(stack.call(shape, stack.add(p, dy))) - stack.x(stack.call(shape, stack.sub(p, dy))),
+      stack.x(stack.call(shape, stack.add(p, dz))) - stack.x(stack.call(shape, stack.sub(p, dz))),
       0);
     stack.copy(normal, stack.normalize(normal));
     stack.end();
 
     const result = stack.allocate();
     stack.begin();
-    stack.copy(result, renderer(stack, searchPoint, normal));
+    stack.copy(result, renderer(stack, p, normal));
     stack.end();
 
     return result;

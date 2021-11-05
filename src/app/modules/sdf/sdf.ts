@@ -98,13 +98,9 @@ export function decircular(scale: number, img: SdfShape) {
   }
 }
 
-const D = 0.0001;
-export function sdf3d(stack: VecStack, shape: SdfShape, renderer: SdfShapeRenderer): SdfShape {
+export function sdf3d(shape: SdfShape, renderer: SdfShapeRenderer): SdfShape {
   return (stack: VecStack, pos: number) => {
     const p = stack.copy(stack.allocate(), pos);
-    const dx = stack.push(D, 0, 0, 0);
-    const dy = stack.push(0, D, 0, 0);
-    const dz = stack.push(0, 0, D, 0);
     let z = -1;
     let dist = Number.MAX_VALUE;
     let iters = 100;
@@ -118,35 +114,20 @@ export function sdf3d(stack: VecStack, shape: SdfShape, renderer: SdfShapeRender
     }
     if (dist > 0.0001) return stack.push(0, 0, 0, 1);
 
-    const normal = stack.allocate();
-    stack.begin();
-    stack.set(normal,
-      stack.x(stack.call(shape, stack.add(p, dx))) - stack.x(stack.call(shape, stack.sub(p, dx))),
-      stack.x(stack.call(shape, stack.add(p, dy))) - stack.x(stack.call(shape, stack.sub(p, dy))),
-      stack.x(stack.call(shape, stack.add(p, dz))) - stack.x(stack.call(shape, stack.sub(p, dz))),
-      0);
-    stack.copy(normal, stack.normalize(normal));
-    stack.end();
-
-    const result = stack.allocate();
-    stack.begin();
-    stack.copy(result, renderer(stack, p, normal));
-    stack.end();
-
-    return result;
+    const normal = stack.call(calcNormal, pos, shape);
+    return stack.call(renderer, p, normal);
   }
 }
 
-export const sphere = (center: number, r: number) => (vecs: VecStack3d, pos: number) => vecs.distance(pos, center) - r;
-
-export function softShadow(penumbra: number, vecs: VecStack3d, pos: number, toLight: number, s: SdfShape<VecStack3d>): number {
+export function softShadow(stack: VecStack, pos: number, toLight: number, shape: SdfShape): number {
   let shadow = 1;
   let ph = 1e20;
   let l = 0.01;
   let radius = l;
-  for (let i = 0; i < 32; i++) {
-    const d = s(vecs, vecs.start().add(pos, vecs.scale(toLight, l)));
-    vecs.stop();
+  for (let i = 0; i < 100; i++) {
+    const scaledToLight = stack.scale(toLight, l);
+    const d = stack.callScalar(shape, stack.add(pos, scaledToLight));
+
     // const y = d * d / (2.0 * ph);
     // const z = Math.sqrt(d * d - y * y);
     // shadow = Math.min(shadow, penumbra * z / Math.max(0.0, l - y));
@@ -156,7 +137,7 @@ export function softShadow(penumbra: number, vecs: VecStack3d, pos: number, toLi
     // if (d <= 0.0001) { shadow = 0.0; break }
     // if (l > 1) break;
 
-    shadow = Math.min(shadow, penumbra * d / radius);
+    shadow = Math.min(shadow, 10 * d / radius);
     radius += clamp(d, 0.02, 0.1);
     l += d;
     if (d <= 0.0001) { shadow = 0.0; break }
@@ -164,20 +145,33 @@ export function softShadow(penumbra: number, vecs: VecStack3d, pos: number, toLi
 
   }
   const r = clamp(shadow, 0, 1);
-  return r * r * (3 - 2 * r);
+  return stack.pushScalar(r * r * (3 - 2 * r));
 }
 
-export function ambientOcclusion(vecs: VecStack3d, pos: number, normal: number, s: SdfShape<VecStack3d>): number {
+const D = 0.0001;
+export function calcNormal(stack: VecStack, pos: number, shape: SdfShape): number {
+  const dx = stack.push(D, 0, 0, 0);
+  const dy = stack.push(0, D, 0, 0);
+  const dz = stack.push(0, 0, D, 0);
+  return stack.normalize(stack.push(
+    stack.callScalar(shape, stack.add(pos, dx)) - stack.callScalar(shape, stack.sub(pos, dx)),
+    stack.callScalar(shape, stack.add(pos, dy)) - stack.callScalar(shape, stack.sub(pos, dy)),
+    stack.callScalar(shape, stack.add(pos, dz)) - stack.callScalar(shape, stack.sub(pos, dz)),
+    0));
+}
+
+export function ambientOcclusion(stack: VecStack, pos: number, normal: number, shape: SdfShape): number {
   let occ = 0;
   let sca = 1;
   for (let i = 0; i < 5; i++) {
     const h = 0.001 + 0.15 * i / 4.0;
-    const d = s(vecs, vecs.start().add(pos, vecs.scale(normal, h)))
-    vecs.stop();
+    const scaledN = stack.scale(normal, h);
+    const npos = stack.add(pos, scaledN);
+    const d = stack.callScalar(shape, npos);
     occ += (h - d) * sca;
     sca *= 0.95;
   }
-  return clamp(1 - 1.5 * occ, 0, 1);
+  return stack.pushScalar(clamp(1 - 1.5 * occ, 0, 1));
 }
 
 

@@ -22,15 +22,18 @@ export class VecStack {
 
   allocate(): number { const id = this.sp; this.sp += 4; return id }
   allocateGlobal(): number { const id = this.gp; this.gp -= 4; return id }
-  call<Args extends number[]>(f: (stack: VecStack, ...args: Args) => number, ...args: Args) { this.begin(); return this.return(f(this, ...args)); }
+  call<Args extends any[]>(f: (stack: VecStack, ...args: Args) => number, ...args: Args) { this.begin(); return this.return(f(this, ...args)); }
+  callScalar<Args extends any[]>(f: (stack: VecStack, ...args: Args) => number, ...args: Args) { this.begin(); return this.x(this.return(f(this, ...args))); }
   begin(): VecStack { this.spStack[this.ssp++] = this.sp; return this }
   end() { this.sp = this.spStack[--this.ssp] }
   return(id: number): number { this.end(); return this.copy(this.allocate(), id) }
   push(x: number, y: number, z: number, w: number): number { return this.set(this.allocate(), x, y, z, w); }
+  pushScalar(x: number): number { return this.set(this.allocate(), x, 0, 0, 0); }
   pushSpread(x: number): number { return this.spread(this.allocate(), x); }
   spread(v: number, x: number): number { return this.set(v, x, x, x, x) }
   pushGlobal(x: number, y: number, z: number, w: number) { return this.set(this.allocateGlobal(), x, y, z, w); }
   length(id: number): number { return Math.hypot(this.stack[id], this.stack[id + 1], this.stack[id + 2], this.stack[id + 3]) }
+  reflect(toPoint: number, normal: number) { return this.sub(toPoint, this.scale(normal, this.dot(toPoint, normal) * 2)) }
   sqrlength(id: number): number { return this.dot(id, id) }
   dot(lh: number, rh: number): number { return this.stack[lh] * this.stack[rh] + this.stack[lh + 1] * this.stack[rh + 1] + this.stack[lh + 2] * this.stack[rh + 2] + this.stack[lh + 3] * this.stack[rh + 3] }
   distance(lh: number, rh: number) { return Math.hypot(this.stack[lh] - this.stack[rh], this.stack[lh + 1] - this.stack[rh + 1], this.stack[lh + 2] - this.stack[rh + 2], this.stack[lh + 3] - this.stack[rh + 3]) }

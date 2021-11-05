@@ -14,7 +14,7 @@ import { Scheduler, SCHEDULER, TaskHandle } from "../apis/app";
 import { BUS, busDisconnector } from "../apis/handler";
 import { Ui, UI, Window } from "../apis/ui";
 import { namedMessageHandler } from "../edit/messages";
-import { circularArray, decircular, displacedPointGrid, pointGrid, sdf3d } from "../modules/sdf/sdf";
+import { ambientOcclusion, circularArray, decircular, displacedPointGrid, pointGrid, sdf3d, softShadow } from "../modules/sdf/sdf";
 
 export async function PainterModule(module: Module) {
   module.bind(plugin('Painter'), lifecycle(async (injector, lifecycle) => {
@@ -268,7 +268,8 @@ function profile(p: (name: string) => Image, oracle: Oracle<string>): Image {
 
     handle(p, (p, src, y) => {
       renderer.set((stack: VecStack, pos: number) => {
-        const value = stack.x(stack.call(src, stack.push(stack.x(pos), y, 0, 0)));
+        const x = stack.x(pos);
+        const value = stack.callScalar(src, stack.push(x, y, 0, 0));
         const py = stack.y(pos);
         const v = clamp(smothstep(value - (1 - py), 0, 0.01) * 100, 0, 1);
         return stack.push(v, 0, 0, 1);
@@ -400,20 +401,23 @@ function render(stack: VecStack, p: (name: string) => Image, oracle: Oracle<stri
       stack.begin();
       stack.copy(toLight, stack.normalize(stack.sub(stack.push(lightX, lightY, lightZ, 0), stack.push(0.5, 0.5, 0, 0))));
       stack.end();
-      const plane = sdf3d(stack,
-        (stack: VecStack, pos: number) => {
-          const x = stack.x(pos);
-          const y = stack.y(pos);
-          const z = stack.z(pos);
-          const v = stack.x(stack.call(hmap, stack.push(x, y, 0, 0)));
-          return stack.push(-v - z, 0, 0, 0);
-        },
-        (stack: VecStack, pos: number, normal: number) => {
-          const toEye = stack.push(0, 0, -1, 0);
-          const reflect = stack.normalize(stack.sub(stack.scale(normal, stack.dot(toEye, normal) * 2), toEye));
-          return stack.push(clamp(stack.dot(normal, toLight) + Math.pow(stack.dot(toLight, reflect), 20), 0, 1), 0, 0, 1);
-        }
-      )
+      const shape = (stack: VecStack, pos: number) => {
+        const x = stack.x(pos);
+        const y = stack.y(pos);
+        const z = stack.z(pos);
+        const v = stack.x(stack.call(hmap, stack.push(x, y, 0, 0)));
+        return stack.pushScalar(-v - z);
+      };
+      const r = (stack: VecStack, pos: number, normal: number) => {
+        const fromEye = stack.sub(pos, stack.push(0.5, 0.5, -1, 0));
+        const reflect = stack.normalize(stack.reflect(fromEye, normal));
+        const diffuse = stack.dot(normal, toLight);
+        const specular = Math.pow(Math.max(stack.dot(toLight, reflect), 0), 20);
+        const ambient = stack.callScalar(ambientOcclusion, pos, normal, shape);
+        const shadow = stack.callScalar(softShadow, pos, toLight, shape);
+        return stack.push(clamp(0.1 + shadow * (ambient * diffuse + specular), 0, 1), 0, 0, 1);
+      };
+      const plane = sdf3d(shape, r);
       renderer.set((stack: VecStack, pos: number) => stack.call(plane, pos));
     }, hmap.renderer, lightX.value, lightY.value, lightZ.value);
 
@@ -1019,7 +1023,7 @@ class Painter {
     menu.item('Apply', () => this.addImage(`Apply${counter++}`, apply(this.stack, this.imageProvider(), this.shapeOracle())));
     menu.item('Gradient', () => this.addImage(`Gradient${counter++}`, gradient(this.imageProvider(), this.shapeOracle())));
     menu.item('Blend', () => this.addImage(`Blend${counter++}`, blend(this.imageProvider(), this.shapeOracle())));
-    menu.item('Sphere', () => this.addImage(`Sphere${counter++}`, render(this.stack, this.imageProvider(), this.shapeOracle())));
+    menu.item('Renderer', () => this.addImage(`Renderer${counter++}`, render(this.stack, this.imageProvider(), this.shapeOracle())));
     return menuButton('icon-plus', menu);
   }
 

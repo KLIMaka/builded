@@ -2,6 +2,7 @@ import { clamp, cyclic, fract, mix, monoatan2 } from "../../../utils/mathutils";
 import { VecStack } from '../../../utils/vecstack';
 
 export type SdfShape = (stack: VecStack, pos: number) => number;
+export type SdfShapeRenderer = (stack: VecStack, pos: number, normal: number) => number;
 export type DistanceOperation = (d1: number, d2: number) => number;
 
 export function SdfReducer(op: DistanceOperation) {
@@ -37,7 +38,7 @@ export function pointGrid(scale: number, offset: number) {
     const gridPos = stack.add(stack.apply(scaled, Math.floor), offset);
     const f = stack.sub(stack.apply(stack.sub(scaled, gridPos), Math.abs), offset);
     const closest = stack.div(stack.add(gridPos, stack.push(stack.x(f) < 0.5 ? 0 : 1, stack.y(f) < 0.5 ? 0 : 1, 0, 0)), scale);
-    return stack.push(stack.distance(pos, closest), 0, 0, 0);
+    return stack.push(stack.distance(pos, closest), 0, 0, 1);
   }
 }
 
@@ -56,7 +57,7 @@ export function displacedPointGrid(scale: number, offset: number, displacement: 
         stack.end();
       }
     }
-    return stack.push(Math.sqrt(mind), 0, 0, 0);
+    return stack.push(Math.sqrt(mind), 0, 0, 1);
   }
 }
 
@@ -81,7 +82,7 @@ export function circularArray(segments: number, img: SdfShape) {
     const ang = monoatan2(stack.x(p), stack.y(p));
     const angn = ang / (2 * Math.PI);
     const x = fract(angn * segments);
-    const y = 1 - stack.length(p);
+    const y = 1 - Math.hypot(stack.x(p), stack.y(p));
     const npos = stack.push(x, y, 0, 0);
     return stack.call(img, npos);
   }
@@ -97,24 +98,36 @@ export function decircular(scale: number, img: SdfShape) {
   }
 }
 
+export function sdf3d(shape: SdfShape, renderer: SdfShapeRenderer): SdfShape {
+  return (stack: VecStack, pos: number) => {
+    const p = stack.copy(stack.allocate(), pos);
+    let z = -1;
+    let dist = Number.MAX_VALUE;
+    let iters = 100;
+    while (dist > 0.0001 && iters > 0 && z < 1) {
+      stack.begin();
+      stack.setz(p, z);
+      dist = stack.x(stack.call(shape, p));
+      z += dist;
+      iters--;
+      stack.end();
+    }
+    if (dist > 0.0001) return stack.push(0, 0, 0, 1);
 
-export function sdf3d(f: (x: number, y: number, z: number) => number) {
-  return (stack: VecStack3d, pos: number) => {
-    const p = stack.get(pos);
-    return f(p[0], p[1], p[2]);
-  };
+    const normal = stack.call(calcNormal, pos, shape);
+    return stack.call(renderer, p, normal);
+  }
 }
 
-export const sphere = (center: number, r: number) => (vecs: VecStack3d, pos: number) => vecs.distance(pos, center) - r;
-
-export function softShadow(penumbra: number, vecs: VecStack3d, pos: number, toLight: number, s: SdfShape<VecStack3d>): number {
-  let shadow = 1.0;
+export function softShadow(stack: VecStack, pos: number, toLight: number, shape: SdfShape): number {
+  let shadow = 1;
   let ph = 1e20;
   let l = 0.01;
   let radius = l;
-  for (let i = 0; i < 32; i++) {
-    const d = s(vecs, vecs.start().add(pos, vecs.scale(toLight, l)));
-    vecs.stop();
+  for (let i = 0; i < 100; i++) {
+    const scaledToLight = stack.scale(toLight, l);
+    const d = stack.callScalar(shape, stack.add(pos, scaledToLight));
+
     // const y = d * d / (2.0 * ph);
     // const z = Math.sqrt(d * d - y * y);
     // shadow = Math.min(shadow, penumbra * z / Math.max(0.0, l - y));
@@ -124,42 +137,41 @@ export function softShadow(penumbra: number, vecs: VecStack3d, pos: number, toLi
     // if (d <= 0.0001) { shadow = 0.0; break }
     // if (l > 1) break;
 
-    shadow = Math.min(shadow, penumbra * d / radius);
+    shadow = Math.min(shadow, 10 * d / radius);
     radius += clamp(d, 0.02, 0.1);
     l += d;
     if (d <= 0.0001) { shadow = 0.0; break }
     if (l > 1) break;
 
   }
-  const r = clamp(shadow, 0.0, 1.0);
-  return r * r * (3.0 - 2.0 * r);
+  const r = clamp(shadow, 0, 1);
+  return stack.pushScalar(r * r * (3 - 2 * r));
 }
 
-export function ambientOcclusion(vecs: VecStack3d, pos: number, normal: number, s: SdfShape<VecStack3d>): number {
+const D = 0.0001;
+export function calcNormal(stack: VecStack, pos: number, shape: SdfShape): number {
+  const dx = stack.push(D, 0, 0, 0);
+  const dy = stack.push(0, D, 0, 0);
+  const dz = stack.push(0, 0, D, 0);
+  return stack.normalize(stack.push(
+    stack.callScalar(shape, stack.add(pos, dx)) - stack.callScalar(shape, stack.sub(pos, dx)),
+    stack.callScalar(shape, stack.add(pos, dy)) - stack.callScalar(shape, stack.sub(pos, dy)),
+    stack.callScalar(shape, stack.add(pos, dz)) - stack.callScalar(shape, stack.sub(pos, dz)),
+    0));
+}
+
+export function ambientOcclusion(stack: VecStack, pos: number, normal: number, shape: SdfShape): number {
   let occ = 0;
   let sca = 1;
   for (let i = 0; i < 5; i++) {
     const h = 0.001 + 0.15 * i / 4.0;
-    const d = s(vecs, vecs.start().add(pos, vecs.scale(normal, h)))
-    vecs.stop();
+    const scaledN = stack.scale(normal, h);
+    const npos = stack.add(pos, scaledN);
+    const d = stack.callScalar(shape, npos);
     occ += (h - d) * sca;
     sca *= 0.95;
   }
-  return clamp(1 - 1.5 * occ, 0, 1);
+  return stack.pushScalar(clamp(1 - 1.5 * occ, 0, 1));
 }
 
-export function lambert(vecs: VecStack3d, normal: number, toLight: number): number {
-  return clamp(vecs.dot(normal, toLight), 0, 1)
-}
-
-const H = 0.0001;
-export function normal(vecs: VecStack3d, pos: number, s: SdfShape<VecStack3d>): number {
-  return vecs.start().return(vecs.normalized(
-    vecs.push(
-      s(vecs, vecs.add(pos, vecs.push(H, 0, 0))) - s(vecs, vecs.add(pos, vecs.push(-H, 0, 0))),
-      s(vecs, vecs.add(pos, vecs.push(0, H, 0))) - s(vecs, vecs.add(pos, vecs.push(0, -H, 0))),
-      s(vecs, vecs.add(pos, vecs.push(0, 0, H))) - s(vecs, vecs.add(pos, vecs.push(0, 0, -H))),
-    )
-  ));
-}
 

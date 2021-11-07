@@ -19,10 +19,10 @@ module.exports = {
   },
   devtool: 'source-map',
   devServer: {
-    contentBase: __dirname,
-    publicPath: '/distr/',
+    static: {
+      directory: __dirname,
+    },
     compress: true,
     port: 9000,
-    writeToDisk: true
   }
 };

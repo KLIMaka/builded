@@ -487,7 +487,7 @@ function select(p: (name: string) => Image, oracle: Oracle<string>): Image {
 
     handle(p, (p, src, from, to, smoth) => {
       renderer.set((stack: VecStack, pos: number) => {
-        const value = stack.x(stack.call(src, pos));
+        const value = stack.callScalar(src, pos);
         const l = smothstep(value, from - smoth, from);
         const r = 1 - smothstep(value, to, to + smoth);
         return stack.push(Math.min(l, r), 0, 0, 1);
@@ -647,6 +647,7 @@ function blend(p: (name: string) => Image, oracle: Oracle<string>): Image {
     "Max": (stack: VecStack, lh: number, rh: number, t: number) => stack.apply2(lh, rh, Math.max),
     "Min": (stack: VecStack, lh: number, rh: number, t: number) => stack.apply2(lh, rh, Math.min),
     "Add": (stack: VecStack, lh: number, rh: number, t: number) => stack.add(lh, rh),
+    "Multiply": (stack: VecStack, lh: number, rh: number, t: number) => stack.mul(lh, rh),
   }
 
   const src1 = transformedParam('Source 1', p, oracle);
@@ -992,6 +993,7 @@ class Painter {
     menu.item('Gradient', () => this.addImage(`Gradient ${counter++}`, gradient(this.imageProvider(), this.shapeOracle())));
     menu.item('Blend', () => this.addImage(`Blend ${counter++}`, blend(this.imageProvider(), this.shapeOracle())));
     menu.item('Renderer', () => this.addImage(`Renderer ${counter++}`, render(this.stack, this.imageProvider(), this.shapeOracle())));
+    menu.item('Points', () => this.addImage(`Points ${counter++}`, points(this.imageProvider(), this.shapeOracle())));
     return menuButton('icon-plus', menu);
   }
 

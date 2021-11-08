@@ -40,38 +40,34 @@ function rasterizer(raster: Raster<number>, out: Uint32Array) {
 class Model {
   private x = 0;
   private y = 0;
-  private points: Vec3Array[] = [];
-  private dragged: Vec3Array;
+  private points: number[] = [];
+  private dragged: number;
 
-  constructor(private canvas: HTMLCanvasElement, private cb: () => void) {
+  constructor(private stack: VecStack, private canvas: HTMLCanvasElement, private cb: () => void) {
     canvas.addEventListener('mousemove', e => this.move(e.offsetX, e.offsetY));
     canvas.addEventListener('mousedown', e => this.drag())
     canvas.addEventListener('mouseup', e => this.drop())
     this.redraw();
   }
 
-  addPoint(x: number, y: number, z: number): number {
-    const id = this.points.length;
-    this.points.push(vec3.fromValues(x, y, z));
+  addPoint(pointId: number): void {
+    this.points.push(pointId);
     this.redraw();
-    return id;
   }
 
-  getPoint(id: number): Vec3Array {
-    return this.points[id];
-  }
-
-  private findPoint(): Vec3Array {
+  private findPoint(): number {
     let minLen = Number.MAX_VALUE;
-    let closest: Vec3Array = null;
+    let closest = -1;
     for (const p of this.points) {
-      const l = len2d(p[0] - this.x, p[1] - this.y);
+      const px = this.stack.x(p);
+      const py = this.stack.y(p);
+      const l = len2d(px - this.x, py - this.y);
       if (l < minLen) {
         minLen = l;
         closest = p;
       }
     }
-    return minLen < 0.01 ? closest : null;
+    return minLen < 0.01 ? closest : -1;
   }
 
   private redraw() {
@@ -84,8 +80,8 @@ class Model {
     ctx.fillStyle = 'rgba(0,0,0,1)';
     ctx.strokeStyle = 'rgba(255,255,255,1)';
     for (const p of this.points) {
-      const x = p[0] * w;
-      const y = p[1] * h;
+      const x = this.stack.x(p) * w;
+      const y = this.stack.y(p) * h;
       ctx.beginPath();
       ctx.rect(x - 5, y - 5, 10, 10);
       ctx.closePath();
@@ -94,15 +90,14 @@ class Model {
     }
   }
 
-
   public drag() {
     const closest = this.findPoint();
-    if (closest == null) return;
+    if (closest == -1) return;
     this.dragged = closest;
   }
 
   public drop() {
-    this.dragged = null;
+    this.dragged = -1;
   }
 
   public move(x: number, y: number) {
@@ -111,10 +106,12 @@ class Model {
     this.x = x / w;
     this.y = y / h;
 
-    if (this.dragged != null) {
+    if (this.dragged != -1) {
       const nx = Math.round(this.x / 0.1) * 0.1;
       const ny = Math.round(this.y / 0.1) * 0.1;
-      vec3.set(this.dragged, nx, ny, this.dragged[2]);
+      this.stack
+        .setx(this.dragged, nx)
+        .sety(this.dragged, ny);
       this.cb();
     }
     this.redraw();
@@ -572,10 +569,12 @@ function hash(stack: VecStack, x: number): number {
 }
 
 function grad(f: (stack: VecStack, pos: number) => number, stack: VecStack, pos: number, d: number) {
-  const d1 = stack.x(f(stack, stack.add(pos, stack.push(-d, 0, 0, 0))));
-  const d2 = stack.x(f(stack, stack.add(pos, stack.push(d, 0, 0, 0))));
-  const d3 = stack.x(f(stack, stack.add(pos, stack.push(0, -d, 0, 0))));
-  const d4 = stack.x(f(stack, stack.add(pos, stack.push(0, d, 0, 0))));
+  const dx = stack.push(d, 0, 0, 0);
+  const dy = stack.push(0, d, 0, 0);
+  const d1 = stack.x(f(stack, stack.add(pos, dx)));
+  const d2 = stack.x(f(stack, stack.sub(pos, dx)));
+  const d3 = stack.x(f(stack, stack.add(pos, dy)));
+  const d4 = stack.x(f(stack, stack.sub(pos, dy)));
   return stack.normalize(stack.push(d1 - d2, d3 - d4, d, 0));
 }
 
@@ -933,14 +932,13 @@ class Painter {
   private settingsHandle = new CallbackHandlerImpl(() => replaceContent(this.sidebarRight, properties(this.currentImage.get().settings.get())));
   private postrocessor = value(NORMAL);
 
-  constructor(private ui: Ui, private scheduler: Scheduler) {
+  constructor(private ui: Ui, scheduler: Scheduler) {
     this.recreateBuffer();
     this.renderer = new Image2dRenderer(scheduler, this.stack, this.buffer, this.bufferSize, this.postrocessor);
     this.renderer.add(() => this.redraw());
     this.currentImage.add(() => this.renderer.set(this.currentImage.get().renderer))
 
     const view = this.createView();
-    this.model = new Model(this.overlay, () => this.redraw());
     this.window = ui.builder.window()
       .title('Painter')
       .draggable(true)
@@ -954,36 +952,6 @@ class Painter {
         .widget(this.createAddMenu())
         .endGroup())
       .build();
-
-    // const kdtree = new KDTree([...map(range(0, 100), _ => <[number, number]>[Math.random(), Math.random()])]);
-    // const line1 = lineSegment(this.stack.pushGlobal(0.5, 0.0, 0, 0), this.stack.pushGlobal(0.5, 1.0, 0, 0));
-    // const line2 = lineSegment(this.stack.pushGlobal(0.0, 0.6, 0, 0), this.stack.pushGlobal(1.0, 0.6, 0, 0));
-    // const lines = union(line1, line2);
-    // const grid = pointGrid(this.stack.pushGlobal(1, 1, 1, 1), this.stack.pushGlobal(0.5, 0, 0, 0))
-    // const _hash = (stack: VecStack, p: number) => hash(stack, perlin2d(stack.x(p) * 13.123, stack.y(p) * 13.123))
-    // const points = displacedPointGrid(this.stack.pushGlobal(10, 10, 1, 1), this.stack.pushGlobal(0, 0, 0, 0), _hash);
-
-    // this.addImage('Profiles', profiles());
-    // this.addImage('Point', pointDistance());
-    // this.addImage('SDF', sdf(this.imageProvider(), this.shapeOracle()));
-    // this.addImage('Profile', profile(this.imageProvider(), this.shapeOracle()));
-    // this.addImage('Circle', circle());
-    // this.addImage('Box', box(this.imageProvider(), this.shapeOracle()));
-    // this.addImage('Perlin', perlin());
-    // this.addImage('Select', select(this.imageProvider(), this.shapeOracle()));
-    // this.addImage('Displace', displace(this.imageProvider(), this.shapeOracle()));
-    // this.addImage('Repeat', repeat(this.imageProvider(), this.shapeOracle()));
-    // this.addImage('Voronoi', voronoi(this.stack, this.imageProvider(), this.shapeOracle()));
-    // this.addImage('Distance', distance2d((stack, p) => stack.push(kdtree.distance(stack.x(p), stack.y(p)), 0, 0, 0)));
-    // this.addImage('Line', distance2d(circular));
-    // this.addImage('Circular', circular(this.imageProvider(), this.shapeOracle()));
-    // this.addImage('Transform', transform(this.imageProvider(), this.shapeOracle()));
-    // this.addImage('Grid', grid(this.stack));
-    // this.addImage('Displaced Grid', displacedGrid(this.stack, this.imageProvider(), this.shapeOracle()));
-    // this.addImage('Apply', apply(this.stack, this.imageProvider(), this.shapeOracle()));
-    // this.addImage('Decircular', decircular1(this.stack, this.imageProvider(), this.shapeOracle()));
-    // this.addImage('Gradient', gradient(this.imageProvider(), this.shapeOracle()));
-    // this.addImage('Blend', blend(this.imageProvider(), this.shapeOracle()));
   }
 
   private imageProvider(): (name: string) => Image {
@@ -1006,24 +974,24 @@ class Painter {
   private createAddMenu() {
     let counter = 0;
     const menu = this.ui.builder.menu();
-    menu.item('Profiles', () => this.addImage(`Profiles${counter++}`, profiles()));
-    menu.item('Point', () => this.addImage(`Point${counter++}`, pointDistance()));
-    menu.item('SDF', () => this.addImage(`SDF${counter++}`, sdf(this.imageProvider(), this.shapeOracle())));
-    menu.item('Profile', () => this.addImage(`Profile${counter++}`, profile(this.imageProvider(), this.shapeOracle())));
-    menu.item('Circle', () => this.addImage(`Circle${counter++}`, circle()));
-    menu.item('Box', () => this.addImage(`Box${counter++}`, box(this.imageProvider(), this.shapeOracle())));
-    menu.item('Perlin', () => this.addImage(`Perlin${counter++}`, perlin()));
-    menu.item('Select', () => this.addImage(`Select${counter++}`, select(this.imageProvider(), this.shapeOracle())));
-    menu.item('Displace', () => this.addImage(`Displace${counter++}`, displace(this.imageProvider(), this.shapeOracle())));
-    menu.item('Repeat', () => this.addImage(`Repeat${counter++}`, repeat(this.imageProvider(), this.shapeOracle())));
-    menu.item('Circular', () => this.addImage(`Circular${counter++}`, circular(this.imageProvider(), this.shapeOracle())));
-    menu.item('Transform', () => this.addImage(`Transform${counter++}`, transform(this.imageProvider(), this.shapeOracle())));
-    menu.item('Grid', () => this.addImage(`Grid${counter++}`, grid(this.stack)));
-    menu.item('Displaced', () => this.addImage(`Displaced${counter++}`, displacedGrid(this.stack, this.imageProvider(), this.shapeOracle())));
-    menu.item('Apply', () => this.addImage(`Apply${counter++}`, apply(this.stack, this.imageProvider(), this.shapeOracle())));
-    menu.item('Gradient', () => this.addImage(`Gradient${counter++}`, gradient(this.imageProvider(), this.shapeOracle())));
-    menu.item('Blend', () => this.addImage(`Blend${counter++}`, blend(this.imageProvider(), this.shapeOracle())));
-    menu.item('Renderer', () => this.addImage(`Renderer${counter++}`, render(this.stack, this.imageProvider(), this.shapeOracle())));
+    menu.item('Profiles', () => this.addImage(`Profiles ${counter++}`, profiles()));
+    menu.item('Point', () => this.addImage(`Point ${counter++}`, pointDistance()));
+    menu.item('SDF', () => this.addImage(`SDF ${counter++}`, sdf(this.imageProvider(), this.shapeOracle())));
+    menu.item('Profile', () => this.addImage(`Profile ${counter++}`, profile(this.imageProvider(), this.shapeOracle())));
+    menu.item('Circle', () => this.addImage(`Circle ${counter++}`, circle()));
+    menu.item('Box', () => this.addImage(`Box ${counter++}`, box(this.imageProvider(), this.shapeOracle())));
+    menu.item('Perlin', () => this.addImage(`Perlin ${counter++}`, perlin()));
+    menu.item('Select', () => this.addImage(`Select ${counter++}`, select(this.imageProvider(), this.shapeOracle())));
+    menu.item('Displace', () => this.addImage(`Displace ${counter++}`, displace(this.imageProvider(), this.shapeOracle())));
+    menu.item('Repeat', () => this.addImage(`Repeat ${counter++}`, repeat(this.imageProvider(), this.shapeOracle())));
+    menu.item('Circular', () => this.addImage(`Circular ${counter++}`, circular(this.imageProvider(), this.shapeOracle())));
+    menu.item('Transform', () => this.addImage(`Transform ${counter++}`, transform(this.imageProvider(), this.shapeOracle())));
+    menu.item('Grid', () => this.addImage(`Grid ${counter++}`, grid(this.stack)));
+    menu.item('Displaced', () => this.addImage(`Displaced ${counter++}`, displacedGrid(this.stack, this.imageProvider(), this.shapeOracle())));
+    menu.item('Apply', () => this.addImage(`Apply ${counter++}`, apply(this.stack, this.imageProvider(), this.shapeOracle())));
+    menu.item('Gradient', () => this.addImage(`Gradient ${counter++}`, gradient(this.imageProvider(), this.shapeOracle())));
+    menu.item('Blend', () => this.addImage(`Blend ${counter++}`, blend(this.imageProvider(), this.shapeOracle())));
+    menu.item('Renderer', () => this.addImage(`Renderer ${counter++}`, render(this.stack, this.imageProvider(), this.shapeOracle())));
     return menuButton('icon-plus', menu);
   }
 

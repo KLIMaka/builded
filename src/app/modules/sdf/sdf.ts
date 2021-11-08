@@ -52,7 +52,10 @@ export function displacedPointGrid(scale: number, offset: number, displacement: 
       for (let x = -1; x <= 1; x++) {
         stack.begin();
         const p = stack.add(gridPos, stack.push(x, y, 0, 0));
-        const displaced = stack.div(stack.add(p, stack.call(displacement, stack.apply(p, wrap))), scale);
+        const d = stack.call(displacement, stack.apply(p, wrap));
+        const dx = stack.x(d);
+        const dy = stack.y(d);
+        const displaced = stack.div(stack.add(p, stack.push(dx, dy, 0, 0)), scale);
         mind = Math.min(mind, stack.sqrdistance(displaced, pos));
         stack.end();
       }

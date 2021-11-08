@@ -21,6 +21,7 @@ module.exports = {
   devServer: {
     static: {
       directory: __dirname,
+      watch: false
     },
     compress: true,
     port: 9000,

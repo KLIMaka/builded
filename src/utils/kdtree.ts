@@ -58,9 +58,9 @@ export class KDTree {
   private closestEstimation(pos: [number, number], node: number, mind: number, depth: number): number {
     if (node == -1) return -1;
     const idx = this.tree[node];
-    const p = this.points[idx];
     const left = this.tree[node + 1];
     const right = this.tree[node + 2];
+    const p = this.points[idx];
     const d = sqrLen2d(p[0] - pos[0], p[1] - pos[1]);
     const z = depth & 1;
     const dz = pos[z] - p[z];

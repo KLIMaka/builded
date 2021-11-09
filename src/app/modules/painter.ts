@@ -287,9 +287,9 @@ function perlin(): Image {
   const octaves = param('Octaves', 1, intValue(1, numberRangeValidator(1, 8)));
 
   const renderer = transformed(tuple(scale.value, octaves.value), ([s, o]) => {
-    const noise = octaves2d(perlin2d, o);
+    // const noise = octaves2d(perlin2d, o);
     return (stack: VecStack, pos: number) => {
-      const nx = noise(stack.x(pos) * s, stack.y(pos) * s);
+      const nx = perlin2d(stack.x(pos) * s, stack.y(pos) * s);
       return stack.push(nx, 0, 0, 1);
     }
   });
@@ -505,63 +505,74 @@ function select(p: (name: string) => Image, oracle: Oracle<string>): Image {
 
 const CORE: [number, number][] = [[-1, -1], [0, -1], [1, -1], [-1, 0], [0, 0], [1, 0], [-1, 1], [0, 1], [1, 1]]
 
-function voronoi(stack: VecStack, p: (name: string) => Image2d, oracle: Oracle<string>): Image2d {
-  const cbs = new Callbacks<Image2d>();
-  const noise = new ValueHandleIml('');
-  const scale = new ValueHandleIml(4);
-  noise.addListener(() => cbs.notify(null));
-  scale.addListener(() => cbs.notify(null));
-  const settings = properties([
-    listProp('Noise', oracle, noise),
-    rangeProp('Scale', 1, 100, scale)
-  ]);
+function voronoi(stack: VecStack, p: (name: string) => Image, oracle: Oracle<string>): Image {
+  const src = transformedParam('Source', p, oracle);
+  const scale = param('Scale', 4);
+  const props = [src.prop, scale.prop];
+
   const core = [...map(CORE, c => stack.pushGlobal(c[0], c[1], 0, 0))];
-  const pixel = (stack: VecStack, pos: number) => {
-    const noiseImage = p(noise.get());
-    const s = 1 / scale.get();
-    const n = stack.scale(pos, 1 / s);
-    const c = stack.apply(n, Math.floor);
-    const f = stack.apply(n, fract);
-    const img = (stack: VecStack, pos: number) => stack.call(noiseImage.pixel, stack.scale(stack.add(c, pos), s));
 
-    let mind = 8;
-    let mini = 0;
-    const minr = stack.allocate();
+  const renderer = value(VOID_RENDERER);
+  const settings = value(props);
 
-    for (let i = 0; i < 9; i++) {
-      stack.begin();
-      const xy = core[i];
-      const v = hash(stack, img(stack, xy));
-      const r = stack.add(xy, stack.sub(v, f));
-      const d = stack.dot(r, r);
-      if (d < mind) {
-        mind = d;
-        mini = i;
-        stack.copy(minr, r);
-      }
-      stack.end();
+  handle(null, (p, src) => {
+    if (src == null) {
+      renderer.set(VOID_RENDERER);
+      settings.set(props);
+      return
     }
 
-    const minxy = core[mini];
-    mind = 8;
-    for (let i = 0; i < 9; i++) {
-      stack.begin();
-      const xy = stack.add(minxy, core[i]);
-      const v = hash(stack, img(stack, xy));
-      const r = stack.add(xy, stack.sub(v, f));
-      const dr = stack.sub(r, minr);
-      if (stack.eqz(dr)) { stack.end(); continue }
-      const sr = stack.scale(stack.add(r, minr), 0.5);
-      const d = Math.abs(stack.dot(sr, dr));
-      mind = Math.min(d, mind);
-      stack.end();
-    }
+    handle(p, (p, src, scale) => {
+      renderer.set((stack: VecStack, pos: number) => {
+        const s1 = 1 / scale;
+        const n = stack.scale(pos, scale);
+        const c = stack.apply(n, Math.floor);
+        const f = stack.apply(n, fract);
 
-    return stack.push(mind, 0, 0, 0);
-  }
-  const addListener = (cb: (v: Image2d) => void) => cbs.add(cb);
-  const removeListener = (id: number) => cbs.remove(id);
-  return { pixel, settings, addListener, removeListener, type: Type.VALUE }
+        let mind = 8;
+        let mini = 0;
+        const minr = stack.allocate();
+
+        for (let i = 0; i < 9; i++) {
+          stack.begin();
+          const xy = core[i];
+          const v = stack.call(src, stack.scale(stack.add(c, xy), s1));
+          const r = stack.add(xy, stack.sub(v, f));
+          const d = stack.sqrlength(r);
+          if (d < mind) {
+            mind = d;
+            mini = i;
+            stack.copy(minr, r);
+          }
+          stack.end();
+        }
+
+        const minxy = core[mini];
+        mind = 8;
+        for (let i = 0; i < 9; i++) {
+          stack.begin();
+          const xy = stack.add(minxy, core[i]);
+          const v = stack.call(src, stack.scale(stack.add(c, xy), s1));
+          const r = stack.add(xy, stack.sub(v, f));
+          const dr = stack.sub(r, minr);
+          if (stack.eqz(dr)) { stack.end(); continue }
+          const sr = stack.scale(stack.add(r, minr), 0.5);
+          const d = Math.abs(stack.dot(sr, dr));
+          mind = Math.min(d, mind);
+          stack.end();
+        }
+
+        return stack.push(mind, 0, 0, 0);
+      });
+    }, src.renderer, scale.value);
+
+    handle(p, (p, s) => {
+      settings.set([...props, ...s]);
+    }, src.settings);
+
+  }, src.value);
+
+  return { renderer, settings }
 }
 
 function hash(stack: VecStack, x: number): number {
@@ -993,7 +1004,7 @@ class Painter {
     menu.item('Gradient', () => this.addImage(`Gradient ${counter++}`, gradient(this.imageProvider(), this.shapeOracle())));
     menu.item('Blend', () => this.addImage(`Blend ${counter++}`, blend(this.imageProvider(), this.shapeOracle())));
     menu.item('Renderer', () => this.addImage(`Renderer ${counter++}`, render(this.stack, this.imageProvider(), this.shapeOracle())));
-    menu.item('Points', () => this.addImage(`Points ${counter++}`, points(this.imageProvider(), this.shapeOracle())));
+    menu.item('Voronoi', () => this.addImage(`Voronoi ${counter++}`, voronoi(this.stack, this.imageProvider(), this.shapeOracle())));
     return menuButton('icon-plus', menu);
   }
 

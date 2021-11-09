@@ -14,6 +14,7 @@ test("kdtree", () => {
   ]
 
   const tree = new KDTree(points);
+  expect(tree.closest([1, 1])).toBe(4);
   expect(tree.closest([0, 0])).toBe(0);
   expect(tree.closest([0.499, 0])).toBe(0);
   expect(tree.closest([0.5, 0])).toBe(0);

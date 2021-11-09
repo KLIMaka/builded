@@ -1,3 +1,4 @@
+import { map, range } from "./collections";
 import { Interpolator, NumberInterpolator } from "./interpolator";
 
 export const radsInDeg = 180 / Math.PI;
@@ -302,12 +303,13 @@ export function perlin2d(x: number, y: number) {
 }
 
 
+const POWS = [...map(range(0, 20), x => 1 / Math.pow(2, x))];
 export function octaves2d(f: (x: number, y: number) => number, octaves: number) {
   return (x: number, y: number) => {
     let sum = 0;
     let norm = 0;
     for (let i = 1; i <= octaves; i++) {
-      const k = 1 / Math.pow(2, i - 1);
+      const k = POWS[i - 1];
       sum += f(x * i, y * i) * k;
       norm += k;
     }

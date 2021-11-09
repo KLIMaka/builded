@@ -1,4 +1,4 @@
-import { map, range } from "./collections";
+import { getOrCreate, map, range } from "./collections";
 import { Interpolator, NumberInterpolator } from "./interpolator";
 
 export const radsInDeg = 180 / Math.PI;
@@ -317,3 +317,34 @@ export function octaves2d(f: (x: number, y: number) => number, octaves: number) 
   }
 }
 
+export class HashMap<K, V> {
+  private map = new Map<number, [K, V][]>();
+  constructor(private hash: (k: K) => number, private eq: (lh: K, rh: K) => boolean) { }
+
+  get(key: K): V {
+    const hash = this.hash(key);
+    const slot = this.findSlot(getOrCreate(this.map, hash, _ => []), key);
+    return slot == undefined ? undefined : slot[1];
+  }
+
+  set(key: K, value: V) {
+    const hash = this.hash(key);
+    const slot = this.findSlot(getOrCreate(this.map, hash, _ => []), key);
+    if (slot == undefined) {
+      const newSlot: [K, V] = [key, value];
+      this.map.get(hash).push(newSlot);
+    } else {
+      slot[1] = value;
+    }
+  }
+
+  private findSlot(bucket: [K, V][], key: K): [K, V] {
+    for (const kv of bucket)
+      if (this.eq(kv[0], key)) return kv;
+    return undefined;
+  }
+}
+
+const SCALE = 27644437;
+export const Vec2Hash: (v: [number, number]) => number = ([x, y]) => (x * SCALE) ^ (y * SCALE);
+export const Vec2Eq: (v1: [number, number], v2: [number, number]) => boolean = ([x1, y1], [x2, y2]) => x1 == x2 && y1 == y2;

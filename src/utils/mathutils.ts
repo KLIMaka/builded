@@ -1,3 +1,4 @@
+import { getOrCreate, map, range } from "./collections";
 import { Interpolator, NumberInterpolator } from "./interpolator";
 
 export const radsInDeg = 180 / Math.PI;
@@ -295,23 +296,59 @@ export function perlin2d(x: number, y: number) {
   const B = PERLIN[X + 1] + Y;
   const BA = PERLIN[B];
   const BB = PERLIN[B + 1];
-  return NumberInterpolator(
-    NumberInterpolator(grad2d(PERLIN[AA], x, y), grad2d(PERLIN[BA], x - 1, y), u),
-    NumberInterpolator(grad2d(PERLIN[AB], x, y - 1), grad2d(PERLIN[BB], x - 1, y - 1), u),
-    v);
+  const v1 = grad2d(PERLIN[AA], x, y);
+  const v2 = grad2d(PERLIN[BA], x - 1, y);
+  const v3 = grad2d(PERLIN[AB], x, y - 1);
+  const v4 = grad2d(PERLIN[BB], x - 1, y - 1);
+  const dv1 = v1 + (v2 - v1) * u;
+  const dv2 = v3 + (v4 - v3) * u;
+  return dv1 + (dv2 - dv1) * v;
 }
 
-
+const POWS = [...map(range(0, 20), x => 1 / Math.pow(2, x))];
 export function octaves2d(f: (x: number, y: number) => number, octaves: number) {
   return (x: number, y: number) => {
     let sum = 0;
     let norm = 0;
     for (let i = 1; i <= octaves; i++) {
-      const k = 1 / Math.pow(2, i - 1);
+      const k = POWS[i - 1];
       sum += f(x * i, y * i) * k;
       norm += k;
     }
     return sum / norm;
   }
 }
+
+
+export class HashMap<K, V> {
+  private map = new Map<number, [K, V][]>();
+  constructor(private hash: (k: K) => number, private eq: (lh: K, rh: K) => boolean) { }
+
+  get(key: K): V {
+    const hash = this.hash(key);
+    const slot = this.findSlot(getOrCreate(this.map, hash, _ => []), key);
+    return slot == undefined ? undefined : slot[1];
+  }
+
+  set(key: K, value: V) {
+    const hash = this.hash(key);
+    const slot = this.findSlot(getOrCreate(this.map, hash, _ => []), key);
+    if (slot == undefined) {
+      const newSlot: [K, V] = [key, value];
+      this.map.get(hash).push(newSlot);
+    } else {
+      slot[1] = value;
+    }
+  }
+
+  private findSlot(bucket: [K, V][], key: K): [K, V] {
+    for (const kv of bucket)
+      if (this.eq(kv[0], key)) return kv;
+    return undefined;
+  }
+}
+
+const SCALE = 27644437;
+export const Vec2Hash: (v: [number, number]) => number = ([x, y]) => (x * SCALE) ^ (y * SCALE);
+export const Vec2Eq: (v1: [number, number], v2: [number, number]) => boolean = ([x1, y1], [x2, y2]) => x1 == x2 && y1 == y2;
 

@@ -1,10 +1,10 @@
 import h from "stage0";
 import { vec3, Vec3Array } from "../../libs_js/glmatrix";
 import { CallbackChannel, CallbackChannelImpl, CallbackHandlerImpl, Handle, handle, Source, transformed, tuple, value } from "../../utils/callbacks";
-import { filter, map } from "../../utils/collections";
+import { filter, getOrCreate, map } from "../../utils/collections";
 import { create, lifecycle, Module, plugin } from "../../utils/injector";
 import { Range, Vec3Interpolator } from "../../utils/interpolator";
-import { clamp, fract, int, len2d, octaves2d, perlin2d, smothstep } from "../../utils/mathutils";
+import { clamp, fract, HashMap, int, len2d, octaves2d, perlin2d, smothstep, Vec2Eq, Vec2Hash } from "../../utils/mathutils";
 import { array, Raster, rect, resize } from "../../utils/pixelprovider";
 import { listProp, menuButton, NavItem1, navTree, NavTreeModel, Oracle, properties, Property, rangeProp } from "../../utils/ui/renderers";
 import { addDragController, replaceContent } from "../../utils/ui/ui";
@@ -168,10 +168,10 @@ const GRAY_R = (stack: VecStack, res: number) => {
   return r | (r << 8) | (r << 16) | (255 << 24);
 }
 
-const BLUE_RED = new Range([0, 0, 255], [255, 0, 0], Vec3Interpolator);
+const GREEN_RED = new Range([0, 255, 0], [255, 0, 0], Vec3Interpolator);
 const PLUS_MINUS_ONE_R = (stack: VecStack, res: number) => {
   const i = (stack.x(res) + 1) * 0.5;
-  const [r, g, b] = BLUE_RED.get(i);
+  const [r, g, b] = GREEN_RED.get(i);
   return r | (g << 8) | (b << 16) | (255 << 24);
 }
 
@@ -289,8 +289,10 @@ function perlin(): Image {
   const renderer = transformed(tuple(scale.value, octaves.value), ([s, o]) => {
     const noise = octaves2d(perlin2d, o);
     return (stack: VecStack, pos: number) => {
-      const nx = noise(stack.x(pos) * s, stack.y(pos) * s);
-      return stack.push(nx, 0, 0, 1);
+      const x = stack.x(pos) * s;
+      const y = stack.y(pos) * s;
+      const result = noise(x, y);
+      return stack.push(result, 0, 0, 1);
     }
   });
   return { renderer, settings: value([scale.prop, octaves.prop]) }
@@ -929,6 +931,7 @@ class Painter {
   private images: Image[] = [];
   private imagesModel = new ShapesModel();
   private imageMap = new Map<string, Image>();
+  private postprocessors = new Map<Image, Postprocessor>();
   private currentImage = value(<Image>null);
   private settingsHandle = new CallbackHandlerImpl(() => replaceContent(this.sidebarRight, properties(this.currentImage.get().settings.get())));
   private postrocessor = value(NORMAL);
@@ -938,6 +941,7 @@ class Painter {
     this.renderer = new Image2dRenderer(scheduler, this.stack, this.buffer, this.bufferSize, this.postrocessor);
     this.renderer.add(() => this.redraw());
     this.currentImage.add(() => this.renderer.set(this.currentImage.get().renderer))
+    this.postrocessor.add(() => this.postprocessors.set(this.currentImage.get(), this.postrocessor.get()));
 
     const view = this.createView();
     this.window = ui.builder.window()
@@ -993,7 +997,6 @@ class Painter {
     menu.item('Gradient', () => this.addImage(`Gradient ${counter++}`, gradient(this.imageProvider(), this.shapeOracle())));
     menu.item('Blend', () => this.addImage(`Blend ${counter++}`, blend(this.imageProvider(), this.shapeOracle())));
     menu.item('Renderer', () => this.addImage(`Renderer ${counter++}`, render(this.stack, this.imageProvider(), this.shapeOracle())));
-    menu.item('Points', () => this.addImage(`Points ${counter++}`, points(this.imageProvider(), this.shapeOracle())));
     return menuButton('icon-plus', menu);
   }
 
@@ -1016,6 +1019,7 @@ class Painter {
     const img = this.images[id];
     if (img == undefined) return;
     this.currentImage.set(img);
+    this.postrocessor.set(getOrCreate(this.postprocessors, img, _ => NORMAL))
     this.settingsHandle.connect(img.settings);
     replaceContent(this.sidebarRight, properties(img.settings.get()));
   }

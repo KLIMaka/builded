@@ -525,6 +525,18 @@ function voronoi(stack: VecStack, p: (name: string) => Image, oracle: Oracle<str
     }
 
     handle(p, (p, src, scale) => {
+      const cache = new Map<number, [number, number]>();
+      const sample = (stack: VecStack, pos: number) => {
+        const hash = Vec2Hash([stack.x(pos), stack.y(pos)]);
+        const result = cache.get(hash);
+        if (result == undefined) {
+          const v = stack.call(src, pos);
+          cache.set(hash, [stack.x(v), stack.y(v)]);
+          return v;
+        }
+        return stack.push(result[0], result[1], 0, 0);
+      }
+
       renderer.set((stack: VecStack, pos: number) => {
         const s1 = 1 / scale;
         const n = stack.scale(pos, scale);
@@ -538,7 +550,7 @@ function voronoi(stack: VecStack, p: (name: string) => Image, oracle: Oracle<str
         for (let i = 0; i < 9; i++) {
           stack.begin();
           const xy = core[i];
-          const v = stack.call(src, stack.scale(stack.add(c, xy), s1));
+          const v = stack.call(sample, stack.scale(stack.add(c, xy), s1));
           const r = stack.add(xy, stack.sub(v, f));
           const d = stack.sqrlength(r);
           if (d < mind) {
@@ -554,7 +566,7 @@ function voronoi(stack: VecStack, p: (name: string) => Image, oracle: Oracle<str
         for (let i = 0; i < 9; i++) {
           stack.begin();
           const xy = stack.add(minxy, core[i]);
-          const v = stack.call(src, stack.scale(stack.add(c, xy), s1));
+          const v = stack.call(sample, stack.scale(stack.add(c, xy), s1));
           const r = stack.add(xy, stack.sub(v, f));
           const dr = stack.sub(r, minr);
           if (stack.eqz(dr)) { stack.end(); continue }

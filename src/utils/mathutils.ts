@@ -346,5 +346,5 @@ export class HashMap<K, V> {
 }
 
 const SCALE = 27644437;
-export const Vec2Hash: (v: [number, number]) => number = ([x, y]) => (x * SCALE) ^ (y * SCALE);
+export const Vec2Hash: (v: [number, number]) => number = ([x, y]) => (x * 9834497) ^ (y * 8503057);
 export const Vec2Eq: (v1: [number, number], v2: [number, number]) => boolean = ([x1, y1], [x2, y2]) => x1 == x2 && y1 == y2;

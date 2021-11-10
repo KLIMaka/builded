@@ -31,13 +31,14 @@
     "babel-loader": "^8.1.0",
     "jest": "^27.3.1",
     "typescript": "~4.4",
-    "webpack": "^4.43.0",
+    "webpack": "^5.63.0",
     "webpack-cli": "^4.9.1",
     "webpack-dev-server": "^4.4.0"
   },
   "dependencies": {
     "crc-32": "^1.2.0",
     "stage0": "0.0.25",
-    "tippy.js": "6.2.7"
+    "tippy.js": "6.2.7",
+    "wasm_rust": "file:./libs/wasm"
   }
 }

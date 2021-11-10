@@ -1,10 +1,10 @@
 import h from "stage0";
-import { vec3, Vec3Array } from "../../libs_js/glmatrix";
+import { perlin as wasmPerlin, perlinOctaves, simd_len } from "wasm_rust";
 import { CallbackChannel, CallbackChannelImpl, CallbackHandlerImpl, Handle, handle, Source, transformed, tuple, value } from "../../utils/callbacks";
 import { filter, getOrCreate, map } from "../../utils/collections";
 import { create, lifecycle, Module, plugin } from "../../utils/injector";
 import { Range, Vec3Interpolator } from "../../utils/interpolator";
-import { clamp, fract, HashMap, int, len2d, octaves2d, perlin2d, smothstep, Vec2Eq, Vec2Hash } from "../../utils/mathutils";
+import { clamp, fract, int, len2d, octaves2d, perlin2d, smothstep, Vec2Hash } from "../../utils/mathutils";
 import { array, Raster, rect, resize } from "../../utils/pixelprovider";
 import { listProp, menuButton, NavItem1, navTree, NavTreeModel, Oracle, properties, Property, rangeProp } from "../../utils/ui/renderers";
 import { addDragController, replaceContent } from "../../utils/ui/ui";
@@ -26,6 +26,7 @@ export async function PainterModule(module: Module) {
 }
 
 function rasterizer(raster: Raster<number>, out: Uint32Array) {
+  console.log(simd_len(1, 2));
   const w = raster.width;
   const h = raster.height;
   let off = 0;
@@ -287,11 +288,12 @@ function perlin(): Image {
   const octaves = param('Octaves', 1, intValue(1, numberRangeValidator(1, 8)));
 
   const renderer = transformed(tuple(scale.value, octaves.value), ([s, o]) => {
-    const noise = octaves2d(perlin2d, o);
+    const noise = octaves2d(wasmPerlin, o);
     return (stack: VecStack, pos: number) => {
       const x = stack.x(pos) * s;
       const y = stack.y(pos) * s;
-      const result = noise(x, y);
+      const result = perlinOctaves(x, y, o);
+      // const result = noise(x, y);
       return stack.push(result, 0, 0, 1);
     }
   });

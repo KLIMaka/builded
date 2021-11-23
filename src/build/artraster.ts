@@ -1,3 +1,4 @@
+import { int } from '../utils/mathutils';
 import { Raster } from '../utils/pixelprovider';
 import { ArtInfo } from './formats/art';
 
@@ -8,7 +9,7 @@ export class ArtRaster implements Raster<number> {
     this.width = art.w;
     this.height = art.h;
   }
-  pixel(x: number, y: number) { return this.art.img[y + x * this.art.h] };
+  pixel(x: number, y: number) { return this.art.img[int(y) + int(x) * this.art.h] };
 }
 
 export function art(art: ArtInfo) {

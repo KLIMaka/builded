@@ -5,7 +5,7 @@ import { DefaultSetupModule, MainLoopConstructor } from './app/modules/context';
 import { DbFsModule } from './app/modules/fs/db';
 import { FileBrowserModule } from './app/modules/fs/manager';
 import { ArtEditorModule } from './app/modules/arteditor';
-import { PainterModule } from './app/modules/painter';
+import { PainterModule } from './app/modules/painter/painter';
 import { PhotonUiModule } from './app/modules/photonui';
 import { animate, createContextFromCanvas } from './utils/gl/gl';
 import { App, instance, plugin, provider } from './utils/injector';

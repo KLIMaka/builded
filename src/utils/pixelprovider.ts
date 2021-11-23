@@ -36,7 +36,7 @@ export class ConstRaster<P> implements Raster<P> {
 
 export class ArrayRaster<P> implements Raster<P> {
   constructor(readonly width: number, readonly height: number, private pixels: ArrayLike<P>) { }
-  pixel(x: number, y: number) { return this.pixels[y * this.width + x] };
+  pixel(x: number, y: number) { return this.pixels[int(y) * this.width + int(x)] };
 }
 
 export class TransformRaster<P, P1> implements Raster<P> {
@@ -95,7 +95,7 @@ export class ResizeRaster<P> implements Raster<P> {
     this.dy = src.height / this.height;
   }
 
-  pixel(x: number, y: number): P { return this.src.pixel(int(x * this.dx), int(y * this.dy)) }
+  pixel(x: number, y: number): P { return this.src.pixel(x * this.dx, y * this.dy) }
 }
 
 export type PixelOperator<P> = (lh: P, rh: P, off: number) => P;

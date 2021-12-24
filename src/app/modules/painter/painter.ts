@@ -12,7 +12,7 @@ import { Scheduler, SCHEDULER, TaskHandle } from "../../apis/app";
 import { BUS, busDisconnector } from "../../apis/handler";
 import { Ui, UI, Window } from "../../apis/ui";
 import { namedMessageHandler } from "../../edit/messages";
-import { apply, blend, box, circle, circular, displace, displacedGrid, gradient, grid, Image, perlin, pointDistance, Postprocessor, profile, profiles, render, Renderer, repeat, sdf, select, transform, Value, voronoi } from './funcs';
+import { apply, blend, box, circle, circular, displace, displacedGrid, gradient, grid, Image, mouldings, perlin, pointDistance, Postprocessor, profile, profiles, render, Renderer, repeat, sdf, select, transform, Value, voronoi } from './funcs';
 
 export async function PainterModule(module: Module) {
   module.bind(plugin('Painter'), lifecycle(async (injector, lifecycle) => {
@@ -199,22 +199,27 @@ class Image2dRenderer extends CallbackChannelImpl<[]> {
   private * redraw(renderer: Renderer, pp: Postprocessor) {
     let time = 0;
     let t = window.performance.now();
-    let off = 0;
     const size = this.size;
-    for (let y = 0; y < size; y++) {
-      for (let x = 0; x < size; x++) {
-        this.stack.begin();
-        this.stack.set(this.position, x / size, y / size, 0, 0);
-        const res = this.stack.call(renderer, this.position);
-        this.buff[off++] = pp(this.stack, res);
-        this.stack.end();
-      }
-      const dt = window.performance.now() - t;
-      if (dt > 100) {
-        t = window.performance.now();
-        time += dt;
-        this.notify();
-        yield;
+    const ds = 0.5 / size;
+    const max = size * size;
+    for (let i = 0; i < max; i++) {
+      const off = (i * 71129) % max;
+      const x = int(off % size);
+      const y = int(off / size);
+      this.stack.begin();
+      this.stack.set(this.position, x / size + ds, y / size + ds, 0, 0);
+      const res = this.stack.call(renderer, this.position);
+      this.buff[off] = pp(this.stack, res);
+      this.stack.end();
+
+      if (i % 512 == 0) {
+        const dt = window.performance.now() - t;
+        if (dt > 100) {
+          t = window.performance.now();
+          time += dt;
+          this.notify();
+          yield;
+        }
       }
     }
     this.notify();
@@ -313,6 +318,7 @@ class Painter {
     menu.item('Blend', () => this.addImage(`Blend ${counter++}`, blend(this.imageProvider(), this.shapeOracle())));
     menu.item('Renderer', () => this.addImage(`Renderer ${counter++}`, render(this.stack, this.imageProvider(), this.shapeOracle())));
     menu.item('Voronoi', () => this.addImage(`Voronoi ${counter++}`, voronoi(this.stack, this.imageProvider(), this.shapeOracle())));
+    menu.item('Mouldings', () => this.addImage(`Mouldings ${counter++}`, mouldings()));
     return menuButton('icon-plus', menu);
   }
 

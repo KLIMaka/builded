@@ -1,11 +1,12 @@
 import { art } from "../../build/artraster";
 import { ArtInfoProvider } from "../../build/formats/art";
+import { value } from "../../utils/callbacks";
 import { range } from "../../utils/collections";
 import { create, Dependency, lifecycle } from "../../utils/injector";
 import { iter } from "../../utils/iter";
 import { palRasterizer } from "../../utils/pixelprovider";
 import { DrawPanel } from "../../utils/ui/drawpanel";
-import { menuButton, search, ValueHandleImpl } from "../../utils/ui/renderers";
+import { menuButton, search } from "../../utils/ui/renderers";
 import { ART } from "../apis/app";
 import { Ui, UI, Window } from "../apis/ui";
 import { PicNumCallback } from "../edit/tools/selection";
@@ -43,7 +44,7 @@ export class Selector {
   private window: Window;
   private drawPanel: DrawPanel<number>;
   private cb: PicNumCallback;
-  private filter = new ValueHandleImpl("");
+  private filter = value("");
 
   constructor(private ui: Ui, arts: ArtInfoProvider, pal: Uint8Array, private tags: PicTags) {
     const canvas = document.createElement('canvas');
@@ -65,7 +66,7 @@ export class Selector {
       .content(canvas)
       .build();
 
-    this.filter.add(_ => this.updateFilter());
+    this.filter.add(() => this.updateFilter());
     this.drawPanel = createDrawPanel(arts, pal, canvas, (id: number) => this.select(id), () => this.pics());
     this.hide();
   }

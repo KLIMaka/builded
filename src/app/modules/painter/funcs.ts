@@ -1,7 +1,9 @@
+import { NumberLiteralTypeAnnotation } from "@babel/types";
 import { perlin_simd_octaves } from "wasm_rust";
 import { CallbackChannel, handle, Source, transformed, tuple, value } from "../../../utils/callbacks";
 import { map } from "../../../utils/collections";
-import { clamp, fract, octaves2d, perlin2d, smothstep, Vec2Hash } from "../../../utils/mathutils";
+import { NumberInterpolator } from "../../../utils/interpolator";
+import { clamp, cubic, fract, int, octaves2d, perlin2d, smothstep, Vec2Hash } from "../../../utils/mathutils";
 import { listProp, Oracle, Property, rangeProp } from "../../../utils/ui/renderers";
 import { BasicValue, floatValue, intValue, numberRangeValidator } from "../../../utils/value";
 import { VecStack } from "../../../utils/vecstack";
@@ -685,4 +687,67 @@ export function displacedGrid(stack: VecStack, p: (name: string) => Image, oracl
   }, src.value);
 
   return { renderer, settings };
+}
+
+type Moulding = (x: number) => number;
+type MouldingPart = { moulding: Moulding, width: number, height: number, hoffset: number, woffset: number }
+
+const LISTEL: Moulding = x => 1;
+const QUARTER_ROUND: Moulding = x => Math.sqrt(1 - x * x);
+const SPLAY: Moulding = x => x;
+
+export function mouldings() {
+  const size = param('Size', 4);
+  const props = [size.prop];
+
+  const renderer = value(VOID_RENDERER);
+  const settings = value(props);
+
+  handle(null, (p, size_) => {
+    const parts = parseMouldings(':1,1,0;-/:4,4,2;:1,1,5;:1,1,6');
+    const size = parts.length;
+    const d = 1 / size;
+    renderer.set((stack: VecStack, pos: number) => {
+      const x = stack.x(pos);
+      if (x < 0 || x >= 1.0) return stack.pushScalar(0);
+      const idx = int(x * size);
+      const part = parts[idx];
+      const lx = (x - part.woffset * d) / (part.width * d);
+      const y = part.hoffset * d + part.moulding(lx) * part.height * d;
+      return stack.pushScalar(y);
+    });
+  }, size.value);
+
+  return { renderer, settings };
+}
+
+function parseMoulding(str: string): Moulding {
+  switch (str) {
+    case '/': return SPLAY;
+    case '\\': return x => SPLAY(1 - x);
+    case '+/': return x => QUARTER_ROUND(1 - x);
+    case '-/': return x => 1 - QUARTER_ROUND(x);
+    case '-\\': return x => 1 - QUARTER_ROUND(1 - x);
+    case '+\\': return QUARTER_ROUND;
+    default: return LISTEL;
+  }
+}
+
+function parseMouldings(str: string): MouldingPart[] {
+  const result: MouldingPart[] = [];
+  let woff = 0;
+  for (const p of str.split(';')) {
+    const [m, params] = p.split(':');
+    const [w, h, hoff] = params.split(',').map(Number.parseFloat);
+    const part: MouldingPart = {
+      moulding: parseMoulding(m),
+      width: w,
+      height: h,
+      woffset: woff,
+      hoffset: hoff
+    };
+    for (let i = 0; i < w; i++) result.push(part);
+    woff += w;
+  }
+  return result;
 }

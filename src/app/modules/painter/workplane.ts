@@ -50,7 +50,9 @@ export class Workplane {
   constructor(
     private plane: HTMLCanvasElement,
     private renderer: WorkplaneRenderer
-  ) { }
+  ) {
+    this.setup();
+  }
 
   private setup() {
     handle(null, (p, scale, xoff, yoff) => {
@@ -62,4 +64,16 @@ export class Workplane {
     }, this.scale, this.xoff, this.yoff);
   }
 
+  private move(dx: number, dy: number) {
+    this.xoff.set(this.xoff.get() + dx / this.scale.get());
+    this.yoff.set(this.yoff.get() + dy / this.scale.get());
+  }
+
+  private zoom(x: number, y: number, s: number) {
+    const nscale = this.scale.get() * s;
+    const nw = this.plane.width * nscale;
+    const nh = this.plane.height * nscale;
+    const hx = x / 2;
+    const hy = y / 2;
+  }
 }

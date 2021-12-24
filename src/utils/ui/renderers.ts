@@ -1,7 +1,7 @@
 import tippy, { Props } from "tippy.js";
 import { MenuBuilder } from "../../app/apis/ui";
 import { iter } from "../iter";
-import { div, Element, replaceContent, span, Table, tag } from "./ui";
+import { div, Element, Properties, replaceContent, span, Table, tag } from "./ui";
 import h from "stage0";
 import { map, take } from "../collections";
 import { CallbackChannel, CallbackChannelImpl, CallbackHandle, Destenation, Source } from "../callbacks";
@@ -170,7 +170,42 @@ function menu(input: HTMLElement, suggestContainer: HTMLElement) {
 export type SliderModel = {
   label: string,
   value: BasicValue<number>,
-  handle: Source<number> & Destenation<number> & CallbackChannel<[]>,
+  handle: Handle<number>,
+}
+
+function setter<T>(handle: Handle<T>, value: BasicValue<T>) {
+  return (v: T) => {
+    if (!value.validator(v)) return;
+    handle.set(v);
+  }
+}
+
+function wheelAction(handle: Handle<number>, set: (x: number) => void) {
+  return (e: WheelEvent) => {
+    const scale = e.altKey ? 0.1 : e.shiftKey ? 10 : 1;
+    if (e.deltaY < 0) { set(handle.get() + scale); e.preventDefault() }
+    if (e.deltaY > 0) { set(handle.get() - scale); e.preventDefault() }
+  }
+}
+
+function arrowAction(handle: Handle<number>, set: (x: number) => void) {
+  return (e: KeyboardEvent) => {
+    const scale = e.altKey ? 0.1 : e.shiftKey ? 10 : 1;
+    if (e.code == 'ArrowUp') { set(handle.get() + scale); e.preventDefault() }
+    if (e.code == 'ArrowDown') { set(handle.get() - scale); e.preventDefault() }
+  }
+}
+
+export function numberBox(handle: Handle<number>, value: BasicValue<number>): HTMLElement {
+  const boxTemplate = h`<div class="popup-widget"><input type="text" value="${handle.get()}" class="input-widget" #box></div>`;
+  const widget = <HTMLElement>boxTemplate.cloneNode(true);
+  const { box } = boxTemplate.collect(widget);
+  handle.add(() => box.value = value.formatter(handle.get()));
+  const set = setter(handle, value);
+  box.oninput = () => { if (value.parseValidator(box.value)) set(value.parser(box.value)) }
+  box.onkeydown = arrowAction(handle, set);
+  box.onwheel = wheelAction(handle, set);
+  return widget;
 }
 
 const widgetPopup = (widget: HTMLElement, opts = {}): Partial<Props> => {
@@ -189,34 +224,13 @@ const widgetPopup = (widget: HTMLElement, opts = {}): Partial<Props> => {
 }
 
 export function sliderToolbarButton(model: SliderModel) {
-  const widgetTemplate = h`<div class="popup-widget"><input type="text" value="${model.handle.get()}" class="input-widget" #box></div>`;
-  const buttonTemplate = h`<button class="btn btn-default btn-dropdown">${model.label} ${model.handle.get()}</button>`;
-  const widget = <HTMLElement>widgetTemplate.cloneNode(true);
-  const { box } = widgetTemplate.collect(widget);
+  const printLabel = () => `${model.label} ${model.value.formatter(model.handle.get())}`;
+  const buttonTemplate = h`<button class="btn btn-default btn-dropdown">${printLabel()}</button>`;
+  const widget = numberBox(model.handle, model.value);
   const btn = <HTMLElement>buttonTemplate.cloneNode(true);
-  const currentValue = () => model.value.formatter(model.handle.get());
   tippy(btn, widgetPopup(widget));
-
-  model.handle.add(() => { btn.textContent = `${model.label} ${currentValue()}`; box.value = currentValue() });
-
-  const set = (value: number) => {
-    if (!model.value.validator(value)) return;
-    model.handle.set(value);
-  }
-
-  box.oninput = () => { if (model.value.parseValidator(box.value)) set(model.value.parser(box.value)) }
-  box.onkeydown = (e: KeyboardEvent) => {
-    const scale = e.altKey ? 0.1 : e.shiftKey ? 10 : 1;
-    if (e.code == 'ArrowUp') { set(model.handle.get() + scale); e.preventDefault() }
-    if (e.code == 'ArrowDown') { set(model.handle.get() - scale); e.preventDefault() }
-  }
-  const wheel = (e: WheelEvent) => {
-    const scale = e.altKey ? 0.1 : e.shiftKey ? 10 : 1;
-    if (e.deltaY < 0) { set(model.handle.get() + scale); e.preventDefault() }
-    if (e.deltaY > 0) { set(model.handle.get() - scale); e.preventDefault() }
-  }
-  box.onwheel = wheel;
-  btn.onwheel = wheel;
+  model.handle.add(() => btn.textContent = printLabel());
+  btn.onwheel = wheelAction(model.handle, setter(model.handle, model.value));
   return btn;
 }
 
@@ -259,21 +273,24 @@ export type Property = {
   widget: HTMLElement
 }
 
-export function textProp(label: string, handle: ValueHandle<string>): Property {
-  const template = h`<input type="text" value="${handle.get()}" class="input-widget" style="max-width:100px">`;
-  const root = <HTMLInputElement>template.cloneNode(true);
-  root.oninput = () => handle.set(root.value);
-  handle.add((_, v) => root.value = v);
-  return { label, widget: root }
+export function rangeWidget(handle: Handle<number>, value: BasicValue<number>): HTMLElement {
+  return sliderToolbarButton({ handle, label: "", value });
 }
 
-export function rangeProp(label: string, handle: Source<number> & Destenation<number> & CallbackChannel<[]>, value: BasicValue<number>): Property {
-  const model: SliderModel = { handle, label: "", value };
-  return { label, widget: sliderToolbarButton(model) }
+function listWidget(oracle: Oracle<string>, handle: Handle<string>): HTMLElement {
+  return search('', null, oracle, handle);
 }
 
-export function listProp(label: string, oracle: Oracle<string>, handle: Source<string> & Destenation<string> & CallbackChannel<[]>): Property {
-  return { label, widget: search('', null, oracle, handle) }
+export function rangeProp(label: string, handle: Handle<number>, value: BasicValue<number>): Property {
+  return widgetProp(label, rangeWidget(handle, value));
+}
+
+export function listProp(label: string, oracle: Oracle<string>, handle: Handle<string>): Property {
+  return widgetProp(label, listWidget(oracle, handle));
+}
+
+export function widgetProp(label: string, widget: HTMLElement): Property {
+  return { label, widget };
 }
 
 const propertiesTemplate = h`<div class="properties"></div>`;
@@ -305,22 +322,4 @@ export function closeable(label: string, closed: boolean) {
   }
   title.onlick = toggle();
   return { root, container };
-}
-
-export interface ValueHandle<T> extends CallbackChannel<[T, T]> {
-  set(value: T): void;
-  get(): T;
-}
-
-export class ValueHandleImpl<T> extends CallbackChannelImpl<[T, T]> implements ValueHandle<T> {
-  constructor(private value: T) { super() }
-
-  set(value: T): void {
-    const o = this.value;
-    const n = value;
-    this.value = n;
-    this.notify(o, n);
-  }
-
-  get(): T { return this.value }
 }

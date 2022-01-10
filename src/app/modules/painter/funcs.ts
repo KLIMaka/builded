@@ -1,9 +1,7 @@
-import { NumberLiteralTypeAnnotation } from "@babel/types";
 import { perlin_simd_octaves } from "wasm_rust";
 import { CallbackChannel, handle, Source, transformed, tuple, value } from "../../../utils/callbacks";
 import { map } from "../../../utils/collections";
-import { NumberInterpolator } from "../../../utils/interpolator";
-import { clamp, cubic, fract, int, octaves2d, perlin2d, smothstep, Vec2Hash } from "../../../utils/mathutils";
+import { clamp, fract, int, octaves2d, perlin2d, smothstep, Vec2Hash } from "../../../utils/mathutils";
 import { listProp, Oracle, Property, rangeProp } from "../../../utils/ui/renderers";
 import { BasicValue, floatValue, intValue, numberRangeValidator } from "../../../utils/value";
 import { VecStack } from "../../../utils/vecstack";
@@ -51,9 +49,12 @@ export function profile(p: (name: string) => Image, oracle: Oracle<string>): Ima
     handle(p, (p, src, y) => {
       renderer.set((stack: VecStack, pos: number) => {
         const x = stack.x(pos);
-        const value = stack.callScalar(src, stack.push(x, y, 0, 0));
+        const p = stack.push(x, y, 0, 0);
+        const value = stack.callScalar(src, p);
         const py = stack.y(pos);
-        const v = clamp(smothstep(value - (1 - py), 0, 0.01) * 100, 0, 1);
+        const mpy = 1 - py;
+        const min = smothstep(value - mpy, 0, 0.01) * 100;
+        const v = clamp(min, 0, 1);
         return stack.push(v, 0, 0, 1);
       });
     }, src.renderer, y.value);

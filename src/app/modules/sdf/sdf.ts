@@ -75,7 +75,7 @@ export function lineSegment(p1: number, p2: number) {
     if (dot < 0) res = stack.distance(p1, pos)
     else if (t > 1) res = stack.distance(p2, pos);
     else res = stack.distance(pos, stack.add(p1, stack.scale(p1p2, t)));
-    return stack.pushSpread(res);
+    return stack.pushScalar(res);
   }
 }
 
@@ -110,7 +110,7 @@ export function sdf3d(shape: SdfShape, renderer: SdfShapeRenderer): SdfShape {
     while (dist > 0.0001 && iters > 0 && z < 1) {
       stack.begin();
       stack.setz(p, z);
-      dist = stack.x(stack.call(shape, p));
+      dist = stack.callScalar(shape, p);
       z += dist;
       iters--;
       stack.end();

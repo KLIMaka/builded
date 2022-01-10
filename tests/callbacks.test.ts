@@ -68,12 +68,12 @@ test('transformed', () => {
   expect(tsrc1.get()).toBe(12 * 12 + 1);
 });
 
-test('delay', async done => {
+test('delay', done => {
   const src = value(42);
   const tsrc = transformed(src, v => v.toString());
 
   const log: string[] = [];
-  const dsrc = delay(tsrc);
+  const dsrc = delay(tsrc, setTimeout);
   dsrc.add(() => log.push(dsrc.get()));
 
   src.set(1);
@@ -90,11 +90,11 @@ test('delay', async done => {
   });
 });
 
-test('tuple', async done => {
+test('tuple', done => {
   const a = value(1);
   const b = value(2);
   const t = tuple(a, b);
-  const d = delay(t);
+  const d = delay(t, setTimeout);
 
   const log1: [number, number][] = [];
   const log2: [number, number][] = [];

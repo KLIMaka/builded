@@ -81,21 +81,23 @@ export function transformed<T, U>(source: SourceCallbacklChannel<U>, transformer
   return new TransformValue<T, U>(source, transformer);
 }
 
+export type Executor = (executable: () => void, delay: number) => number;
+
 export class Delay<T> extends CallbackChannelImpl<[]> implements Source<T> {
   private handle = -1;
-  constructor(private source: SourceCallbacklChannel<T>, delay = 0) {
+  constructor(private source: SourceCallbacklChannel<T>, private executor: Executor, delay = 0) {
     super();
     source.add(() => {
       if (this.handle != -1) return;
-      this.handle = window.setTimeout(() => { this.handle = -1; this.notify() }, delay);
+      this.handle = this.executor(() => { this.handle = -1; this.notify() }, delay);
     });
   }
 
   get(): T { return this.source.get() }
 }
 
-export function delay<T>(source: SourceCallbacklChannel<T>, delay = 0) {
-  return new Delay<T>(source, delay);
+export function delay<T>(source: SourceCallbacklChannel<T>, executor: Executor, delay = 0) {
+  return new Delay<T>(source, executor, delay);
 }
 
 export class Tuple<Args extends any[]> extends CallbackChannelImpl<[]> implements Source<Args> {

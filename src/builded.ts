@@ -15,7 +15,7 @@ import { InputModule } from './app/modules/input';
 addLogAppender(CONSOLE);
 const gl = createContextFromCanvas("display", { alpha: false, antialias: true, stencil: true });
 
-const app = new App();
+const app = new App(() => performance.now());
 app.bind(GL, instance(gl));
 app.install(InputModule);
 app.install(DbFsModule('resources/engines/blood/'));

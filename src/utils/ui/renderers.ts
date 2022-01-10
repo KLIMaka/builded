@@ -228,7 +228,7 @@ export function sliderToolbarButton(model: SliderModel) {
   const buttonTemplate = h`<button class="btn btn-default btn-dropdown">${printLabel()}</button>`;
   const widget = numberBox(model.handle, model.value);
   const btn = <HTMLElement>buttonTemplate.cloneNode(true);
-  tippy(btn, widgetPopup(widget));
+  const inst = tippy(btn, widgetPopup(widget));
   model.handle.add(() => btn.textContent = printLabel());
   btn.onwheel = wheelAction(model.handle, setter(model.handle, model.value));
   return btn;

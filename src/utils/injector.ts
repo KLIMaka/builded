@@ -47,9 +47,12 @@ class ChildInjector<T> implements ParentInjector {
   getInstance<T>(dependency: Dependency<T>): Promise<T> { return this.parent.getInstanceParent(dependency, this) }
 }
 
+export type Timer = () => number;
 
 export class App implements Module {
   private plugins = new Map<Dependency<any>, Plugin<any>>();
+
+  constructor(private timer: Timer) { }
 
   public bind<T>(dependency: Dependency<T>, plugin: Plugin<T>): void {
     if (this.plugins.has(dependency)) throw new Error(`Multiple bindings to dependency ${dependency.name}`);
@@ -61,15 +64,15 @@ export class App implements Module {
   }
 
   public async start(): Promise<Runtime> {
-    const injector = new RootInjector(this.plugins);
+    const injector = new RootInjector(this.plugins, this.timer);
     try {
-      const start = performance.now();
+      const start = this.timer();
       const voidDeps = iter(this.plugins.keys())
         .filter(dep => dep.isVoid)
         .map(dep => injector.getInstance(dep))
         .collect();
       await Promise.all(voidDeps);
-      console.info(`App started in ${(performance.now() - start).toFixed(2)}ms`);
+      console.info(`App started in ${(this.timer() - start).toFixed(2)}ms`);
       return injector;
     } catch (e) {
       console.error(`Error while starting App. ${e}\n${e.stack}`);
@@ -94,7 +97,7 @@ class RootInjector implements ParentInjector, Runtime {
   private graph = new DirecredGraph<Dependency<any>>();
   private instances = new Map<Dependency<any>, Promise<any>>();
 
-  constructor(private providers: Map<Dependency<any>, Plugin<any>>) {
+  constructor(private providers: Map<Dependency<any>, Plugin<any>>, private timer: Timer) {
     this.instances.set(RUNTIME, Promise.resolve(this));
   }
 
@@ -129,9 +132,9 @@ class RootInjector implements ParentInjector, Runtime {
     if (provider == undefined) throw new Error(`No provider bound to ${dependency.name}`);
     const injector = new ChildInjector(dependency, parent);
     try {
-      const start = performance.now();
+      const start = this.timer();
       const instance = await provider.start(injector);
-      console.info(`${dependency.name} started in ${(performance.now() - start).toFixed(2)}ms`);
+      console.info(`${dependency.name} started in ${(this.timer() - start).toFixed(2)}ms`);
       return instance;
     } catch (error) {
       console.error(`Error while creating ${dependency.name}. ${error}\n${error.stack}`);
@@ -141,11 +144,11 @@ class RootInjector implements ParentInjector, Runtime {
 
   private async stopInstance<T>(dependency: Dependency<T>) {
     try {
-      const start = performance.now();
+      const start = this.timer();
       await this.providers.get(dependency).stop(this);
       this.graph.remove(dependency);
       this.instances.delete(dependency);
-      console.info(`${dependency.name} stopped in ${(performance.now() - start).toFixed(2)}ms`);
+      console.info(`${dependency.name} stopped in ${(this.timer() - start).toFixed(2)}ms`);
     } catch (error) {
       console.error(`Error while stopping ${dependency.name}. ${error}\n${error.stack}`);
       throw error;

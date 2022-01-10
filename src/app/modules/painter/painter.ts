@@ -152,8 +152,7 @@ const NORMAL = (stack: VecStack, res: number) => {
   const r = 255 * clamp(stack.x(res), 0, 1);
   const g = 255 * clamp(stack.y(res), 0, 1);
   const b = 255 * clamp(stack.z(res), 0, 1);
-  const a = 255 * clamp(stack.w(res), 0, 1);
-  return r | (g << 8) | (b << 16) | (a << 24);
+  return r | (g << 8) | (b << 16) | (255 << 24);
 }
 
 const GRAY_R = (stack: VecStack, res: number) => {

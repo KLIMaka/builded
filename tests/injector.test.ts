@@ -1,5 +1,6 @@
 import { App, Dependency, getInstances, Injector, Plugin, provider } from "../src/utils/injector";
 import { iter } from "../src/utils/iter";
+import { performance } from "perf_hooks";
 
 interface Type {
   foo(arg: any): any;
@@ -49,8 +50,8 @@ class CProvider implements Plugin<Type> {
   async stop(injector: Injector): Promise<void> { }
 }
 
-test('injector test', async done => {
-  const app = new App();
+test('injector test', async () => {
+  const app = new App(performance.now);
   app.bind(A, new AProvider());
   app.bind(B, provider(async i => { return { foo: arg => arg } }));
   app.bind(C, new CProvider());
@@ -75,12 +76,11 @@ test('injector test', async done => {
 
   expected = 43;
   await runtime.replaceInstance(B, provider(async i => { return { foo: arg => arg + 1 } }));
-  done();
 });
 
-test('cyclic', async done => {
+test('cyclic', async () => {
   expect.assertions(1);
-  const app = new App();
+  const app = new App(performance.now);
   app.bind(A, new AProvider());
   app.bind(B, provider(async i => {
     const a = i.getInstance(A)
@@ -96,11 +96,10 @@ test('cyclic', async done => {
   } catch (e) {
     expect(e).toStrictEqual(new Error('Found cycle: B,A'));
   }
-  done();
 });
 
-test('test', async done => {
-  const app = new App();
+test('test', async () => {
+  const app = new App(performance.now);
   const log: string[] = [];
   const A = new Dependency<number>('A');
   const B = new Dependency<number>('B');
@@ -192,6 +191,4 @@ test('test', async done => {
   log.splice(0, log.length);
   await runtime.stop();
   expect(log).toStrictEqual(['Main-', 'Main2-', 'OP-', 'Main1-', 'A-', 'nB-']);
-
-  done();
 });

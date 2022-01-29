@@ -73,8 +73,8 @@ export class TransformValue<T, U> extends CallbackChannelImpl<[]> implements Sou
     source.add(() => { this.needToUpdate = true; this.notify() });
   }
 
-  private update() { this.value = this.transformer(this.source.get()); }
-  get(): T { if (this.needToUpdate) { this.update(); this.needToUpdate = false } return this.value }
+  private update() { if (this.needToUpdate) { this.value = this.transformer(this.source.get()); this.needToUpdate = false } }
+  get(): T { this.update(); return this.value }
 }
 
 export function transformed<T, U>(source: SourceCallbacklChannel<U>, transformer: (value: U) => T): TransformValue<T, U> {

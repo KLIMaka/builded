@@ -29,6 +29,16 @@ export function palRasterizer(pal: ArrayLike<number>): Rasterizer<number> {
   }
 }
 
+export function rasterizeRGBA8(raster: Raster<number>, out: ArrayBuffer) {
+  const u32 = new Uint32Array(out);
+  let off = 0;
+  for (let y = 0; y < raster.height; y++) {
+    for (let x = 0; x < raster.width; x++) {
+      u32[off++] = raster.pixel(x, y);
+    }
+  }
+}
+
 export class ConstRaster<P> implements Raster<P> {
   constructor(readonly width: number, readonly height: number, private color: P) { }
   pixel(x: number, y: number) { return this.color };

@@ -1,7 +1,6 @@
-import { handle, value } from "../../../utils/callbacks";
-import { Raster, rect, resize } from "../../../utils/pixelprovider";
-
-export type WorkplaneRenderer = (canvas: HTMLCanvasElement, x: number, y: number, w: number, h: number) => void;
+import { Raster, rasterizeRGBA8, rect, resize } from "../../../utils/pixelprovider";
+import { addDragController } from "../../../utils/ui/ui";
+import { PushWallModule } from "../../edit/tools/pushwall";
 
 function createImageDataCache() {
   let id: ImageData = null;
@@ -20,60 +19,43 @@ function createImageDataCache() {
   }
 }
 
-function rasterize(raster: Raster<number>, out: ArrayBuffer) {
-  const u32 = new Uint32Array(out);
-  let off = 0;
-  for (let y = 0; y < raster.height; y++) {
-    for (let x = 0; x < raster.width; x++) {
-      u32[off++] = raster.pixel(x, y);
-    }
-  }
-}
+export type WorkplaneRenderer = (canvas: HTMLCanvasElement, xoff: number, yoff: number, scale: number) => void;
 
-export function RasterWorkplaneRenderer(raster: Raster<number>): WorkplaneRenderer {
+export function rasterWorkplaneRenderer(raster: Raster<number>): WorkplaneRenderer {
   const cache = createImageDataCache();
-  return (canvas, x, y, w, h) => {
+  return (canvas, xoff, yoff, scale) => {
     const ctx = canvas.getContext('2d');
-    const framed = rect(raster, x, y, w, h, 0);
-    const scaled = resize(framed, canvas.width, canvas.height);
+    const scaled = resize(raster, raster.width * scale, raster.height * scale);
+    const framed = rect(scaled, -xoff, -yoff, canvas.height - xoff, canvas.height - yoff, 0);
     const id = cache(canvas.width, canvas.height);
-    rasterize(scaled, id.data.buffer);
+    rasterizeRGBA8(framed, id.data.buffer);
     ctx.putImageData(id, 0, 0);
   }
 }
 
 export class Workplane {
-  private scale = value(1);
-  private xoff = value(0);
-  private yoff = value(0);
+  private scale = 1;
+  private xoff = 0;
+  private yoff = 0;
 
   constructor(
     private plane: HTMLCanvasElement,
     private renderer: WorkplaneRenderer
   ) {
-    this.setup();
+    addDragController(plane, (posx, posy, dx, dy, dscale) => {
+      const cx = posx - plane.width / 2;
+      const cy = posy - plane.height / 2;
+      const ds = this.scale * dscale - this.scale;
+      this.xoff += dx - cx * ds;
+      this.yoff += dy - cy * ds;
+      this.scale *= dscale;
+      console.log(this.xoff, this.yoff, this.scale);
+      this.redraw();
+    });
+    this.redraw();
   }
 
-  private setup() {
-    handle(null, (p, scale, xoff, yoff) => {
-      const x = xoff * scale;
-      const y = yoff * scale;
-      const w = this.plane.width * scale;
-      const h = this.plane.height * scale;
-      this.renderer(this.plane, x, y, w, h);
-    }, this.scale, this.xoff, this.yoff);
-  }
-
-  private move(dx: number, dy: number) {
-    this.xoff.set(this.xoff.get() + dx / this.scale.get());
-    this.yoff.set(this.yoff.get() + dy / this.scale.get());
-  }
-
-  private zoom(x: number, y: number, s: number) {
-    const nscale = this.scale.get() * s;
-    const nw = this.plane.width * nscale;
-    const nh = this.plane.height * nscale;
-    const hx = x / 2;
-    const hy = y / 2;
+  public redraw() {
+    this.renderer(this.plane, this.xoff, this.yoff, this.scale);
   }
 }

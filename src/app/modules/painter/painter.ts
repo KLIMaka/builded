@@ -4,7 +4,7 @@ import { filter, getOrCreate } from "../../../utils/collections";
 import { create, lifecycle, Module, plugin } from "../../../utils/injector";
 import { Range, Vec3Interpolator } from "../../../utils/interpolator";
 import { clamp, int, len2d } from "../../../utils/mathutils";
-import { array, Raster, rect, resize } from "../../../utils/pixelprovider";
+import { array, Raster, rasterizeRGBA8, rect, resize } from "../../../utils/pixelprovider";
 import { menuButton, NavItem1, navTree, NavTreeModel, Oracle, properties } from "../../../utils/ui/renderers";
 import { addDragController, replaceContent } from "../../../utils/ui/ui";
 import { VecStack } from "../../../utils/vecstack";
@@ -13,6 +13,7 @@ import { BUS, busDisconnector } from "../../apis/handler";
 import { Ui, UI, Window } from "../../apis/ui";
 import { namedMessageHandler } from "../../edit/messages";
 import { apply, blend, box, circle, circular, displace, displacedGrid, gradient, grid, Image, mouldings, perlin, pointDistance, Postprocessor, profile, profiles, render, Renderer, repeat, sdf, select, transform, Value, voronoi } from './funcs';
+import { rasterWorkplaneRenderer, Workplane } from "./workplane";
 
 export async function PainterModule(module: Module) {
   module.bind(plugin('Painter'), lifecycle(async (injector, lifecycle) => {
@@ -22,18 +23,6 @@ export async function PainterModule(module: Module) {
     lifecycle(editor, async e => e.stop());
   }));
 }
-
-function rasterizer(raster: Raster<number>, out: Uint32Array) {
-  const w = raster.width;
-  const h = raster.height;
-  let off = 0;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      out[off++] = raster.pixel(x, y);
-    }
-  }
-}
-
 
 class Model {
   private x = 0;
@@ -242,8 +231,8 @@ class Painter {
   private buffer: Uint32Array;
   private bufferSize = 512;
   private data: Uint8ClampedArray;
-  private dataView: Uint32Array;
   private id: ImageData;
+  private workplane: Workplane;
   private renderer: Image2dRenderer;
   private stack = new VecStack(1024);
 
@@ -324,7 +313,6 @@ class Painter {
   private recreateBuffer() {
     this.buffer = new Uint32Array(this.bufferSize * this.bufferSize);
     this.data = new Uint8ClampedArray(640 * 640 * 4);
-    this.dataView = new Uint32Array(this.data.buffer);
     this.id = new ImageData(this.data, 640, 640);
   }
 
@@ -346,16 +334,7 @@ class Painter {
   }
 
   private redraw() {
-    const ctx = this.display.getContext('2d');
-    const img = array(this.buffer, this.bufferSize, this.bufferSize);
-    const scale = int(this.bufferSize * this.scale);
-    const scaled = resize(img, scale, scale);
-    const off = int((this.bufferSize / 2) * this.scale);
-    const x = this.centerX - off;
-    const y = this.centerY - off;
-    const framed = rect(scaled, -x, -y, this.display.width - x, this.display.height - y, 0);
-    rasterizer(framed, this.dataView);
-    ctx.putImageData(this.id, 0, 0);
+    this.workplane.redraw();
   }
 
   private createView(): HTMLElement {
@@ -374,13 +353,7 @@ class Painter {
     this.overlay = overlay;
     this.sidebarLeft = sidebarleft;
     this.sidebarRight = sidebarright;
-
-    addDragController(overlay, (dx, dy, dscale) => {
-      this.centerX += dx;
-      this.centerY += dy;
-      this.scale *= dscale;
-      this.redraw();
-    });
+    this.workplane = new Workplane(this.overlay, rasterWorkplaneRenderer(array(this.buffer, this.bufferSize, this.bufferSize)))
 
     navTree(sidebarleft, this.imagesModel);
     return widget;

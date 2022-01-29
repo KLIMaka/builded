@@ -290,12 +290,12 @@ export function replaceContent(root: HTMLElement, newchild: HTMLElement) {
   else root.appendChild(newchild);
 }
 
-export type DragController = (dx: number, dy: number, dscale: number) => void;
+export type DragController = (posx: number, posy: number, dx: number, dy: number, dscale: number) => void;
 
 export function addDragController(elem: HTMLElement, controller: DragController) {
   elem.addEventListener('wheel', e => {
-    if (e.deltaY > 0) controller(0, 0, 0.9);
-    if (e.deltaY < 0) controller(0, 0, 1.1);
+    if (e.deltaY > 0) controller(e.x, e.y, 0, 0, 0.9);
+    if (e.deltaY < 0) controller(e.x, e.y, 0, 0, 1.1);
   });
   let isDrag = false;
   let oldx = 0;
@@ -304,7 +304,7 @@ export function addDragController(elem: HTMLElement, controller: DragController)
     if (isDrag) {
       const dx = e.x - oldx;
       const dy = e.y - oldy;
-      if (dx != 0 || dy != 0) controller(dx, dy, 1);
+      if (dx != 0 || dy != 0) controller(e.x, e.y, dx, dy, 1);
     }
     oldx = e.x;
     oldy = e.y;

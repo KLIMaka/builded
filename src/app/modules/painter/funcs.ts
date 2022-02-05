@@ -696,6 +696,8 @@ type MouldingPart = { moulding: Moulding, width: number, height: number, hoffset
 const LISTEL: Moulding = x => 1;
 const QUARTER_ROUND: Moulding = x => Math.sqrt(1 - x * x);
 const SPLAY: Moulding = x => x;
+const CYMA_RECTA: Moulding = x => x < 0.5 ? 2 * x * x : 1 - 2 * (1 - x) * (1 - x);
+const CYMA_REVERSA: Moulding = x => x < 0.5 ? 0.5 * Math.sqrt(2 * x) : 1 - 0.5 * Math.sqrt(2 - 2 * x);
 
 export function mouldings() {
   const size = param('Size', 4);
@@ -705,7 +707,7 @@ export function mouldings() {
   const settings = value(props);
 
   handle(null, (p, size_) => {
-    const parts = parseMouldings(':1,1,0;-/:4,4,2;:1,1,5;:1,1,6');
+    const parts = parseMouldings('+\\:1,1,3;-\\:2,2,1;_/-:4,2,1;+\\:2,2,1');
     const size = parts.length;
     const d = 1 / size;
     renderer.set((stack: VecStack, pos: number) => {
@@ -730,6 +732,10 @@ function parseMoulding(str: string): Moulding {
     case '-/': return x => 1 - QUARTER_ROUND(x);
     case '-\\': return x => 1 - QUARTER_ROUND(1 - x);
     case '+\\': return QUARTER_ROUND;
+    case '_/-': return CYMA_RECTA;
+    case '-\\_': return x => CYMA_RECTA(1 - x);
+    case '|/|': return CYMA_REVERSA;
+    case '|\\|': return x => CYMA_REVERSA(1 - x);
     default: return LISTEL;
   }
 }

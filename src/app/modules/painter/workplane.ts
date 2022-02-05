@@ -1,6 +1,5 @@
 import { Raster, rasterizeRGBA8, rect, resize } from "../../../utils/pixelprovider";
 import { addDragController } from "../../../utils/ui/ui";
-import { PushWallModule } from "../../edit/tools/pushwall";
 
 function createImageDataCache() {
   let id: ImageData = null;
@@ -43,8 +42,8 @@ export class Workplane {
     private renderer: WorkplaneRenderer
   ) {
     addDragController(plane, (posx, posy, dx, dy, dscale) => {
-      const cx = posx - plane.width / 2;
-      const cy = posy - plane.height / 2;
+      const cx = -posx;
+      const cy = -posy;
       const ds = this.scale * dscale - this.scale;
       this.xoff += dx - cx * ds;
       this.yoff += dy - cy * ds;

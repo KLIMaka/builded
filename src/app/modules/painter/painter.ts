@@ -13,7 +13,7 @@ import { BUS, busDisconnector } from "../../apis/handler";
 import { Ui, UI, Window } from "../../apis/ui";
 import { namedMessageHandler } from "../../edit/messages";
 import { apply, blend, box, circle, circular, displace, displacedGrid, gradient, grid, Image, mouldings, perlin, pointDistance, Postprocessor, profile, profiles, render, Renderer, repeat, sdf, select, transform, Value, voronoi } from './funcs';
-import { rasterWorkplaneRenderer, Workplane } from "./workplane";
+import { gridRenderer, rasterWorkplaneRenderer, Workplane } from "./workplane";
 
 export async function PainterModule(module: Module) {
   module.bind(plugin('Painter'), lifecycle(async (injector, lifecycle) => {
@@ -218,15 +218,10 @@ class Image2dRenderer extends CallbackChannelImpl<[]> {
 
 class Painter {
   private window: Window;
-  private display: HTMLCanvasElement;
-  private overlay: HTMLCanvasElement;
   private sidebarRight: HTMLElement;
   private sidebarLeft: HTMLElement;
   private model: Model;
 
-  private centerX = 320;
-  private centerY = 320;
-  private scale = 1.0;
 
   private buffer: Uint32Array;
   private bufferSize = 512;
@@ -341,19 +336,15 @@ class Painter {
     const template = h` 
     <div class='pane-group'>
       <div class='pane pane-sm sidebar' #sidebarleft></div>
-      <div class='pane' style="position: relative;">
-        <canvas width="640" height="640" style="position: absolute; left: 0; top: 0" #display></canvas>
-        <canvas width="640" height="640" style="position: absolute; left: 0; top: 0" #overlay></canvas>    
-      </div>
+      <div class='pane' style="position: relative;" #holder></div>
       <div class='pane pane-sm sidebar' #sidebarright></div>
     </div>`;
     const widget = <HTMLElement>template.cloneNode(true);
-    const { overlay, display, sidebarleft, sidebarright } = template.collect(widget);
-    this.display = display;
-    this.overlay = overlay;
+    const { holder, sidebarleft, sidebarright } = template.collect(widget);
     this.sidebarLeft = sidebarleft;
     this.sidebarRight = sidebarright;
-    this.workplane = new Workplane(this.overlay, rasterWorkplaneRenderer(array(this.buffer, this.bufferSize, this.bufferSize)))
+    this.workplane = new Workplane(640, 640, [rasterWorkplaneRenderer(array(this.buffer, this.bufferSize, this.bufferSize)), gridRenderer()]);
+    holder.appendChild(this.workplane.getHolder());
 
     navTree(sidebarleft, this.imagesModel);
     return widget;

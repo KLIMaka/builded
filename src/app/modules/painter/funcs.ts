@@ -69,16 +69,14 @@ export function profile(p: (name: string) => Image, oracle: Oracle<string>): Ima
 }
 
 export function perlin(): Image {
-  const scale = param('Scale', 1);
+  const scale = param('Scale', 256);
   const octaves = param('Octaves', 1, intValue(1, numberRangeValidator(1, 8)));
 
   const renderer = transformed(tuple(scale.value, octaves.value), ([s, o]) => {
-    const noise = octaves2d(perlin2d, o);
     return (stack: VecStack, pos: number) => {
       const x = stack.x(pos) * s;
       const y = stack.y(pos) * s;
       const result = perlin_simd_octaves(x, y, o);
-      // const result = noise(x, y);
       return stack.push(result, 0, 0, 1);
     }
   });

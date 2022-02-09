@@ -258,6 +258,7 @@ class Painter {
         .startGroup()
         .widget(this.createPPMenu())
         .widget(this.createAddMenu())
+        .iconButton('icon-resize-small', () => this.workplane.update(64, 64, 1))
         .endGroup())
       .build();
   }
@@ -343,7 +344,11 @@ class Painter {
     const { holder, sidebarleft, sidebarright } = template.collect(widget);
     this.sidebarLeft = sidebarleft;
     this.sidebarRight = sidebarright;
-    this.workplane = new Workplane(640, 640, [rasterWorkplaneRenderer(array(this.buffer, this.bufferSize, this.bufferSize)), gridRenderer()]);
+    this.workplane = new Workplane(640, 640, [
+      rasterWorkplaneRenderer(array(this.buffer, this.bufferSize, this.bufferSize)),
+      gridRenderer()
+    ]);
+    this.workplane.update(64, 64, 1);
     holder.appendChild(this.workplane.getHolder());
 
     navTree(sidebarleft, this.imagesModel);

@@ -34,36 +34,42 @@ export function rasterWorkplaneRenderer(raster: Raster<number>): WorkplaneRender
   }
 }
 
+function drawGrid(ctx: CanvasRenderingContext2D, w: number, h: number, xoff: number, yoff: number, scale: number, gridoff: number) {
+  const off = 0.5 * scale;
+  const dg = 128 * scale;
+
+  ctx.beginPath();
+  const xcount = 2 + int(w / scale / 128);
+  const startx = xoff + Math.floor(-xoff / dg) * dg;
+  for (let i = 0; i < xcount; i++) {
+    const x = startx + i * dg + off;
+    ctx.moveTo(x, 0.5 - gridoff);
+    ctx.lineTo(x, gridoff + h + 0.5);
+  }
+
+  const ycount = 2 + int(h / scale / 128);
+  const starty = yoff + Math.floor(-yoff / dg) * dg;
+  for (let i = 0; i < ycount; i++) {
+    const y = starty + i * dg + off;
+    ctx.moveTo(0.5 - gridoff, y);
+    ctx.lineTo(gridoff + w + 0.5, y);
+  }
+  ctx.closePath();
+  ctx.stroke();
+}
+
 export function gridRenderer(): WorkplaneRenderer {
   return (canvas, xoff, yoff, scale) => {
     const ctx = canvas.getContext('2d');
     const w = canvas.width;
     const h = canvas.height;
-    ctx.fillStyle = 'white';
     ctx.setLineDash([3, 3]);
     ctx.clearRect(0, 0, w, h);
 
-    const off = 0.5 * scale;
-    const dg = 128 * scale;
-
-    ctx.beginPath();
-    const xcount = 2 + int(w / scale / 128);
-    const startx = xoff + Math.floor(-xoff / dg) * dg;
-    for (let i = 0; i < xcount; i++) {
-      const x = startx + i * dg + off;
-      ctx.moveTo(x, 0.5);
-      ctx.lineTo(x, h + 0.5);
-    }
-
-    const ycount = 2 + int(h / scale / 128);
-    const starty = yoff + Math.floor(-yoff / dg) * dg;
-    for (let i = 0; i < ycount; i++) {
-      const y = starty + i * dg + off;
-      ctx.moveTo(0.5, y);
-      ctx.lineTo(w + 0.5, y);
-    }
-    ctx.closePath();
-    ctx.stroke();
+    ctx.strokeStyle = 'white';
+    drawGrid(ctx, w, h, xoff, yoff, scale, 0);
+    ctx.strokeStyle = 'black';
+    drawGrid(ctx, w, h, xoff, yoff, scale, 3);
   }
 }
 
@@ -78,6 +84,7 @@ export class Workplane {
   private yoff = 0;
   private planes: Plane[] = [];
   private holder: HTMLElement;
+  private controller: HTMLCanvasElement;
 
   constructor(
     private w: number,
@@ -85,17 +92,15 @@ export class Workplane {
     renderers: WorkplaneRenderer[]
   ) {
     this.holder = <HTMLElement>CANVAS_HOLDER_TEMPLATE.cloneNode(true);
-    let lastCanvas = null;
+    this.controller = this.createCanvas(h, w);
+    this.holder.appendChild(this.controller);
     for (const renderer of renderers) {
-      const canvas = <HTMLCanvasElement>CANVAS_TEMPLATE.cloneNode(true);
-      canvas.height = h;
-      canvas.width = w;
-      this.holder.appendChild(canvas);
+      const canvas = this.createCanvas(h, w)
+      this.controller.before(canvas);
       this.planes.push({ canvas, renderer })
-      lastCanvas = canvas;
     }
 
-    addDragController(lastCanvas, (posx, posy, dx, dy, dscale) => {
+    addDragController(this.controller, (posx, posy, dx, dy, dscale) => {
       const cx = -posx;
       const cy = -posy;
       const ds = this.scale * dscale - this.scale;
@@ -107,12 +112,25 @@ export class Workplane {
     this.redraw();
   }
 
+  private createCanvas(h: number, w: number) {
+    const canvas = <HTMLCanvasElement>CANVAS_TEMPLATE.cloneNode(true);
+    canvas.height = h;
+    canvas.width = w;
+    return canvas;
+  }
+
   public redraw() {
-    for (const p of this.planes)
-      p.renderer(p.canvas, this.xoff, this.yoff, this.scale);
+    for (const p of this.planes) p.renderer(p.canvas, this.xoff, this.yoff, this.scale);
   }
 
   public getHolder(): HTMLElement {
     return this.holder;
+  }
+
+  public update(xoff: number, yoff: number, scale: number) {
+    this.xoff = xoff;
+    this.yoff = yoff;
+    this.scale = scale;
+    this.redraw();
   }
 }

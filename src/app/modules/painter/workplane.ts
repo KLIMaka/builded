@@ -20,14 +20,16 @@ function createImageDataCache() {
   }
 }
 
-export type WorkplaneRenderer = (canvas: HTMLCanvasElement, xoff: number, yoff: number, scale: number) => void;
+export type WorkplaneContext = { xoff: number, yoff: number, scale: number };
+// export type WorkplaneHandler = (canvas: HTMLCanvasElement, ctx: WorkplaneContext, x:number, y:number);
+export type WorkplaneRenderer = (canvas: HTMLCanvasElement, ctx: WorkplaneContext) => void;
 
 export function rasterWorkplaneRenderer(raster: Raster<number>): WorkplaneRenderer {
   const cache = createImageDataCache();
-  return (canvas, xoff, yoff, scale) => {
+  return (canvas, wctx) => {
     const ctx = canvas.getContext('2d');
-    const scaled = resize(raster, raster.width * scale, raster.height * scale);
-    const framed = rect(scaled, -xoff, -yoff, canvas.height - xoff, canvas.height - yoff, 0);
+    const scaled = resize(raster, raster.width * wctx.scale, raster.height * wctx.scale);
+    const framed = rect(scaled, -wctx.xoff, -wctx.yoff, canvas.height - wctx.xoff, canvas.height - wctx.yoff, 0);
     const id = cache(canvas.width, canvas.height);
     rasterizeRGBA8(framed, id.data.buffer);
     ctx.putImageData(id, 0, 0);
@@ -59,7 +61,7 @@ function drawGrid(ctx: CanvasRenderingContext2D, w: number, h: number, xoff: num
 }
 
 export function gridRenderer(): WorkplaneRenderer {
-  return (canvas, xoff, yoff, scale) => {
+  return (canvas, wctx) => {
     const ctx = canvas.getContext('2d');
     const w = canvas.width;
     const h = canvas.height;
@@ -67,9 +69,9 @@ export function gridRenderer(): WorkplaneRenderer {
     ctx.clearRect(0, 0, w, h);
 
     ctx.strokeStyle = 'white';
-    drawGrid(ctx, w, h, xoff, yoff, scale, 0);
+    drawGrid(ctx, w, h, wctx.xoff, wctx.yoff, wctx.scale, 0);
     ctx.strokeStyle = 'black';
-    drawGrid(ctx, w, h, xoff, yoff, scale, 3);
+    drawGrid(ctx, w, h, wctx.xoff, wctx.yoff, wctx.scale, 3);
   }
 }
 
@@ -78,10 +80,11 @@ const CANVAS_TEMPLATE = h` <canvas style="position: absolute; left: 0; top: 0"><
 
 type Plane = { canvas: HTMLCanvasElement, renderer: WorkplaneRenderer };
 
-export class Workplane {
-  private scale = 1;
-  private xoff = 0;
-  private yoff = 0;
+export class Workplane implements WorkplaneContext {
+  scale = 1;
+  xoff = 0;
+  yoff = 0;
+
   private planes: Plane[] = [];
   private holder: HTMLElement;
   private controller: HTMLCanvasElement;
@@ -103,7 +106,7 @@ export class Workplane {
     addDragController(this.controller, (posx, posy, dx, dy, dscale) => {
       const cx = -posx;
       const cy = -posy;
-      const ds = this.scale * dscale - this.scale;
+      const ds = this.scale - this.scale * dscale;
       this.xoff += dx - cx * ds;
       this.yoff += dy - cy * ds;
       this.scale *= dscale;
@@ -120,10 +123,10 @@ export class Workplane {
   }
 
   public redraw() {
-    for (const p of this.planes) p.renderer(p.canvas, this.xoff, this.yoff, this.scale);
+    for (const p of this.planes) p.renderer(p.canvas, this);
   }
 
-  public getHolder(): HTMLElement {
+  public getWidget(): HTMLElement {
     return this.holder;
   }
 

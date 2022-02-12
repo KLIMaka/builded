@@ -294,13 +294,14 @@ export type DragController = (posx: number, posy: number, dx: number, dy: number
 
 export function addDragController(elem: HTMLElement, controller: DragController) {
   elem.addEventListener('wheel', e => {
-    if (e.deltaY > 0) controller(e.x, e.y, 0, 0, 0.9);
+    if (e.deltaY > 0) controller(e.x, e.y, 0, 0, 1 / 1.1);
     if (e.deltaY < 0) controller(e.x, e.y, 0, 0, 1.1);
   });
   let isDrag = false;
   let oldx = 0;
   let oldy = 0;
   elem.addEventListener('mousemove', e => {
+    isDrag = e.buttons == 2;
     if (isDrag) {
       const dx = e.x - oldx;
       const dy = e.y - oldy;
@@ -309,8 +310,6 @@ export function addDragController(elem: HTMLElement, controller: DragController)
     oldx = e.x;
     oldy = e.y;
   });
-  elem.addEventListener('mousedown', e => isDrag = true);
-  elem.addEventListener('mouseup', e => isDrag = false);
 }
 
 export function center(parent: HTMLElement, child: HTMLElement, width: number, height: number) {

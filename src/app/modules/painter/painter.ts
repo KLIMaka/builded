@@ -349,7 +349,7 @@ class Painter {
       gridRenderer()
     ]);
     this.workplane.update(64, 64, 1);
-    holder.appendChild(this.workplane.getHolder());
+    holder.appendChild(this.workplane.getWidget());
 
     navTree(sidebarleft, this.imagesModel);
     return widget;

@@ -1,5 +1,5 @@
-import { clamp, cyclic, fract, mix, monoatan2 } from "../../../utils/mathutils";
-import { VecStack } from '../../../utils/vecstack';
+import { clamp, cyclic, fract, mix, monoatan2 } from "../../../../utils/mathutils";
+import { VecStack } from '../../../../utils/vecstack';
 
 export type SdfShape = (stack: VecStack, pos: number) => number;
 export type SdfShapeRenderer = (stack: VecStack, pos: number, normal: number) => number;

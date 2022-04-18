@@ -1,6 +1,5 @@
-import { cyclic } from "./mathutils";
 import { Iter } from "./iter";
-import { App } from "./injector";
+import { cyclic } from "./mathutils";
 
 export interface Collection<T> extends Iterable<T> {
   get(i: number): T;
@@ -274,6 +273,12 @@ export function* take<T>(c: Iterable<T>, count: number): Generator<T> {
     yield next.value;
     count--;
   }
+}
+
+export function takeFirst<T>(i: Iterable<T>): T {
+  const iter = i[Symbol.iterator]();
+  const item = iter.next();
+  return item.done ? null : item.value;
 }
 
 export function skip<T>(i: Iterable<T>, count: number): Iterable<T> {

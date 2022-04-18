@@ -25,50 +25,29 @@ class MessageParser {
   public get<T>(expected: string, value: T = null): T {
     for (; this.lexer.next() == 'WS';);
     if (this.lexer.isEoi()) throw new Error();
-    let tokenId = this.lexer.rule().name;
-    let actual = this.lexer.value();
+    const tokenId = this.lexer.rule().name;
+    const actual = this.lexer.value();
     if (tokenId != expected || value != null && value != actual) throw new Error();
-    return this.lexer.value();
-  }
-
-  public tryGet<T>(expected: string, value: T = null): T {
-    let mark = this.lexer.mark();
-    try {
-      return this.get(expected, value);
-    } catch (e) {
-      this.lexer.reset(mark);
-      return null;
-    }
+    return actual;
   }
 }
-let parser = new MessageParser();
-
-function parseArgs(...types: string[]) {
-  let args = new Deck<any>();
-  for (let type of types) {
-    args.push(parser.get(type));
-  }
-  return args;
-}
+const PARSER = new MessageParser();
 
 const NOOP_MESSAGE: Message = {};
-let factArgs = new Deck<any>();
 function createMessage(constr: Function, ...types: string[]) {
-  let args = parseArgs(...types);
-  factArgs.clear();
-  for (let v of args) factArgs.push(v);
+  const args = [...types].map(t => PARSER.get(t));
   try {
-    return Reflect.construct(constr, [...factArgs]);
+    return Reflect.construct(constr, args);
   } catch (e) {
-    error(`Invalid message constructor ${constr.name} (${types})`, factArgs);
+    error(`Invalid message constructor ${constr.name} (${types})`, args);
     return NOOP_MESSAGE;
   }
 }
 
-let parsdMessages = new Deck<Message>();
+const parsdMessages = new Deck<Message>();
 function tryParseMessage(): Collection<Message> {
   parsdMessages.clear();
-  switch (parser.get('ID')) {
+  switch (PARSER.get('ID')) {
     case 'picnum': return parsdMessages.push(createMessage(SetPicnum, 'INT'));
     case 'shade': return parsdMessages.push(createMessage(Shade, 'INT', 'BOOLEAN'));
     case 'panrepeat': return parsdMessages.push(createMessage(PanRepeat, 'INT', 'INT', 'INT', 'INT', 'BOOLEAN'));
@@ -90,12 +69,12 @@ function tryParseMessage(): Collection<Message> {
 
 function tryParse(src: string, messages: Deck<Message>): Collection<Message> {
   try {
-    parser.setSource(src);
-    parser.get('ID', 'msg');
+    PARSER.setSource(src);
+    PARSER.get('ID', 'msg');
     let parsedMessages = tryParseMessage();
     while (!isEmpty(parsedMessages)) {
       messages.pushAll(parsedMessages);
-      try { parser.get('COMA') } catch (e) { break }
+      try { PARSER.get('COMA') } catch (e) { break }
       parsedMessages = tryParseMessage();
     }
     return messages;
@@ -104,9 +83,9 @@ function tryParse(src: string, messages: Deck<Message>): Collection<Message> {
   }
 }
 
-let messages = new Deck<Message>();
+const messages = new Deck<Message>();
 export function messageParser(str: string): Collection<Message> {
-  let result = tryParse(str, messages.clear());
+  const result = tryParse(str, messages.clear());
   if (result.length() == 0) return messages.push(new NamedMessage(str));
   return result;
 }

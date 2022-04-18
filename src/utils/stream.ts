@@ -6,7 +6,7 @@ export class Stream {
   private currentBit = 0;
   private currentByte = 0;
 
-  constructor(buf: ArrayBuffer, isLE: boolean) {
+  constructor(buf: ArrayBuffer, isLE = true) {
     this.view = new DataView(buf);
     this.offset = 0;
     this.littleEndian = isLE;

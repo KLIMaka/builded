@@ -20,8 +20,8 @@ function createLexer(str: string) {
     get: <T>(expected: string, value: T = null): T => {
       for (; lexer.next() == 'WS';);
       if (lexer.isEoi()) throw new Error();
-      let tokenId = lexer.rule().name;
-      let actual = lexer.value();
+      const tokenId = lexer.rule().name;
+      const actual = lexer.value();
       if (tokenId != expected || value != null && value != actual) throw new Error();
       return lexer.value();
     }

@@ -41,8 +41,7 @@ export class InputConsumer {
     this.pressed.clear();
     for (const [_, states] of this.states)
       for (const [name, _, off] of states)
-        if (state.has(name))
-          state.set(name, off);
+        if (state.has(name)) state.set(name, off);
   }
 
 

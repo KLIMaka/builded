@@ -64,7 +64,7 @@ const loadPluTexture = provider(async (injector: Injector) => {
 function loadMapImpl(name: string) {
   return async (injector: Injector) => {
     const res = await injector.getInstance(RESOURCES)
-    return loadBuildMap(new Stream(await res.get(name), true));
+    return loadBuildMap(new Stream(await res.get(name)));
   }
 }
 

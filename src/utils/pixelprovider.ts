@@ -1,3 +1,4 @@
+import h from 'stage0';
 import { clamp, int } from './mathutils';
 
 export interface Raster<P> {
@@ -45,8 +46,22 @@ export class ConstRaster<P> implements Raster<P> {
 }
 
 export class ArrayRaster<P> implements Raster<P> {
-  constructor(readonly width: number, readonly height: number, private pixels: ArrayLike<P>) { }
+  constructor(readonly width: number, readonly height: number, private pixels: ArrayLike<P>) {
+    if (pixels.length != width * height) throw new Error(`Invalid dimensions`);
+  }
   pixel(x: number, y: number) { return this.pixels[int(y) * this.width + int(x)] };
+}
+
+export type Mapper = (r: number, g: number, b: number, a: number) => number;
+export class F32RGBAArrayRaster implements Raster<number> {
+  constructor(readonly width: number, readonly height: number, private pixels: Float32Array, private mapper: Mapper) {
+    if (pixels.length != width * height * 4) throw new Error('Invalid dimensions');
+  }
+
+  pixel(x: number, y: number): number {
+    const idx = 4 * (int(y) * this.width + int(x));
+    return this.mapper(this.pixels[idx], this.pixels[idx + 1], this.pixels[idx + 2], this.pixels[idx + 3]);
+  }
 }
 
 export class TransformRaster<P, P1> implements Raster<P> {
@@ -159,8 +174,11 @@ export class SuperResizeRaster<P> implements Raster<P> {
 
 
 export function array<P>(arr: ArrayLike<P>, w: number, h: number): Raster<P> {
-  if (arr.length != w * h) throw new Error(`Invalid dimensions`);
   return new ArrayRaster(w, h, arr);
+}
+
+export function f32array(arr: Float32Array, w: number, h: number, mapper: Mapper): Raster<number> {
+  return new F32RGBAArrayRaster(w, h, arr, mapper);
 }
 
 export function transform<P, P1>(src: Raster<P>, transform: (p: P) => P1): Raster<P1> {

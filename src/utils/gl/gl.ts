@@ -34,11 +34,11 @@ function resize(gl: WebGLRenderingContext) {
 }
 
 export function animate(gl: WebGLRenderingContext, callback: (gl: WebGLRenderingContext, time: number) => void) {
-  let time = new Date().getTime();
+  let time = performance.now();
 
   function update() {
     resize(gl);
-    const now = new Date().getTime();
+    const now = performance.now();
     callback(gl, (now - time) / 1000);
     requestAnimationFrame(update);
     time = now;

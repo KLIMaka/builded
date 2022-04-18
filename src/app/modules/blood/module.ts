@@ -1,5 +1,4 @@
-import { cloneBoard, cloneSector, cloneSprite, cloneWall, loadBloodMap, newBoard, newSector, newSprite, newWall, saveBloodMap } from '../../../build/blood/maploader';
-import { BloodBoard } from '../../../build/blood/structs';
+import { cloneBoard, cloneSector, cloneSprite, cloneWall, loadBloodMap, newBoard, newSector, newSprite, newWall } from '../../../build/blood/maploader';
 import { BloodImplementationConstructor } from '../../../build/blood/utils';
 import { EngineApi } from '../../../build/board/mutations/api';
 import { ArtFile, ArtFiles } from '../../../build/formats/art';
@@ -9,7 +8,7 @@ import { createTexture } from '../../../utils/gl/textures';
 import { getInstances, Injector, instance, lifecycle, Module, plugin, provider } from '../../../utils/injector';
 import { iter } from '../../../utils/iter';
 import { Stream } from '../../../utils/stream';
-import { ACTIVITY, ACTIVITY_CONTROLLER, BOARD, ENGINE_API, RESOURCES } from '../../apis/app';
+import { ACTIVITY, ENGINE_API, RESOURCES } from '../../apis/app';
 import { BUS, busDisconnector } from '../../apis/handler';
 import { LoadBoard, namedMessageHandler } from '../../edit/messages';
 import { DefaultMapName, MAP_NAME } from '../../modules/default/mapnamedialog';
@@ -26,7 +25,7 @@ const artFiles = provider(async (injector: Injector): Promise<ArtFiles> => {
   for (let a = 0; a < 100; a++) {
     const name = 'TILES0' + ("00" + a).slice(-2) + '.ART';
     const file = await res.get(name);
-    if (file) arts.push(new ArtFile(new Stream(file, true)));
+    if (file) arts.push(new ArtFile(new Stream(file)));
     else break;
   }
   if (arts.length == 0) throw new Error('No ART files was loaded');
@@ -51,7 +50,7 @@ const rawPlus = provider(async (injector: Injector) => {
   const res = await injector.getInstance(RESOURCES)
   const palettes = ['NORMAL', 'SATURATE', 'BEAST', 'TOMMY', 'SPIDER3', 'GRAY', 'GRAYISH', 'SPIDER1', 'SPIDER2', 'FLAME', 'COLD', 'P1', 'P2', 'P3', 'P4'];
   const plus = await Promise.all(palettes.map(p => res.get(p + '.PLU')));
-  return iter(enumerate(plus)).filter(([p, i]) => p != null).map(([p, i]) => <Palette>{ name: palettes[i], plu: new Uint8Array(p) }).collect();
+  return iter(enumerate(plus)).filter(([p, _]) => p != null).map(([p, i]) => <Palette>{ name: palettes[i], plu: new Uint8Array(p) }).collect();
 });
 
 const pluTexture = lifecycle(async (injector, lifecycle) => {
@@ -166,11 +165,7 @@ function loadTags(surfaceDat: ArrayBuffer) {
   const tags = ['None', 'Stone', 'Metal', 'Wood', 'Flesh', 'Water', 'Dirt', 'Clay', 'Snow', 'Ice', 'Leaves', 'Cloth', 'Plant', 'Goo', 'Lava'];
   return <PicTags>{
     allTags: () => tags,
-    tags: id => {
-      if (surface.length <= id)
-        return [];
-      return [tags[surface[id]]];
-    }
+    tags: id => surface.length <= id ? [] : [tags[surface[id]]]
   };
 }
 

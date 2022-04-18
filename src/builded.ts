@@ -10,7 +10,7 @@ import { PhotonUiModule } from './app/modules/photonui';
 import { animate, createContextFromCanvas } from './utils/gl/gl';
 import { App, instance, plugin, provider } from './utils/injector';
 import { addLogAppender, CONSOLE } from './utils/logger';
-import { InputModule } from './app/modules/input';
+import { InputModule } from './app/modules/default/input';
 
 addLogAppender(CONSOLE);
 const gl = createContextFromCanvas("display", { alpha: false, antialias: true, stencil: true });

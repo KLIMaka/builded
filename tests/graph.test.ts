@@ -71,4 +71,7 @@ test('subgraph', () => {
 
   graph.add('c', 'a');
   expect([...graph.supgraphs()]).toStrictEqual([['b', 'c', 'a'], ['e', 'f', 'd']]);
+
+  graph.add('a', 'e');
+  expect([...graph.supgraphs()]).toStrictEqual([['b', 'c', 'a', 'e', 'f', 'd']]);
 });

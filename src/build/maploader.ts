@@ -2,7 +2,7 @@ import { struct, bits, ushort, int, short, byte, ubyte, uint, Stream, array } fr
 import { SectorStats, Sector, WallStats, Wall, SpriteStats, Sprite, Board, FACE_SPRITE } from './board/structs';
 import { ZSCALE } from './utils';
 
-let sectorStats = struct(SectorStats)
+const sectorStats = struct(SectorStats)
   .field('parallaxing', bits(1))
   .field('slopped', bits(1))
   .field('swapXY', bits(1))
@@ -12,7 +12,7 @@ let sectorStats = struct(SectorStats)
   .field('alignToFirstWall', bits(1))
   .field('unk', bits(9));
 
-export let sectorStruct = struct(Sector)
+export const sectorStruct = struct(Sector)
   .field('wallptr', ushort)
   .field('wallnum', ushort)
   .field('ceilingz', int)
@@ -37,7 +37,7 @@ export let sectorStruct = struct(Sector)
   .field('hitag', ushort)
   .field('extra', ushort);
 
-let wallStats = struct(WallStats)
+const wallStats = struct(WallStats)
   .field('blocking', bits(1))
   .field('swapBottoms', bits(1))
   .field('alignBottom', bits(1))
@@ -50,7 +50,7 @@ let wallStats = struct(WallStats)
   .field('translucentReversed', bits(1))
   .field('unk', bits(6));
 
-export let wallStruct = struct(Wall)
+export const wallStruct = struct(Wall)
   .field('x', int)
   .field('y', int)
   .field('point2', ushort)
@@ -69,7 +69,7 @@ export let wallStruct = struct(Wall)
   .field('hitag', ushort)
   .field('extra', ushort);
 
-let spriteStats = struct(SpriteStats)
+const spriteStats = struct(SpriteStats)
   .field('blocking', bits(1))
   .field('translucent', bits(1))
   .field('xflip', bits(1))
@@ -83,7 +83,7 @@ let spriteStats = struct(SpriteStats)
   .field('unk', bits(4))
   .field('invisible', bits(1));
 
-export let spriteStruct = struct(Sprite)
+export const spriteStruct = struct(Sprite)
   .field('x', int)
   .field('y', int)
   .field('z', int)
@@ -108,7 +108,7 @@ export let spriteStruct = struct(Sprite)
   .field('hitag', ushort)
   .field('extra', ushort);
 
-export let boardStruct = struct(Board)
+export const boardStruct = struct(Board)
   .field('version', uint)
   .field('posx', int)
   .field('posy', int)
@@ -117,7 +117,7 @@ export let boardStruct = struct(Board)
   .field('cursectnum', ushort);
 
 export function loadBuildMap(stream: Stream): Board {
-  let brd = boardStruct.read(stream);
+  const brd = boardStruct.read(stream);
   brd.numsectors = ushort.read(stream);
   brd.sectors = array(sectorStruct, brd.numsectors).read(stream);
   brd.numwalls = ushort.read(stream);
@@ -133,7 +133,7 @@ export function saveBuildMap(board: Board): ArrayBuffer {
     + 2 + wallStruct.size * board.numwalls +
     + 2 + spriteStruct.size * board.numsprites;
   const buffer = new ArrayBuffer(size);
-  const stream = new Stream(buffer, true);
+  const stream = new Stream(buffer);
   boardStruct.write(stream, board);
   ushort.write(stream, board.numsectors);
   array(sectorStruct, board.numsectors).write(stream, fixSectorSlopes(board.sectors));
@@ -295,7 +295,7 @@ export function newBoard() {
 }
 
 export function cloneSector(sector: Sector): Sector {
-  let sectorCopy = new Sector();
+  const sectorCopy = new Sector();
   Object.assign(sectorCopy, sector);
   sectorCopy.floorstat = Object.assign(new SectorStats(), sector.floorstat);
   sectorCopy.ceilingstat = Object.assign(new SectorStats(), sector.ceilingstat);
@@ -303,21 +303,21 @@ export function cloneSector(sector: Sector): Sector {
 }
 
 export function cloneWall(wall: Wall): Wall {
-  let wallCopy = new Wall();
+  const wallCopy = new Wall();
   Object.assign(wallCopy, wall);
   wallCopy.cstat = Object.assign(new WallStats(), wall.cstat);
   return wallCopy;
 }
 
 export function cloneSprite(sprite: Sprite): Sprite {
-  let spriteCopy = new Sprite();
+  const spriteCopy = new Sprite();
   Object.assign(spriteCopy, sprite);
   spriteCopy.cstat = Object.assign(new SpriteStats(), sprite.cstat);
   return spriteCopy;
 }
 
 export function cloneBoard(board: Board): Board {
-  let copy = new Board();
+  const copy = new Board();
   Object.assign(copy, board);
   copy.sectors = [];
   copy.walls = [];

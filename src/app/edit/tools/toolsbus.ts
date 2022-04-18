@@ -1,4 +1,4 @@
-import { any, findFirst, forEach } from "../../../utils/collections";
+import { any, forEach } from "../../../utils/collections";
 import { Dependency, Injector } from "../../../utils/injector";
 import { BUS, Handle, Message, MessageBus, MessageHandler, MessageHandlerReflective } from "../../apis/handler";
 
@@ -65,7 +65,7 @@ class ToolsMessageBus implements MessageBus {
   }
 
   private deactivateTool(tool: Tool) {
-    if (this.activeTool != tool) throw new Error();
+    if (this.activeTool != tool) throw new Error('Invalid tool deactivated');
     this.activeTool = null;
   }
 

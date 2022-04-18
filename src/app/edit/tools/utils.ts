@@ -156,9 +156,7 @@ class Utils extends DefaultTool {
     const s = sectorOfWall(board, id);
     invalidateSectorAndWalls(s, board, this.bus);
     const nextsector = board.walls[id].nextsector;
-    if (nextsector != -1) {
-      invalidateSectorAndWalls(nextsector, board, this.bus);
-    }
+    if (nextsector != -1) invalidateSectorAndWalls(nextsector, board, this.bus);
   }
 
   private print() {

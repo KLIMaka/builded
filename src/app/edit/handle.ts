@@ -20,14 +20,14 @@ export class MovingHandle {
     this.parallel = parallel;
     this.vertical = vertical;
     if (vertical) {
-      let dx = this.currentPoint[0] - start[0];
-      let dy = this.currentPoint[2] - start[2];
-      let t = len2d(dx, dy) / len2d(dir[0], dir[2]);
+      const dx = this.currentPoint[0] - start[0];
+      const dy = this.currentPoint[2] - start[2];
+      const t = len2d(dx, dy) / len2d(dir[0], dir[2]);
       this.dzoff = dir[1] * t + start[1] - this.currentPoint[1];
     } else {
       this.dzoff = 0;
-      let dz = this.startPoint[1] - start[1];
-      let t = dz / dir[1];
+      const dz = this.startPoint[1] - start[1];
+      const t = dz / dir[1];
       vec3.copy(this.currentPoint, dir);
       vec3.scale(this.currentPoint, this.currentPoint, t);
       vec3.add(this.currentPoint, this.currentPoint, start);

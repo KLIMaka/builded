@@ -5,8 +5,9 @@ import { range } from "../../utils/collections";
 import { create, Dependency, lifecycle } from "../../utils/injector";
 import { iter } from "../../utils/iter";
 import { palRasterizer } from "../../utils/pixelprovider";
+import { listBox } from "../../utils/ui/controls/listbox";
 import { DrawPanel } from "../../utils/ui/drawpanel";
-import { menuButton, search } from "../../utils/ui/renderers";
+import { menuButton } from "../../utils/ui/renderers";
 import { ART } from "../apis/app";
 import { Ui, UI, Window } from "../apis/ui";
 import { PicNumCallback } from "../edit/tools/selection";
@@ -60,7 +61,7 @@ export class Selector {
           .item('32', () => { this.drawPanel.setCellSize(32, 32) })
           .item('64', () => { this.drawPanel.setCellSize(64, 64) })
           .item('128', () => { this.drawPanel.setCellSize(128, 128) })))
-        .widget(search('Search', 'icon-search', s => this.oracle(s), this.filter))
+        .widget(listBox('Search', 'icon-search', s => this.oracle(s), this.filter, true))
       )
       .onclose(() => this.select(-1))
       .content(canvas)

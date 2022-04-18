@@ -7,7 +7,7 @@ export class GrpFile {
   readonly sizes: { [index: string]: number } = {};
 
   constructor(buf: ArrayBuffer) {
-    this.data = new Stream(buf, true);
+    this.data = new Stream(buf);
     this.loadFiles();
   }
 

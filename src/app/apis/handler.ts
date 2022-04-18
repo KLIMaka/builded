@@ -1,5 +1,6 @@
 import { Deck } from "../../utils/collections";
 import { Dependency } from "../../utils/injector";
+import { List, Node } from "../../utils/list";
 import { error } from "../../utils/logger";
 
 export interface Message { }
@@ -36,7 +37,7 @@ export function DefaultMessageBus() {
 const messageBox: [Message] = [null];
 export function handleReflective(obj: Object, message: Message) {
   const name = message.constructor.name;
-  let handler = obj[name];
+  const handler = obj[name];
   if (handler != undefined) {
     messageBox[0] = message;
     handler.apply(obj, messageBox);
@@ -63,4 +64,37 @@ export class MessageHandlerList implements MessageHandler {
 
 export function busDisconnector(bus: MessageBus) {
   return async (v: Handle) => bus.disconnect(v);
+}
+
+type MHandler = (data: any) => void;
+
+class Mbus {
+  private lastType = 0;
+  private messageTypes: Map<string, number> = new Map();
+  private handlers: List<MHandler>[] = [];
+
+  public registerNewType(name: string): number {
+    if (this.messageTypes.has(name)) throw new Error(`Message Type ${name} already registered`);
+    const id = this.lastType++;
+    this.messageTypes.set(name, id);
+    this.handlers.push(new List());
+    return id;
+  }
+
+  public connect(type: number, handler: MHandler): () => void {
+    if (type < 0 || type >= this.lastType) throw new Error(`Invalid type id ${type}`);
+    const handlers = this.handlers[type];
+    const node = handlers.push(handler);
+    return () => handlers.remove(node);
+  }
+
+  public getTypeByName(name: string): number {
+    return this.messageTypes.get(name);
+  }
+
+  public handle(type: number, data: any) {
+    if (type < 0 || type >= this.lastType) throw new Error(`Invalid type id ${type}`);
+    const handlers = this.handlers[type];
+    for (const h of handlers) h(data);
+  }
 }

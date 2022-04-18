@@ -16,7 +16,7 @@ function encryptBuffer(buffer: Uint8Array, size: number, key: number) {
 }
 
 function createStream(arr: Uint8Array) {
-  return new Stream(arr.buffer, true);
+  return new Stream(arr.buffer);
 }
 
 function crc(buff: ArrayBuffer) {

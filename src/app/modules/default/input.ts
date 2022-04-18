@@ -1,12 +1,12 @@
-import { loadBinds } from "../../app/input/keymap"
-import { messageParser } from "../../app/input/messageparser"
-import { GL } from "../../app/modules/buildartprovider"
-import { Deck, forEach } from "../../utils/collections"
-import { loadString } from "../../utils/getter"
-import { getInstances, lifecycle, Module, plugin } from "../../utils/injector"
-import { STATE } from "../apis/app"
-import { BUS, busDisconnector, MessageHandlerReflective } from "../apis/handler"
-import { Key, Mouse, PreFrame } from "../edit/messages"
+import { loadBinds } from "../../input/keymap"
+import { messageParser } from "../../input/messageparser"
+import { GL } from "../buildartprovider"
+import { Deck, forEach } from "../../../utils/collections"
+import { loadString } from "../../../utils/getter"
+import { getInstances, lifecycle, Module, plugin } from "../../../utils/injector"
+import { STATE } from "../../apis/app"
+import { BUS, busDisconnector, MessageHandlerReflective } from "../../apis/handler"
+import { Key, Mouse, PreFrame } from "../../edit/messages"
 
 const MOUSE = new Mouse(0, 0);
 

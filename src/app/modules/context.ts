@@ -33,7 +33,6 @@ import { BuildGlConstructor, BUILD_GL } from './gl/buildgl';
 import { InfoModule } from './info';
 import { SwappableViewModule } from './view/view';
 import { DefaultPortalsConstructor } from '../modules/default/portals';
-import { DefaultVecStack, VEC_STACK } from '../modules/sdf/vecstack';
 import { PROFILER, DefaultProfiler, Profiler } from '../../utils/profiler';
 
 function mapBackupService(module: Module) {
@@ -84,7 +83,6 @@ export function DefaultSetupModule(module: Module) {
   module.bind(SCHEDULER, DefaultScheduler);
   module.bind(PORTALS, DefaultPortalsConstructor);
   module.bind(PROFILER, instance(new DefaultProfiler()));
-  module.bind(VEC_STACK, DefaultVecStack);
 
   module.install(SwappableViewModule);
   module.install(JoinSectorsModule);

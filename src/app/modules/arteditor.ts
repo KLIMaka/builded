@@ -7,8 +7,9 @@ import { create, lifecycle, Module, plugin } from "../../utils/injector";
 import { iter } from "../../utils/iter";
 import { int } from "../../utils/mathutils";
 import { palRasterizer, Raster, Rasterizer, rect, resize, superResize, transform } from "../../utils/pixelprovider";
+import { listBox } from "../../utils/ui/controls/listbox";
 import { DrawPanel } from "../../utils/ui/drawpanel";
-import { menuButton, search, sliderToolbarButton } from "../../utils/ui/renderers";
+import { menuButton, sliderToolbarButton } from "../../utils/ui/renderers";
 import { addDragController, div } from "../../utils/ui/ui";
 import { intValue, numberRangeValidator } from "../../utils/value";
 import { ART } from "../apis/app";
@@ -87,7 +88,7 @@ export class ArtEditor {
         .widget(this.createShadowLevels())
         .iconButton('icon-adjust', () => { this.superSample.set(!this.superSample.get()) })
         .endGroup()
-        .widget(search('Search', 'icon-search', s => this.oracle(s), this.filter, true)))
+        .widget(listBox('Search', 'icon-search', s => this.oracle(s), this.filter, true)))
       .build();
 
     this.filter.add(() => this.updateFilter());
@@ -135,7 +136,7 @@ export class ArtEditor {
   }
 
   private createShadowLevels() {
-    return sliderToolbarButton({ label: "Shadow", handle: this.currentShadow, value: intValue(0, numberRangeValidator(0, this.shadowsteps)) });
+    return sliderToolbarButton({ label: "Shadow", handle: this.currentShadow, model: intValue(0, numberRangeValidator(0, this.shadowsteps)) });
   }
 
   private oracle(s: string) {

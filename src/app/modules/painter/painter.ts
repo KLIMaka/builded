@@ -1,19 +1,23 @@
 import h from "stage0";
-import { CallbackChannelImpl, CallbackHandlerImpl, Handle, handle, value } from "../../../utils/callbacks";
-import { filter, getOrCreate } from "../../../utils/collections";
+import { CallbackChannelImpl, CallbackHandlerImpl, CallbackSource, Handle, handle, reference, transformed, value } from "../../../utils/callbacks";
+import { getOrCreate } from "../../../utils/collections";
 import { create, lifecycle, Module, plugin } from "../../../utils/injector";
 import { Range, Vec3Interpolator } from "../../../utils/interpolator";
-import { clamp, int, len2d } from "../../../utils/mathutils";
-import { array, Raster, rasterizeRGBA8, rect, resize } from "../../../utils/pixelprovider";
-import { menuButton, NavItem1, navTree, NavTreeModel, Oracle, properties } from "../../../utils/ui/renderers";
-import { addDragController, replaceContent } from "../../../utils/ui/ui";
+import { iter } from "../../../utils/iter";
+import { clamp, int, len2d, normalize, vec42int } from "../../../utils/mathutils";
+import { array, f32array, Mapper } from "../../../utils/pixelprovider";
+import { Oracle } from "../../../utils/ui/controls/api";
+import { listBox } from "../../../utils/ui/controls/listbox";
+import { menuButton, NavItem1, navTree, NavTreeModel, properties } from "../../../utils/ui/renderers";
+import { replaceContent } from "../../../utils/ui/ui";
 import { VecStack } from "../../../utils/vecstack";
 import { Scheduler, SCHEDULER, TaskHandle } from "../../apis/app";
 import { BUS, busDisconnector } from "../../apis/handler";
 import { Ui, UI, Window } from "../../apis/ui";
 import { namedMessageHandler } from "../../edit/messages";
-import { apply, blend, box, circle, circular, displace, displacedGrid, gradient, grid, Image, mouldings, perlin, pointDistance, Postprocessor, profile, profiles, render, Renderer, repeat, sdf, select, transform, Value, voronoi } from './funcs';
-import { gridRenderer, rasterWorkplaneRenderer, Workplane } from "./workplane";
+import { Context, Image, Renderer, Value } from "./api";
+import { apply, blend, box, circle, circular, displace, displacedGrid, gradient, grid, mouldings, perlin, pointDistance, profile, profiles, render, repeat, sdf, select, transform, voronoi } from './funcs/catalog';
+import { rasterWorkplaneRenderer, renderGrid, Workplane, WorkplaneRendererBuilder } from "./workplane";
 
 export async function PainterModule(module: Module) {
   module.bind(plugin('Painter'), lifecycle(async (injector, lifecycle) => {
@@ -22,87 +26,6 @@ export async function PainterModule(module: Module) {
     lifecycle(bus.connect(namedMessageHandler('show_painter', () => editor.show())), busDisconnector(bus));
     lifecycle(editor, async e => e.stop());
   }));
-}
-
-class Model {
-  private x = 0;
-  private y = 0;
-  private points: number[] = [];
-  private dragged: number;
-
-  constructor(private stack: VecStack, private canvas: HTMLCanvasElement, private cb: () => void) {
-    canvas.addEventListener('mousemove', e => this.move(e.offsetX, e.offsetY));
-    canvas.addEventListener('mousedown', e => this.drag())
-    canvas.addEventListener('mouseup', e => this.drop())
-    this.redraw();
-  }
-
-  addPoint(pointId: number): void {
-    this.points.push(pointId);
-    this.redraw();
-  }
-
-  private findPoint(): number {
-    let minLen = Number.MAX_VALUE;
-    let closest = -1;
-    for (const p of this.points) {
-      const px = this.stack.x(p);
-      const py = this.stack.y(p);
-      const l = len2d(px - this.x, py - this.y);
-      if (l < minLen) {
-        minLen = l;
-        closest = p;
-      }
-    }
-    return minLen < 0.01 ? closest : -1;
-  }
-
-  private redraw() {
-    const ctx = this.canvas.getContext('2d');
-    const w = this.canvas.clientWidth;
-    const h = this.canvas.clientHeight;
-    ctx.clearRect(0, 0, w, h);
-
-    const point = this.findPoint();
-    ctx.fillStyle = 'rgba(0,0,0,1)';
-    ctx.strokeStyle = 'rgba(255,255,255,1)';
-    for (const p of this.points) {
-      const x = this.stack.x(p) * w;
-      const y = this.stack.y(p) * h;
-      ctx.beginPath();
-      ctx.rect(x - 5, y - 5, 10, 10);
-      ctx.closePath();
-      if (p == point) ctx.fill();
-      else ctx.stroke();
-    }
-  }
-
-  public drag() {
-    const closest = this.findPoint();
-    if (closest == -1) return;
-    this.dragged = closest;
-  }
-
-  public drop() {
-    this.dragged = -1;
-  }
-
-  public move(x: number, y: number) {
-    const w = this.canvas.clientWidth;
-    const h = this.canvas.clientHeight;
-    this.x = x / w;
-    this.y = y / h;
-
-    if (this.dragged != -1) {
-      const nx = Math.round(this.x / 0.1) * 0.1;
-      const ny = Math.round(this.y / 0.1) * 0.1;
-      this.stack
-        .setx(this.dragged, nx)
-        .sety(this.dragged, ny);
-      this.cb();
-    }
-    this.redraw();
-  }
 }
 
 class Model1Item implements NavItem1 {
@@ -137,56 +60,52 @@ class ShapesModel implements NavTreeModel {
   }
 }
 
-const NORMAL = (stack: VecStack, res: number) => {
-  const r = 255 * clamp(stack.x(res), 0, 1);
-  const g = 255 * clamp(stack.y(res), 0, 1);
-  const b = 255 * clamp(stack.z(res), 0, 1);
-  return r | (g << 8) | (b << 16) | (255 << 24);
-}
-
-const GRAY_R = (stack: VecStack, res: number) => {
-  const r = 255 * clamp(stack.x(res), 0, 1);
-  return r | (r << 8) | (r << 16) | (255 << 24);
-}
 
 const GREEN_RED = new Range([0, 255, 0], [255, 0, 0], Vec3Interpolator);
-const PLUS_MINUS_ONE_R = (stack: VecStack, res: number) => {
-  const i = (stack.x(res) + 1) * 0.5;
-  const [r, g, b] = GREEN_RED.get(i);
-  return r | (g << 8) | (b << 16) | (255 << 24);
-}
-
-const VECTOR = (stack: VecStack, res: number) => {
-  const r = 255 * (stack.x(res) + 1) * 0.5;
-  const g = 255 * (stack.y(res) + 1) * 0.5;
-  const b = 255 * (stack.z(res) + 1) * 0.5;
-  return r | (g << 8) | (b << 16) | (255 << 24);
-}
-
+type Limiter = (r: number, g: number, b: number, a: number) => number;
 
 class Image2dRenderer extends CallbackChannelImpl<[]> {
   private scheduleHandle: TaskHandle;
   private position: number;
   private handler: Handle;
+  public mins = [0, 0, 0, 0];
+  public maxs = [0, 0, 0, 0];
 
-  constructor(private scheduler: Scheduler, private stack: VecStack, private buff: Uint32Array, private size: number, private pp: Value<Postprocessor>) {
+  constructor(private scheduler: Scheduler, private stack: VecStack, private buff: Float32Array, private size: number) {
     super();
     this.position = this.stack.pushGlobal(0, 0, 0, 0);
   }
 
   public set(renderer: Value<Renderer>) {
     if (this.handler != null) this.handler.stop();
-    this.handler = handle(null, (p, renderer, pp) => this.scheduleRedraw(renderer, pp), renderer, this.pp);
+    this.handler = handle(null, (p, renderer) => this.scheduleRedraw(renderer), renderer);
   }
 
-  private scheduleRedraw(renderer: Renderer, pp: Postprocessor) {
+  private scheduleRedraw(renderer: Renderer) {
     if (this.scheduleHandle != null) this.scheduleHandle.stop();
-    this.scheduleHandle = this.scheduler.addTask(this.redraw(renderer, pp));
+    this.scheduleHandle = this.scheduler.addTask(this.redraw(renderer));
   }
 
-  private * redraw(renderer: Renderer, pp: Postprocessor) {
-    let time = 0;
+  private updateStats(r: number, g: number, b: number, a: number) {
+    this.maxs[0] = Math.max(this.maxs[0], r);
+    this.maxs[1] = Math.max(this.maxs[1], g);
+    this.maxs[2] = Math.max(this.maxs[2], b);
+    this.maxs[3] = Math.max(this.maxs[3], a);
+    this.mins[0] = Math.min(this.mins[0], r);
+    this.mins[1] = Math.min(this.mins[1], g);
+    this.mins[2] = Math.min(this.mins[2], b);
+    this.mins[3] = Math.min(this.mins[3], a);
+  }
+
+  private resetStats() {
+    this.mins = [0, 0, 0, 0];
+    this.maxs = [0, 0, 0, 0];
+  }
+
+  private * redraw(renderer: Renderer) {
     let t = window.performance.now();
+    const start = t;
+    this.resetStats();
     const size = this.size;
     const ds = 0.5 / size;
     const max = size * size;
@@ -197,54 +116,71 @@ class Image2dRenderer extends CallbackChannelImpl<[]> {
       this.stack.begin();
       this.stack.set(this.position, x / size + ds, y / size + ds, 0, 0);
       const res = this.stack.call(renderer, this.position);
-      this.buff[off] = pp(this.stack, res);
+      const r = this.stack.x(res);
+      const g = this.stack.y(res);
+      const b = this.stack.z(res);
+      const a = this.stack.w(res);
       this.stack.end();
+      this.updateStats(r, g, b, a);
+
+      const ptr = off * 4;
+      this.buff[ptr] = r;
+      this.buff[ptr + 1] = g;
+      this.buff[ptr + 2] = b;
+      this.buff[ptr + 3] = a;
 
       if (i % 512 == 0) {
         const dt = window.performance.now() - t;
         if (dt > 100) {
           t = window.performance.now();
-          time += dt;
           this.notify();
           yield;
         }
       }
     }
     this.notify();
-    console.log(time);
+    console.log(window.performance.now() - start);
   }
 }
 
 
-class Painter {
+
+class Painter implements Context {
   private window: Window;
   private sidebarRight: HTMLElement;
   private sidebarLeft: HTMLElement;
-  private model: Model;
 
-
-  private buffer: Uint32Array;
+  private buffer: Float32Array;
   private bufferSize = 512;
-  private data: Uint8ClampedArray;
-  private id: ImageData;
   private workplane: Workplane;
   private renderer: Image2dRenderer;
-  private stack = new VecStack(1024);
+  private _stack = new VecStack(1024);
+
+  private readonly NORMAL = this.createNormal();
+  private readonly GRAY_R = this.createGrayR();
+  private readonly PLUS_MINUS_ONE_R = this.createPlusMinusOneR();
+  private readonly VECTOR = this.createVector();
 
   private images: Image[] = [];
   private imagesModel = new ShapesModel();
   private imageMap = new Map<string, Image>();
-  private postprocessors = new Map<Image, Postprocessor>();
+  private limiters = new Map<Image, Limiter>();
   private currentImage = value(<Image>null);
+  private _currentImageName = '';
   private settingsHandle = new CallbackHandlerImpl(() => replaceContent(this.sidebarRight, properties(this.currentImage.get().settings.get())));
-  private postrocessor = value(NORMAL);
+  private limiter = value(this.GRAY_R);
+  private mapper: Mapper = (r, g, b, a) => this.limiter.get()(r, g, b, a);
+  private shapesLib = this.initShapes();
+
+  private gridSizeName = value("128");
+  private gridSize = transformed(this.gridSizeName, Number.parseInt);
 
   constructor(private ui: Ui, scheduler: Scheduler) {
     this.recreateBuffer();
-    this.renderer = new Image2dRenderer(scheduler, this.stack, this.buffer, this.bufferSize, this.postrocessor);
+    this.renderer = new Image2dRenderer(scheduler, this._stack, this.buffer, this.bufferSize);
     this.renderer.add(() => this.redraw());
     this.currentImage.add(() => this.renderer.set(this.currentImage.get().renderer))
-    this.postrocessor.add(() => this.postprocessors.set(this.currentImage.get(), this.postrocessor.get()));
+    this.limiter.add(() => { this.limiters.set(this.currentImage.get(), this.limiter.get()); this.workplane.redraw() });
 
     const view = this.createView();
     this.window = ui.builder.window()
@@ -257,80 +193,122 @@ class Painter {
       .toolbar(ui.builder.toolbar()
         .startGroup()
         .widget(this.createPPMenu())
-        .widget(this.createAddMenu())
+        .widget(this.createPopup())
         .iconButton('icon-resize-small', () => this.workplane.update(64, 64, 1))
-        .endGroup())
+        .endGroup()
+        .widget(this.createGridSizeControl()))
       .build();
-  }
-
-  private imageProvider(): (name: string) => Image {
-    return s => this.imageMap.get(s);
-  }
-
-  private shapeOracle(): Oracle<string> {
-    return s => filter(this.imageMap.keys(), k => s.startsWith(s));
   }
 
   private createPPMenu() {
     const menu = this.ui.builder.menu();
-    menu.item('Normal', () => this.postrocessor.set(NORMAL));
-    menu.item('Gray R', () => this.postrocessor.set(GRAY_R));
-    menu.item('+/-1 R', () => this.postrocessor.set(PLUS_MINUS_ONE_R));
-    menu.item('Vector', () => this.postrocessor.set(VECTOR));
+    menu.item('Normal', () => this.limiter.set(this.NORMAL));
+    menu.item('Gray R', () => this.limiter.set(this.GRAY_R));
+    menu.item('+/-1 R', () => this.limiter.set(this.PLUS_MINUS_ONE_R));
+    menu.item('Vector', () => this.limiter.set(this.VECTOR));
     return menuButton('icon-adjust', menu);
   }
 
-  private createAddMenu() {
+  private initShapes(): Map<string, () => void> {
+    const map = new Map<string, () => void>();
     let counter = 0;
+    map.set('Profiles', () => this.addImage(`Profiles ${counter++}`, profiles(this)));
+    map.set('Point', () => this.addImage(`Point ${counter++}`, pointDistance(this)));
+    map.set('SDF', () => this.addImage(`SDF ${counter++}`, sdf(this)));
+    map.set('Profile', () => this.addImage(`Profile ${counter++}`, profile(this)));
+    map.set('Circle', () => this.addImage(`Circle ${counter++}`, circle(this)));
+    map.set('Box', () => this.addImage(`Box ${counter++}`, box(this)));
+    map.set('Perlin', () => this.addImage(`Perlin ${counter++}`, perlin(this)));
+    map.set('Select', () => this.addImage(`Select ${counter++}`, select(this)));
+    map.set('Displace', () => this.addImage(`Displace ${counter++}`, displace(this)));
+    map.set('Repeat', () => this.addImage(`Repeat ${counter++}`, repeat(this)));
+    map.set('Circular', () => this.addImage(`Circular ${counter++}`, circular(this)));
+    map.set('Transform', () => this.addImage(`Transform ${counter++}`, transform(this)));
+    map.set('Grid', () => this.addImage(`Grid ${counter++}`, grid(this)));
+    map.set('Displaced', () => this.addImage(`Displaced ${counter++}`, displacedGrid(this)));
+    map.set('Apply', () => this.addImage(`Apply ${counter++}`, apply(this)));
+    map.set('Gradient', () => this.addImage(`Gradient ${counter++}`, gradient(this)));
+    map.set('Blend', () => this.addImage(`Blend ${counter++}`, blend(this)));
+    map.set('Renderer', () => this.addImage(`Renderer ${counter++}`, render(this)));
+    map.set('Voronoi', () => this.addImage(`Voronoi ${counter++}`, voronoi(this)));
+    map.set('Mouldings', () => this.addImage(`Mouldings ${counter++}`, mouldings(this)));
+    return map;
+  }
+
+  private createAddMenu() {
     const menu = this.ui.builder.menu();
-    menu.item('Profiles', () => this.addImage(`Profiles ${counter++}`, profiles()));
-    menu.item('Point', () => this.addImage(`Point ${counter++}`, pointDistance()));
-    menu.item('SDF', () => this.addImage(`SDF ${counter++}`, sdf(this.imageProvider(), this.shapeOracle())));
-    menu.item('Profile', () => this.addImage(`Profile ${counter++}`, profile(this.imageProvider(), this.shapeOracle())));
-    menu.item('Circle', () => this.addImage(`Circle ${counter++}`, circle()));
-    menu.item('Box', () => this.addImage(`Box ${counter++}`, box(this.imageProvider(), this.shapeOracle())));
-    menu.item('Perlin', () => this.addImage(`Perlin ${counter++}`, perlin()));
-    menu.item('Select', () => this.addImage(`Select ${counter++}`, select(this.imageProvider(), this.shapeOracle())));
-    menu.item('Displace', () => this.addImage(`Displace ${counter++}`, displace(this.imageProvider(), this.shapeOracle())));
-    menu.item('Repeat', () => this.addImage(`Repeat ${counter++}`, repeat(this.imageProvider(), this.shapeOracle())));
-    menu.item('Circular', () => this.addImage(`Circular ${counter++}`, circular(this.imageProvider(), this.shapeOracle())));
-    menu.item('Transform', () => this.addImage(`Transform ${counter++}`, transform(this.imageProvider(), this.shapeOracle())));
-    menu.item('Grid', () => this.addImage(`Grid ${counter++}`, grid(this.stack)));
-    menu.item('Displaced', () => this.addImage(`Displaced ${counter++}`, displacedGrid(this.stack, this.imageProvider(), this.shapeOracle())));
-    menu.item('Apply', () => this.addImage(`Apply ${counter++}`, apply(this.stack, this.imageProvider(), this.shapeOracle())));
-    menu.item('Gradient', () => this.addImage(`Gradient ${counter++}`, gradient(this.imageProvider(), this.shapeOracle())));
-    menu.item('Blend', () => this.addImage(`Blend ${counter++}`, blend(this.imageProvider(), this.shapeOracle())));
-    menu.item('Renderer', () => this.addImage(`Renderer ${counter++}`, render(this.stack, this.imageProvider(), this.shapeOracle())));
-    menu.item('Voronoi', () => this.addImage(`Voronoi ${counter++}`, voronoi(this.stack, this.imageProvider(), this.shapeOracle())));
-    menu.item('Mouldings', () => this.addImage(`Mouldings ${counter++}`, mouldings()));
+    for (const [name, action] of this.shapesLib) menu.item(name, action);
     return menuButton('icon-plus', menu);
   }
 
   private recreateBuffer() {
-    this.buffer = new Uint32Array(this.bufferSize * this.bufferSize);
-    this.data = new Uint8ClampedArray(640 * 640 * 4);
-    this.id = new ImageData(this.data, 640, 640);
+    this.buffer = new Float32Array(this.bufferSize * this.bufferSize * 4);
   }
 
   private addImage(name: string, img: Image) {
     const id = this.images.length;
     this.images.push(img);
     const item = this.imagesModel.add(name);
-    item.setSelect(s => { if (s) this.selectImage(id) })
+    item.setSelect(s => { if (s) this.selectImage(id, name) });
     this.imageMap.set(name, img);
+    this.imagesModel.select(item);
   }
 
-  private selectImage(id: number) {
+  private selectImage(id: number, name: string) {
     const img = this.images[id];
     if (img == undefined) return;
+    this._currentImageName = name;
     this.currentImage.set(img);
-    this.postrocessor.set(getOrCreate(this.postprocessors, img, _ => NORMAL))
+    this.limiter.set(getOrCreate(this.limiters, img, _ => this.GRAY_R))
     this.settingsHandle.connect(img.settings);
     replaceContent(this.sidebarRight, properties(img.settings.get()));
   }
 
+  private createPopup() {
+    const oracle = (s: string) => iter(this.shapesLib.keys()).filter(i => i.toLowerCase().startsWith(s.toLowerCase()));
+    const name = value('');
+    const handle = transformed(name, v => this.shapesLib.get(v));
+    handle.add(() => { const a = handle.get(); if (a) { a(); name.set("") } });
+    return listBox("Shape", "icon-plus", oracle, name, true);
+  }
+
   private redraw() {
     this.workplane.redraw();
+  }
+
+  private createNormal(): Limiter {
+    return (r, g, b, a) => {
+      return vec42int(
+        normalize(r, this.renderer.mins[0], this.renderer.maxs[0]) * 255,
+        normalize(g, this.renderer.mins[1], this.renderer.maxs[1]) * 255,
+        normalize(b, this.renderer.mins[2], this.renderer.maxs[2]) * 255,
+        255);
+    };
+  }
+
+  private createGrayR(): Limiter {
+    return (r, g, b, a) => {
+      const v = normalize(r, this.renderer.mins[0], this.renderer.maxs[0]) * 255;
+      return vec42int(v, v, v, 255);
+    };
+  }
+
+  private createPlusMinusOneR(): Limiter {
+    return (r, g, b, a) => {
+      const v = normalize(r, -1, 1);
+      const [r_, g_, b_] = GREEN_RED.get(v);
+      return vec42int(r_, g_, b_, 255);
+    };
+  }
+
+  private createVector(): Limiter {
+    return (r, g, b, a) => {
+      return vec42int(
+        normalize(r, -1, 1) * 255,
+        normalize(g, -1, 1) * 255,
+        normalize(b, -1, 1) * 255,
+        255);
+    };
   }
 
   private createView(): HTMLElement {
@@ -345,14 +323,40 @@ class Painter {
     this.sidebarLeft = sidebarleft;
     this.sidebarRight = sidebarright;
     this.workplane = new Workplane(640, 640, [
-      rasterWorkplaneRenderer(array(this.buffer, this.bufferSize, this.bufferSize)),
-      gridRenderer()
+      rasterWorkplaneRenderer(f32array(this.buffer, this.bufferSize, this.bufferSize, this.mapper)),
+      this.createGridRenderer()
     ]);
     this.workplane.update(64, 64, 1);
     holder.appendChild(this.workplane.getWidget());
 
     navTree(sidebarleft, this.imagesModel);
     return widget;
+  }
+
+  private createGridRenderer(): WorkplaneRendererBuilder {
+    return (canvas, ctx) => {
+      const renderer = () => renderGrid(canvas, ctx, this.gridSize.get());
+      this.gridSize.add(() => renderer());
+      return renderer;
+    }
+  }
+
+  private createGridSizeControl() {
+    const sizes = ["0", "64", "128", "170", "256"];
+    const oracle = (s: string) => sizes;
+    return listBox("", "icon-plus", oracle, this.gridSizeName);
+  }
+
+
+  public stack(): VecStack { return this._stack }
+  public currentImageName(): string { return this._currentImageName }
+  public imageProvider(): (name: string) => Image { return s => this.imageMap.get(s) }
+
+  public oracle(img: Image): Oracle<string> {
+    return s =>
+      iter(this.imageMap.entries())
+        .filter(ent => ent[0].startsWith(s) && !ent[1].dependsOn(img))
+        .map(e => e[0])
   }
 
   public stop() { this.window.destroy() }

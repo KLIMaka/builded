@@ -39,13 +39,13 @@ export class RffFile {
   private namesTable: { [index: string]: number } = {};
 
   constructor(buf: ArrayBuffer) {
-    this.data = new Stream(buf, true);
+    this.data = new Stream(buf);
     this.header = headerStruct.read(this.data);
     this.data.setOffset(this.header.offFat);
     const len = this.header.numFiles * 48;
     const fat = atomic_array(ubyte, len).read(this.data);
     this.decodeFat(fat);
-    const fatBuffer = new Stream(fat.buffer, true);
+    const fatBuffer = new Stream(fat.buffer);
     fatBuffer.setOffset(fat.byteOffset);
     this.loadFat(fatBuffer, this.header.numFiles);
   }

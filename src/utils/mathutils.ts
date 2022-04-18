@@ -42,6 +42,11 @@ export function mix(x: number, y: number, d: number) {
   return x + (y - x) * d;
 }
 
+export function normalize(x: number, min: number, max: number): number {
+  const d = max - min;
+  return (x - min) / d;
+}
+
 export function trz(x: number) {
   x = int(x);
   if (x == 0) return 32;
@@ -141,6 +146,10 @@ export function int2vec4(int: number) {
 
 export function int2vec4norm(int: number) {
   return [(int & 0xff) / 256, ((int >>> 8) & 0xff) / 256, ((int >>> 16) & 0xff) / 256, ((int >>> 24) & 0xff) / 256];
+}
+
+export function vec42int(x: number, y: number, z: number, w: number) {
+  return x | (y << 8) | (z << 16) | (w << 24);
 }
 
 export function tuple(v0: number, v1: number) {

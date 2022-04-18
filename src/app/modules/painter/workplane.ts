@@ -1,7 +1,6 @@
 import h from "stage0";
 import { int } from "../../../utils/mathutils";
 import { Raster, rasterizeRGBA8, rect, resize } from "../../../utils/pixelprovider";
-import { addDragController } from "../../../utils/ui/ui";
 
 function createImageDataCache() {
   let id: ImageData = null;
@@ -20,99 +19,151 @@ function createImageDataCache() {
   }
 }
 
-export type WorkplaneContext = { xoff: number, yoff: number, scale: number };
-// export type WorkplaneHandler = (canvas: HTMLCanvasElement, ctx: WorkplaneContext, x:number, y:number);
-export type WorkplaneRenderer = (canvas: HTMLCanvasElement, ctx: WorkplaneContext) => void;
+export type WorkplaneContext = {
+  xoff: number,
+  yoff: number,
+  scale: number,
+  addMouseHandler: (handler: MouseEventHandler) => void;
+  addKeyboardHandler: (handler: KeyboardEventHandler) => void;
+};
 
-export function rasterWorkplaneRenderer(raster: Raster<number>): WorkplaneRenderer {
-  const cache = createImageDataCache();
+export type Renderer = () => void;
+export type WorkplaneRendererBuilder = (canvas: HTMLCanvasElement, ctx: WorkplaneContext) => Renderer;
+
+export function rasterWorkplaneRenderer(raster: Raster<number>): WorkplaneRendererBuilder {
   return (canvas, wctx) => {
-    const ctx = canvas.getContext('2d');
-    const scaled = resize(raster, raster.width * wctx.scale, raster.height * wctx.scale);
-    const framed = rect(scaled, -wctx.xoff, -wctx.yoff, canvas.height - wctx.xoff, canvas.height - wctx.yoff, 0);
-    const id = cache(canvas.width, canvas.height);
-    rasterizeRGBA8(framed, id.data.buffer);
-    ctx.putImageData(id, 0, 0);
+    const cache = createImageDataCache();
+    return () => {
+      const ctx = canvas.getContext('2d');
+      const scaled = resize(raster, raster.width * wctx.scale, raster.height * wctx.scale);
+      const framed = rect(scaled, -wctx.xoff, -wctx.yoff, canvas.height - wctx.xoff, canvas.height - wctx.yoff, 0);
+      const id = cache(canvas.width, canvas.height);
+      rasterizeRGBA8(framed, id.data.buffer);
+      ctx.putImageData(id, 0, 0);
+    }
   }
 }
 
-function drawGrid(ctx: CanvasRenderingContext2D, w: number, h: number, xoff: number, yoff: number, scale: number, gridoff: number) {
-  const off = 0.5 * scale;
-  const dg = 128 * scale;
+function drawGrid(ctx: CanvasRenderingContext2D, size: number, w: number, h: number, xoff: number, yoff: number, scale: number, goff: number) {
+  const dg = size * scale;
 
   ctx.beginPath();
-  const xcount = 2 + int(w / scale / 128);
+  const xcount = 2 + int(w / scale / size);
   const startx = xoff + Math.floor(-xoff / dg) * dg;
   for (let i = 0; i < xcount; i++) {
-    const x = startx + i * dg + off;
-    ctx.moveTo(x, 0.5 - gridoff);
-    ctx.lineTo(x, gridoff + h + 0.5);
+    const x = startx + i * dg;
+    ctx.moveTo(x, 0.5 - goff);
+    ctx.lineTo(x, goff + h + 0.5);
   }
 
-  const ycount = 2 + int(h / scale / 128);
+  const ycount = 2 + int(h / scale / size);
   const starty = yoff + Math.floor(-yoff / dg) * dg;
   for (let i = 0; i < ycount; i++) {
-    const y = starty + i * dg + off;
-    ctx.moveTo(0.5 - gridoff, y);
-    ctx.lineTo(gridoff + w + 0.5, y);
+    const y = starty + i * dg;
+    ctx.moveTo(0.5 - goff, y);
+    ctx.lineTo(goff + w + 0.5, y);
   }
   ctx.closePath();
   ctx.stroke();
 }
 
-export function gridRenderer(): WorkplaneRenderer {
-  return (canvas, wctx) => {
-    const ctx = canvas.getContext('2d');
-    const w = canvas.width;
-    const h = canvas.height;
-    ctx.setLineDash([3, 3]);
-    ctx.clearRect(0, 0, w, h);
+export function renderGrid(canvas: HTMLCanvasElement, wctx: WorkplaneContext, size: number) {
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.setLineDash([3, 3]);
+  ctx.clearRect(0, 0, w, h);
+  ctx.lineWidth = 0.9;
+  if (size == 0) return;
 
-    ctx.strokeStyle = 'white';
-    drawGrid(ctx, w, h, wctx.xoff, wctx.yoff, wctx.scale, 0);
-    ctx.strokeStyle = 'black';
-    drawGrid(ctx, w, h, wctx.xoff, wctx.yoff, wctx.scale, 3);
-  }
+  ctx.strokeStyle = 'white';
+  drawGrid(ctx, size, w, h, wctx.xoff, wctx.yoff, wctx.scale, 0);
+  ctx.strokeStyle = 'black';
+  drawGrid(ctx, size, w, h, wctx.xoff, wctx.yoff, wctx.scale, 3);
 }
 
 const CANVAS_HOLDER_TEMPLATE = h`<div style="position: relative;"></div>`;
 const CANVAS_TEMPLATE = h` <canvas style="position: absolute; left: 0; top: 0"></canvas>`;
 
-type Plane = { canvas: HTMLCanvasElement, renderer: WorkplaneRenderer };
+type MouseEventHandler = (x: number, y: number, buttons: number, wheel: number) => void;
+type KeyboardEventHandler = (key: string, down: boolean) => void;
 
 export class Workplane implements WorkplaneContext {
   scale = 1;
   xoff = 0;
   yoff = 0;
 
-  private planes: Plane[] = [];
+  private renderers: Renderer[] = [];
   private holder: HTMLElement;
   private controller: HTMLCanvasElement;
+  private mouseHandlers: MouseEventHandler[] = [];
+  private keyboardHandlers: KeyboardEventHandler[] = [];
 
   constructor(
     private w: number,
     private h: number,
-    renderers: WorkplaneRenderer[]
+    builders: WorkplaneRendererBuilder[]
   ) {
     this.holder = <HTMLElement>CANVAS_HOLDER_TEMPLATE.cloneNode(true);
     this.controller = this.createCanvas(h, w);
     this.holder.appendChild(this.controller);
-    for (const renderer of renderers) {
+    for (const builder of builders) {
       const canvas = this.createCanvas(h, w)
       this.controller.before(canvas);
-      this.planes.push({ canvas, renderer })
+      this.renderers.push(builder(canvas, this));
     }
-
-    addDragController(this.controller, (posx, posy, dx, dy, dscale) => {
-      const cx = -posx;
-      const cy = -posy;
-      const ds = this.scale - this.scale * dscale;
-      this.xoff += dx - cx * ds;
-      this.yoff += dy - cy * ds;
-      this.scale *= dscale;
-      this.redraw();
-    });
+    this.controller.addEventListener('wheel', e => this.mouseHandle(e.x, e.y, e.buttons, e.deltaY));
+    this.controller.addEventListener('mousemove', e => this.mouseHandle(e.x, e.y, e.buttons, 0));
+    this.controller.addEventListener('mousedown', e => this.mouseHandle(e.x, e.y, e.buttons, 0));
+    this.controller.addEventListener('mouseup', e => this.mouseHandle(e.x, e.y, e.buttons, 0));
+    this.controller.addEventListener('keydown', e => this.keyboardHandle(e.key, true));
+    this.controller.addEventListener('keyup', e => this.keyboardHandle(e.key, false));
+    this.addDragController();
     this.redraw();
+  }
+
+  private mouseHandle(x: number, y: number, buttons: number, wheel: number) {
+    for (const h of this.mouseHandlers) h(x, y, buttons, wheel);
+  }
+
+  private keyboardHandle(key: string, down: boolean) {
+    for (const h of this.keyboardHandlers) h(key, down);
+  }
+
+  public addMouseHandler(handler: MouseEventHandler) {
+    this.mouseHandlers.push(handler);
+  }
+
+  public addKeyboardHandler(handler: KeyboardEventHandler) {
+    this.keyboardHandlers.push(handler);
+  }
+
+  private addDragController() {
+    let isDrag = false;
+    let oldx = 0;
+    let oldy = 0;
+
+    this.addMouseHandler((x, y, buttons, wheel) => {
+      let needToRedraw = false;
+      if (wheel > 0) { this.scale *= 1 / 1.1; needToRedraw = true; }
+      if (wheel < 0) { this.scale *= 1.1; needToRedraw = true; }
+      isDrag = buttons == 1;
+      if (isDrag) {
+        const dx = x - oldx;
+        const dy = y - oldy;
+        if (dx != 0 || dy != 0) {
+          this.xoff += dx;
+          this.yoff += dy;
+          needToRedraw = true;
+        }
+      }
+      oldx = x;
+      oldy = y;
+      if (needToRedraw) this.redraw();
+    });
+    this.addKeyboardHandler((key, down) => {
+      console.log(key, down);
+    });
   }
 
   private createCanvas(h: number, w: number) {
@@ -123,7 +174,7 @@ export class Workplane implements WorkplaneContext {
   }
 
   public redraw() {
-    for (const p of this.planes) p.renderer(p.canvas, this);
+    for (const r of this.renderers) r();
   }
 
   public getWidget(): HTMLElement {

@@ -1,11 +1,11 @@
+import h from "stage0";
 import tippy, { Props } from "tippy.js";
 import { MenuBuilder } from "../../app/apis/ui";
 import { iter } from "../iter";
-import { div, Element, Properties, replaceContent, span, Table, tag } from "./ui";
-import h from "stage0";
-import { map, take } from "../collections";
-import { CallbackChannel, CallbackChannelImpl, CallbackHandle, Destenation, Source } from "../callbacks";
-import { BasicValue } from "../value";
+import { Handle, Oracle } from "./controls/api";
+import { listBox } from "./controls/listbox";
+import { FLOAT_MODEL, numberBox, NumberModel } from "./controls/numberbox";
+import { Element, replaceContent, span, Table, tag } from "./ui";
 
 export type ColumnRenderer<T> = (value: T) => Element;
 
@@ -77,107 +77,16 @@ export function widgetButton(icon: string, widget: HTMLElement): HTMLElement {
   return btn;
 }
 
-interface SuggestionModel {
-  readonly widget: HTMLElement,
-  shift(d: number): void;
-  select(): void;
-}
-
-const suggestTemplate = h`
-<button class="btn btn-default btn-mini dropdown-list" #button>
-  <span class="icon hidden" #icon></span>
-  <input type="text" class="toolbar-control" #input>
-</button>
-`;
-
-export type Oracle<T> = (s: string) => Iterable<T>;
-export type Handle<T> = Source<T> & Destenation<T> & CallbackChannel<[]>;
-
-export function search(hint: string, ico: string, oracle: Oracle<string>, handle: Handle<string>, trackInput = false): HTMLElement {
-  const root = suggestTemplate.cloneNode(true);
-  const { button, input, icon } = suggestTemplate.collect(root);
-  if (ico != null) {
-    icon.classList.remove('hidden');
-    icon.classList.add(ico);
-  }
-  if (!trackInput) button.classList.add('btn-dropdown');
-  const suggestContainer = div('suggest').elem();
-  let suggestModel: SuggestionModel = null;
-  const suggestions = menu(input, suggestContainer);
-  suggestions.setProps({ onHide: () => { input.value = handle.get() } })
-  handle.add(() => { input.value = handle.get(); suggestions.hide(); });
-  const update = (items: Iterable<string>) => {
-    suggestModel = sugggestionsMenu(map(items, (i: string) => <[string, () => void]>[i, () => handle.set(i)]));
-    replaceContent(suggestContainer, suggestModel.widget);
-    suggestions.show();
-  }
-  input.oninput = () => { if (trackInput) handle.set(input.value); update(oracle(input.value)); }
-  input.placeholder = hint;
-  input.value = handle.get();
-  input.addEventListener('keydown', (e: KeyboardEvent) => {
-    if (e.key == 'ArrowDown') suggestModel.shift(1)
-    else if (e.key == 'ArrowUp') suggestModel.shift(-1)
-    else if (e.key == 'Enter') suggestModel.select()
-    else if (e.key == 'Escape') suggestions.hide()
-  });
-  button.onclick = () => update(oracle(''));
-  return button;
-}
-
-const EMPTY_SUGGESTIONS: SuggestionModel = {
-  widget: div('hidden').elem(),
-  shift: (d: number) => { },
-  select: () => { }
-}
-
-function sugggestionsMenu(items: Iterable<[string, () => void]>): SuggestionModel {
-  const menu = div('menu menu-default');
-  let selected = 0;
-  const options: [Element, () => void][] = [];
-  for (const [label, click] of items) {
-    const item = div('menu-item').text(label).click(() => click());
-    options.push([item, click]);
-    menu.append(item);
-  }
-  if (options.length == 0) return EMPTY_SUGGESTIONS;
-  const select = (newSelected: number) => {
-    options[selected][0].elem().classList.remove('selected');
-    options[newSelected][0].elem().classList.add('selected');
-    selected = newSelected;
-  }
-  // select(0);
-  return {
-    widget: menu.elem(),
-    shift(d: number) { select(Math.min(Math.max(0, selected + d), options.length - 1)) },
-    select() { options[selected][1]() }
-  }
-}
-
-function menu(input: HTMLElement, suggestContainer: HTMLElement) {
-  return tippy(input, {
-    allowHTML: true,
-    placement: 'bottom-start',
-    interactive: true,
-    content: suggestContainer,
-    trigger: 'focus',
-    arrow: false,
-    offset: [0, 0],
-    appendTo: document.body
-  });
-}
 
 
 export type SliderModel = {
   label: string,
-  value: BasicValue<number>,
+  model: NumberModel,
   handle: Handle<number>,
 }
 
-function setter<T>(handle: Handle<T>, value: BasicValue<T>) {
-  return (v: T) => {
-    if (!value.validator(v)) return;
-    handle.set(v);
-  }
+function setter<T>(handle: Handle<T>, validator: (v: T) => boolean) {
+  return (v: T) => { if (validator(v)) handle.set(v) }
 }
 
 function wheelAction(handle: Handle<number>, set: (x: number) => void) {
@@ -186,26 +95,6 @@ function wheelAction(handle: Handle<number>, set: (x: number) => void) {
     if (e.deltaY < 0) { set(handle.get() + scale); e.preventDefault() }
     if (e.deltaY > 0) { set(handle.get() - scale); e.preventDefault() }
   }
-}
-
-function arrowAction(handle: Handle<number>, set: (x: number) => void) {
-  return (e: KeyboardEvent) => {
-    const scale = e.altKey ? 0.1 : e.shiftKey ? 10 : 1;
-    if (e.code == 'ArrowUp') { set(handle.get() + scale); e.preventDefault() }
-    if (e.code == 'ArrowDown') { set(handle.get() - scale); e.preventDefault() }
-  }
-}
-
-export function numberBox(handle: Handle<number>, value: BasicValue<number>): HTMLElement {
-  const boxTemplate = h`<div class="popup-widget"><input type="text" value="${handle.get()}" class="input-widget" #box></div>`;
-  const widget = <HTMLElement>boxTemplate.cloneNode(true);
-  const { box } = boxTemplate.collect(widget);
-  handle.add(() => box.value = value.formatter(handle.get()));
-  const set = setter(handle, value);
-  box.oninput = () => { if (value.parseValidator(box.value)) set(value.parser(box.value)) }
-  box.onkeydown = arrowAction(handle, set);
-  box.onwheel = wheelAction(handle, set);
-  return widget;
 }
 
 const widgetPopup = (widget: HTMLElement, opts = {}): Partial<Props> => {
@@ -224,13 +113,13 @@ const widgetPopup = (widget: HTMLElement, opts = {}): Partial<Props> => {
 }
 
 export function sliderToolbarButton(model: SliderModel) {
-  const printLabel = () => `${model.label} ${model.value.formatter(model.handle.get())}`;
+  const printLabel = () => `${model.label} ${model.model.formatter(model.handle.get())}`;
   const buttonTemplate = h`<button class="btn btn-default btn-dropdown">${printLabel()}</button>`;
-  const widget = numberBox(model.handle, model.value);
+  const widget = numberBox(model.handle, model.model);
   const btn = <HTMLElement>buttonTemplate.cloneNode(true);
   const inst = tippy(btn, widgetPopup(widget));
   model.handle.add(() => btn.textContent = printLabel());
-  btn.onwheel = wheelAction(model.handle, setter(model.handle, model.value));
+  btn.onwheel = wheelAction(model.handle, setter(model.handle, model.model.validator));
   return btn;
 }
 
@@ -273,16 +162,12 @@ export type Property = {
   widget: HTMLElement
 }
 
-export function rangeWidget(handle: Handle<number>, value: BasicValue<number>): HTMLElement {
-  return sliderToolbarButton({ handle, label: "", value });
-}
-
 function listWidget(oracle: Oracle<string>, handle: Handle<string>): HTMLElement {
-  return search('', null, oracle, handle);
+  return listBox('', null, oracle, handle);
 }
 
-export function rangeProp(label: string, handle: Handle<number>, value: BasicValue<number>): Property {
-  return widgetProp(label, rangeWidget(handle, value));
+export function rangeProp(label: string, handle: Handle<number>, model: NumberModel = FLOAT_MODEL): Property {
+  return widgetProp(label, numberBox(handle, model));
 }
 
 export function listProp(label: string, oracle: Oracle<string>, handle: Handle<string>): Property {

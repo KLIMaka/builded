@@ -27,9 +27,9 @@ export class SectorEnt extends MessageHandlerReflective {
   ) { super() }
 
   public StartMove(msg: StartMove) {
-    let [x, y] = this.ctx.view.target().coords;
-    // let sec = ctx.board.sectors[this.sectorId];
-    // let slope = createSlopeCalculator(sec, ctx.board.walls);
+    const [x, y] = this.ctx.view.target().coords;
+    // const sec = ctx.board.sectors[this.sectorId];
+    // const slope = createSlopeCalculator(sec, ctx.board.walls);
     // this.originz = slope(x, y, this.type == HitType.CEILING ? sec.ceilingheinum : sec.floorheinum) + sectorZ(ctx.board, this.sectorId, this.type)) / ZSCALE;
     this.originz = sectorZ(this.ctx.board(), this.sectorEnt) / ZSCALE;
     GLM.vec2.set(this.origin, x, y);
@@ -43,7 +43,7 @@ export class SectorEnt extends MessageHandlerReflective {
   public Move(msg: Move) {
     if (this.ctx.state.get(MOVE_VERTICAL)) {
       const ent = this.ctx.view.target().entity;
-      let z = ent != null && ent.isSector() && ent.id != this.sectorEnt.id
+      const z = ent != null && ent.isSector() && ent.id != this.sectorEnt.id
         ? sectorZ(this.ctx.board(), ent) / ZSCALE
         : this.ctx.gridController.snap(this.originz + msg.dz);
       this.setZ(z * ZSCALE);
@@ -72,8 +72,8 @@ export class SectorEnt extends MessageHandlerReflective {
   }
 
   public Shade(msg: Shade) {
-    let sector = this.ctx.board().sectors[this.sectorEnt.id];
-    let shade = this.sectorEnt.type == EntityType.CEILING ? sector.ceilingshade : sector.floorshade;
+    const sector = this.ctx.board().sectors[this.sectorEnt.id];
+    const shade = this.sectorEnt.type == EntityType.CEILING ? sector.ceilingshade : sector.floorshade;
     if (msg.absolute && msg.value == shade) return;
     if (msg.absolute) {
       if (this.sectorEnt.type == EntityType.CEILING) sector.ceilingshade = msg.value; else sector.floorshade = msg.value;
@@ -89,7 +89,7 @@ export class SectorEnt extends MessageHandlerReflective {
   }
 
   public PanRepeat(msg: PanRepeat) {
-    let sector = this.ctx.board().sectors[this.sectorEnt.id];
+    const sector = this.ctx.board().sectors[this.sectorEnt.id];
     if (msg.absolute) {
       if (this.sectorEnt.type == EntityType.CEILING) {
         if (sector.ceilingxpanning == msg.xpan && sector.ceilingypanning == msg.ypan) return;
@@ -113,8 +113,8 @@ export class SectorEnt extends MessageHandlerReflective {
     this.ctx.bus.handle(new BoardInvalidate(this.sectorEnt));
   }
 
-  public Palette(msg: Palette) {
-    let sector = this.ctx.board().sectors[this.sectorEnt.id];
+  public Paconstte(msg: Palette) {
+    const sector = this.ctx.board().sectors[this.sectorEnt.id];
     if (msg.absolute) {
       if (this.sectorEnt.type == EntityType.CEILING) {
         if (msg.value == sector.ceilingpal) return;
@@ -130,15 +130,15 @@ export class SectorEnt extends MessageHandlerReflective {
         sector.floorpal = cyclic(sector.floorpal + msg.value, msg.max);
       }
     }
-    this.ctx.bus.handle(new Commit(`Set Sector ${this.sectorEnt.id}:${this.sectorEnt.type} Palette`, true));
+    this.ctx.bus.handle(new Commit(`Set Sector ${this.sectorEnt.id}:${this.sectorEnt.type} Paconstte`, true));
     this.ctx.bus.handle(new BoardInvalidate(this.sectorEnt));
   }
 
   public SetSectorCstat(msg: SetSectorCstat) {
-    let sector = this.ctx.board().sectors[this.sectorEnt.id];
-    let stat = this.sectorEnt.type == EntityType.CEILING ? sector.ceilingstat[msg.name] : sector.floorstat[msg.name];
+    const sector = this.ctx.board().sectors[this.sectorEnt.id];
+    const stat = this.sectorEnt.type == EntityType.CEILING ? sector.ceilingstat[msg.name] : sector.floorstat[msg.name];
     if (msg.toggle) {
-      let nstat = stat ? 0 : 1;
+      const nstat = stat ? 0 : 1;
       if (this.sectorEnt.type == EntityType.CEILING) sector.ceilingstat[msg.name] = nstat; else sector.floorstat[msg.name] = nstat;
     } else {
       if (stat == msg.value) return;
@@ -183,7 +183,7 @@ export class SectorEnt extends MessageHandlerReflective {
 
   private delete() {
     deleteSector(this.ctx.board(), this.sectorEnt.id, this.ctx.refs);
-    this.ctx.bus.handle(new Commit(`Delete Sector ${this.sectorEnt.id}`));
+    this.ctx.bus.handle(new Commit(`Deconste Sector ${this.sectorEnt.id}`));
     this.ctx.bus.handle(new BoardInvalidate(null));
   }
 

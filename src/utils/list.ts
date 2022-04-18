@@ -28,7 +28,7 @@ export class List<T> implements Iterable<T>{
   }
 
   public pop(): T {
-    let ret = this.last().obj;
+    const ret = this.last().obj;
     this.remove(this.last());
     return ret;
   }
@@ -38,7 +38,7 @@ export class List<T> implements Iterable<T>{
   }
 
   public pushAll(values: T[]): Node<T>[] {
-    let nodes = [];
+    const nodes = [];
     for (let i = 0; i < values.length; i++)
       nodes.push(this.insertAfter(values[i]));
     return nodes;
@@ -73,9 +73,7 @@ export class List<T> implements Iterable<T>{
   }
 
   public remove(ref: Node<T>): Node<T> {
-    if (ref == this.nil)
-      return;
-
+    if (ref == this.nil) return;
     ref.next.prev = ref.prev;
     ref.prev.next = ref.next;
     return ref;
@@ -95,7 +93,7 @@ export class List<T> implements Iterable<T>{
           if (pointer == this.terminator())
             return TERMINAL_ITERATOR_RESULT;
           else {
-            let obj = pointer.obj;
+            const obj = pointer.obj;
             pointer = pointer.next;
             return ITERATOR_RESULT(obj);
           }

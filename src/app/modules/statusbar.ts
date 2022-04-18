@@ -82,6 +82,7 @@ export class Statusbar extends MessageHandlerReflective {
     bufferUpdate: (value: any) => void;
   };
   private root: hElement;
+  private lastUpdate = 0;
 
   constructor(private view: View, private profiler: Profiler) {
     super();
@@ -96,6 +97,8 @@ export class Statusbar extends MessageHandlerReflective {
   }
 
   public PostFrame(msg: PostFrame) {
+    if (this.lastUpdate + 1000 >= performance.now()) return;
+    this.lastUpdate = performance.now();
     const view = this.view;
     const profile = this.profiler.frame();
     const draws = profile.counter('drawsRequested').get();

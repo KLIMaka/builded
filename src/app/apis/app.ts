@@ -9,6 +9,13 @@ import { ReferenceTracker } from "./referencetracker";
 import { Renderable } from "./renderable";
 import { EngineApi } from "../../build/board/mutations/api"
 
+export type LogLevel = 'ERROR' | 'WARN' | 'INFO' | 'TRACE' | 'DEBUG';
+export type Logger = (level: LogLevel, ...msg: any[]) => void;
+export const LOGGER = new Dependency<Logger>('Logger');
+
+export type Timer = () => number;
+export const TIMER = new Dependency<Timer>('Timer');
+
 export interface Storage {
   get(key: string): Promise<any>;
   set(key: string, value: any): Promise<any>;

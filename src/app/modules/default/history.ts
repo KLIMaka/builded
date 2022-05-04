@@ -1,8 +1,7 @@
 import { Board } from "../../../build/board/structs";
 import { Deck } from "../../../utils/collections";
 import { Injector } from "../../../utils/injector";
-import { info } from "../../../utils/logger";
-import { ENGINE_API } from "../../apis/app";
+import { ENGINE_API, LOGGER, TIMER } from "../../apis/app";
 import { BUS, Handle, MessageHandlerReflective } from "../../apis/handler";
 import { Commit, INVALIDATE_ALL, LoadBoard, NamedMessage } from "../../edit/messages";
 
@@ -12,13 +11,15 @@ export const DefaultBoardProviderConstructor = (() => {
     start: async (injector: Injector) => {
       const bus = await injector.getInstance(BUS);
       const api = await injector.getInstance(ENGINE_API);
+      const logger = await injector.getInstance(LOGGER);
+      const timer = await injector.getInstance(TIMER);
       const defaultBoard = api.newBoard();
       const history = new Deck<Board>();
       const forward = new Deck<Board>();
       const dt = 5000;
       let activeBoard: Board = api.cloneBoard(defaultBoard);
       let lastTag = '';
-      let lastCommit = performance.now();
+      let lastCommit = timer();
       history.push(api.cloneBoard(defaultBoard));
 
       handle = bus.connect(new class extends MessageHandlerReflective {
@@ -45,9 +46,9 @@ export const DefaultBoardProviderConstructor = (() => {
 
         Commit(msg: Commit) {
           forward.clear();
-          const now = performance.now();
+          const now = timer();
           if (msg.merge && msg.tag == lastTag && now - lastCommit < dt) history.pop();
-          else info(msg.tag);
+          else logger('INFO', msg.tag);
           history.push(api.cloneBoard(activeBoard));
           lastTag = msg.tag;
           lastCommit = now;

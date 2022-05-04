@@ -74,7 +74,7 @@ export class DirecredGraph<T> {
     return null;
   }
 
-  public supgraphs(): T[][] {
+  public subgraphs(): T[][] {
     const visited = new Set();
     const nodes = this.nodes;
     const collect = function (node: T) {

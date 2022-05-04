@@ -1,23 +1,27 @@
 import { SelectorConstructor } from '../../app/modules/artselector';
 import { Board } from '../../build/board/structs';
 import { Deck } from '../../utils/collections';
+import { resize } from '../../utils/gl/gl';
 import { IndexedImgLibJsConstructor, INDEXED_IMG_LIB } from '../../utils/imglib';
-import { create, getInstances, Injector, instance, lifecycle, Module, plugin } from '../../utils/injector';
-import { ART, BOARD, ENGINE_API, GRID, PORTALS, REFERENCE_TRACKER, SCHEDULER, STATE, STORAGES, View, VIEW } from '../apis/app';
-import { BUS, busDisconnector, DefaultMessageBus, MessageBus, MessageHandlerReflective } from '../apis/handler';
+import { getInstances, instance, lifecycle, Module, plugin } from '../../utils/injector';
+import { DefaultProfiler, DefaultProfilerConstructor, Profiler, PROFILER, Timer } from '../../utils/profiler';
+import { ART, BOARD, ENGINE_API, GRID, PORTALS, REFERENCE_TRACKER, SCHEDULER, STATE, STORAGES, View } from '../apis/app';
+import { BUS, busDisconnector, DefaultMessageBusConstructor, MessageBus, MessageHandlerReflective } from '../apis/handler';
 import { Renderable } from '../apis/renderable';
 import { DefaultScheduler } from '../apis/scheduler';
 import { EntityFactoryConstructor, ENTITY_FACTORY } from '../edit/context';
-import { Frame, LoadBoard, namedMessageHandler, PostFrame, PreFrame, Render } from '../edit/messages';
+import { LoadBoard, namedMessageHandler, PostFrame, PreFrame, Render } from '../edit/messages';
+import { ClipboardModule } from '../edit/tools/clipboard';
 import { DrawSectorModule } from '../edit/tools/drawsector';
 import { DrawWallModule } from '../edit/tools/drawwall';
 import { JoinSectorsModule } from '../edit/tools/joinsectors';
 import { PushWallModule } from '../edit/tools/pushwall';
 import { PICNUM_SELECTOR, SelectionModule } from '../edit/tools/selection';
-import { TransformModule } from '../edit/tools/transform';
-import { ClipboardModule } from '../edit/tools/clipboard';
 import { ToolsBusConstructor, TOOLS_BUS } from '../edit/tools/toolsbus';
+import { TransformModule } from '../edit/tools/transform';
 import { UtilsModule } from '../edit/tools/utils';
+import { DefaultFrameGenerator, FrameGenerator, FRAME_GENERATOR } from "../modules/default/framegenerator";
+import { DefaultPortalsConstructor } from '../modules/default/portals';
 import { StatusBarModule } from '../modules/statusbar';
 import { TaskManagerModule } from '../modules/taskmanager';
 import { BuildArtProviderConstructor, TEXTURES_OVERRIDE } from './buildartprovider';
@@ -32,8 +36,6 @@ import { BUFFER_FACTORY, DefaultBufferFactory } from './gl/buffers';
 import { BuildGlConstructor, BUILD_GL } from './gl/buildgl';
 import { InfoModule } from './info';
 import { SwappableViewModule } from './view/view';
-import { DefaultPortalsConstructor } from '../modules/default/portals';
-import { PROFILER, DefaultProfiler, Profiler } from '../../utils/profiler';
 
 function mapBackupService(module: Module) {
   module.bind(plugin('MapBackupService'), lifecycle(async (injector, lifecycle) => {
@@ -75,14 +77,15 @@ export function DefaultSetupModule(module: Module) {
   module.bind(BUILD_GL, BuildGlConstructor);
   module.bind(BUFFER_FACTORY, DefaultBufferFactory);
   module.bind(BUILDERS_FACTORY, DefaultBuildersFactory);
-  module.bind(BUS, instance(DefaultMessageBus()));
+  module.bind(BUS, DefaultMessageBusConstructor);
   module.bind(TOOLS_BUS, ToolsBusConstructor);
   module.bind(BOARD, DefaultBoardProviderConstructor);
   module.bind(ENTITY_FACTORY, EntityFactoryConstructor);
   module.bind(INDEXED_IMG_LIB, IndexedImgLibJsConstructor);
   module.bind(SCHEDULER, DefaultScheduler);
   module.bind(PORTALS, DefaultPortalsConstructor);
-  module.bind(PROFILER, instance(new DefaultProfiler()));
+  module.bind(PROFILER, DefaultProfilerConstructor);
+  module.bind(FRAME_GENERATOR, DefaultFrameGenerator);
 
   module.install(SwappableViewModule);
   module.install(JoinSectorsModule);
@@ -102,10 +105,6 @@ export function DefaultSetupModule(module: Module) {
   // module.install(mapBackupService);
 }
 
-export function MainLoopConstructor(injector: Injector) {
-  return create(injector, MainLoop, VIEW, BUS, PROFILER);
-}
-
 function createTools() {
   const list = new Deck<Renderable>();
   return {
@@ -115,49 +114,31 @@ function createTools() {
   }
 }
 
-const FRAME = new Frame(0);
-const PREFRAME = new PreFrame();
-const POSTFRAME = new PostFrame();
 const tools = createTools();
 const RENDER = new Render(tools.consumer);
 
 export class MainLoop extends MessageHandlerReflective {
   constructor(
+    private gl: WebGL2RenderingContext,
     private view: View,
     private bus: MessageBus,
-    private profiler: Profiler
-  ) { super() }
+    private profiler: Profiler,
+    private frameGenerator: FrameGenerator
+  ) {
+    super();
+    bus.connect(this);
+    frameGenerator.start();
+  }
 
-  private drawTools() {
+  PreFrame(msg: PreFrame) {
+    resize(this.gl);
+    this.profiler.frameStart();
+    this.profiler.frame().timer('Frame').start();
+  }
+
+  PostFrame(msg: PostFrame) {
     tools.clear();
     this.bus.handle(RENDER);
     this.view.drawTools(tools.provider);
-  }
-
-  frame(dt: number) {
-    this.profiler.frameStart();
-    const frame = this.profiler.frame().timer('Frame').start();
-    this.bus.handle(PREFRAME);
-    FRAME.dt = dt;
-    this.bus.handle(FRAME);
-    this.drawTools();
-    frame.stop();
-    this.bus.handle(POSTFRAME);
-  }
-}
-
-export class FrameGenerator {
-  private time = window.performance.now();
-
-  constructor(private bus: MessageBus) { }
-
-  private frame() {
-    this.bus.handle(PREFRAME);
-    const now = window.performance.now();
-    FRAME.dt = now - this.time;
-    this.time = now;
-    this.bus.handle(FRAME);
-    this.bus.handle(POSTFRAME);
-    requestAnimationFrame(() => this.frame());
   }
 }

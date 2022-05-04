@@ -8,11 +8,11 @@ module.exports = {
     filename: 'app.bundle.js'
   },
   resolve: {
-    extensions: ['.ts', '.js', '.jsx', '.tsx']
+    extensions: ['.ts', '.js']
   },
   module: {
     rules: [{
-      test: /\.(ts|js|jsx|tsx)$/,
+      test: /\.(ts|js)$/,
       exclude: /node_modules/,
       loader: 'babel-loader',
     }],

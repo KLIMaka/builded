@@ -1,13 +1,17 @@
-import { Dependency } from "./injector";
+import { TIMER, Timer as Timer_ } from "../app/apis/app";
+import { Dependency, Injector, Plugin, provider } from "./injector";
 
-function now() {
-  return performance.now();
-}
+export const DefaultProfilerConstructor: Plugin<Profiler> = provider(async (injector: Injector) => {
+  const timer = await injector.getInstance(TIMER);
+  return new DefaultProfiler(timer);
+});
+
 
 export interface Timer {
   start(): Timer;
   stop(): Timer;
   get(): number;
+  print(): string;
 }
 
 export interface Counter {
@@ -26,6 +30,7 @@ export interface Profiler {
   global(): Profile;
   frame(): Profile;
   frameStart(): void;
+  timer(): Timer;
 }
 
 export const PROFILER = new Dependency<Profiler>('Profiler');
@@ -34,17 +39,24 @@ export class DefaultTimer implements Timer {
   private time = 0;
   private startTime = -1;
 
-  get() { return this.startTime != -1 ? now() - this.startTime : this.time }
+  constructor(private timer: Timer_) { };
+
+  get() { return this.startTime != -1 ? this.timer() - this.startTime : this.time }
   start() {
-    if (this.startTime == -1) this.startTime = now();
+    if (this.startTime == -1) this.startTime = this.timer();
     return this;
   }
   stop() {
     if (this.startTime != -1) {
-      this.time = now() - this.startTime;
+      this.time = this.timer() - this.startTime;
       this.startTime = -1;
     }
     return this;
+  }
+  print() {
+    const t = this.get();
+    if (t <= 500) return t.toFixed(2) + 'ms';
+    return (t / 1000).toFixed(2) + 'sec';
   }
 }
 
@@ -69,15 +81,20 @@ export class DefaultProfile implements Profile {
   private timers = new Map<string, Timer>();
   private counters = new Map<string, Counter>();
 
-  timer(name: string): Timer { return ensure(this.timers, name, () => new DefaultTimer()) }
+  constructor(private t: Timer_) { }
+
+  timer(name: string): Timer { return ensure(this.timers, name, () => new DefaultTimer(this.t)) }
   counter(name: string): Counter { return ensure(this.counters, name, () => new DefaultCounter()) }
 }
 
 export class DefaultProfiler implements Profiler {
-  private globalProfile = new DefaultProfile();
-  private frameProfile = new DefaultProfile();
+  private globalProfile = new DefaultProfile(this.t);
+  private frameProfile = new DefaultProfile(this.t);
+
+  constructor(private t: Timer_) { }
 
   global() { return this.globalProfile }
   frame() { return this.frameProfile }
-  frameStart() { this.frameProfile = new DefaultProfile() }
+  frameStart() { this.frameProfile = new DefaultProfile(this.t) }
+  timer() { return new DefaultTimer(this.t) }
 }

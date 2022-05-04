@@ -1,11 +1,11 @@
 import h from "stage0";
-import { CallbackChannelImpl, CallbackHandlerImpl, CallbackSource, Handle, handle, reference, transformed, value } from "../../../utils/callbacks";
+import { CallbackChannelImpl, CallbackHandlerImpl, Handle, handle, transformed, value } from "../../../utils/callbacks";
 import { getOrCreate } from "../../../utils/collections";
 import { create, lifecycle, Module, plugin } from "../../../utils/injector";
 import { Range, Vec3Interpolator } from "../../../utils/interpolator";
 import { iter } from "../../../utils/iter";
-import { clamp, int, len2d, normalize, vec42int } from "../../../utils/mathutils";
-import { array, f32array, Mapper } from "../../../utils/pixelprovider";
+import { int, normalize, vec42int } from "../../../utils/mathutils";
+import { f32array, Mapper } from "../../../utils/pixelprovider";
 import { Oracle } from "../../../utils/ui/controls/api";
 import { listBox } from "../../../utils/ui/controls/listbox";
 import { menuButton, NavItem1, navTree, NavTreeModel, properties } from "../../../utils/ui/renderers";

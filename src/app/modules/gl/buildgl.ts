@@ -3,8 +3,8 @@ import { Shader, Texture } from '../../../utils/gl/drawstruct';
 import { createShader } from '../../../utils/gl/shaders';
 import { Profile, State } from '../../../utils/gl/stategl';
 import { Dependency, getInstances, lifecycle } from '../../../utils/injector';
-import { info } from '../../../utils/logger';
 import { Profiler, PROFILER } from '../../../utils/profiler';
+import { Logger, LOGGER } from '../../apis/app';
 import { Renderable } from '../../apis/renderable';
 import { GL } from '../buildartprovider';
 
@@ -16,7 +16,7 @@ export const PALSWAPS = new Dependency<number>('Palswaps');
 export const BUILD_GL = new Dependency<BuildGl>('BuildGL');
 
 export const BuildGlConstructor = lifecycle(async (injector, lifecycle) => {
-  const [gl, pal, plus, trans, palswaps, shadowsteps, profiler] = await getInstances(injector, GL, PAL_TEXTURE, PLU_TEXTURE, TRANS_TEXTURE, PALSWAPS, SHADOWSTEPS, PROFILER);
+  const [gl, pal, plus, trans, palswaps, shadowsteps, profiler, logger] = await getInstances(injector, GL, PAL_TEXTURE, PLU_TEXTURE, TRANS_TEXTURE, PALSWAPS, SHADOWSTEPS, PROFILER, LOGGER);
   const defs = ['PALSWAPS (' + palswaps + '.0)', 'SHADOWSTEPS (' + shadowsteps + '.0)', 'PAL_LIGHTING'];
   const SHADER_NAME = 'resources/shaders/build';
   const state = new State()
@@ -31,7 +31,7 @@ export const BuildGlConstructor = lifecycle(async (injector, lifecycle) => {
   state.setTexture('pal', pal);
   state.setTexture('plu', plus);
   if (state.isTextureEnabled('trans')) state.setTexture('trans', trans);
-  return new BuildGl(state, gl, profiler);
+  return new BuildGl(state, gl, profiler, logger);
 });
 
 const inv = mat4.create();
@@ -40,7 +40,7 @@ const clipPlane = vec4.create();
 
 export class BuildGl {
 
-  constructor(readonly state: State, readonly gl: WebGLRenderingContext, private profiler: Profiler) {
+  constructor(readonly state: State, readonly gl: WebGLRenderingContext, private profiler: Profiler, private logger: Logger) {
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.enable(gl.CULL_FACE);
     gl.enable(gl.DEPTH_TEST);
@@ -97,7 +97,7 @@ export class BuildGl {
   }
 
   public printInfo() {
-    info(this.state.profile);
+    this.logger('INFO', this.state.profile + '');
   }
 
   public flush() {

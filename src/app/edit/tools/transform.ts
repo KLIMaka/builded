@@ -1,9 +1,8 @@
 import { build2gl } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 import { create, getInstances, lifecycle, Module, plugin } from "../../../utils/injector";
-import { error } from "../../../utils/logger";
 import { detuple0, detuple1 } from "../../../utils/mathutils";
-import { STATE } from "../../apis/app";
+import { LOGGER, Logger, STATE } from "../../apis/app";
 import { busDisconnector, MessageHandler, NULL_MESSAGE_HANDLER } from "../../apis/handler";
 import { RenderablesCache, RENDRABLES_CACHE } from "../../modules/geometry/cache";
 import { EntityFactory, ENTITY_FACTORY } from "../context";
@@ -20,7 +19,7 @@ export async function TransformModule(module: Module) {
     lifecycle(state.register(MOVE_COPY, false), stateCleaner);
     lifecycle(state.register(MOVE_VERTICAL, false), stateCleaner);
     lifecycle(state.register(MOVE_PARALLEL, false), stateCleaner);
-    const transform = await create(injector, Transform, SELECTED, ENTITY_FACTORY, RENDRABLES_CACHE);
+    const transform = await create(injector, Transform, SELECTED, ENTITY_FACTORY, RENDRABLES_CACHE, LOGGER);
     lifecycle(bus.connect(transform), busDisconnector(bus));
   }));
 }
@@ -49,6 +48,7 @@ export class Transform extends DefaultTool {
     private selected: Selected,
     private factory: EntityFactory,
     private renderables: RenderablesCache,
+    private logger: Logger,
     private ctx = factory.ctx
   ) { super() }
 
@@ -60,7 +60,7 @@ export class Transform extends DefaultTool {
         this.updateMove();
       } catch (e) {
         this.valid = false;
-        error(e);
+        this.logger('ERROR', e);
       }
     }
   }

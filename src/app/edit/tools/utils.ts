@@ -8,9 +8,8 @@ import { EntityType } from "../../../build/hitscan";
 import { slope, vec2ang, wallNormal, ZSCALE } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 import { create, lifecycle, Module, plugin } from "../../../utils/injector";
-import { info } from "../../../utils/logger";
 import { int, trz } from "../../../utils/mathutils";
-import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, GRID, GridController, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
+import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, GRID, GridController, LOGGER, Logger, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
 import { BUS, busDisconnector, MessageBus } from "../../apis/handler";
 import { invalidateSectorAndWalls } from "../editutils";
 import { Commit, INVALIDATE_ALL, NamedMessage, SetPicnum } from "../messages";
@@ -20,7 +19,7 @@ import { DefaultTool, TOOLS_BUS } from "./toolsbus";
 export async function UtilsModule(module: Module) {
   module.bind(plugin('Utils'), lifecycle(async (injector, lifecycle) => {
     const bus = await injector.getInstance(TOOLS_BUS);
-    const utils = await create(injector, Utils, BOARD, ENGINE_API, ART, VIEW, BUS, REFERENCE_TRACKER, GRID, PICNUM_SELECTOR, SELECTED);
+    const utils = await create(injector, Utils, BOARD, ENGINE_API, ART, VIEW, BUS, REFERENCE_TRACKER, GRID, PICNUM_SELECTOR, SELECTED, LOGGER);
     lifecycle(bus.connect(utils), busDisconnector(bus));
   }));
 }
@@ -37,7 +36,8 @@ class Utils extends DefaultTool {
     private refs: BuildReferenceTracker,
     private gridController: GridController,
     private picnumSelector: PicNumSelector,
-    private selected: Selected
+    private selected: Selected,
+    private logger: Logger,
   ) { super() }
 
   public NamedMessage(msg: NamedMessage) {
@@ -166,15 +166,15 @@ class Utils extends DefaultTool {
     switch (target.entity.type) {
       case EntityType.CEILING:
       case EntityType.FLOOR:
-        info(target.entity.id, board.sectors[target.entity.id]);
+        this.logger('INFO', target.entity.id, board.sectors[target.entity.id]);
         break;
       case EntityType.UPPER_WALL:
       case EntityType.MID_WALL:
       case EntityType.LOWER_WALL:
-        info(target.entity.id, board.walls[target.entity.id]);
+        this.logger('INFO', target.entity.id, board.walls[target.entity.id]);
         break;
       case EntityType.SPRITE:
-        info(target.entity.id, board.sprites[target.entity.id]);
+        this.logger('INFO', target.entity.id, board.sprites[target.entity.id]);
         break;
     }
   }
@@ -269,7 +269,7 @@ class Utils extends DefaultTool {
       this.getSectorPics(board, nextsector).forEach(pf);
       sectors.add(nextsector);
     }
-    info(pics, sectors, sizes);
+    this.logger('INFO', pics, sectors, sizes);
   }
 
   private setTexture() {

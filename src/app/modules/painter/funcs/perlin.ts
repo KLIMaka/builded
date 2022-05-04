@@ -1,5 +1,6 @@
-import { perlin_simd_octaves } from "wasm_rust";
+import { perlinOctaves } from "wasm_rust";
 import { transformed, tuple, value } from "../../../../utils/callbacks";
+import { octaves2d, perlin2d } from "../../../../utils/mathutils";
 import { INT_MODEL, NumberModelBuilder } from "../../../../utils/ui/controls/numberbox";
 import { VecStack } from "../../../../utils/vecstack";
 import { Context, Image } from "../api";
@@ -14,7 +15,8 @@ export function perlin(ctx: Context): Image {
     return (stack: VecStack, pos: number) => {
       const x = stack.x(pos) * s;
       const y = stack.y(pos) * s;
-      const result = perlin_simd_octaves(x, y, o);
+      // const result = perlinOctaves(x, y, o);
+      const result = octaves2d(perlin2d, o)(x, y);
       return stack.push(result, 0, 0, 1);
     }
   });

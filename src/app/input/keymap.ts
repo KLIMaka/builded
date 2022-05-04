@@ -1,6 +1,5 @@
 import { Collection, EMPTY_COLLECTION } from "../../utils/collections";
-import { warning } from "../../utils/logger";
-import { State } from "../apis/app";
+import { Logger, State } from "../apis/app";
 import { Message } from "../apis/handler";
 import { Key } from "../edit/messages";
 
@@ -70,7 +69,7 @@ type ContextMatcher = (context: string) => boolean;
 function parseContextMatcher(str: string): ContextMatcher {
   return s => s == str;
 }
-export type EventParser = (str: string) => Collection<Message>;
+export type EventParser = (str: string, logger: Logger) => Collection<Message>;
 
 function parseKey(key: string): string {
   if (key == 'space') return ' ';
@@ -78,23 +77,23 @@ function parseKey(key: string): string {
   return key;
 }
 
-export function loadBinds(binds: string, messageParser: EventParser) {
+export function loadBinds(binds: string, messageParser: EventParser, logger: Logger) {
   const consumer = new InputConsumer();
   const lines = binds.split(/\r?\n/);
-  for (let line of lines) {
-    line = line.trim();
-    if (line.length == 0) continue;
-    const parts = line.split('|');
-    if (parts.length != 3) { warning(`Skipping bind line: ${line}`); continue; }
+  for (const line of lines) {
+    const trline = line.trim();
+    if (trline.length == 0) continue;
+    const parts = trline.split('|');
+    if (parts.length != 3) { logger('WARN', `Skipping bind line: ${trline}`); continue; }
     const context = parseContextMatcher(parts[0].trim());
     const keys = parts[1].trim().toLowerCase().split('+').map(parseKey);
     const command = parts[2].trim();
     if (keys[0] == '') {
       consumer.addStateBind(command, true, false, keys[1]);
     } else {
-      const messages = messageParser(command);
+      const messages = messageParser(command, logger);
       if (messages == null) {
-        warning(`'${command}' failed to parse`);
+        logger('WARN', `'${command}' failed to parse`);
         continue;
       }
       consumer.addBind(messages, keys.pop(), ...keys);

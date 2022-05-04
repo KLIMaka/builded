@@ -93,7 +93,7 @@ export class View3d extends MessageHandlerReflective implements View {
     this.buildgl.setCursorPosiotion(this.cursor[0], this.cursor[1], this.cursor[2]);
     this.buildgl.newFrame();
     this.renderer.draw(this);
-    this.move(msg.dt);
+    this.move(msg.dt / 1000);
   }
 
   private move(dt: number) {

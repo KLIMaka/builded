@@ -1,6 +1,12 @@
-import { App, Dependency, getInstances, Injector, Plugin, provider } from "../src/utils/injector";
+import { App, Dependency, DependencyError, getInstances, Injector, LifecycleListener, Plugin, provider } from "../src/utils/injector";
 import { iter } from "../src/utils/iter";
 import { performance } from "perf_hooks";
+
+class Listener implements LifecycleListener {
+  constructor(public log: string[] = []) { }
+  async start<T>(dep: Dependency<T>, promise: Promise<T>): Promise<T> { this.log.push(`${dep.name}+`); return await promise }
+  async stop<T>(dep: Dependency<T>, promise: Promise<void>): Promise<void> { this.log.push(`${dep.name}-`); return await promise }
+}
 
 interface Type {
   foo(arg: any): any;
@@ -51,7 +57,8 @@ class CProvider implements Plugin<Type> {
 }
 
 test('injector test', async () => {
-  const app = new App(performance.now);
+  const listener = new Listener();
+  const app = new App(listener);
   app.bind(A, new AProvider());
   app.bind(B, provider(async i => { return { foo: arg => arg } }));
   app.bind(C, new CProvider());
@@ -76,11 +83,11 @@ test('injector test', async () => {
 
   expected = 43;
   await runtime.replaceInstance(B, provider(async i => { return { foo: arg => arg + 1 } }));
+  expect(listener.log).toStrictEqual(['B+', 'A+', 'main+', 'Runtime+', 'C+', 'main-', 'A-', 'B-', 'B+', 'A+', 'main+']);
 });
 
 test('cyclic', async () => {
-  expect.assertions(1);
-  const app = new App(performance.now);
+  const app = new App();
   app.bind(A, new AProvider());
   app.bind(B, provider(async i => {
     const a = i.getInstance(A)
@@ -94,13 +101,22 @@ test('cyclic', async () => {
   try {
     await app.start();
   } catch (e) {
-    expect(e).toStrictEqual(new Error('Found cycle: B,A'));
+    expect(e instanceof DependencyError).toBeTruthy();
+    let de = <DependencyError>e;
+    expect(de.message).toBe('Error while starting App');
+    expect(de.cause.message).toBe('Error while creating main');
+    de = <DependencyError>de.cause;
+    expect(de.cause.message).toBe('Error while creating A');
+    de = <DependencyError>de.cause;
+    expect(de.cause.message).toBe('Error while creating B');
+    de = <DependencyError>de.cause;
+    expect(de.cause.message).toBe('Found cycle: B,A');
   }
 });
 
 test('test', async () => {
-  const app = new App(performance.now);
-  const log: string[] = [];
+  const listener = new Listener();
+  const app = new App(listener);
   const A = new Dependency<number>('A');
   const B = new Dependency<number>('B');
   const OP = new Dependency<number>('OP');
@@ -109,86 +125,40 @@ test('test', async () => {
   let ref_b = 12;
   let ref_op = ref_a + ref_b;
 
-  app.bind(A, {
-    start: async i => {
-      log.push('A+');
-      return ref_a;
-    },
-    stop: async i => {
-      log.push('A-');
-    }
-  });
-  app.bind(B, {
-    start: async i => {
-      log.push('B+');
-      return ref_b;
-    },
-    stop: async i => {
-      log.push('B-');
-    }
-  });
-  app.bind(OP, {
-    start: async i => {
-      log.push('OP+');
-      const [a, b] = await getInstances(i, A, B);
-      return a + b;
-    },
-    stop: async i => {
-      log.push('OP-');
-    }
-  });
+  app.bind(A, provider(async (i: Injector) => ref_a));
+  app.bind(B, provider(async (i: Injector) => ref_b));
+  app.bind(OP, provider(async (i: Injector) => {
+    const [a, b] = await getInstances(i, A, B);
+    return a + b;
+  }));
 
 
-  app.bind(new Dependency('Main', true), {
-    start: async i => {
-      log.push('Main+');
-      const op = await i.getInstance(OP);
-      expect(op).toEqual(ref_op);
-    },
-    stop: async i => {
-      log.push('Main-');
-    }
-  });
-  app.bind(new Dependency('Main1', true), {
-    start: async i => {
-      log.push('Main1+');
-      const b = await i.getInstance(B);
-      expect(b).toEqual(ref_b);
-    },
-    stop: async i => {
-      log.push('Main1-');
-    }
-  });
-  app.bind(new Dependency('Main2', true), {
-    start: async i => {
-      log.push('Main2+');
-      const a = await i.getInstance(A);
-      expect(a).toEqual(ref_a);
-    },
-    stop: async i => {
-      log.push('Main2-');
-    }
-  });
+  app.bind(new Dependency('Main', true), provider(async (i: Injector) => {
+    const op = await i.getInstance(OP);
+    expect(op).toEqual(ref_op);
+  }));
+  app.bind(new Dependency('Main1', true), provider(async (i: Injector) => {
+    const b = await i.getInstance(B);
+    expect(b).toEqual(ref_b);
+  }));
+  app.bind(new Dependency('Main2', true), provider(async (i: Injector) => {
+    const a = await i.getInstance(A);
+    expect(a).toEqual(ref_a);
+  }));
   const runtime = await app.start();
 
-  expect(log).toStrictEqual(['Main+', 'OP+', 'A+', 'B+', 'Main1+', 'Main2+']);
+  expect(listener.log).toStrictEqual(['A+', 'B+', 'OP+', 'Main+', 'Main1+', 'Main2+', 'Runtime+']);
 
   ref_b = 11;
   ref_op = ref_a + ref_b;
 
-  log.splice(0, log.length);
-  await runtime.replaceInstance(B, {
-    start: async i => {
-      log.push('nB+');
-      return ref_b;
-    },
-    stop: async i => {
-      log.push('nB-');
-    }
-  });
-  expect(log).toStrictEqual(['Main-', 'OP-', 'Main1-', 'B-', 'Main+', 'OP+', 'nB+', 'Main1+']);
+  listener.log = [];
 
-  log.splice(0, log.length);
+  await runtime.replaceInstance(B, provider(async (i: Injector) => ref_b));
+  expect(listener.log).toStrictEqual(['Main-', 'OP-', 'Main1-', 'B-', 'B+', 'OP+', 'Main+', 'Main1+']);
+
+  listener.log = [];
+
   await runtime.stop();
-  expect(log).toStrictEqual(['Main-', 'Main2-', 'OP-', 'Main1-', 'A-', 'nB-']);
+  expect(listener.log).toStrictEqual(['Main-', 'Main2-', 'OP-', 'Main1-', 'A-', 'B-']);
 });

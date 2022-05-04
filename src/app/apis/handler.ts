@@ -1,7 +1,7 @@
 import { Deck } from "../../utils/collections";
-import { Dependency } from "../../utils/injector";
-import { List, Node } from "../../utils/list";
-import { error } from "../../utils/logger";
+import { Dependency, Injector, provider } from "../../utils/injector";
+import { List } from "../../utils/list";
+import { LOGGER } from "./app";
 
 export interface Message { }
 export interface Context { }
@@ -15,7 +15,8 @@ export const BUS = new Dependency<MessageBus>('Message Bus');
 
 export const NULL_MESSAGE_HANDLER: MessageHandler = { handle: (m) => { } };
 
-export function DefaultMessageBus() {
+export const DefaultMessageBusConstructor = provider(async (i: Injector) => {
+  const logger = await i.getInstance(LOGGER);
   let lastHandle = 1;
   const handlers = new Map<number, MessageHandler>();
   return <MessageBus>{
@@ -28,11 +29,11 @@ export function DefaultMessageBus() {
       try {
         handleCollection(handlers.values(), msg);
       } catch (e) {
-        error(e, e.stack);
+        logger('ERROR', e);
       }
     }
   }
-}
+});
 
 const messageBox: [Message] = [null];
 export function handleReflective(obj: Object, message: Message) {

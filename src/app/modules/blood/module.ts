@@ -191,7 +191,6 @@ export function BloodModule(module: Module) {
   module.bind(MAP_NAME, DefaultMapName);
   module.bind(MAP_SELECTOR, DefaultMapSelector);
   module.bind(PIC_TAGS, picTags);
-  module.bind(ACTIVITY, instance(() => { return { id: () => "view3d" } }));
 
   module.install(mapLoader);
   module.install(mapSaver);

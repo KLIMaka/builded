@@ -18,7 +18,7 @@ export function createContext(w: number, h: number, opts = {}): WebGLRenderingCo
   return gl;
 }
 
-function resize(gl: WebGLRenderingContext) {
+export function resize(gl: WebGLRenderingContext) {
   const canvas = <HTMLCanvasElement>gl.canvas;
 
   const displayWidth = canvas.clientWidth;

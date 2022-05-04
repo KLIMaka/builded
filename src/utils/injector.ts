@@ -47,12 +47,28 @@ class ChildInjector<T> implements ParentInjector {
   getInstance<T>(dependency: Dependency<T>): Promise<T> { return this.parent.getInstanceParent(dependency, this) }
 }
 
-export type Timer = () => number;
+export class DependencyError extends Error {
+  constructor(message: string, public cause: Error) {
+    super(message);
+  }
+}
+
+export interface LifecycleListener {
+  start<T>(dep: Dependency<T>, promise: Promise<T>): Promise<T>;
+  stop<T>(dep: Dependency<T>, promise: Promise<void>): Promise<void>;
+}
+
+class NopListener implements LifecycleListener {
+  async start<T>(dep: Dependency<T>, promise: Promise<T>): Promise<T> { return await promise }
+  async stop<T>(dep: Dependency<T>, promise: Promise<void>): Promise<void> { return await promise }
+}
+
+const NOP_LISTENER = new NopListener();
 
 export class App implements Module {
   private plugins = new Map<Dependency<any>, Plugin<any>>();
 
-  constructor(private timer: Timer) { }
+  constructor(private listener: LifecycleListener = NOP_LISTENER) { }
 
   public bind<T>(dependency: Dependency<T>, plugin: Plugin<T>): void {
     if (this.plugins.has(dependency)) throw new Error(`Multiple bindings to dependency ${dependency.name}`);
@@ -64,19 +80,20 @@ export class App implements Module {
   }
 
   public async start(): Promise<Runtime> {
-    const injector = new RootInjector(this.plugins, this.timer);
+    return this.listener.start(RUNTIME, this.doStart());
+  }
+
+  private async doStart(): Promise<Runtime> {
+    const injector = new RootInjector(this.plugins, this.listener);
     try {
-      const start = this.timer();
       const voidDeps = iter(this.plugins.keys())
         .filter(dep => dep.isVoid)
         .map(dep => injector.getInstance(dep))
         .collect();
       await Promise.all(voidDeps);
-      console.info(`App started in ${(this.timer() - start).toFixed(2)}ms`);
       return injector;
     } catch (e) {
-      console.error(`Error while starting App. ${e}\n${e.stack}`);
-      throw e;
+      throw new DependencyError(`Error while starting App`, e);
     }
   }
 }
@@ -97,7 +114,8 @@ class RootInjector implements ParentInjector, Runtime {
   private graph = new DirecredGraph<Dependency<any>>();
   private instances = new Map<Dependency<any>, Promise<any>>();
 
-  constructor(private providers: Map<Dependency<any>, Plugin<any>>, private timer: Timer) {
+
+  constructor(private providers: Map<Dependency<any>, Plugin<any>>, private listener: LifecycleListener) {
     this.instances.set(RUNTIME, Promise.resolve(this));
   }
 
@@ -113,7 +131,7 @@ class RootInjector implements ParentInjector, Runtime {
 
   public getInstanceParent<T>(dependency: Dependency<T>, injector: ParentInjector): Promise<T> {
     this.add(dependency, injector);
-    return getOrCreate(this.instances, dependency, d => this.create(d, injector));
+    return getOrCreate(this.instances, dependency, d => this.listener.start(d, this.create(d, injector)));
   }
 
   public getInstance<T>(dependency: Dependency<T>): Promise<T> {
@@ -132,26 +150,25 @@ class RootInjector implements ParentInjector, Runtime {
     if (provider == undefined) throw new Error(`No provider bound to ${dependency.name}`);
     const injector = new ChildInjector(dependency, parent);
     try {
-      const start = this.timer();
       const instance = await provider.start(injector);
-      console.info(`${dependency.name} started in ${(this.timer() - start).toFixed(2)}ms`);
       return instance;
-    } catch (error) {
-      console.error(`Error while creating ${dependency.name}. ${error}\n${error.stack}`);
-      throw error;
+    } catch (e) {
+      throw new DependencyError(`Error while creating ${dependency.name}`, e);
     }
   }
 
-  private async stopInstance<T>(dependency: Dependency<T>) {
+  private async stopInstance<T>(dependency: Dependency<T>): Promise<void> {
+    return this.listener.stop(dependency, this.doStopInstance(dependency));
+  }
+
+  private async doStopInstance<T>(dependency: Dependency<T>): Promise<void> {
     try {
-      const start = this.timer();
-      await this.providers.get(dependency).stop(this);
+      const result = await this.providers.get(dependency).stop(this);
       this.graph.remove(dependency);
       this.instances.delete(dependency);
-      console.info(`${dependency.name} stopped in ${(this.timer() - start).toFixed(2)}ms`);
-    } catch (error) {
-      console.error(`Error while stopping ${dependency.name}. ${error}\n${error.stack}`);
-      throw error;
+      return result;
+    } catch (e) {
+      throw new DependencyError(`Error while stopping ${dependency.name}`, e);
     }
   }
 }

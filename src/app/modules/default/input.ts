@@ -4,7 +4,7 @@ import { GL } from "../buildartprovider"
 import { Deck, forEach } from "../../../utils/collections"
 import { loadString } from "../../../utils/getter"
 import { getInstances, lifecycle, Module, plugin } from "../../../utils/injector"
-import { STATE } from "../../apis/app"
+import { LOGGER, STATE } from "../../apis/app"
 import { BUS, busDisconnector, MessageHandlerReflective } from "../../apis/handler"
 import { Key, Mouse, PreFrame } from "../../edit/messages"
 
@@ -12,9 +12,9 @@ const MOUSE = new Mouse(0, 0);
 
 export function InputModule(module: Module) {
   module.bind(plugin('Input'), lifecycle(async (injector, lifecycle) => {
-    const [gl, bus, state] = await getInstances(injector, GL, BUS, STATE);
+    const [gl, bus, state, logger] = await getInstances(injector, GL, BUS, STATE, LOGGER);
     const keybinds = await loadString('builded_binds.txt');
-    const consumer = loadBinds(keybinds, messageParser);
+    const consumer = loadBinds(keybinds, messageParser, logger);
     const kbe = (handler: (key: string) => void) => (e: KeyboardEvent) => { if (e.target != document.body) return true; handler(e.key.toLowerCase()); e.preventDefault(); return false; }
     const keyup = kbe(key => bus.handle(new Key(key, false)));
     const keydown = kbe(key => bus.handle(new Key(key, true)));

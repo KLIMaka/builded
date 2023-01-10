@@ -20,8 +20,10 @@ export interface GenericBuildBuffer {
 export interface BuildBuffer extends GenericBuildBuffer {
   writeNormal(off: number, x: number, y: number, z: number): number;
   writeTcLighting(off: number, u: number, v: number, pal?: number, shade?: number): number;
+  writeLightmap(off: number, x: number, y: number, z?: number, w?: number): number;
   getNormBuffer(): VertexBuffer;
   getTexCoordBuffer(): VertexBuffer;
+  getLightmapBuffer(): VertexBuffer;
 }
 
 export interface BuildBufferFactory {
@@ -125,6 +127,7 @@ export class LineBuilder {
 const POSITION = 0;
 const NORMAL = 1;
 const TEX_SHADING = 2;
+const LIGHTMAP = 3;
 
 class BuildBufferFactoryImpl implements BuildBufferFactory {
   private buffers = new Map<string, Buffer[]>();
@@ -135,7 +138,9 @@ class BuildBufferFactoryImpl implements BuildBufferFactory {
     const buffer = new Buffer(this.gl, new BufferBuilder()
       .addVertexBuffer(this.gl, this.gl.FLOAT, 3)
       .addVertexBuffer(this.gl, this.gl.FLOAT, 3)
-      .addVertexBuffer(this.gl, this.gl.FLOAT, 4));
+      .addVertexBuffer(this.gl, this.gl.FLOAT, 4)
+      .addVertexBuffer(this.gl, this.gl.FLOAT, 4)
+    );
     const buffers = this.buffers.get(hint);
     buffers.push(buffer);
     return buffer;
@@ -209,6 +214,11 @@ export class BuildBufferImpl implements BuildBuffer {
     return off + 1;
   }
 
+  public writeLightmap(off: number, x: number, y: number, z: number = 0, w: number = 0): number {
+    this.ptr.buffer.writeVertex(this.ptr, LIGHTMAP, off, [x, y, z, w]);
+    return off + 1;
+  }
+
   public writeTriangle(off: number, a: number, b: number, c: number): number {
     this.ptr.buffer.writeIndex(this.ptr, off, [a, b, c]);
     return off + 3;
@@ -234,6 +244,10 @@ export class BuildBufferImpl implements BuildBuffer {
 
   public getTexCoordBuffer(): VertexBuffer {
     return this.ptr.buffer.getVertexBuffer(TEX_SHADING);
+  }
+
+  getLightmapBuffer(): VertexBuffer {
+    return this.ptr.buffer.getVertexBuffer(LIGHTMAP);
   }
 
   public getIdxBuffer(): IndexBuffer {

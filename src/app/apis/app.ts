@@ -8,6 +8,7 @@ import { MessageHandler } from "./handler";
 import { ReferenceTracker } from "./referencetracker";
 import { Renderable } from "./renderable";
 import { EngineApi } from "../../build/board/mutations/api"
+import { Vec3Array } from "libs_js/glmatrix";
 
 export type LogLevel = 'ERROR' | 'WARN' | 'INFO' | 'TRACE' | 'DEBUG';
 export type Logger = (level: LogLevel, ...msg: any[]) => void;
@@ -48,6 +49,16 @@ export interface Portals {
   isPortalWall(wallId: number): boolean;
 }
 export const PORTALS = new Dependency<Portals>('Portals');
+
+
+export interface LightmapHandle {
+  texture(): Texture;
+}
+
+export interface Lightmaps {
+  allocate(vtxs: Vec3Array[], normal: Vec3Array): LightmapHandle;
+}
+export const LIGHTMAPS = new Dependency<Lightmaps>('Lightmaps');
 
 export interface State {
   register<T>(name: string, defaultValue: T): string;

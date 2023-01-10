@@ -58,17 +58,20 @@ export class GenericBufferSetup implements StateSetup {
 export class BufferSetup extends GenericBufferSetup {
   protected aNormIdx: number;
   protected aTcps: number;
+  protected aLm: number;
 
   constructor(state: State) {
     super(state);
     this.aNormIdx = this.register('aNorm', state);
     this.aTcps = this.register('aTcps', state);
+    this.aLm = this.register('aLm', state);
   }
 
   public buffer(buffer: BuildBuffer) {
     super.buffer(buffer);
     this.values.set(this.aNormIdx, buffer.getNormBuffer())
     this.values.set(this.aTcps, buffer.getTexCoordBuffer())
+    this.values.set(this.aLm, buffer.getLightmapBuffer())
     return this;
   }
 }

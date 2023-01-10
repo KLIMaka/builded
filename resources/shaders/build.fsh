@@ -18,6 +18,7 @@ in vec4 tcps;
 in vec2 gridtc;
 in vec3 wpos;
 in vec3 wnormal;
+in vec4 lm;
 
 out vec4 fragColor;
 

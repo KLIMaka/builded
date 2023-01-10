@@ -1,5 +1,5 @@
 import { NumberInterpolator } from "../src/utils/interpolator";
-import { bilinear, quadratic } from "../src/utils/mathutils";
+import { bilinear, optimize, quadratic } from "../src/utils/mathutils";
 
 test('interpolator', () => {
   const arr = [1, 2, 2, 1];
@@ -19,3 +19,10 @@ test('quadric', () => {
   expect(quadratic(x0, x1, x2, 0.25)).toBe(2);
   expect(quadratic(x0, x1, x2, 0.75)).toBe(3);
 });
+
+test('optimize', () => {
+  const f = (x: number) => x;
+  expect(optimize(x => x)).toBe(0);
+  expect(optimize(x => Math.pow(x + 1, 2), 5)).toBeCloseTo(-1);
+  expect(optimize(x => Math.pow(x - 3, 2), 5)).toBeCloseTo(3);
+})

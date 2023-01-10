@@ -1,4 +1,5 @@
-var path = require('path');
+const path = require('path');
+const TsconfigPathsPlugin = require('tsconfig-paths-webpack-plugin');
 
 module.exports = {
   mode: 'development',
@@ -8,7 +9,8 @@ module.exports = {
     filename: 'app.bundle.js'
   },
   resolve: {
-    extensions: ['.ts', '.js']
+    extensions: ['.ts', '.js'],
+    plugins: [new TsconfigPathsPlugin()]
   },
   module: {
     rules: [{
@@ -28,5 +30,5 @@ module.exports = {
   },
   experiments: {
     asyncWebAssembly: true
-  }
+  },
 };

@@ -64,7 +64,7 @@ const pluTexture = lifecycle(async (injector, lifecycle) => {
 function loadMapImpl(name: string) {
   return async (injector: Injector) => {
     const res = await injector.getInstance(RESOURCES)
-    return loadBloodMap(new Stream(await res.get(name), true));
+    return loadBloodMap(new Stream(await res.get(name)));
   }
 }
 

@@ -159,21 +159,19 @@ export abstract class BufferRenderable<T extends BufferSetup> implements Builder
 const textureMap = new Map<Texture, number>();
 const bufferMap = new Map<Buffer, number>();
 const shaderMap = new Map<String, number>();
+
+function getId<T>(map: Map<T, number>, value: T) {
+  let t = map.get(value);
+  if (t == undefined) {
+    t = map.size;
+    map.set(value, t);
+  }
+  return t;
+}
+
 export function hash(sh: String, buff: Buffer, tex: Texture, offset: number) {
-  let shader = shaderMap.get(sh);
-  if (shader == undefined) {
-    shader = shaderMap.size;
-    shaderMap.set(sh, shader);
-  }
-  let texture = textureMap.get(tex);
-  if (texture == undefined) {
-    texture = textureMap.size;
-    textureMap.set(tex, texture);
-  }
-  let buffer = bufferMap.get(buff);
-  if (buffer == undefined) {
-    buffer = bufferMap.size;
-    bufferMap.set(buff, buffer);
-  }
+  const shader = getId(shaderMap, sh);
+  const texture = getId(textureMap, tex);
+  const buffer = getId(bufferMap, buff);
   return offset + (texture << 16) + (buffer << 24) + (shader << 28);
 }

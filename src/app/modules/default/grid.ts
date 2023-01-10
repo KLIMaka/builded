@@ -1,9 +1,10 @@
 import { Injector } from "../../../utils/injector";
 import { cyclic } from "../../../utils/mathutils";
+import { GridController } from "../../apis/app";
 import { BUS, Handle, MessageHandlerReflective } from "../../apis/handler";
 import { NamedMessage } from "../../edit/messages";
 
-export class GridControllerImpl extends MessageHandlerReflective {
+export class GridControllerImpl extends MessageHandlerReflective implements GridController {
   private gridSizes = [16, 32, 64, 128, 256, 512, 1024];
   private gridSizeIdx = 6;
 

@@ -113,7 +113,7 @@ export class SectorEnt extends MessageHandlerReflective {
     this.ctx.bus.handle(new BoardInvalidate(this.sectorEnt));
   }
 
-  public Paconstte(msg: Palette) {
+  public Palette(msg: Palette) {
     const sector = this.ctx.board().sectors[this.sectorEnt.id];
     if (msg.absolute) {
       if (this.sectorEnt.type == EntityType.CEILING) {
@@ -130,7 +130,7 @@ export class SectorEnt extends MessageHandlerReflective {
         sector.floorpal = cyclic(sector.floorpal + msg.value, msg.max);
       }
     }
-    this.ctx.bus.handle(new Commit(`Set Sector ${this.sectorEnt.id}:${this.sectorEnt.type} Paconstte`, true));
+    this.ctx.bus.handle(new Commit(`Set Sector ${this.sectorEnt.id}:${this.sectorEnt.type} Palette`, true));
     this.ctx.bus.handle(new BoardInvalidate(this.sectorEnt));
   }
 
@@ -183,8 +183,24 @@ export class SectorEnt extends MessageHandlerReflective {
 
   private delete() {
     deleteSector(this.ctx.board(), this.sectorEnt.id, this.ctx.refs);
-    this.ctx.bus.handle(new Commit(`Deconste Sector ${this.sectorEnt.id}`));
+    this.ctx.bus.handle(new Commit(`Delete Sector ${this.sectorEnt.id}`));
     this.ctx.bus.handle(new BoardInvalidate(null));
+  }
+
+  private lotag(delta: number) {
+    const board = this.ctx.board();
+    const lotag = board.sectors[this.sectorEnt.id].lotag + delta;
+    board.sectors[this.sectorEnt.id].lotag = lotag;
+    this.ctx.bus.handle(new Commit(`Change Sector ${this.sectorEnt.id} Lo-Tag to ${delta}`));
+    this.ctx.bus.handle(new BoardInvalidate(this.sectorEnt));
+  }
+
+  private hitag(delta: number) {
+    const board = this.ctx.board();
+    const hitag = board.sectors[this.sectorEnt.id].hitag + delta;
+    board.sectors[this.sectorEnt.id].hitag = hitag;
+    this.ctx.bus.handle(new Commit(`Change Sector ${this.sectorEnt.id} Hi-Tag to ${delta}`));
+    this.ctx.bus.handle(new BoardInvalidate(this.sectorEnt));
   }
 
   public NamedMessage(msg: NamedMessage) {
@@ -192,6 +208,10 @@ export class SectorEnt extends MessageHandlerReflective {
       case 'delete': this.delete(); return;
       case 'fly': this.fly(); return;
       case 'fall': this.fall(); return;
+      case 'lotag+': this.lotag(1); return;
+      case 'lotag-': this.lotag(-1); return;
+      case 'hitag+': this.hitag(1); return;
+      case 'hitag-': this.hitag(-1); return;
     }
   }
 

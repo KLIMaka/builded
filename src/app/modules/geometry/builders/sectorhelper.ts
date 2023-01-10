@@ -63,11 +63,11 @@ function fillBuffersForSectorWireframe(s: number, sec: Sector, heinum: number, z
   let fw = sec.wallptr;
   let off = 0;
   for (let w = 0; w < sec.wallnum; w++) {
-    let wid = sec.wallptr + w;
-    let wall = board.walls[wid];
-    let vx = wall.x;
-    let vy = wall.y;
-    let vz = (slope(vx, vy, heinum) + z) / ZSCALE;
+    const wid = sec.wallptr + w;
+    const wall = board.walls[wid];
+    const vx = wall.x;
+    const vy = wall.y;
+    const vz = (slope(vx, vy, heinum) + z) / ZSCALE;
     buff.writePos(w, vx, vz, vy);
     if (fw != wid) {
       off = buff.writeLine(off, w - 1, w);

@@ -1,17 +1,17 @@
-import { Dependency, Injector, lifecycle, Module, plugin, Plugin, provider } from "../../../utils/injector"
+import { Dependency, getInstances, Injector, Module, plugin, provider } from "../../../utils/injector";
+import { Timer, TIMER } from "../../apis/app";
 import { BUS, MessageBus } from "../../apis/handler";
 import { Frame, PostFrame, PreFrame } from "../../edit/messages";
 
 export function FramegeneratorModule(module: Module) {
-
   module.bind(plugin("FrameGenerator"), provider(async injector => {
-    const bus = await injector.getInstance(BUS);
-    let time = window.performance.now();
+    const [bus, timer] = await getInstances(injector, BUS, TIMER);
+    let time = timer();
     let started = true;
     const frame = () => {
       if (!started) return;
       bus.handle(PREFRAME);
-      const now = window.performance.now();
+      const now = timer();
       FRAME.dt = now - time;
       time = now;
       bus.handle(FRAME);
@@ -19,7 +19,7 @@ export function FramegeneratorModule(module: Module) {
       if (started) requestAnimationFrame(frame);
     };
 
-    const start = () => { started = true; time = window.performance.now(); requestAnimationFrame(frame) }
+    const start = () => { started = true; time = timer(); requestAnimationFrame(frame) }
     const stop = () => { started = false }
     start();
   }));
@@ -36,8 +36,8 @@ export const DefaultFrameGenerator = (() => {
   let instance: FrameGenerator = null;
   return {
     async start(injector: Injector) {
-      const bus = await injector.getInstance(BUS);
-      instance = createFrameGenerator(bus);
+      const [bus, timer] = await getInstances(injector, BUS, TIMER);
+      instance = createFrameGenerator(bus, timer);
       return instance;
     },
 
@@ -51,13 +51,13 @@ const FRAME = new Frame(0);
 const PREFRAME = new PreFrame();
 const POSTFRAME = new PostFrame();
 
-function createFrameGenerator(bus: MessageBus): FrameGenerator {
-  let time = window.performance.now();
-  let started = true;
+function createFrameGenerator(bus: MessageBus, timer: Timer): FrameGenerator {
+  let time = timer();
+  let started = false;
   const frame = () => {
     if (!started) return;
     bus.handle(PREFRAME);
-    const now = window.performance.now();
+    const now = timer();
     FRAME.dt = now - time;
     time = now;
     bus.handle(FRAME);
@@ -65,7 +65,7 @@ function createFrameGenerator(bus: MessageBus): FrameGenerator {
     if (started) requestAnimationFrame(frame);
   };
 
-  const start = () => { started = true; time = window.performance.now(); requestAnimationFrame(frame) }
+  const start = () => { if (started) return; started = true; time = timer(); requestAnimationFrame(frame) }
   const stop = () => { started = false }
   start();
   return { start, stop };

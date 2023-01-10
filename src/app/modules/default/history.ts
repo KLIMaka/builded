@@ -1,6 +1,6 @@
 import { Board } from "../../../build/board/structs";
 import { Deck } from "../../../utils/collections";
-import { Injector } from "../../../utils/injector";
+import { getInstances, Injector } from "../../../utils/injector";
 import { ENGINE_API, LOGGER, TIMER } from "../../apis/app";
 import { BUS, Handle, MessageHandlerReflective } from "../../apis/handler";
 import { Commit, INVALIDATE_ALL, LoadBoard, NamedMessage } from "../../edit/messages";
@@ -9,10 +9,7 @@ export const DefaultBoardProviderConstructor = (() => {
   let handle: Handle;
   return {
     start: async (injector: Injector) => {
-      const bus = await injector.getInstance(BUS);
-      const api = await injector.getInstance(ENGINE_API);
-      const logger = await injector.getInstance(LOGGER);
-      const timer = await injector.getInstance(TIMER);
+      const [bus, api, logger, timer] = await getInstances(injector, BUS, ENGINE_API, LOGGER, TIMER);
       const defaultBoard = api.newBoard();
       const history = new Deck<Board>();
       const forward = new Deck<Board>();

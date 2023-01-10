@@ -8,8 +8,8 @@ export class Wall2dBuilder extends Builders implements WallRenderable {
   constructor(
     factory: BuildersFactory,
     readonly top = factory.wireframe('2d'),
-    readonly mid = factory.wireframe('2d'),
-    readonly bot = factory.wireframe('2d')
+    readonly mid = top,
+    readonly bot = top
   ) { super([top, mid, bot]) }
 }
 

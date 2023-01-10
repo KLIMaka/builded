@@ -37,6 +37,8 @@ function createSprite(): [HTMLElement, (id: number, sprite: Sprite) => void] {
   const [pal, palUpdater] = createRow("Palette");
   const [offset, offsetUpdater] = createRow("Offset");
   const [repeat, repeatUpdater] = createRow("Repeat");
+  const [lotag, lotagUpdater] = createRow("Lo-Tag");
+  const [hitag, hitagUpdater] = createRow("Hi-Tag");
   table.appendChild(id);
   table.appendChild(pos);
   table.appendChild(picnum);
@@ -44,6 +46,8 @@ function createSprite(): [HTMLElement, (id: number, sprite: Sprite) => void] {
   table.appendChild(pal);
   table.appendChild(offset);
   table.appendChild(repeat);
+  table.appendChild(lotag);
+  table.appendChild(hitag);
   return [root,
     (id: number, s: Sprite) => {
       idUpdater(id);
@@ -53,6 +57,8 @@ function createSprite(): [HTMLElement, (id: number, sprite: Sprite) => void] {
       offsetUpdater(`${s.xoffset}, ${s.yoffset}`);
       repeatUpdater(`${s.xrepeat}, ${s.yrepeat}`);
       posUpdater(`${s.x}, ${s.y}, ${s.z}`);
+      lotagUpdater(s.lotag);
+      hitagUpdater(s.hitag);
     }];
 }
 
@@ -67,6 +73,8 @@ function createWall(): [HTMLElement, (id: number, wall: Wall) => void] {
   const [pal, palUpdater] = createRow("Palette");
   const [offset, offsetUpdater] = createRow("Offset");
   const [repeat, repeatUpdater] = createRow("Repeat");
+  const [lotag, lotagUpdater] = createRow("Lo-Tag");
+  const [hitag, hitagUpdater] = createRow("Hi-Tag");
   table.appendChild(id);
   table.appendChild(pos);
   table.appendChild(picnum);
@@ -74,6 +82,8 @@ function createWall(): [HTMLElement, (id: number, wall: Wall) => void] {
   table.appendChild(pal);
   table.appendChild(offset);
   table.appendChild(repeat);
+  table.appendChild(lotag);
+  table.appendChild(hitag);
   return [root,
     (id: number, w: Wall) => {
       idUpdater(id);
@@ -83,6 +93,8 @@ function createWall(): [HTMLElement, (id: number, wall: Wall) => void] {
       palUpdater(w.pal);
       offsetUpdater(`${w.xpanning}, ${w.ypanning}`);
       repeatUpdater(`${w.xrepeat}, ${w.yrepeat}`);
+      lotagUpdater(w.lotag);
+      hitagUpdater(w.hitag);
     }];
 }
 
@@ -97,6 +109,8 @@ function createSector(): [HTMLElement, (id: number, sector: Sector, ceiling: boo
   const [offset, offsetUpdater] = createRow("Offset");
   const [z, zUpdater] = createRow("Z");
   const [heinum, heinumUpdater] = createRow("Heinum");
+  const [lotag, lotagUpdater] = createRow("Lo-Tag");
+  const [hitag, hitagUpdater] = createRow("Hi-Tag");
   table.appendChild(id);
   table.appendChild(picnum);
   table.appendChild(shade);
@@ -104,6 +118,8 @@ function createSector(): [HTMLElement, (id: number, sector: Sector, ceiling: boo
   table.appendChild(offset);
   table.appendChild(z);
   table.appendChild(heinum);
+  table.appendChild(lotag);
+  table.appendChild(hitag);
   return [root,
     (id: number, s: Sector, ceiling: boolean) => {
       idUpdater(id);
@@ -113,6 +129,8 @@ function createSector(): [HTMLElement, (id: number, sector: Sector, ceiling: boo
       offsetUpdater(ceiling ? `${s.ceilingxpanning}, ${s.ceilingypanning}` : `${s.floorxpanning}, ${s.floorypanning}`);
       zUpdater(ceiling ? s.ceilingz : s.floorz)
       heinumUpdater(ceiling ? s.ceilingheinum : s.floorheinum)
+      lotagUpdater(s.lotag);
+      hitagUpdater(s.hitag);
     }];
 }
 

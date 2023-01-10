@@ -26,6 +26,10 @@ view3d | SHIFT+wheelUp      | msg shade 8 false
 view3d | SHIFT+wheelDown    | msg shade -8 false
 view3d | ALT+wheelDown      | msg rotate -128 false
 view3d | ALT+wheelUp        | msg rotate 128 false
+view3d | L                  | lotag+
+view3d | CTRL+L             | lotag-
+view3d | H                  | hitag+
+view3d | CTRL+H             | hitag-
 view3d | K                  | msg wallcstat swapBottoms true true
 view3d | M                  | msg wallcstat alignBottom true true
 view3d | R                  | msg sprite_mode
@@ -75,6 +79,7 @@ view3d | CTRL+SHIFT+P       | show_painter
 view3d | CTRL+ALT+T         | show_tasks
 view3d | F11                | toggle_draw_portals
 view3d | F9                 | add_mount
+view3d | CTRL+C             | center
 
 view3d | +W                 | forward
 view3d | +S                 | backward

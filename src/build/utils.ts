@@ -1,5 +1,5 @@
 import { vec2, vec3, Vec3Array } from '../libs_js/glmatrix';
-import { cyclicPairs, loopPairs, reverse } from '../utils/collections';
+import { cyclicPairs, loopPairs } from '../utils/collections';
 import { cross2d, cyclic, int, len2d, monoatan2, PI2 } from '../utils/mathutils';
 import { normal2d } from '../utils/vecmath';
 import { Board, Sprite } from './board/structs';
@@ -120,32 +120,25 @@ export function groupSprites(board: Board): { [index: number]: number[] } {
 export const ANGSCALE = (1 / 4096);
 
 export function slope(board: Board, sectorId: number, x: number, y: number, heinum: number) {
-  const sec = board.sectors[sectorId];
-  const wall1 = board.walls[sec.wallptr];
-  const wall2 = board.walls[wall1.point2];
-  let dx = wall2.x - wall1.x;
-  let dy = wall2.y - wall1.y;
-  const ln = len2d(dx, dy);
-  dx /= ln; dy /= ln;
-  const dx1 = x - wall1.x;
-  const dy1 = y - wall1.y;
-  const k = -cross2d(dx, dy, dx1, dy1);
-  return int(heinum * ANGSCALE * k * ZSCALE);
+  return createSlopeCalculator(board, sectorId)(x, y, heinum);
 }
 
-export function createSlopeCalculator(board: Board, sectorId: number) {
+export type SlopeCalculator = (x: number, y: number, heinum: number) => number;
+
+export function createSlopeCalculator(board: Board, sectorId: number): SlopeCalculator {
   const sector = board.sectors[sectorId];
   const wall1 = board.walls[sector.wallptr];
   const wall2 = board.walls[wall1.point2];
-  let dx = wall2.x - wall1.x;
-  let dy = wall2.y - wall1.y;
+  const dx = wall2.x - wall1.x;
+  const dy = wall2.y - wall1.y;
   const ln = len2d(dx, dy);
-  dx /= ln; dy /= ln;
-
-  return function (x: number, y: number, heinum: number): number {
+  if (ln == 0) return (x: number, y: number, heinum: number) => 0;
+  const dxn = dx / ln;
+  const dyn = dy / ln;
+  return (x: number, y: number, heinum: number): number => {
     const dx1 = x - wall1.x;
     const dy1 = y - wall1.y;
-    const k = -cross2d(dx, dy, dx1, dy1);
+    const k = -cross2d(dxn, dyn, dx1, dy1);
     return int(heinum * ANGSCALE * k * ZSCALE);
   };
 }
@@ -299,9 +292,5 @@ export function clockwise(polygon: Iterable<[number, number]>): boolean {
 export function order(points: Iterable<[number, number]>, cw = true): Iterable<[number, number]> {
   const actual = clockwise(points);
   if (actual == cw) return points;
-  else {
-    const reversed = [...points];
-    reversed.reverse();
-    return reversed;
-  }
+  else return [...points].reverse();
 }

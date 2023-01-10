@@ -177,7 +177,8 @@ function addLength(ctx: RenderablesCacheContext, builder: PointSpriteBuilder, wa
   const fz = slope(board, sectorId, cx, cy, sector.floorheinum) + sector.floorz;
   const cz = slope(board, sectorId, cx, cy, sector.ceilingheinum) + sector.ceilingz;
   const length = walllen(board, wallId).toFixed(2).replace(/\.00$/, "");
-  text(builder, length, cx, cy, (ceiling ? cz : fz) / ZSCALE, 8, 8, ctx.art.get(-2));
+  const z = (ceiling ? cz : fz) / ZSCALE;
+  text(builder, length, cx, cy, z, 8, 8, ctx.art.get(-2));
 }
 
 export function updateWallHelper(cache: BuildRenderableProvider, ctx: RenderablesCacheContext, wallId: number, builder: WallHelperBuilder): WallHelperBuilder {

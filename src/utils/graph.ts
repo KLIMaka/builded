@@ -1,4 +1,4 @@
-import { chain, filter, flatten, map, pairs, reduce, wrap } from './collections';
+import { chain, filter, flatten, map, pairs, reduce } from './collections';
 import { memoize } from './mathutils';
 
 export type Links<T> = { to: Set<T>, from: Set<T> };
@@ -20,7 +20,7 @@ export class DirecredGraph<T> {
   }
 
   public addChain(chain: T[]) {
-    for (const [c1, c2] of pairs(wrap(chain))) this.add(c1, c2);
+    for (const [c1, c2] of pairs(chain)) this.add(c1, c2);
   }
 
   public remove(n: T) {

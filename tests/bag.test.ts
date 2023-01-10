@@ -39,9 +39,9 @@ test('bag controller', () => {
     return true;
   }
 
-  const places = [];
+  const places: Place[] = [];
   for (let p = get(randInt(64, 128)); p != null; p = get(randInt(64, 128))) places.push(p);
-  const validPlaces = [];
+  const validPlaces: Place[] = [];
   for (const p of places) {
     if (coin()) controller.put(p);
     else validPlaces.push(p);

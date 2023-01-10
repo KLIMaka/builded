@@ -34,7 +34,7 @@ export function int(x: number) {
   return x | 0;
 }
 
-export function clamp(x: number, min: number, max: number) {
+export function clamp(x: number, min = 0.0, max = 1.0) {
   return x > max ? max : x < min ? min : x;
 }
 
@@ -357,3 +357,24 @@ export class HashMap<K, V> {
 const SCALE = 27644437;
 export const Vec2Hash: (v: [number, number]) => number = ([x, y]) => (x * 9834497) ^ (y * 8503057);
 export const Vec2Eq: (v1: [number, number], v2: [number, number]) => boolean = ([x1, y1], [x2, y2]) => x1 == x2 && y1 == y2;
+
+function slope(f: (number) => number, x: number, d = 0.01): number {
+  const y1 = f(x - d);
+  const y2 = f(x + d);
+  return (y2 - y1) / (2 * d);
+}
+
+export function optimize(f: (number) => number, count = 2, eps = 0.001): number {
+  const x0 = f(0.5);
+  let xp = x0;
+  let xn = x0 - f(x0) / slope(f, x0);
+  let i = 0;
+  let dx = Math.abs(xp - xn);
+  while (i < count && dx > eps) {
+    xp = xn;
+    xn = xp - f(xp) / slope(f, xp, dx);
+    dx = Math.abs(xp - xn);
+    i++;
+  }
+  return xn;
+}

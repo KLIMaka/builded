@@ -10,11 +10,13 @@ export class Controller3D {
   private camera = new camera.Camera(0, 0, 0, 0, 0);
   private projection = mat4.create();
   private fov = 90;
+  private fovRad = MU.deg2rad(this.fov);
   private oldX = 0;
   private oldY = 0;
 
   public setFov(fov: number) {
     this.fov = fov;
+    this.fovRad = MU.deg2rad(fov);
   }
 
   public getFov(): number {
@@ -28,7 +30,7 @@ export class Controller3D {
   }
 
   public getProjectionMatrix(aspect: number): Mat4Array {
-    return mat4.perspective(this.projection, MU.deg2rad(this.fov), aspect, 1, 0xFFFF);
+    return mat4.perspective(this.projection, this.fovRad, aspect, 1, null);
   }
 
   public getTransformMatrix() {
@@ -78,5 +80,9 @@ export class Controller3D {
     if (move) this.camera.updateAngles((x - this.oldX) / 2, (y - this.oldY) / 2);
     this.oldX = x;
     this.oldY = y;
+  }
+
+  public getCamera(): camera.Camera {
+    return this.camera;
   }
 }

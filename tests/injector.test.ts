@@ -1,6 +1,5 @@
 import { App, Dependency, DependencyError, getInstances, Injector, LifecycleListener, Plugin, provider } from "../src/utils/injector";
 import { iter } from "../src/utils/iter";
-import { performance } from "perf_hooks";
 
 class Listener implements LifecycleListener {
   constructor(public log: string[] = []) { }
@@ -103,14 +102,7 @@ test('cyclic', async () => {
   } catch (e) {
     expect(e instanceof DependencyError).toBeTruthy();
     let de = <DependencyError>e;
-    expect(de.message).toBe('Error while starting App');
-    expect(de.cause.message).toBe('Error while creating main');
-    de = <DependencyError>de.cause;
-    expect(de.cause.message).toBe('Error while creating A');
-    de = <DependencyError>de.cause;
-    expect(de.cause.message).toBe('Error while creating B');
-    de = <DependencyError>de.cause;
-    expect(de.cause.message).toBe('Found cycle: B,A');
+    expect(de.message).toBe('Error while starting App:  Error while creating main:  Error while creating A:  Error while creating B:  Found cycle: B,A');
   }
 });
 

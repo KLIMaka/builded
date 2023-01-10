@@ -1,4 +1,3 @@
-import h from 'stage0';
 import { clamp, int } from './mathutils';
 
 export interface Raster<P> {

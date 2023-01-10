@@ -1,4 +1,4 @@
-import { DrawCall, State } from '../../utils/gl/stategl';
+import { DrawCall } from 'utils/gl/stategl';
 
 export type DrawCallConsumer = (d: DrawCall) => void;
 export interface Renderable {

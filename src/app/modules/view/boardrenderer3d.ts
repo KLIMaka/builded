@@ -250,10 +250,11 @@ export class Boardrenderer3D {
   private _sectorVisitor = (board: Board, sectorId: number) => this.sectorVisitor(board, sectorId);
   private sectorVisitor(board: Board, sectorId: number) {
     const sector = this.renderables.sector(sectorId);
-    if (this.impl.rorLinks().floorLinks[sectorId] == undefined)
-      this.surfaces.add(sector.floor);
-    if (this.impl.rorLinks().ceilLinks[sectorId] == undefined)
-      this.surfaces.add(sector.ceiling);
+    // if (this.impl.rorLinks().floorLinks[sectorId] == undefined)
+    //   this.surfaces.add(sector.floor);
+    // if (this.impl.rorLinks().ceilLinks[sectorId] == undefined)
+    //   this.surfaces.add(sector.ceiling);
+    this.surfaces.add(sector);
   }
 
   private _wallVisitor = (board: Board, wallId: number, sectorId: number) => this.wallVisitor(board, wallId, sectorId);

@@ -17,11 +17,10 @@ export interface MutableCollection<T> extends Collection<T> {
 export function ITERATOR_RESULT<T>(value: T): IteratorResult<T> { return { value, done: false } };
 export const TERMINAL_ITERATOR_RESULT: IteratorResult<any> = { value: null, done: true };
 export const EMPTY_ITERATOR = { next: () => TERMINAL_ITERATOR_RESULT };
-export const EMPTY_COLLECTION: MutableCollection<any> = {
+export const EMPTY_COLLECTION: Collection<any> = {
   get: (i: number) => undefined,
   length: () => 0,
-  [Symbol.iterator]: () => EMPTY_ITERATOR,
-  set: (i: number, v: any) => { }
+  [Symbol.iterator]: () => EMPTY_ITERATOR
 }
 
 export function iteratorResult<T>(isDone: boolean, val: T): IteratorResult<T> {
@@ -29,13 +28,13 @@ export function iteratorResult<T>(isDone: boolean, val: T): IteratorResult<T> {
 }
 
 export class ArrayWrapper<T> implements MutableCollection<T> {
-  constructor(readonly array: T[], readonly size: number = array.length) { };
+  constructor(readonly array: T[]) { };
   get(i: number) { return this.array[i] }
-  length() { return this.size }
+  length() { return this.array.length }
   [Symbol.iterator]() { return this.array.values(); }
   set(i: number, value: T) { this.array[i] = value }
 }
-export function wrap<T>(array: T[], len: number = array.length) { return new ArrayWrapper(array, len) }
+export function wrap<T>(array: T[]) { return new ArrayWrapper(array) }
 
 export class Deck<T> implements MutableCollection<T>{
   public array: T[] = [];
@@ -221,10 +220,6 @@ export function* enumerate<T>(c: Iterable<T>): Generator<[T, number]> {
 export function* range(start: number, end: number): Generator<number> {
   const di = start > end ? -1 : 1;
   for (let i = start; i != end; i += di) yield i;
-}
-
-export function rangeIter(start: number, end: number): Iter<number> {
-  return Iter.of(range(start, end));
 }
 
 export function* cyclicRange(start: number, length: number) {

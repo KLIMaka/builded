@@ -120,6 +120,7 @@ export class View3d extends MessageHandlerReflective implements View {
 
   NamedMessage(msg: NamedMessage) {
     if (msg.name == 'print_info') this.buildgl.printInfo();
+    if (msg.name == 'center') this.control.getCamera().setAngles(0, 0);
   }
 
   BoardInvalidate(msg: BoardInvalidate) {

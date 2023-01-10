@@ -64,13 +64,13 @@ export class ShaderImpl implements Shader {
 
 export async function createShader(gl: WebGLRenderingContext, name: string, defines: string[] = []): Promise<Shader> {
   const deftext = '#version 300 es\n' + defines.map(d => "#define " + d).join("\n") + "\n";
-  return Promise.all([loadString(name + '.vsh'), loadString(name + '.fsh')]).then(([vsh, fsh]) => {
-    return Promise.all([preprocess(vsh), preprocess(fsh)]).then(([pvhs, pfsh]) => {
+  return Promise.all([loadString(name + '.vsh'), loadString(name + '.fsh')])
+    .then(async ([vsh, fsh]) => {
+      const [pvhs, pfsh] = await Promise.all([preprocess(vsh), preprocess(fsh)]);
       const program = compileProgram(gl, deftext + pvhs, deftext + pfsh);
       const defs = processShaders(gl, program);
       return new ShaderImpl(gl, program, defs);
     })
-  })
 }
 
 function compileProgram(gl: WebGLRenderingContext, vsh: string, fsh: string): WebGLProgram {

@@ -2,7 +2,7 @@ import { GridController } from "../../app/apis/app";
 import { any, findFirst, interpolate, intersect, range } from "../../utils/collections";
 import { NumberInterpolator } from "../../utils/interpolator";
 import { iter } from "../../utils/iter";
-import { cross2d, int, len2d, tuple2 } from "../../utils/mathutils";
+import { cross2d, int, len2d } from "../../utils/mathutils";
 import { connectedWalls, sectorWalls } from "./loops";
 import { DEFAULT_REPEAT_RATE } from "./mutations/internal";
 import { Board } from "./structs";
@@ -121,19 +121,15 @@ export function sectorOfWall(board: Board, wallId: number): number {
 
 export function findSector(board: Board, x: number, y: number, sectorId: number = -1): number {
   if (!isValidSectorId(board, sectorId)) return findSectorAll(board, x, y);
-  const secs = [sectorId];
-  for (let i = 0; i < secs.length; i++) {
-    sectorId = secs[i];
-    const sec = board.sectors[sectorId];
-    if (inSector(board, x, y, sectorId)) return sectorId;
+  const secs = new Set<number>();
+  secs.add(sectorId);
+  for (const s of secs) {
+    const sec = board.sectors[s];
+    if (inSector(board, x, y, s)) return s;
     for (let w = 0; w < sec.wallnum; w++) {
       const wallidx = w + sec.wallptr;
       const wall = board.walls[wallidx];
-      if (wall.nextsector != -1) {
-        const nextsector = wall.nextsector;
-        if (secs.indexOf(nextsector) == -1)
-          secs.push(nextsector);
-      }
+      if (wall.nextsector != -1) secs.add(wall.nextsector);
     }
   }
   return -1;

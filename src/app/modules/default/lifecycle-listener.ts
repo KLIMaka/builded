@@ -1,5 +1,5 @@
 import { map, range } from "../../../utils/collections";
-import { Dependency, LifecycleListener, RUNTIME } from "../../../utils/injector";
+import { Dependency, LifecycleListener } from "../../../utils/injector";
 import { iter } from "../../../utils/iter";
 import { int } from "../../../utils/mathutils";
 import { Logger, Timer } from "../../apis/app";

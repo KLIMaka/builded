@@ -1,7 +1,7 @@
-import { sectorOfWall } from "../../../../build/board/query";
+import { isValidSectorId, sectorOfWall } from "../../../../build/board/query";
 import { Wall } from "../../../../build/board/structs";
 import { ArtInfo } from "../../../../build/formats/art";
-import { createSlopeCalculator, wallNormal, ZSCALE } from "../../../../build/utils";
+import { createSlopeCalculator, SlopeCalculator, wallNormal, ZSCALE } from "../../../../build/utils";
 import { mat4, Mat4Array, vec3, Vec3Array, vec4 } from "../../../../libs_js/glmatrix";
 import { len2d } from "../../../../utils/mathutils";
 import { Builders } from "../../../apis/builder";
@@ -15,16 +15,21 @@ export class WallBuilder extends Builders implements WallRenderable {
     factory: BuildersFactory,
     readonly top = factory.solid('wall'),
     readonly mid = factory.solid('wall'),
-    readonly bot = factory.solid('wall')
-  ) { super([top, mid, bot]) }
+    readonly bot = factory.solid('wall'),
+    readonly tdf = factory.solid('wall')
+  ) { super([top, mid, bot, tdf]) }
 }
 
 function normals(n: Vec3Array) {
   return [n[0], n[1], n[2], n[0], n[1], n[2], n[0], n[1], n[2], n[0], n[1], n[2]];
 }
 
-function getWallCoords(x1: number, y1: number, x2: number, y2: number,
-  slope: any, nextslope: any, heinum: number, nextheinum: number, z: number, nextz: number, check: boolean): number[] {
+function getWallCoords(
+  x1: number, y1: number, x2: number, y2: number,
+  slope: SlopeCalculator, nextslope: SlopeCalculator,
+  heinum: number, nextheinum: number,
+  z: number, nextz: number,
+  check: boolean): number[] {
   const z1 = (slope(x1, y1, heinum) + z) / ZSCALE;
   const z2 = (slope(x2, y2, heinum) + z) / ZSCALE;
   const z3 = (nextslope(x2, y2, nextheinum) + nextz) / ZSCALE;
@@ -130,8 +135,8 @@ export function updateWall(ctx: RenderablesCacheContext, wallId: number, builder
   const sectorId = sectorOfWall(board, wallId);
   const sector = board.sectors[sectorId];
   const wall2 = board.walls[wall.point2];
-  const x1 = wall.x; const y1 = wall.y;
-  const x2 = wall2.x; const y2 = wall2.y;
+  const [x1, y1] = [wall.x, wall.y];
+  const [x2, y2] = [wall2.x, wall2.y];
   const tex = art.get(wall.picnum);
   const info = art.getInfo(wall.picnum);
   const slope = createSlopeCalculator(board, sectorId);
@@ -152,9 +157,8 @@ export function updateWall(ctx: RenderablesCacheContext, wallId: number, builder
     const nextsector = board.sectors[wall.nextsector];
     const nextslope = createSlopeCalculator(board, wall.nextsector);
     const nextfloorz = nextsector.floorz;
-    const nextceilingz = nextsector.ceilingz;
-
     const nextfloorheinum = nextsector.floorheinum;
+
     const floorcoords = getWallCoords(x1, y1, x2, y2, nextslope, slope, nextfloorheinum, floorheinum, nextfloorz, floorz, true);
     if (floorcoords != null) {
       let pal = 0;
@@ -178,6 +182,7 @@ export function updateWall(ctx: RenderablesCacheContext, wallId: number, builder
       genQuad(floorcoords, normal, texMat_, pal, shade, builder.bot.buff);
     }
 
+    const nextceilingz = nextsector.ceilingz;
     const nextceilingheinum = nextsector.ceilingheinum;
     const ceilcoords = getWallCoords(x1, y1, x2, y2, slope, nextslope, ceilingheinum, nextceilingheinum, ceilingz, nextceilingz, true);
     if (ceilcoords != null) {
@@ -209,6 +214,22 @@ export function updateWall(ctx: RenderablesCacheContext, wallId: number, builder
       genQuad(coords, normal, texMat_, wall.pal, wall.shade, builder.mid.buff);
       builder.mid.tex = tex1;
       builder.mid.trans = trans;
+    }
+
+    if (nextsector.lotag == 32 && isValidSectorId(board, nextsector.hitag)) {
+      const tds = board.sectors[nextsector.hitag];
+      const wall3d = board.walls[tds.wallptr];
+      const tex = art.get(wall3d.picnum);
+      const info = art.getInfo(wall3d.picnum);
+      const slope = createSlopeCalculator(board, wall.nextsector);
+      const z1 = (slope(x1, y1, tds.ceilingheinum) + tds.ceilingz) / ZSCALE;
+      const z2 = (slope(x2, y2, tds.ceilingheinum) + tds.ceilingz) / ZSCALE;
+      const z3 = (slope(x2, y2, tds.floorheinum) + tds.floorz) / ZSCALE;
+      const z4 = (slope(x1, y1, tds.floorheinum) + tds.floorz) / ZSCALE;
+      const coords = [x1, y1, z1, x2, y2, z2, x2, y2, z3, x1, y1, z4];
+      applyWallTextureTransform(wall, wall2, info, wall3d.cstat.alignBottom ? tds.floorz : tds.ceilingz, wall, texMat_);
+      genQuad(coords, normal, texMat_, wall3d.pal, wall3d.shade, builder.tdf.buff);
+      builder.tdf.tex = tex;
     }
   }
 

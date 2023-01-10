@@ -187,7 +187,7 @@ function length(list: FastList<any>, from: number, to: number) {
 }
 
 function binaryIndexOf(list: FastList<number>, searchElement: number) {
-  let refMin = list.first();
+  const refMin = list.first();
   let min = list.first();
   let max = list.last(0);
   if (searchElement < list.get(min)) return 0;

@@ -49,7 +49,7 @@ class ChildInjector<T> implements ParentInjector {
 
 export class DependencyError extends Error {
   constructor(message: string, public cause: Error) {
-    super(message);
+    super(`${message}:  ${cause.message}`);
   }
 }
 
@@ -163,10 +163,9 @@ class RootInjector implements ParentInjector, Runtime {
 
   private async doStopInstance<T>(dependency: Dependency<T>): Promise<void> {
     try {
-      const result = await this.providers.get(dependency).stop(this);
+      await this.providers.get(dependency).stop(this);
       this.graph.remove(dependency);
       this.instances.delete(dependency);
-      return result;
     } catch (e) {
       throw new DependencyError(`Error while stopping ${dependency.name}`, e);
     }

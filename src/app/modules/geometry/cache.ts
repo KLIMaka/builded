@@ -1,3 +1,4 @@
+import { forEach, getOrCreate } from 'utils/collections';
 import { create, Dependency, getInstances, lifecycle, Module, plugin, provider } from '../../../utils/injector';
 import { ART, ArtProvider, BOARD, BoardProvider, PORTALS, Portals, SCHEDULER, Scheduler, SchedulerTask, STATE, State, TaskHandle } from '../../apis/app';
 import { Builder } from '../../apis/builder';
@@ -22,15 +23,17 @@ class Entry<T> {
   update(value: T) { this.value = value; this.valid = true; }
 }
 
+type Updater<T> = (ctx: RenderablesCacheContext, id: number, value: T) => T;
+
 class CacheMap<T extends Builder> {
   constructor(
-    readonly update: (ctx: RenderablesCacheContext, id: number, value: T) => T
+    readonly update: Updater<T>
   ) { }
 
-  private cache: { [index: number]: Entry<T> } = {};
+  private cache: Map<number, Entry<T>> = new Map();
 
   get(id: number, ctx: RenderablesCacheContext): T {
-    let v = this.ensureValue(id);
+    const v = getOrCreate(this.cache, id, id => new Entry<T>(null));
     if (!v.valid) {
       v.update(this.update(ctx, id, v.value));
       v.value.needToRebuild();
@@ -38,26 +41,15 @@ class CacheMap<T extends Builder> {
     return v.value;
   }
 
-  private ensureValue(id: number) {
-    let v = this.cache[id];
-    if (v == undefined) {
-      v = new Entry<T>(null);
-      this.cache[id] = v;
-    }
-    return v;
-  }
-
   invalidate(id: number) {
-    let v = this.cache[id];
+    const v = this.cache.get(id);
     if (v == undefined) return;
     v.value.reset();
     v.valid = false;
   }
 
   invalidateAll() {
-    for (let id in this.cache) {
-      this.invalidate(<any>id);
-    }
+    forEach(this.cache.keys(), k => this.invalidate(k));
   }
 }
 

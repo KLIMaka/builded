@@ -121,10 +121,10 @@ function genSpriteQuad(x: number, y: number, z: number, n: number[], t: number[]
 }
 
 function fillBuffersForFaceSprite(x: number, y: number, z: number, xo: number, yo: number, hw: number, hh: number, xf: number, yf: number, pal: number, shade: number, renderable: SolidBuilder) {
-  const texMat = texMat_;
-  mat4.identity(texMat);
-  mat4.scale(texMat, texMat, [1 / (hw * 2), -1 / (hh * 2), 1, 1]);
-  mat4.translate(texMat, texMat, [hw - xo, -hh - yo, 0, 0]);
+  // const texMat = texMat_;
+  // mat4.identity(texMat);
+  // mat4.scale(texMat, texMat, [1 / (hw * 2), -1 / (hh * 2), 1, 1]);
+  // mat4.translate(texMat, texMat, [hw - xo, -hh - yo, 0, 0]);
 
   genSpriteQuad(x, y, z, [
     -hw + xo, +hh + yo, 0,
@@ -139,18 +139,22 @@ export function updateSprite(ctx: RenderablesCacheContext, sprId: number, builde
   builder = builder == null ? ctx.factory.solid('sprite') : builder;
   const board = ctx.board();
   const spr = board.sprites[sprId];
-  if (spr.picnum == 0 || spr.cstat.invisible)
-    return builder;
+  if (spr.picnum == 0 || spr.cstat.invisible) return builder;
 
-  const x = spr.x; const y = spr.y; const z = spr.z / ZSCALE;
+  const x = spr.x;
+  const y = spr.y;
+  const z = spr.z / ZSCALE;
   const info = ctx.art.getInfo(spr.picnum);
   const tex = ctx.art.get(spr.picnum);
-  const w = (info.w * spr.xrepeat) / 4; const hw = w >> 1;
-  const h = (info.h * spr.yrepeat) / 4; const hh = h >> 1;
+  const w = (info.w * spr.xrepeat) / 4;
+  const hw = w / 2;
+  const h = (info.h * spr.yrepeat) / 4;
+  const hh = h / 2;
   const ang = spriteAngle(spr.ang);
   const xo = (info.attrs.xoff * spr.xrepeat) / 4;
   const yo = (info.attrs.yoff * spr.yrepeat) / 4 + (spr.cstat.realCenter ? 0 : hh);
-  const xf = spr.cstat.xflip; const yf = spr.cstat.yflip;
+  const xf = spr.cstat.xflip;
+  const yf = spr.cstat.yflip;
   const sec = board.sectors[spr.sectnum];
   const sectorShade = sec ? sec.floorshade : spr.shade;
   const shade = spr.shade == -8 ? sectorShade : spr.shade;

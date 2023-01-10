@@ -52,8 +52,9 @@ float lightOffset() {
 #ifdef PARALLAX
   return 0.0;
 #else
-  float shadowLevel = length(wpos.xz - eyepos.xz) / 512.0 * (SHADOWSTEPS / 64.0);
-  return (0.2 + float(tcps.w) / 127.0) * SHADOWSTEPS + shadowLevel;
+  // float shadowLevel = length(wpos.xz - eyepos.xz) / 512.0 * (SHADOWSTEPS / 64.0);
+  float shadowLevel = (1.0 / gl_FragCoord.w) / 512.0 * (SHADOWSTEPS / 64.0);
+  return (0.3 + float(tcps.w) / 127.0) * SHADOWSTEPS + shadowLevel;
 #endif
 }
 
@@ -195,6 +196,11 @@ vec4 renderGrid() {
   return vec4(0.4, 0.4, 0.4, a * dist);
 }
 
+void addDepth(float dd) {
+  float z = 1.0 / gl_FragCoord.w - dd;
+  gl_FragDepth = 0.5*((z - 2.0) / z) + 0.5;
+}
+
 void main() {
   clip();
 #if defined FLAT
@@ -211,6 +217,9 @@ void main() {
   writeColor(vec3(1.0), renderGrid());
 #elif defined SPRITE_FACE
   writeColor(color.rgb, texture(base, tcps.xy));
+#elif defined SPRITE
+  addDepth(128.0);
+  writeColor(palLookup(tcps.xy), color);
 #else
   writeColor(palLookup(tcps.xy), color);
 #endif

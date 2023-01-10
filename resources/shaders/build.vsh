@@ -20,12 +20,10 @@ void main() {
   tcps = aTcps;
 #ifdef SPRITE
   vec3 p = aPos + vec3(0.0, aNorm.y, 0.0);
-  vec4 epos = V * vec4(p, 1.0);
-  epos.x += aNorm.x;
+  vec4 epos = V * vec4(p, 1.0) + vec4(aNorm.x, 0.0, 0.0, 0.0);
   gl_Position = P * epos;
-  
   wnormal = (IV * vec4(0.0, 0.0, 1.0, 0.0)).xyz;
-  gridtc = (GT * vec4(aNorm.x, aNorm.y, 0.0 , 1.0)).xy;
+  gridtc = (GT * vec4(aNorm.x, aNorm.y, 0.0, 1.0)).xy;
 #elif defined SPRITE_FACE
   vec4 epos = P * V * vec4(aPos, 1.0);
   epos /= epos.w;

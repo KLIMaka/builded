@@ -9,7 +9,7 @@ import * as BUILD from '../src/build/maploader';
 import { wrap } from '../src/utils/collections';
 
 const REFS = new BuildReferenceTrackerImpl();
-const INFO = { w: 64, h: 64, attrs: new Attributes(), img: null };
+const INFO = { w: 64, h: 64, attrs: new Attributes(), img: new Uint8Array() };
 const ART: ArtInfoProvider = { getInfo(picnum: number): ArtInfo { return INFO } }
 const BUILD_API: EngineApi = {
   newBoard: BUILD.newBoard,

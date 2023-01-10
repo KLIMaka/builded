@@ -1,25 +1,13 @@
 import { BuildReferenceTrackerImpl } from '../src/app/modules/default/reftracker';
 import { triangulate } from '../src/app/modules/geometry/builders/sector';
 import { createNewSector } from '../src/build/board/mutations/ceatesector';
-import { Board } from '../src/build/board/structs';
+import { cloneBoard, cloneSector, cloneSprite, cloneWall, newBoard, newSector, newSprite, newWall } from '../src/build/maploader';
 import { wrap } from '../src/utils/collections';
-import { cloneBoard, loadBloodMap, saveBloodMap, cloneSector, cloneWall, cloneSprite, newSector, newSprite, newWall } from '../src/build/blood/maploader';
 
-const API = { cloneBoard, cloneSector, cloneWall, cloneSprite, newSector, newSprite, newWall };
-
-function createEmptyBoard() {
-  const board = new Board();
-  board.walls = [];
-  board.sectors = [];
-  board.sprites = [];
-  board.numwalls = 0;
-  board.numsectors = 0;
-  board.numsprites = 0;
-  return board;
-}
+const API = { cloneBoard, cloneSector, cloneWall, cloneSprite, newSector, newSprite, newWall, newBoard };
 
 function createBoardWSector() {
-  const board = createEmptyBoard();
+  const board = API.newBoard();
   const refs = new BuildReferenceTrackerImpl();
   createNewSector(board, wrap([[0, 0], [1024, 0], [1024, 1024], [0, 1024]]), refs, API);
   return board;

@@ -1,4 +1,4 @@
-import { Injector, provider } from "../../utils/injector";
+import { Injector, provider } from "utils/injector";
 import { Storage, Storages } from "../apis/app";
 
 class Db implements Storage {
@@ -38,7 +38,7 @@ class Db implements Storage {
   set(key: string, value: any) {
     return new Promise(async (ok, error) => {
       const request = (await this.request('readwrite')).put({ key: key.toUpperCase(), name: key, data: value });
-      request.onsuccess = () => ok();
+      request.onsuccess = () => ok(null);
       request.onerror = (e) => error(e);
     })
   }

@@ -11,6 +11,7 @@ import { SectorRenderable } from "../../../apis/renderable";
 import { BuildBuffer } from "../../gl/buffers";
 import { RenderablesCacheContext } from "../cache";
 import { BuildersFactory } from "../common";
+import { project3d } from "utils/vecmath";
 
 
 export class SectorBuilder extends Builders implements SectorRenderable {
@@ -53,6 +54,8 @@ function fillBuffersForSectorNormal(ceil: boolean, board: Board, sectorId: numbe
   buff: BuildBuffer,
   vtxs: number[][], vidxs: number[], normal: Vec3Array, t: Mat4Array) {
   const slope = createSlopeCalculator(board, sectorId);
+
+  const proj = project3d(vtxs, normal);
 
   for (let i = 0; i < vtxs.length; i++) {
     const vx = vtxs[i][0];

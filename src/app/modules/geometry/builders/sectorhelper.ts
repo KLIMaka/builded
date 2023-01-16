@@ -56,7 +56,7 @@ function addWallPoint(offset: number, builder: PointSpriteBuilder, ctx: Renderab
 }
 
 function fillBuffersForSectorWireframe(s: number, sec: Sector, heinum: number, z: number, board: Board, builder: WireframeBuilder) {
-  let slope = createSlopeCalculator(board, s);
+  const slope = createSlopeCalculator(board, s);
   const buff = builder.buff;
   buff.allocate(sec.wallnum, sec.wallnum * 2);
 
@@ -69,9 +69,7 @@ function fillBuffersForSectorWireframe(s: number, sec: Sector, heinum: number, z
     const vy = wall.y;
     const vz = (slope(vx, vy, heinum) + z) / ZSCALE;
     buff.writePos(w, vx, vz, vy);
-    if (fw != wid) {
-      off = buff.writeLine(off, w - 1, w);
-    }
+    if (fw != wid) off = buff.writeLine(off, w - 1, w);
     if (wall.point2 == fw) {
       off = buff.writeLine(off, w, fw - sec.wallptr);
       fw = wid + 1;

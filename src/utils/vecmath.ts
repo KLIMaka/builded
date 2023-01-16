@@ -145,24 +145,24 @@ export function mirrorBasis(out: GLM.Mat4Array, mat: GLM.Mat4Array, point: GLM.V
 // }
 
 
-export function projectionSpace(vtxs: GLM.Vec3Array[], n: GLM.Vec3Array) {
+export function projectionSpace(vtxs: GLM.Vec3Array[], n: GLM.Vec3Array): GLM.Mat3Array {
   const a = GLM.vec3.create();
   GLM.vec3.normalize(a, GLM.vec3.sub(a, vtxs[0], vtxs[1]));
   const c = GLM.vec3.create();
   GLM.vec3.normalize(c, GLM.vec3.cross(c, n, a));
-  const ret = [
+  return [
     a[0], c[0], n[0],
     a[1], c[1], n[1],
     a[2], c[2], n[2]
   ];
-  return ret;
 }
 
 export function project3d(vtxs: GLM.Vec3Array[], normal: GLM.Vec3Array): GLM.Vec2Array[] {
   const mat = projectionSpace(vtxs, normal);
   const ret = [];
+  const t = GLM.vec3.create();
   for (let i = 0; i < vtxs.length; i++) {
-    const vtx = GLM.vec3.transformMat3(GLM.vec3.create(), vtxs[i], mat);
+    const vtx = GLM.vec3.transformMat3(t, vtxs[i], mat);
     ret.push([vtx[0], vtx[1]]);
   }
   return ret;

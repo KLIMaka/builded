@@ -222,6 +222,8 @@ void main() {
   addDepth(128.0);
   writeColor(palLookup(tcps.xy), color);
 #else
-  writeColor(palLookup(tcps.xy), color);
+  // writeColor(palLookup(tcps.xy), color);
+  vec4 lm1 = fract(lm / 256.0);
+  fragColor = vec4(vec3(lm1.x > 0.5 && lm1.y > 0.5 || lm1.x <= 0.5 && lm1.y <= 0.5 ? 1.0 : 0.0), 1.0);
 #endif
 }

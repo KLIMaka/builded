@@ -1,6 +1,6 @@
 import { forEach, getOrCreate } from 'utils/collections';
 import { create, Dependency, getInstances, lifecycle, Module, plugin, provider } from '../../../utils/injector';
-import { ART, ArtProvider, BOARD, BoardProvider, PORTALS, Portals, SCHEDULER, Scheduler, SchedulerTask, STATE, State, TaskHandle } from '../../apis/app';
+import { ART, ArtProvider, BOARD, BoardProvider, LIGHTMAPS, Lightmaps, PORTALS, Portals, SCHEDULER, Scheduler, SchedulerTask, STATE, State, TaskHandle } from '../../apis/app';
 import { Builder } from '../../apis/builder';
 import { BUS, busDisconnector, MessageHandler, MessageHandlerReflective } from '../../apis/handler';
 import { BuildRenderableProvider, ClusterRenderable, Renderable, SectorRenderable, WallRenderable } from '../../apis/renderable';
@@ -166,11 +166,12 @@ export class RenderablesCacheContext {
   readonly factory: BuildersFactory;
   readonly state: State;
   readonly portals: Portals;
+  readonly lightmaps: Lightmaps;
 }
 const RENDERABLES_CACHE_CONTEXT = new Dependency<RenderablesCacheContext>('RenderablesCacheContext');
 const RenderablesCacheContextConstructor = provider(async injector => {
-  const [board, art, factory, state, portals] = await getInstances(injector, BOARD, ART, BUILDERS_FACTORY, STATE, PORTALS);
-  return { board, art, factory, state, portals }
+  const [board, art, factory, state, portals, lightmaps] = await getInstances(injector, BOARD, ART, BUILDERS_FACTORY, STATE, PORTALS, LIGHTMAPS);
+  return { board, art, factory, state, portals, lightmaps }
 });
 
 const RenderablesCacheConstructor = lifecycle(async (injector, lifecycle) => {

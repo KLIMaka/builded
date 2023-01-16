@@ -5,7 +5,7 @@ import { resize } from '../../utils/gl/gl';
 import { IndexedImgLibJsConstructor, INDEXED_IMG_LIB } from '../../utils/imglib';
 import { getInstances, instance, lifecycle, Module, plugin } from '../../utils/injector';
 import { DefaultProfiler, DefaultProfilerConstructor, Profiler, PROFILER, Timer } from '../../utils/profiler';
-import { ART, BOARD, ENGINE_API, GRID, PORTALS, REFERENCE_TRACKER, SCHEDULER, STATE, STORAGES, View } from '../apis/app';
+import { ART, BOARD, ENGINE_API, GRID, LIGHTMAPS, PORTALS, REFERENCE_TRACKER, SCHEDULER, STATE, STORAGES, View } from '../apis/app';
 import { BUS, busDisconnector, DefaultMessageBusConstructor, MessageBus, MessageHandlerReflective } from '../apis/handler';
 import { Renderable } from '../apis/renderable';
 import { DefaultScheduler } from '../apis/scheduler';
@@ -36,6 +36,7 @@ import { BUFFER_FACTORY, DefaultBufferFactory } from './gl/buffers';
 import { BuildGlConstructor, BUILD_GL } from './gl/buildgl';
 import { InfoModule } from './info';
 import { SwappableViewModule } from './view/view';
+import { DefaultLightmapsConstructor } from '../modules/default/lightmap';
 
 function mapBackupService(module: Module) {
   module.bind(plugin('MapBackupService'), lifecycle(async (injector, lifecycle) => {
@@ -84,6 +85,7 @@ export function DefaultSetupModule(module: Module) {
   module.bind(INDEXED_IMG_LIB, IndexedImgLibJsConstructor);
   module.bind(SCHEDULER, DefaultScheduler);
   module.bind(PORTALS, DefaultPortalsConstructor);
+  module.bind(LIGHTMAPS, DefaultLightmapsConstructor)
   module.bind(PROFILER, DefaultProfilerConstructor);
   module.bind(FRAME_GENERATOR, DefaultFrameGenerator);
 

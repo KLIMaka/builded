@@ -3,7 +3,7 @@ import { sectorWalls } from "../../../../build/board/loops";
 import { Board, Wall } from "../../../../build/board/structs";
 import { ArtInfo } from "../../../../build/formats/art";
 import { createSlopeCalculator, getFirstWallAngle, sectorNormal, ZSCALE } from "../../../../build/utils";
-import { mat4, Mat4Array, vec3, Vec3Array, vec4 } from "../../../../libs_js/glmatrix";
+import { Mat2dArray, mat4, Mat4Array, vec2, Vec2Array, vec3, Vec3Array, vec4 } from "../../../../libs_js/glmatrix";
 import { Deck, last, range } from "../../../../utils/collections";
 import { iter } from "../../../../utils/iter";
 import { Builders } from "../../../apis/builder";
@@ -11,7 +11,6 @@ import { SectorRenderable } from "../../../apis/renderable";
 import { BuildBuffer } from "../../gl/buffers";
 import { RenderablesCacheContext } from "../cache";
 import { BuildersFactory } from "../common";
-import { project3d } from "utils/vecmath";
 
 
 export class SectorBuilder extends Builders implements SectorRenderable {
@@ -49,14 +48,12 @@ function applySectorTextureTransform(board: Board, sectorId: number, ceiling: bo
 }
 
 const tc_ = vec4.create();
+const lm_ = vec2.create();
 function fillBuffersForSectorNormal(ceil: boolean, board: Board, sectorId: number,
   heinum: number, shade: number, pal: number, z: number,
   buff: BuildBuffer,
-  vtxs: number[][], vidxs: number[], normal: Vec3Array, t: Mat4Array) {
+  vtxs: number[][], vidxs: number[], normal: Vec3Array, t: Mat4Array, lms: Mat2dArray) {
   const slope = createSlopeCalculator(board, sectorId);
-
-  const proj = project3d(vtxs, normal);
-
   for (let i = 0; i < vtxs.length; i++) {
     const vx = vtxs[i][0];
     const vy = vtxs[i][1];
@@ -65,6 +62,8 @@ function fillBuffersForSectorNormal(ceil: boolean, board: Board, sectorId: numbe
     buff.writeNormal(i, normal[0], normal[1], normal[2]);
     vec4.transformMat4(tc_, vec4.set(tc_, vx, vz, vy, 1), t);
     buff.writeTcLighting(i, tc_[0], tc_[1], pal, shade);
+    vec2.transformMat2d(lm_, vec2.set(lm_, vx, vy), lms);
+    buff.writeLightmap(i, lm_[0], lm_[1], 0, 0);
   }
 
   if (ceil) {
@@ -161,7 +160,7 @@ export function triangulate(board: Board, sectorId: number) {
   return compress(triangles);
 }
 
-function fillBuffersForSector(ceil: boolean, board: Board, s: number, builder: SectorBuilder, normal: Vec3Array, t: Mat4Array) {
+function fillBuffersForSector(ceil: boolean, board: Board, s: number, builder: SectorBuilder, normal: Vec3Array, t: Mat4Array, lms: Mat2dArray) {
   const [vtxs, vidxs] = triangulate(board, s);
   const d = ceil ? builder.ceiling : builder.floor;
   d.buff.allocate(vtxs.length, vidxs.length);
@@ -170,7 +169,7 @@ function fillBuffersForSector(ceil: boolean, board: Board, s: number, builder: S
   const shade = ceil ? sector.ceilingshade : sector.floorshade;
   const pal = ceil ? sector.ceilingpal : sector.floorpal;
   const z = ceil ? sector.ceilingz : sector.floorz;
-  fillBuffersForSectorNormal(ceil, board, s, heinum, shade, pal, z, d.buff, vtxs, vidxs, normal, t);
+  fillBuffersForSectorNormal(ceil, board, s, heinum, shade, pal, z, d.buff, vtxs, vidxs, normal, t, lms);
 }
 
 const sectorNormal_ = vec3.create();
@@ -182,39 +181,41 @@ export function updateSector(ctx: RenderablesCacheContext, sectorId: number, bui
   const sector = board.sectors[sectorId];
 
   const ceilinginfo = art.getInfo(sector.ceilingpicnum);
+  const ceilinglms = ctx.lightmaps.ceiling(sectorId);
   applySectorTextureTransform(board, sectorId, true, ceilinginfo, texMat_);
-  fillBuffersForSector(true, board, sectorId, builder, sectorNormal(sectorNormal_, board, sectorId, true), texMat_);
+  fillBuffersForSector(true, board, sectorId, builder, sectorNormal(sectorNormal_, board, sectorId, true), texMat_, ceilinglms);
   builder.ceiling.tex = sector.ceilingstat.parallaxing ? art.getParallaxTexture(sector.ceilingpicnum) : art.get(sector.ceilingpicnum);
   builder.ceiling.parallax = sector.ceilingstat.parallaxing;
 
   const floorinfo = art.getInfo(sector.floorpicnum);
+  const floorlms = ctx.lightmaps.floor(sectorId);
   applySectorTextureTransform(board, sectorId, false, floorinfo, texMat_);
-  fillBuffersForSector(false, board, sectorId, builder, sectorNormal(sectorNormal_, board, sectorId, false), texMat_);
+  fillBuffersForSector(false, board, sectorId, builder, sectorNormal(sectorNormal_, board, sectorId, false), texMat_, floorlms);
   builder.floor.tex = sector.floorstat.parallaxing ? art.getParallaxTexture(sector.floorpicnum) : art.get(sector.floorpicnum);
   builder.floor.parallax = sector.floorstat.parallaxing;
 
-  if (sector.lotag == 32 && isValidSectorId(board, sector.hitag)) {
-    const tds = board.sectors[sector.hitag];
-    const [vtxs, vidxs] = triangulate(board, sectorId);
+  // if (sector.lotag == 32 && isValidSectorId(board, sector.hitag)) {
+  //   const tds = board.sectors[sector.hitag];
+  //   const [vtxs, vidxs] = triangulate(board, sectorId);
 
-    const tdceilingInfo = art.getInfo(tds.ceilingpicnum);
-    applySectorTextureTransform(board, sector.hitag, false, tdceilingInfo, texMat_);
-    builder.tdceiling.buff.allocate(vtxs.length, vidxs.length);
-    fillBuffersForSectorNormal(false, board, sectorId,
-      tds.ceilingheinum, tds.ceilingshade, tds.ceilingpal, tds.ceilingz,
-      builder.tdceiling.buff, vtxs, vidxs, sectorNormal(sectorNormal_, board, sectorId, false), texMat_);
-    builder.tdceiling.tex = tds.ceilingstat.parallaxing ? art.getParallaxTexture(tds.ceilingpicnum) : art.get(tds.ceilingpicnum);
-    builder.tdceiling.parallax = tds.ceilingstat.parallaxing;
+  //   const tdceilingInfo = art.getInfo(tds.ceilingpicnum);
+  //   applySectorTextureTransform(board, sector.hitag, false, tdceilingInfo, texMat_);
+  //   builder.tdceiling.buff.allocate(vtxs.length, vidxs.length);
+  //   fillBuffersForSectorNormal(false, board, sectorId,
+  //     tds.ceilingheinum, tds.ceilingshade, tds.ceilingpal, tds.ceilingz,
+  //     builder.tdceiling.buff, vtxs, vidxs, sectorNormal(sectorNormal_, board, sectorId, false), texMat_);
+  //   builder.tdceiling.tex = tds.ceilingstat.parallaxing ? art.getParallaxTexture(tds.ceilingpicnum) : art.get(tds.ceilingpicnum);
+  //   builder.tdceiling.parallax = tds.ceilingstat.parallaxing;
 
-    const tdfloorInfo = art.getInfo(tds.floorpicnum);
-    applySectorTextureTransform(board, sector.hitag, true, tdfloorInfo, texMat_);
-    builder.tdfloor.buff.allocate(vtxs.length, vidxs.length);
-    fillBuffersForSectorNormal(true, board, sectorId,
-      tds.floorheinum, tds.floorshade, tds.floorpal, tds.floorz,
-      builder.tdfloor.buff, vtxs, vidxs, sectorNormal(sectorNormal_, board, sectorId, true), texMat_);
-    builder.tdfloor.tex = tds.floorstat.parallaxing ? art.getParallaxTexture(tds.floorpicnum) : art.get(tds.floorpicnum);
-    builder.tdfloor.parallax = tds.floorstat.parallaxing;
-  }
+  //   const tdfloorInfo = art.getInfo(tds.floorpicnum);
+  //   applySectorTextureTransform(board, sector.hitag, true, tdfloorInfo, texMat_);
+  //   builder.tdfloor.buff.allocate(vtxs.length, vidxs.length);
+  //   fillBuffersForSectorNormal(true, board, sectorId,
+  //     tds.floorheinum, tds.floorshade, tds.floorpal, tds.floorz,
+  //     builder.tdfloor.buff, vtxs, vidxs, sectorNormal(sectorNormal_, board, sectorId, true), texMat_);
+  //   builder.tdfloor.tex = tds.floorstat.parallaxing ? art.getParallaxTexture(tds.floorpicnum) : art.get(tds.floorpicnum);
+  //   builder.tdfloor.parallax = tds.floorstat.parallaxing;
+  // }
 
   return builder;
 }

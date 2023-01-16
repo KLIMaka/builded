@@ -11,7 +11,6 @@ import { SectorRenderable } from "../../../apis/renderable";
 import { BuildBuffer } from "../../gl/buffers";
 import { RenderablesCacheContext } from "../cache";
 import { BuildersFactory } from "../common";
-import { project3d } from "utils/vecmath";
 
 
 export class SectorBuilder extends Builders implements SectorRenderable {
@@ -26,8 +25,8 @@ export class SectorBuilder extends Builders implements SectorRenderable {
 
 function applySectorTextureTransform(board: Board, sectorId: number, ceiling: boolean, info: ArtInfo, texMat: Mat4Array) {
   const sector = board.sectors[sectorId];
-  const xpan = (ceiling ? sector.ceilingxpanning : sector.floorxpanning) / 256.0;
-  const ypan = (ceiling ? sector.ceilingypanning : sector.floorypanning) / 256.0;
+  const xpan = (ceiling ? sector.ceilingxpanning : sector.floorxpanning) / 255.0;
+  const ypan = (ceiling ? sector.ceilingypanning : sector.floorypanning) / 255.0;
   const stats = ceiling ? sector.ceilingstat : sector.floorstat;
   const scale = stats.doubleSmooshiness ? 8.0 : 16.0;
   const parallaxscale = stats.parallaxing ? 6.0 : 1.0;
@@ -54,8 +53,6 @@ function fillBuffersForSectorNormal(ceil: boolean, board: Board, sectorId: numbe
   buff: BuildBuffer,
   vtxs: number[][], vidxs: number[], normal: Vec3Array, t: Mat4Array) {
   const slope = createSlopeCalculator(board, sectorId);
-
-  const proj = project3d(vtxs, normal);
 
   for (let i = 0; i < vtxs.length; i++) {
     const vx = vtxs[i][0];

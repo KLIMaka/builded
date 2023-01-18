@@ -94,7 +94,7 @@ export class Buffer {
   public writeVertex(ptr: Pointer, idx: number, off: number, vdata: number[]) {
     const buff = this.vtxBuffers[idx];
     const offset = (ptr.vtx.offset + off) * buff.getSpacing();
-    const data = <any>buff.getData();
+    const data = buff.getData();
     for (let i = 0; i < vdata.length; i++) data[offset + i] = vdata[i];
     this.vtxRegions[idx].push([offset / buff.getSpacing(), Math.ceil(vdata.length / buff.getSpacing())]);
     this.needUpdate = true;
@@ -104,7 +104,7 @@ export class Buffer {
     const buff = this.idxBuffer;
     const offset = ptr.idx.offset + off;
     const vtxoff = ptr.vtx.offset;
-    const data = <any>buff.getData();
+    const data = buff.getData();
     for (let i = 0; i < idata.length; i++) data[offset + i] = idata[i] + vtxoff;
     this.idxRegions.push([offset, idata.length]);
     this.needUpdate = true;

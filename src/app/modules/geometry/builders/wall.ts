@@ -81,15 +81,23 @@ function writePos(buff: BuildBuffer, c: number[]) {
 }
 
 const tc = vec4.create();
-function writeTransformTc(buff: BuildBuffer, t: Mat4Array, c: number[], pal: number, shade: number) {
+function writeTransformTc(buff: BuildBuffer, t: Mat4Array, lmt: Mat4Array, c: number[], pal: number, shade: number) {
   vec4.transformMat4(tc, vec4.set(tc, c[0], c[2], c[1], 1), t);
   buff.writeTcLighting(0, tc[0], tc[1], pal, shade);
+  vec4.transformMat4(tc, vec4.set(tc, c[0], c[2], c[1], 1), lmt);
+  buff.writeLightmap(0, tc[0], tc[1], 0, 0);
   vec4.transformMat4(tc, vec4.set(tc, c[3], c[5], c[4], 1), t);
   buff.writeTcLighting(1, tc[0], tc[1], pal, shade);
+  vec4.transformMat4(tc, vec4.set(tc, c[3], c[5], c[4], 1), lmt);
+  buff.writeLightmap(1, tc[0], tc[1], 0, 0);
   vec4.transformMat4(tc, vec4.set(tc, c[6], c[8], c[7], 1), t);
   buff.writeTcLighting(2, tc[0], tc[1], pal, shade);
+  vec4.transformMat4(tc, vec4.set(tc, c[6], c[8], c[7], 1), lmt);
+  buff.writeLightmap(2, tc[0], tc[1], 0, 0);
   vec4.transformMat4(tc, vec4.set(tc, c[9], c[11], c[10], 1), t);
   buff.writeTcLighting(3, tc[0], tc[1], pal, shade);
+  vec4.transformMat4(tc, vec4.set(tc, c[9], c[11], c[10], 1), lmt);
+  buff.writeLightmap(3, tc[0], tc[1], 0, 0);
 }
 
 function writeNormal(buff: BuildBuffer, n: number[]) {
@@ -99,10 +107,10 @@ function writeNormal(buff: BuildBuffer, n: number[]) {
   buff.writeNormal(3, n[9], n[10], n[11]);
 }
 
-function genQuad(c: number[], n: number[], t: Mat4Array, pal: number, shade: number, buff: BuildBuffer) {
+function genQuad(c: number[], n: number[], t: Mat4Array, lmt: Mat4Array, pal: number, shade: number, buff: BuildBuffer) {
   buff.allocate(4, 6);
   writePos(buff, c);
-  writeTransformTc(buff, t, c, pal, shade);
+  writeTransformTc(buff, t, lmt, c, pal, shade);
   writeNormal(buff, n);
   buff.writeQuad(0, 0, 1, 2, 3);
 }
@@ -151,7 +159,7 @@ export function updateWall(ctx: RenderablesCacheContext, wallId: number, builder
     const coords = getWallCoords(x1, y1, x2, y2, slope, slope, ceilingheinum, floorheinum, ceilingz, floorz, false);
     const base = wall.cstat.alignBottom ? floorz : ceilingz;
     applyWallTextureTransform(wall, wall2, info, base, wall, texMat_);
-    genQuad(coords, normal, texMat_, wall.pal, wall.shade, builder.mid.buff);
+    genQuad(coords, normal, texMat_, ctx.lightmaps.midWall(wallId), wall.pal, wall.shade, builder.mid.buff);
     builder.mid.tex = tex;
   } else {
     const nextsector = board.sectors[wall.nextsector];
@@ -179,7 +187,7 @@ export function updateWall(ctx: RenderablesCacheContext, wallId: number, builder
         shade = wall_.shade;
         pal = wall_.pal;
       }
-      genQuad(floorcoords, normal, texMat_, pal, shade, builder.bot.buff);
+      genQuad(floorcoords, normal, texMat_, ctx.lightmaps.lowerWall(wallId), pal, shade, builder.bot.buff);
     }
 
     const nextceilingz = nextsector.ceilingz;
@@ -200,37 +208,37 @@ export function updateWall(ctx: RenderablesCacheContext, wallId: number, builder
         shade = wall.shade;
         pal = wall.pal;
       }
-      genQuad(ceilcoords, normal, texMat_, pal, shade, builder.top.buff);
+      genQuad(ceilcoords, normal, texMat_, ctx.lightmaps.upperWall(wallId), pal, shade, builder.top.buff);
     }
 
-    if (wall.cstat.masking) {
-      const tex1 = art.get(wall.overpicnum);
-      const info1 = art.getInfo(wall.overpicnum);
-      const coords = getMaskedWallCoords(x1, y1, x2, y2, slope, nextslope,
-        ceilingheinum, nextceilingheinum, ceilingz, nextceilingz,
-        floorheinum, nextfloorheinum, floorz, nextfloorz);
-      const base = wall.cstat.alignBottom ? Math.min(floorz, nextfloorz) : Math.max(ceilingz, nextceilingz);
-      applyWallTextureTransform(wall, wall2, info1, base, wall, texMat_);
-      genQuad(coords, normal, texMat_, wall.pal, wall.shade, builder.mid.buff);
-      builder.mid.tex = tex1;
-      builder.mid.trans = trans;
-    }
+    // if (wall.cstat.masking) {
+    //   const tex1 = art.get(wall.overpicnum);
+    //   const info1 = art.getInfo(wall.overpicnum);
+    //   const coords = getMaskedWallCoords(x1, y1, x2, y2, slope, nextslope,
+    //     ceilingheinum, nextceilingheinum, ceilingz, nextceilingz,
+    //     floorheinum, nextfloorheinum, floorz, nextfloorz);
+    //   const base = wall.cstat.alignBottom ? Math.min(floorz, nextfloorz) : Math.max(ceilingz, nextceilingz);
+    //   applyWallTextureTransform(wall, wall2, info1, base, wall, texMat_);
+    //   genQuad(coords, normal, texMat_, wall.pal, wall.shade, builder.mid.buff);
+    //   builder.mid.tex = tex1;
+    //   builder.mid.trans = trans;
+    // }
 
-    if (nextsector.lotag == 32 && isValidSectorId(board, nextsector.hitag)) {
-      const tds = board.sectors[nextsector.hitag];
-      const wall3d = board.walls[tds.wallptr];
-      const tex = art.get(wall3d.picnum);
-      const info = art.getInfo(wall3d.picnum);
-      const slope = createSlopeCalculator(board, wall.nextsector);
-      const z1 = (slope(x1, y1, tds.ceilingheinum) + tds.ceilingz) / ZSCALE;
-      const z2 = (slope(x2, y2, tds.ceilingheinum) + tds.ceilingz) / ZSCALE;
-      const z3 = (slope(x2, y2, tds.floorheinum) + tds.floorz) / ZSCALE;
-      const z4 = (slope(x1, y1, tds.floorheinum) + tds.floorz) / ZSCALE;
-      const coords = [x1, y1, z1, x2, y2, z2, x2, y2, z3, x1, y1, z4];
-      applyWallTextureTransform(wall, wall2, info, wall3d.cstat.alignBottom ? tds.floorz : tds.ceilingz, wall, texMat_);
-      genQuad(coords, normal, texMat_, wall3d.pal, wall3d.shade, builder.tdf.buff);
-      builder.tdf.tex = tex;
-    }
+    // if (nextsector.lotag == 32 && isValidSectorId(board, nextsector.hitag)) {
+    //   const tds = board.sectors[nextsector.hitag];
+    //   const wall3d = board.walls[tds.wallptr];
+    //   const tex = art.get(wall3d.picnum);
+    //   const info = art.getInfo(wall3d.picnum);
+    //   const slope = createSlopeCalculator(board, wall.nextsector);
+    //   const z1 = (slope(x1, y1, tds.ceilingheinum) + tds.ceilingz) / ZSCALE;
+    //   const z2 = (slope(x2, y2, tds.ceilingheinum) + tds.ceilingz) / ZSCALE;
+    //   const z3 = (slope(x2, y2, tds.floorheinum) + tds.floorz) / ZSCALE;
+    //   const z4 = (slope(x1, y1, tds.floorheinum) + tds.floorz) / ZSCALE;
+    //   const coords = [x1, y1, z1, x2, y2, z2, x2, y2, z3, x1, y1, z4];
+    //   applyWallTextureTransform(wall, wall2, info, wall3d.cstat.alignBottom ? tds.floorz : tds.ceilingz, wall, texMat_);
+    //   genQuad(coords, normal, texMat_, wall3d.pal, wall3d.shade, builder.tdf.buff);
+    //   builder.tdf.tex = tex;
+    // }
   }
 
   return builder;

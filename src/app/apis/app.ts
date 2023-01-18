@@ -8,7 +8,7 @@ import { MessageHandler } from "./handler";
 import { ReferenceTracker } from "./referencetracker";
 import { Renderable } from "./renderable";
 import { EngineApi } from "../../build/board/mutations/api"
-import { Mat2dArray, Vec2Array, Vec3Array } from "libs_js/glmatrix";
+import { Mat2dArray, Mat4Array, Vec2Array, Vec3Array } from "libs_js/glmatrix";
 
 export type LogLevel = 'ERROR' | 'WARN' | 'INFO' | 'TRACE' | 'DEBUG';
 export type Logger = (level: LogLevel, ...msg: any[]) => void;
@@ -58,6 +58,9 @@ export interface LightmapHandle {
 export interface Lightmaps {
   ceiling(sectorId: number): Mat2dArray;
   floor(sectorId: number): Mat2dArray;
+  lowerWall(wallId: number): Mat4Array;
+  upperWall(wallId: number): Mat4Array;
+  midWall(wallId: number): Mat4Array;
 }
 export const LIGHTMAPS = new Dependency<Lightmaps>('Lightmaps');
 

@@ -39,11 +39,10 @@ export function createGridWallMatrix(board: Board, id: number, type: WallGridTyp
   const sx = (wall1.xrepeat * DEFAULT_REPEAT_RATE) / wlen;
   const sy = wall1.yrepeat / 8;
   mat4.identity(texMat);
-  vec4.set(tmp, sx, sy, 1, 1);
-  mat4.scale(texMat, texMat, tmp);
+  mat4.scale(texMat, texMat, vec4.set(tmp, sx, sy, 1, 1));
   mat4.rotateY(texMat, texMat, -Math.atan2(-dy, dx));
-  vec4.set(tmp, -wall1.x, -zbase / ZSCALE, -wall1.y, 0);
-  return mat4.translate(texMat, texMat, tmp);
+  mat4.translate(texMat, texMat, vec4.set(tmp, -wall1.x, -zbase / ZSCALE, -wall1.y, 0));
+  return texMat;
 }
 
 export function buildCeilingHinge(ctx: RenderablesCacheContext, sectorId: number, builder: WireframeBuilder): WireframeBuilder { return prepareHinge(ctx, sectorId, true, builder) }

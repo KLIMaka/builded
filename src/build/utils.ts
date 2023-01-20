@@ -294,3 +294,50 @@ export function order(points: Iterable<[number, number]>, cw = true): Iterable<[
   if (actual == cw) return points;
   else return [...points].reverse();
 }
+
+export function getWallCoords(x1: number, y1: number, x2: number, y2: number,
+  slope: SlopeCalculator, nextslope: SlopeCalculator,
+  heinum: number, nextheinum: number,
+  z: number, nextz: number,
+  check: boolean): number[] {
+  const z1 = (slope(x1, y1, heinum) + z) / ZSCALE;
+  const z2 = (slope(x2, y2, heinum) + z) / ZSCALE;
+  const z3 = (nextslope(x2, y2, nextheinum) + nextz) / ZSCALE;
+  const z4 = (nextslope(x1, y1, nextheinum) + nextz) / ZSCALE;
+  if (check && z4 >= z1 && z3 >= z2) return null;
+
+  if (z4 > z1) {
+    const d = 1 - 1 / ((z4 - z1) / (z2 - z3) + 1);
+    const x1_ = x1 + (x2 - x1) * d;
+    const y1_ = y1 + (y2 - y1) * d;
+    const z1_ = z1 + (z2 - z1) * d;
+    return [x1_, y1_, z1_, x2, y2, z2, x2, y2, z3, x1_, y1_, z1_];
+  } else if (z3 > z2) {
+    const d = 1 - 1 / ((z1 - z4) / (z3 - z2) + 1);
+    const x2_ = x1 + (x2 - x1) * d;
+    const y2_ = y1 + (y2 - y1) * d;
+    const z2_ = z1 + (z2 - z1) * d;
+    return [x1, y1, z1, x2_, y2_, z2_, x2_, y2_, z2_, x1, y1, z4];
+  }
+
+  return [x1, y1, z1, x2, y2, z2, x2, y2, z3, x1, y1, z4];
+}
+
+export function getMaskedWallCoords(x1: number, y1: number, x2: number, y2: number,
+  slope: SlopeCalculator, nextslope: SlopeCalculator,
+  ceilheinum: number, ceilnextheinum: number, ceilz: number, ceilnextz: number,
+  floorheinum: number, floornextheinum: number, floorz: number, floornextz: number): number[] {
+  const currz1 = (slope(x1, y1, ceilheinum) + ceilz) / ZSCALE;
+  const currz2 = (slope(x2, y2, ceilheinum) + ceilz) / ZSCALE;
+  const currz3 = (slope(x2, y2, floorheinum) + floorz) / ZSCALE;
+  const currz4 = (slope(x1, y1, floorheinum) + floorz) / ZSCALE;
+  const nextz1 = (nextslope(x1, y1, ceilnextheinum) + ceilnextz) / ZSCALE;
+  const nextz2 = (nextslope(x2, y2, ceilnextheinum) + ceilnextz) / ZSCALE;
+  const nextz3 = (nextslope(x2, y2, floornextheinum) + floornextz) / ZSCALE;
+  const nextz4 = (nextslope(x1, y1, floornextheinum) + floornextz) / ZSCALE;
+  const z1 = Math.min(currz1, nextz1);
+  const z2 = Math.min(currz2, nextz2);
+  const z3 = Math.max(currz3, nextz3);
+  const z4 = Math.max(currz4, nextz4);
+  return [x1, y1, z1, x2, y2, z2, x2, y2, z3, x1, y1, z4];
+}

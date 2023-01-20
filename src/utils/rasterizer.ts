@@ -230,6 +230,7 @@ export class Rasterizer {
         const param = this.attrparams[a];
         reg[i % 3][a] = this.attrs[a][param.offset + indices[i] * param.stride];
       }
+      const coords = this.shader(reg[i % 3]);
       if ((i + 1) % 3 != 0) continue;
 
       const miny = clamp(Math.min(reg[0][1], reg[1][1], reg[2][1]));

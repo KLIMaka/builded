@@ -190,7 +190,8 @@ export class BloodSprite extends Sprite {
 }
 
 export class BloodBoard extends Board {
-  public sectors: BloodSector[];
-  public walls: BloodWall[];
-  public sprites: BloodSprite[];
+  declare public sectors: BloodSector[];
+  declare public walls: BloodWall[];
+  declare public sprites: BloodSprite[];
+  public visibility: number;
 }

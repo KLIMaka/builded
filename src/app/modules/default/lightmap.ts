@@ -51,6 +51,7 @@ class LightmapsImpl implements Lightmaps {
   midWall(wallId: number): Mat4Array { return this.wall1(wallId, EntityType.MID_WALL) }
 
   private sector(sectorId: number, ceiling: boolean): Mat2dArray {
+    return mat2d.create();
     const board = this.board();
     const sector = board.sectors[sectorId];
     const n = wallNormal(vec3.create(), board, sector.wallptr);
@@ -75,6 +76,7 @@ class LightmapsImpl implements Lightmaps {
   }
 
   private wall1(wallId: number, type: (EntityType.LOWER_WALL | EntityType.MID_WALL | EntityType.UPPER_WALL)): Mat4Array {
+    return mat4.create();
     const coords = this.getCoords(wallId, type);
     if (coords == null) return mat4.create();
     const maxz = Math.max(...map(range(0, 4), i => coords[i * 3 + 2]));
@@ -85,10 +87,10 @@ class LightmapsImpl implements Lightmaps {
     const dsx = (tx * 256) / bb.width();
     const dsy = (ty * 256) / bb.height();
     const r = this.packer.pack(new Rect(tx, ty));
+    if (r == null) return mat4.create();
     const xoff = r.xoff / 1024;
     const yoff = r.yoff / 1024;
     const t = mat4.create();
-    if (r == null) return mat4.create();
     mat4.scale(t, t, [1 / 256, 1 / 256, 1, 1]);
     mat4.translate(m, m, [xoff, yoff, 0, 0]);
     mat4.scale(t, t, [dsx, dsy, 1, 1]);

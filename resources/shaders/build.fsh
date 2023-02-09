@@ -25,6 +25,7 @@ out vec4 fragColor;
 const float TARANS_IDX = float(255.0/256.0);
 const float PI = 3.1415926538;
 const float SQR2 = 1.414213562373095;
+const float PLU_LINES = SHADOWSTEPS * PALSWAPS;
 
 bool isTransIdx(float idx) {
   return idx >= TARANS_IDX;
@@ -53,9 +54,9 @@ float lightOffset() {
 #ifdef PARALLAX
   return 0.0;
 #else
-  // float shadowLevel = length(wpos.xz - eyepos.xz) / 512.0 * (SHADOWSTEPS / 64.0);
-  float shadowLevel = (1.0 / gl_FragCoord.w) / 512.0 * (SHADOWSTEPS / 64.0);
-  return (0.3 + float(tcps.w) / 127.0) * SHADOWSTEPS + shadowLevel;
+  float z = (1.0 / gl_FragCoord.w) ;
+  float shadowLevel = sys.w == 0.0 ? 0.0 : z / sys.w;
+  return tcps.w + shadowLevel;
 #endif
 }
 
@@ -92,7 +93,8 @@ float highlight() {
 
 float palLightOffset(float lightLevel) {
 #ifdef PAL_LIGHTING
-  return  (tcps.z + lightLevel / SHADOWSTEPS) / PALSWAPS;
+  float base = tcps.z * SHADOWSTEPS;
+  return  (base + lightLevel) / PLU_LINES;
 #else
   return (tcps.z + 0.5 / SHADOWSTEPS) / PALSWAPS ;
 #endif
@@ -117,7 +119,7 @@ float transBlend(vec2 idxs) {
 }
 
 vec3 sampleColor(vec3 palSamples, float lightLevel, float overbright) {
-  float off = palLightOffset(lightLevel);
+  float off = palLightOffset(lightLevel + 0.5);
   vec3 idxs = vec3(
     samplePaletteIndex(palSamples.r, off),
     samplePaletteIndex(palSamples.g, off),
@@ -127,7 +129,7 @@ vec3 sampleColor(vec3 palSamples, float lightLevel, float overbright) {
     ? transBlend(vec2(transBlend(idxs.gb), idxs.r))
     : idxs.r;
   if (isTransIdx(idx)) discard;
-  vec3 color = texture(pal, vec2(idx, 0)).rgb;
+  vec3 color = texture(pal, vec2(idx, 0.5)).rgb;
   return color * overbright * lightOffset(lightLevel);
 }
 
@@ -173,7 +175,8 @@ vec3 getPalSamples(vec2 tc) {
 vec3 palLookup(vec2 tc) {
   vec3 palSamples = getPalSamples(tc);
   float lterm = lightOffset() + diffuse() + specular();
-  float lightLevel = clamp(lterm + (fract(lterm) > ditherOffset() ? 1.0 : 0.0), 1.0 / SHADOWSTEPS, SHADOWSTEPS - 1.0 / SHADOWSTEPS);
+  int dither = fract(lterm) > ditherOffset() ? 1 : 0;
+  float lightLevel = clamp(float(int(lterm) + dither), 0.0, SHADOWSTEPS - 1.0);
   float overbright = highlight();
   return sampleColor(palSamples, lightLevel, overbright);
 }
@@ -223,7 +226,7 @@ void main() {
   writeColor(palLookup(tcps.xy), color);
 #else
   writeColor(palLookup(tcps.xy), color);
-  vec4 lm1 = fract(lm / 2.0);
-  fragColor = vec4(vec3(lm1.x > 0.5 && lm1.y > 0.5 || lm1.x <= 0.5 && lm1.y <= 0.5 ? 0.7 : 0.3), 1.0);
+  // vec4 lm1 = fract(lm / 2.0);
+  // fragColor = vec4(vec3(lm1.x > 0.5 && lm1.y > 0.5 || lm1.x <= 0.5 && lm1.y <= 0.5 ? 0.7 : 0.3), 1.0);
 #endif
 }

@@ -229,7 +229,7 @@ export class DrawWall extends DefaultTool {
   private start() {
     const target = this.view.target();
     const snapTarget = this.view.snapTarget();
-    if (snapTarget.entity == null || !snapTarget.entity.isWall() && target.entity == null || target.entity.isSector()) return;
+    if (snapTarget.entity == null || target == null || !snapTarget.entity.isWall() && target.entity == null || target.entity.isSector()) return;
     this.activate();
     const [x, y, z] = snapTarget.coords;
     this.portal.start(this.board(), snapTarget.entity.id, x, y, z);

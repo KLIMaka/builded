@@ -4,10 +4,12 @@ export class ArtInfo {
   constructor(public w: number, public h: number, public attrs: Attributes, public img: Uint8Array) { }
 }
 
+
 export const NO_ANIMATION = 0;
 export const ANIMATE_FORWARD = 2;
 export const OSCILLATING_ANIMATION = 1;
 export const ANIMATE_BACKWARD = 3;
+
 
 export class Attributes {
   public frames = 0;
@@ -17,6 +19,8 @@ export class Attributes {
   public speed = 0;
   public unk = 0;
 }
+
+export const EMPTY_INFO = new ArtInfo(0, 0, new Attributes(), new Uint8Array(0));
 
 export function animate(frame: number, info: ArtInfo) {
   const max = info.attrs.frames + 1;
@@ -110,7 +114,7 @@ export class ArtFiles implements ArtInfoProvider {
 
   public getInfo(id: number): ArtInfo {
     var art = this.getArt(id);
-    if (art == null) return null;
+    if (art == null) return EMPTY_INFO;
     return art.getInfo(id - art.getStart());
   }
 }

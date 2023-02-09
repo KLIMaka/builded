@@ -46,10 +46,8 @@ const wallNormal = vec2.create();
 const mirrorNormal = vec3.create();
 const mirroredTransform = mat4.create();
 const mpos = vec3.create();
-const polyOffsetOn = (bgl: BuildGl) => { bgl.gl.polygonOffset(4, -8) };
-const polyOffsetOff = (bgl: BuildGl) => { bgl.gl.polygonOffset(4, 0) };
-const blendOn = (bgl: BuildGl) => { bgl.gl.enable(WebGLRenderingContext.BLEND) };
-const blendOff = (bgl: BuildGl) => { bgl.gl.disable(WebGLRenderingContext.BLEND) };
+const transOn = (bgl: BuildGl) => { bgl.gl.enable(WebGLRenderingContext.BLEND); bgl.gl.depthMask(false); };
+const transOff = (bgl: BuildGl) => { bgl.gl.disable(WebGLRenderingContext.BLEND); bgl.gl.depthMask(true); };
 
 function list() {
   const list = new Deck<Renderable>();
@@ -293,18 +291,12 @@ export class Boardrenderer3D {
 
   private drawImpl() {
     this.bgl.draw(this.surfaces);
-    this.bgl.flush();
-    polyOffsetOn(this.bgl);
     this.bgl.draw(this.sprites);
     this.bgl.flush();
-    polyOffsetOff(this.bgl);
-    blendOn(this.bgl);
+    transOn(this.bgl);
     this.bgl.draw(this.surfacesTrans);
-    this.bgl.flush();
-    polyOffsetOn(this.bgl);
     this.bgl.draw(this.spritesTrans);
     this.bgl.flush();
-    polyOffsetOff(this.bgl);
-    blendOff(this.bgl);
+    transOff(this.bgl);
   }
 }

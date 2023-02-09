@@ -1,4 +1,4 @@
-import { ArtFiles, ArtInfo, Attributes } from "../../build/formats/art";
+import { ArtFiles, ArtInfo, Attributes, EMPTY_INFO } from "../../build/formats/art";
 import { rect } from "../../utils/collections";
 import { Texture } from "../../utils/gl/drawstruct";
 import { createTexture, TextureImpl } from "../../utils/gl/textures";
@@ -124,6 +124,7 @@ export class BuildArtProvider implements ArtProvider {
     info = add != undefined
       ? new ArtInfo(add.getWidth(), add.getHeight(), new Attributes(), (<TextureImpl>add).data)
       : this.arts.getInfo(picnum);
+    if (info == null) info = EMPTY_INFO;
     this.infos[picnum] = info;
     return info;
   }

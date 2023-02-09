@@ -1,0 +1,5 @@
+07.02.23
+
+* render sprites in 2d and wall sprites in 3d without fract`ing tss
+* preselecting actual enity picnum in picselect dialog
+* distance shading

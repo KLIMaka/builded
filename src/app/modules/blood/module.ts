@@ -1,4 +1,5 @@
-import { cloneBoard, cloneSector, cloneSprite, cloneWall, loadBloodMap, newBoard, newSector, newSprite, newWall } from '../../../build/blood/maploader';
+import { BloodBoard } from 'build/blood/structs';
+import { cloneBoard, cloneSector, cloneSprite, cloneWall, loadBloodMap, newBoard, newSector, newSprite, newWall, saveBloodMap } from '../../../build/blood/maploader';
 import { BloodImplementationConstructor } from '../../../build/blood/utils';
 import { EngineApi } from '../../../build/board/mutations/api';
 import { ArtFile, ArtFiles } from '../../../build/formats/art';
@@ -8,13 +9,14 @@ import { createTexture } from '../../../utils/gl/textures';
 import { getInstances, Injector, instance, lifecycle, Module, plugin, provider } from '../../../utils/injector';
 import { iter } from '../../../utils/iter';
 import { Stream } from '../../../utils/stream';
-import { ACTIVITY, ENGINE_API, RESOURCES } from '../../apis/app';
+import { ACTIVITY, BOARD, ENGINE_API, RESOURCES } from '../../apis/app';
 import { BUS, busDisconnector } from '../../apis/handler';
 import { LoadBoard, namedMessageHandler } from '../../edit/messages';
 import { DefaultMapName, MAP_NAME } from '../../modules/default/mapnamedialog';
 import { Palette, PicTags, PIC_TAGS, RAW_PAL, RAW_PLUs, TRANS_TABLE } from '../artselector';
 import { ART_FILES, GL, PARALLAX_TEXTURES } from '../buildartprovider';
 import { FileSystem, FS } from '../fs/fs';
+import { MOUNTS } from '../fs/mount';
 import { PALSWAPS, PAL_TEXTURE, PLU_TEXTURE, SHADOWSTEPS, TRANS_TEXTURE } from '../gl/buildgl';
 import { DefaultMapSelector, MAP_NAMES, MAP_SELECTOR } from '../selectmap';
 import { Implementation_ } from '../view/boardrenderer3d';
@@ -81,22 +83,22 @@ function mapLoader(module: Module) {
 }
 
 function mapSaver(module: Module) {
-  // module.bind(plugin('MapSaver'), lifecycle(async (injector, lifecycle) => {
-  //   let mapName = 'newboard.map';
-  //   let savedBefore = false;
-  //   const [fsmgr, board, bus, mapNameDialog] = await getInstances(injector, FS_MANAGER, BOARD, BUS, MAP_NAME);
-  //   const saveMap = (name: string) => {
-  //     if (name != null && name.length != 0) {
-  //       if (!name.endsWith('.map')) name = name + '.map'
-  //       fsmgr.write(name, saveBloodMap(<BloodBoard>board()))
-  //       mapName = name;
-  //       savedBefore = true;
-  //     }
-  //   }
+  module.bind(plugin('MapSaver'), lifecycle(async (injector, lifecycle) => {
+    let mapName = 'newboard.map';
+    let savedBefore = false;
+    const [mounts, board, bus, mapNameDialog] = await getInstances(injector, MOUNTS, BOARD, BUS, MAP_NAME);
+    const saveMap = (name: string) => {
+      if (name != null && name.length != 0) {
+        if (!name.endsWith('.map')) name = name + '.map'
+        mounts[0].write().write(name, saveBloodMap(<BloodBoard>board()))
+        mapName = name;
+        savedBefore = true;
+      }
+    }
 
-  //   lifecycle(bus.connect(namedMessageHandler('save_map', async () => saveMap(savedBefore ? mapName : await mapNameDialog(mapName)))), busDisconnector(bus));
-  //   lifecycle(bus.connect(namedMessageHandler('save_map_as', async () => saveMap(await mapNameDialog(mapName)))), busDisconnector(bus));
-  // }));
+    lifecycle(bus.connect(namedMessageHandler('save_map', async () => saveMap(savedBefore ? mapName : await mapNameDialog(mapName)))), busDisconnector(bus));
+    lifecycle(bus.connect(namedMessageHandler('save_map_as', async () => saveMap(await mapNameDialog(mapName)))), busDisconnector(bus));
+  }));
 }
 
 const mapNames = provider(async (injector: Injector) => {

@@ -37,7 +37,7 @@ export async function StorageFs(injector: Injector): Promise<FileSystem> {
 }
 
 const RomFs = (rom: string) => provider(async (injector: Injector) => {
-  return rom == null ? [] : [await UrlFs(rom)(injector)];
+  return rom == null ? [] : [await StorageFs(injector), await UrlFs(rom)(injector)];
 });
 
 export function DbFsModule(rom: string = null) {

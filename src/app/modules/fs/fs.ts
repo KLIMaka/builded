@@ -20,7 +20,7 @@ export function UrlFs(path: string): InstanceProvider<FileSystem> {
     return {
       get: async name => loadBin(path + name),
       list: async () => [],
-      write: () => null,
+      write: () => { throw new Error(`Read Only FS`) },
     }
   }
 }

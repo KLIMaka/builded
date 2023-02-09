@@ -8,9 +8,11 @@ export const DefaultMapName = lifecycle(async (injector, lifecycle) => {
   const input = <HTMLInputElement>tag('input')
     .attr('type', 'text')
     .attr('placeholder', 'Map Name')
-    .className('form-control')
-    .css('width', '300px').elem();
-  const form = tag('form').css('padding', '10px 10px 5px 10px').appendHtml(input);
+    .className('form-control').elem();
+  const label = tag('label').text('File Name:');
+  const form = tag('form').css('padding', '10px 10px 5px 10px').css('width', '400px')
+    .append(tag('div').className('form-group').append(label).appendHtml(input));
+  form.elem().onkeydown = e => e.preventDefault();
 
   const selectMapNameWindow = new PhotonDialog('Save As');
   selectMapNameWindow.contentElement.appendChild(form.elem());

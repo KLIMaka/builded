@@ -1,7 +1,7 @@
 import { sectorOfWall } from "../../../../build/board/query";
 import { Wall } from "../../../../build/board/structs";
 import { ArtInfo } from "../../../../build/formats/art";
-import { createSlopeCalculator, getWallCoords, wallNormal, ZSCALE } from "../../../../build/utils";
+import { createSlopeCalculator, getMaskedWallCoords, getWallCoords, wallNormal, ZSCALE } from "../../../../build/utils";
 import { mat4, Mat4Array, vec3, Vec3Array, vec4 } from "../../../../libs_js/glmatrix";
 import { len2d } from "../../../../utils/mathutils";
 import { Builders } from "../../../apis/builder";
@@ -164,18 +164,18 @@ export function updateWall(ctx: RenderablesCacheContext, wallId: number, builder
       genQuad(ceilcoords, normal, texMat_, ctx.lightmaps.upperWall(wallId), pal, shade, builder.top.buff);
     }
 
-    // if (wall.cstat.masking) {
-    //   const tex1 = art.get(wall.overpicnum);
-    //   const info1 = art.getInfo(wall.overpicnum);
-    //   const coords = getMaskedWallCoords(x1, y1, x2, y2, slope, nextslope,
-    //     ceilingheinum, nextceilingheinum, ceilingz, nextceilingz,
-    //     floorheinum, nextfloorheinum, floorz, nextfloorz);
-    //   const base = wall.cstat.alignBottom ? Math.min(floorz, nextfloorz) : Math.max(ceilingz, nextceilingz);
-    //   applyWallTextureTransform(wall, wall2, info1, base, wall, texMat_);
-    //   genQuad(coords, normal, texMat_, wall.pal, wall.shade, builder.mid.buff);
-    //   builder.mid.tex = tex1;
-    //   builder.mid.trans = trans;
-    // }
+    if (wall.cstat.masking) {
+      const tex1 = art.get(wall.overpicnum);
+      const info1 = art.getInfo(wall.overpicnum);
+      const coords = getMaskedWallCoords(x1, y1, x2, y2, slope, nextslope,
+        ceilingheinum, nextceilingheinum, ceilingz, nextceilingz,
+        floorheinum, nextfloorheinum, floorz, nextfloorz);
+      const base = wall.cstat.alignBottom ? Math.min(floorz, nextfloorz) : Math.max(ceilingz, nextceilingz);
+      applyWallTextureTransform(wall, wall2, info1, base, wall, texMat_);
+      genQuad(coords, normal, texMat_, ctx.lightmaps.upperWall(wallId), wall.pal, wall.shade, builder.mid.buff);
+      builder.mid.tex = tex1;
+      builder.mid.trans = trans;
+    }
 
     // if (nextsector.lotag == 32 && isValidSectorId(board, nextsector.hitag)) {
     //   const tds = board.sectors[nextsector.hitag];

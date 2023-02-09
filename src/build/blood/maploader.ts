@@ -39,7 +39,7 @@ class Header2 {
 
 const header2Struct = struct(Header2)
   .field("visibility", int)
-  .field("songId", uint)
+  .field("songId", int)
   .field("parallaxtype", ubyte);
 
 class Header3 {
@@ -252,12 +252,6 @@ const COPYRIGHT = {
   padd: ""
 }
 
-const HEADER2: Header2 = {
-  songId: 0,
-  visibility: 800,
-  parallaxtype: 1
-}
-
 const sectorReader = atomic_array(ubyte, sectorStruct.size);
 function readSectors(header3: Header3, stream: Stream): BloodSector[] {
   const dec = ((header3.mapRevisions * sectorStruct.size) & 0xFF);
@@ -303,7 +297,7 @@ function readSprites(header3: Header3, stream: Stream): BloodSprite[] {
   return sprites;
 }
 
-function createBoard(version: number, header1: any, header3: any, sectors: BloodSector[], walls: BloodWall[], sprites: BloodSprite[]): BloodBoard {
+function createBoard(version: number, header1: Header1, header2: Header2, header3: Header3, sectors: BloodSector[], walls: BloodWall[], sprites: BloodSprite[]): BloodBoard {
   const brd = new BloodBoard();
   brd.version = version;
   brd.posx = header1.startX;
@@ -317,6 +311,7 @@ function createBoard(version: number, header1: any, header3: any, sectors: Blood
   brd.sectors = sectors;
   brd.walls = walls;
   brd.sprites = sprites;
+  brd.visibility = header2.visibility;
   return brd;
 }
 
@@ -340,7 +335,7 @@ export function loadBloodMap(stream: Stream): BloodBoard {
   const walls = readWalls(header3, stream);
   const sprites = readSprites(header3, stream);
 
-  return createBoard(version, header1, header3, sectors, walls, sprites);
+  return createBoard(version, header1, header2, header3, sectors, walls, sprites);
 }
 
 function hasExtra(extra: number) { return extra != 0 && extra != 65535 }
@@ -377,7 +372,7 @@ export function saveBloodMap(board: BloodBoard): ArrayBuffer {
   atomic_array(ubyte, header1Struct.size).write(stream, tmpArray);
 
   tmpStream.setOffset(0);
-  header2Struct.write(tmpStream, HEADER2);
+  header2Struct.write(tmpStream, { visibility: board.visibility, songId: 0, parallaxtype: 0 });
   encryptBuffer(tmpArray, header2Struct.size, 0x5f);
   atomic_array(ubyte, header2Struct.size).write(stream, tmpArray);
 

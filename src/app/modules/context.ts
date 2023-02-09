@@ -10,7 +10,7 @@ import { BUS, busDisconnector, DefaultMessageBusConstructor, MessageBus, Message
 import { Renderable } from '../apis/renderable';
 import { DefaultScheduler } from '../apis/scheduler';
 import { EntityFactoryConstructor, ENTITY_FACTORY } from '../edit/context';
-import { LoadBoard, namedMessageHandler, PostFrame, PreFrame, Render } from '../edit/messages';
+import { Commit, LoadBoard, namedMessageHandler, PostFrame, PreFrame, Render } from '../edit/messages';
 import { ClipboardModule } from '../edit/tools/clipboard';
 import { DrawSectorModule } from '../edit/tools/drawsector';
 import { DrawWallModule } from '../edit/tools/drawwall';
@@ -43,7 +43,7 @@ function mapBackupService(module: Module) {
     const [storages, bus, board, api] = await getInstances(injector, STORAGES, BUS, BOARD, ENGINE_API)
     const defaultBoard = api.newBoard();
     const store = await storages('session');
-    lifecycle(bus.connect(namedMessageHandler('commit', () => store.set('map_bak', board()))), busDisconnector(bus));
+    lifecycle(bus.connect(new class extends MessageHandlerReflective { Commit(msg: Commit) { store.set('map_bak', board()) } }), busDisconnector(bus));
     lifecycle(bus.connect(namedMessageHandler('new_board', () => {
       bus.handle(new LoadBoard(defaultBoard));
       store.set('map_bak', defaultBoard);
@@ -104,7 +104,7 @@ export function DefaultSetupModule(module: Module) {
   module.install(TaskManagerModule);
 
   module.install(newMap);
-  // module.install(mapBackupService);
+  module.install(mapBackupService);
 }
 
 function createTools() {

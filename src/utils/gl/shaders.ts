@@ -86,7 +86,7 @@ function compileSource(gl: WebGLRenderingContext, type: number, source: string):
   const shader = gl.createShader(type);
   gl.shaderSource(shader, source);
   gl.compileShader(shader);
-  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new Error('compile error: ' + gl.getShaderInfoLog(shader) + '\nin source:\n' + source);
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new Error('compile error: ' + gl.getShaderInfoLog(shader));
   return shader;
 }
 

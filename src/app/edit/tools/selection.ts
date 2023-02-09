@@ -22,7 +22,7 @@ const FULL_LOOP_STATE = 'select_full_loop_mod';
 
 const list = new Deck<MessageHandler>();
 export function getFromHitscan(factory: EntityFactory): Deck<MessageHandler> {
-  const target = factory.ctx.view.snapTarget();
+  const target = factory.ctx.view.target();
   list.clear();
   if (target.entity == null) return list;
   const fullLoop = factory.ctx.state.get<boolean>(FULL_LOOP_STATE)

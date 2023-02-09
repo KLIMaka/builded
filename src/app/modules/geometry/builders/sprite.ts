@@ -156,8 +156,8 @@ export function updateSprite(ctx: RenderablesCacheContext, sprId: number, builde
   const xf = spr.cstat.xflip;
   const yf = spr.cstat.yflip;
   const sec = board.sectors[spr.sectnum];
-  const sectorShade = sec ? sec.floorshade : spr.shade;
-  const shade = spr.shade == -8 ? sectorShade : spr.shade;
+  const sectorShade = sec && sec.ceilingstat.parallaxing ? 0 : sec.floorshade;
+  const shade = sectorShade + spr.shade;
   const trans = spr.cstat.translucent ? spr.cstat.tranclucentReversed ? 0.66 : 0.33 : 1;
   builder.tex = tex;
   builder.trans = trans;

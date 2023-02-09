@@ -2,7 +2,7 @@ import { GridController } from "../../app/apis/app";
 import { any, findFirst, interpolate, intersect, range } from "../../utils/collections";
 import { NumberInterpolator } from "../../utils/interpolator";
 import { iter } from "../../utils/iter";
-import { cross2d, int, len2d } from "../../utils/mathutils";
+import { clamp, cross2d, int, len2d } from "../../utils/mathutils";
 import { connectedWalls, sectorWalls } from "./loops";
 import { DEFAULT_REPEAT_RATE } from "./mutations/internal";
 import { Board } from "./structs";
@@ -150,7 +150,7 @@ export function snapWall(board: Board, wallId: number, x: number, y: number, gri
   const dxt = x - wall.x;
   const dyt = y - wall.y;
   const dt = len2d(dxt, dyt) / len2d(dx, dy);
-  const t = grid.snap(dt * repeat) / repeat;
+  const t = clamp(grid.snap(dt * repeat) / repeat);
   const xs = int(wall.x + (t * dx));
   const ys = int(wall.y + (t * dy));
   return [xs, ys];

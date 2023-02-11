@@ -1,7 +1,7 @@
-import { map } from "../../utils/collections";
+import { forEach, map } from "../../utils/collections";
 import { minValue } from "../../utils/mathutils";
 import { clockwise } from "../utils";
-import { isValidSectorId, lastwall, nextwall } from "./query";
+import { isValidSectorId, isValidWallId, lastwall, nextwall } from "./query";
 import { Board } from "./structs";
 
 export function* sectorWalls(board: Board, sectorId: number): Generator<number> {
@@ -25,7 +25,7 @@ export function* loopWalls(board: Board, wallId: number): Generator<number> {
 }
 
 export function loopStart(board: Board, wallId: number): number {
-  if (wallId < 0 || wallId >= board.numwalls) throw new Error(`Invalid wallId: ${wallId}`);
+  if (!isValidWallId(board, wallId)) throw new Error(`Invalid wallId: ${wallId}`);
   if (wallId > board.walls[wallId].point2) return board.walls[wallId].point2;
   for (let w = board.walls[wallId].point2; w != wallId; w = board.walls[w].point2) {
     const wall = board.walls[w];
@@ -67,8 +67,8 @@ export function innerWalls(board: Board, wallId: number): Iterable<number> {
 }
 
 export function isOuterLoop(board: Board, wallId: number) {
-  const WALL_MAPPER = (w: number) => <[number, number]>[board.walls[w].x, board.walls[w].y];
-  return clockwise(map(loopWalls(board, wallId), WALL_MAPPER));
+  const wallMapper = (w: number) => <[number, number]>[board.walls[w].x, board.walls[w].y];
+  return clockwise(map(loopWalls(board, wallId), wallMapper));
 }
 
 export function loopPointsOrdered(board: Board, sectorId: number): number[] {
@@ -82,23 +82,7 @@ export function loopPointsOrdered(board: Board, sectorId: number): number[] {
 
 export function canonicalWall(board: Board, wallId: number): number {
   const canonical = minValue(wallId);
-  let w = wallId;
-  do {
-    const wall = board.walls[w];
-    if (wall.nextwall != -1) {
-      w = nextwall(board, wall.nextwall);
-      canonical.set(w);
-    } else {
-      w = wallId;
-      do {
-        const wall = board.walls[lastwall(board, w)];
-        if (wall.nextwall != -1) {
-          w = wall.nextwall;
-          canonical.set(w);
-        } else break;
-      } while (w != wallId)
-    }
-  } while (w != wallId)
+  forEach(connectedWalls(board, wallId), w => canonical.set(w));
   return canonical.get();
 }
 

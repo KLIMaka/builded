@@ -1,3 +1,4 @@
+import { connectedWalls } from "build/board/loops";
 import { EngineApi } from "../../../build/board/mutations/api";
 import { addSprite } from "../../../build/board/mutations/internal";
 import { deleteLoop, deleteLoopFull, deleteSectorFull, fillInnerLoop, setFirstWall } from "../../../build/board/mutations/sectors";
@@ -53,6 +54,7 @@ class Utils extends DefaultTool {
       case 'set_picnum': this.setTexture(); return;
       case 'print_info': this.print(); return;
       case 'adapt_grid': this.adaptGrid(); return;
+      case 'align_texture': this.alignTexture(); return;
     }
   }
 
@@ -73,6 +75,36 @@ class Utils extends DefaultTool {
       const wall = board.walls[ent.id];
       this.gridController.setGridSize(scale(wall.x, wall.y));
     }
+  }
+
+  private alignTexture() {
+    const board = this.board();
+    const target = this.view.snapTarget();
+    const ent = target.entity;
+    if (ent == null || !ent.isWall()) return;
+    const wallId = ent.id;
+    const wall = board.walls[wallId];
+    const refPic = wall.picnum;
+    const info = this.art.getInfo(refPic);
+    const off = wall.xrepeat * 8 + wall.xpanning;
+    const aligned = new Set<number>();
+    aligned.add(wallId);
+    const visitor = (wallId: number, off: number) => {
+      if (aligned.has(wallId)) return;
+      aligned.add(wallId);
+      const wall = board.walls[wallId];
+      if (wall.picnum != refPic) return;
+      wall.xpanning = off % info.w;
+      const off1 = off + wall.xrepeat * 8;
+      visitor(wall.point2, off1);
+      for (const w of connectedWalls(board, wallId)) {
+        if (w == wallId || board.walls[w].nextwall == wallId) continue;
+        visitor(w, off);
+      }
+    }
+    visitor(wall.point2, off);
+    this.commit(`Align Texture`);
+    this.invalidateAll();
   }
 
   private insertSprite() {

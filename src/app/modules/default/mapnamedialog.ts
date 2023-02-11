@@ -12,7 +12,7 @@ export const DefaultMapName = lifecycle(async (injector, lifecycle) => {
   const label = tag('label').text('File Name:');
   const form = tag('form').css('padding', '10px 10px 5px 10px').css('width', '400px')
     .append(tag('div').className('form-group').append(label).appendHtml(input));
-  form.elem().onkeydown = e => e.preventDefault();
+  form.elem().onkeydown = e => { if (e.key == 'Enter') e.preventDefault() };
 
   const selectMapNameWindow = new PhotonDialog('Save As');
   selectMapNameWindow.contentElement.appendChild(form.elem());

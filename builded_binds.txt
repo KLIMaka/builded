@@ -47,6 +47,7 @@ view3d | I                  | insert_sprite
 view3d | 1                  | copy
 view3d | 2                  | paste_shade
 view3d | 3                  | paste_picnum
+view3d | 4                  | paste_pal
 view3d | ENTER              | view_mode
 view3d | mouse0             | print_selected
 view3d | INSERT             | split_wall
@@ -80,6 +81,7 @@ view3d | CTRL+ALT+T         | show_tasks
 view3d | F11                | toggle_draw_portals
 view3d | F9                 | add_mount
 view3d | CTRL+C             | center
+view3d | .                  | align_texture
 
 view3d | +W                 | forward
 view3d | +S                 | backward

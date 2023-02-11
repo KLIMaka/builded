@@ -175,6 +175,7 @@ export class Boardrenderer3D {
   private rorSectorCollector = createSectorCollector((board: Board, sectorId: number) => this.impl.rorLinks().hasRor(sectorId));
   private drawRor(result: VisResult, view: View3d) {
     result.forSector(this.board(), this.rorSectorCollector.visit());
+    if (this.rorSectorCollector.sectors.length() == 0) return;
 
     this.bgl.gl.enable(WebGLRenderingContext.STENCIL_TEST);
     for (let i = 0; i < this.rorSectorCollector.sectors.length(); i++) {
@@ -191,6 +192,8 @@ export class Boardrenderer3D {
   private drawMirrors(result: VisResult, view: View3d) {
     const board = this.board();
     result.forWall(board, this.mirrorWallsCollector.visit());
+    if (this.mirrorWallsCollector.walls.length() == 0) return;
+
     this.bgl.gl.enable(WebGLRenderingContext.STENCIL_TEST);
     for (let i = 0; i < this.mirrorWallsCollector.walls.length(); i++) {
       const w = unpackWallId(this.mirrorWallsCollector.walls.get(i));

@@ -155,3 +155,19 @@ export function snapWall(board: Board, wallId: number, x: number, y: number, gri
   const ys = int(wall.y + (t * dy));
   return [xs, ys];
 }
+
+export function getWallBaseZ(board: Board, wallId: number, sectorId = sectorOfWall(board, wallId)): number {
+  const wall = board.walls[wallId];
+  const sector = board.sectors[sectorId];
+  const nextsectorId = wall.nextsector;
+  const floorz = sector.floorz;
+  const ceilingz = sector.ceilingz;
+  if (nextsectorId == -1) {
+    return wall.cstat.alignBottom ? floorz : ceilingz;
+  } else {
+    const nextsector = board.sectors[nextsectorId];
+    const nextfloorz = nextsector.floorz;
+    const nextceilingz = nextsector.ceilingz;
+    return wall.cstat.alignBottom ? Math.min(floorz, nextfloorz) : Math.max(ceilingz, nextceilingz);
+  }
+}

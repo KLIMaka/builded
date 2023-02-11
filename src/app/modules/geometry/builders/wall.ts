@@ -1,4 +1,4 @@
-import { sectorOfWall } from "../../../../build/board/query";
+import { getWallBaseZ, sectorOfWall } from "../../../../build/board/query";
 import { Wall } from "../../../../build/board/structs";
 import { ArtInfo } from "../../../../build/formats/art";
 import { createSlopeCalculator, getMaskedWallCoords, getWallCoords, wallNormal, ZSCALE } from "../../../../build/utils";
@@ -107,10 +107,10 @@ export function updateWall(ctx: RenderablesCacheContext, wallId: number, builder
   const floorz = sector.floorz;
   const trans = wall.cstat.translucent ? wall.cstat.translucentReversed ? 0.66 : 0.33 : 1;
   const normal = normals(wallNormal(wallNormal_, board, wallId));
+  const base = getWallBaseZ(board, wallId, sectorId);
 
   if (wall.nextwall == -1 || wall.cstat.oneWay) {
     const coords = getWallCoords(x1, y1, x2, y2, slope, slope, ceilingheinum, floorheinum, ceilingz, floorz, false);
-    const base = wall.cstat.alignBottom ? floorz : ceilingz;
     applyWallTextureTransform(wall, wall2, info, base, wall, texMat_);
     genQuad(coords, normal, texMat_, ctx.lightmaps.midWall(wallId), wall.pal, wall.shade, builder.mid.buff);
     builder.mid.tex = tex;
@@ -134,7 +134,6 @@ export function updateWall(ctx: RenderablesCacheContext, wallId: number, builder
         const wall2_ = wall.cstat.swapBottoms ? board.walls[wall_.point2] : wall2;
         const tex_ = wall.cstat.swapBottoms ? art.get(wall_.picnum) : tex;
         const info_ = wall.cstat.swapBottoms ? art.getInfo(wall_.picnum) : info;
-        const base = wall.cstat.alignBottom ? ceilingz : nextfloorz;
         applyWallTextureTransform(wall_, wall2_, info_, base, wall, texMat_);
         builder.bot.tex = tex_;
         shade = wall_.shade;
@@ -170,7 +169,6 @@ export function updateWall(ctx: RenderablesCacheContext, wallId: number, builder
       const coords = getMaskedWallCoords(x1, y1, x2, y2, slope, nextslope,
         ceilingheinum, nextceilingheinum, ceilingz, nextceilingz,
         floorheinum, nextfloorheinum, floorz, nextfloorz);
-      const base = wall.cstat.alignBottom ? Math.min(floorz, nextfloorz) : Math.max(ceilingz, nextceilingz);
       applyWallTextureTransform(wall, wall2, info1, base, wall, texMat_);
       genQuad(coords, normal, texMat_, ctx.lightmaps.upperWall(wallId), wall.pal, wall.shade, builder.mid.buff);
       builder.mid.tex = tex1;

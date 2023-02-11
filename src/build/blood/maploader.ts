@@ -467,6 +467,7 @@ export function newBoard() {
   board.numsectors = 0;
   board.numsprites = 0;
   board.version = 0x0700;
+  board.visibility = 800;
   board.posx = board.posy = board.posz = board.cursectnum = board.ang = 0;
   return board;
 }

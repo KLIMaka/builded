@@ -1,7 +1,7 @@
 import { forEach, map } from "../../utils/collections";
 import { minValue } from "../../utils/mathutils";
-import { clockwise } from "../utils";
-import { isValidSectorId, isValidWallId, lastwall, nextwall } from "./query";
+import { clockwise, slope } from "../utils";
+import { isValidSectorId, isValidWallId, lastwall, nextwall, sectorOfWall } from "./query";
 import { Board } from "./structs";
 
 export function* sectorWalls(board: Board, sectorId: number): Generator<number> {
@@ -110,5 +110,34 @@ export function connectedWalls(board: Board, wallId: number, result = new Set<nu
     counter++;
     if (counter > board.numwalls) throw new Error('Cycled connected walls');
   } while (w != wallId)
+  return result;
+}
+
+export function samePicnumWalls(board: Board, wallId: number) {
+  const wall = board.walls[wallId];
+  const refPic = wall.picnum;
+  const visited = new Set<number>();
+  const result = new Set<number>();
+  result.add(wallId);
+  const visitor = (wallId: number) => {
+    if (visited.has(wallId)) return;
+    visited.add(wallId);
+    const wall = board.walls[wallId];
+    const sectorId = sectorOfWall(board, wallId);
+    const sector = board.sectors[sectorId];
+    const nextsectorId = wall.nextsector;
+    if (nextsectorId != -1) {
+      const nextsector = board.sectors[nextsectorId];
+      const cz = slope(board, sectorId, wall.x, wall.y, sector.ceilingheinum) + sector.ceilingz;
+      const fz = slope(board, sectorId, wall.x, wall.y, sector.floorheinum) + sector.floorz;
+      const cnz = slope(board, nextsectorId, wall.x, wall.y, nextsector.ceilingheinum) + nextsector.ceilingz;
+      const fnz = slope(board, nextsectorId, wall.x, wall.y, nextsector.floorheinum) + nextsector.floorz;
+      if (cnz <= cz && fnz >= fz) return;
+    }
+    if (wall.picnum != refPic) return;
+    result.add(wallId);
+    for (const w of connectedWalls(board, wall.point2)) visitor(w);
+  }
+  for (const w of connectedWalls(board, wall.point2)) visitor(w);
   return result;
 }

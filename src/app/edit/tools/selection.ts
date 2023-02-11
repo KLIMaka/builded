@@ -1,4 +1,4 @@
-import { innerWalls, loopWalls } from "../../../build/board/loops";
+import { innerWalls, loopWalls, samePicnumWalls } from "../../../build/board/loops";
 import { nextwall } from "../../../build/board/query";
 import { Board } from "../../../build/board/structs";
 import { Entity, EntityType, Target } from "../../../build/hitscan";

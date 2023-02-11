@@ -3,7 +3,7 @@ import { EngineApi } from "../../../build/board/mutations/api";
 import { addSprite } from "../../../build/board/mutations/internal";
 import { deleteLoop, deleteLoopFull, deleteSectorFull, fillInnerLoop, setFirstWall } from "../../../build/board/mutations/sectors";
 import { splitWall } from "../../../build/board/mutations/walls";
-import { sectorOfWall } from "../../../build/board/query";
+import { getWallBaseZ, sectorOfWall } from "../../../build/board/query";
 import { Board, WALL_SPRITE } from "../../../build/board/structs";
 import { EntityType } from "../../../build/hitscan";
 import { slope, vec2ang, wallNormal, ZSCALE } from "../../../build/utils";
@@ -85,6 +85,9 @@ class Utils extends DefaultTool {
     const wallId = ent.id;
     const wall = board.walls[wallId];
     const refPic = wall.picnum;
+    const refZ = getWallBaseZ(board, wallId);
+    const refYRepeat = wall.yrepeat;
+    const refYPan = wall.ypanning;
     const info = this.art.getInfo(refPic);
     const off = wall.xrepeat * 8 + wall.xpanning;
     const aligned = new Set<number>();
@@ -93,16 +96,27 @@ class Utils extends DefaultTool {
       if (aligned.has(wallId)) return;
       aligned.add(wallId);
       const wall = board.walls[wallId];
+      const sectorId = sectorOfWall(board, wallId);
+      const sector = board.sectors[sectorId];
+      const nextsectorId = wall.nextsector;
+      if (nextsectorId != -1) {
+        const nextsector = board.sectors[nextsectorId];
+        const cz = slope(board, sectorId, wall.x, wall.y, sector.ceilingheinum) + sector.ceilingz;
+        const fz = slope(board, sectorId, wall.x, wall.y, sector.floorheinum) + sector.floorz;
+        const cnz = slope(board, nextsectorId, wall.x, wall.y, nextsector.ceilingheinum) + nextsector.ceilingz;
+        const fnz = slope(board, nextsectorId, wall.x, wall.y, nextsector.floorheinum) + nextsector.floorz;
+        if (cnz <= cz && fnz >= fz) return;
+      }
       if (wall.picnum != refPic) return;
+      const dz = getWallBaseZ(board, wallId) - refZ;
+      const ypanOff = (dz * refYRepeat) / (info.h * 8);
+      wall.yrepeat = refYRepeat;
+      wall.ypanning = ypanOff + refYPan;
       wall.xpanning = off % info.w;
       const off1 = off + wall.xrepeat * 8;
-      visitor(wall.point2, off1);
-      for (const w of connectedWalls(board, wallId)) {
-        if (w == wallId || board.walls[w].nextwall == wallId) continue;
-        visitor(w, off);
-      }
+      for (const w of connectedWalls(board, wall.point2)) visitor(w, off1);
     }
-    visitor(wall.point2, off);
+    for (const w of connectedWalls(board, wall.point2)) visitor(w, off);
     this.commit(`Align Texture`);
     this.invalidateAll();
   }

@@ -156,7 +156,7 @@ export class WallSegmentsEnt extends MessageHandlerReflective {
     for (const w of this.highlighted) {
       const wall = this.getWall(w);
       const shade = wall.shade;
-      if (msg.absolute && shade == msg.value) return;
+      if (msg.absolute && shade == msg.value) continue;
       if (msg.absolute) wall.shade = msg.value; else wall.shade += msg.value;
       this.invalidateWall(w);
     }
@@ -172,7 +172,7 @@ export class WallSegmentsEnt extends MessageHandlerReflective {
       fixxrepeat(this.ctx.board(), w);
       this.invalidateWall(w);
     }
-    this.ctx.bus.handle(new Commit(`Set Walls ${[...this.canonicalWalls]} PanRepeat`, true));
+    this.ctx.bus.handle(new Commit(`Reset Walls ${[...this.canonicalWalls]} PanRepeat`, true));
   }
 
   public PanRepeat(msg: PanRepeat) {

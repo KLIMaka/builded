@@ -37,7 +37,7 @@ export const sectorStruct = struct(Sector)
   .field('hitag', ushort)
   .field('extra', ushort);
 
-const wallStats = struct(WallStats)
+export const wallStats = struct(WallStats)
   .field('blocking', bits(1))
   .field('swapBottoms', bits(1))
   .field('alignBottom', bits(1))

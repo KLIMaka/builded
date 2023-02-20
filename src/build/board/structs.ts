@@ -62,7 +62,7 @@ export class Sector {
 //  nextwall: Index to wall on other side of wall (-1 if there is no sector)
 //  nextsector: Index to sector on other side of wall (-1 if there is no sector)
 //  cstat:
-//    bit 0: 1 = Blocking wall (use with clipmove, getzrange)         "B"
+//  bit 0: 1 = Blocking wall (use with clipmove, getzrange)         "B"
 //  bit 1: 1 = bottoms of invisible walls swapped, 0 = not          "2"
 //  bit 2: 1 = align picture on bottom (for doors), 0 = top         "O"
 //  bit 3: 1 = x-flipped, 0 = normal                                "F"

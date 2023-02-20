@@ -184,13 +184,14 @@ function intersectWall(board: Board, wallId: number, hit: Hitscan): number {
   const nextsec = board.sectors[nextsecId];
   const floorz = slope(board, nextsecId, ix, iy, nextsec.floorheinum) + nextsec.floorz;
   const ceilz = slope(board, nextsecId, ix, iy, nextsec.ceilingheinum) + nextsec.ceilingz;
+  const nextwall = board.walls[wall.nextwall];
   if (iz <= ceilz) {
     hit.hit(it, wallId, EntityType.UPPER_WALL);
     return -1;
   } else if (iz >= floorz) {
     hit.hit(it, wallId, EntityType.LOWER_WALL);
     return -1;
-  } else if (wall.cstat.masking) {
+  } else if (wall.cstat.masking || nextwall.cstat.masking || wall.cstat.oneWay) {
     hit.hit(it, wallId, EntityType.MID_WALL);
     return -1;
   }

@@ -104,7 +104,7 @@ export class WallSegmentsEnt extends MessageHandlerReflective {
 
   public EndMove(msg: EndMove) {
     this.active = false;
-    for (let w of this.wallIds) mergePoints(this.ctx.board(), w, this.ctx.refs);
+    for (const w of this.wallIds) mergePoints(this.ctx.board(), w, this.ctx.refs);
   }
 
   public Rotate(msg: Rotate) {

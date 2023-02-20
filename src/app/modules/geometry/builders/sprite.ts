@@ -121,16 +121,13 @@ function genSpriteQuad(x: number, y: number, z: number, n: number[], t: number[]
 }
 
 function fillBuffersForFaceSprite(x: number, y: number, z: number, xo: number, yo: number, hw: number, hh: number, xf: number, yf: number, pal: number, shade: number, renderable: SolidBuilder) {
-  // const texMat = texMat_;
-  // mat4.identity(texMat);
-  // mat4.scale(texMat, texMat, [1 / (hw * 2), -1 / (hh * 2), 1, 1]);
-  // mat4.translate(texMat, texMat, [hw - xo, -hh - yo, 0, 0]);
-
+  const xfmul = xf ? -1 : 1;
+  const yfmul = yf ? -1 : 1;
   genSpriteQuad(x, y, z, [
-    -hw + xo, +hh + yo, 0,
-    +hw + xo, +hh + yo, 0,
-    +hw + xo, -hh + yo, 0,
-    -hw + xo, -hh + yo, 0
+    -hw * xfmul + xo, +hh * yfmul + yo, 0,
+    +hw * xfmul + xo, +hh * yfmul + yo, 0,
+    +hw * xfmul + xo, -hh * yfmul + yo, 0,
+    -hw * xfmul + xo, -hh * yfmul + yo, 0
   ], [0, 0, 1, 0, 1, 1, 0, 1],
     pal, shade, renderable.buff);
 }

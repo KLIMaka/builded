@@ -1,3 +1,4 @@
+import { wallStats } from "build/maploader";
 import h from "stage0";
 import { Sector, Sprite, Wall } from "../../build/board/structs";
 import { Entity, EntityType } from "../../build/hitscan";
@@ -5,6 +6,7 @@ import { create, lifecycle, Module, plugin } from "../../utils/injector";
 import { BOARD, BoardProvider, View, VIEW } from "../apis/app";
 import { BUS, busDisconnector, MessageHandlerReflective } from "../apis/handler";
 import { BoardInvalidate, Frame } from "../edit/messages";
+import { Stream } from "../../utils/stream";
 
 
 export async function InfoModule(module: Module) {
@@ -75,6 +77,7 @@ function createWall(): [HTMLElement, (id: number, wall: Wall) => void] {
   const [repeat, repeatUpdater] = createRow("Repeat");
   const [lotag, lotagUpdater] = createRow("Lo-Tag");
   const [hitag, hitagUpdater] = createRow("Hi-Tag");
+  const [cstat, cstatUpdater] = createRow("CStat");
   table.appendChild(id);
   table.appendChild(pos);
   table.appendChild(picnum);
@@ -84,6 +87,10 @@ function createWall(): [HTMLElement, (id: number, wall: Wall) => void] {
   table.appendChild(repeat);
   table.appendChild(lotag);
   table.appendChild(hitag);
+  table.appendChild(cstat);
+  const buff = new ArrayBuffer(2);
+  const arr = new Uint16Array(buff);
+  const stream = new Stream(buff);
   return [root,
     (id: number, w: Wall) => {
       idUpdater(id);
@@ -95,6 +102,9 @@ function createWall(): [HTMLElement, (id: number, wall: Wall) => void] {
       repeatUpdater(`${w.xrepeat}, ${w.yrepeat}`);
       lotagUpdater(w.lotag);
       hitagUpdater(w.hitag);
+      stream.setOffset(0);
+      wallStats.write(stream, w.cstat);
+      cstatUpdater(arr[0])
     }];
 }
 

@@ -168,6 +168,6 @@ export function getWallBaseZ(board: Board, wallId: number, sectorId = sectorOfWa
     const nextsector = board.sectors[nextsectorId];
     const nextfloorz = nextsector.floorz;
     const nextceilingz = nextsector.ceilingz;
-    return wall.cstat.alignBottom ? Math.min(floorz, nextfloorz) : Math.max(ceilingz, nextceilingz);
+    return wall.cstat.alignBottom ? Math.max(floorz, nextfloorz) : Math.min(ceilingz, nextceilingz);
   }
 }

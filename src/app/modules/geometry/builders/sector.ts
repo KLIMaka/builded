@@ -38,7 +38,7 @@ function applySectorTextureTransform(board: Board, sectorId: number, ceiling: bo
   mat4.translate(texMat, texMat, [xpan, ypan, 0, 0]);
   mat4.scale(texMat, texMat, [tcscalex, -tcscaley, 1, 1]);
   if (stats.swapXY) {
-    mat4.scale(texMat, texMat, [-1, -1, 1, 1]);
+    mat4.scale(texMat, texMat, [1, -1, 1, 1]);
     mat4.rotateZ(texMat, texMat, Math.PI / 2);
   }
   if (stats.alignToFirstWall) {

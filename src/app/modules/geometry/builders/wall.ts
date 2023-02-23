@@ -164,14 +164,13 @@ export function updateWall(ctx: RenderablesCacheContext, wallId: number, builder
       genQuad(floorcoords, normal, texMat_, ctx.lightmaps.lowerWall(wallId), pal, shade, builder.bot.buff);
     }
 
-    const nextwall = board.walls[wall.nextwall];
-    if (wall.cstat.masking || nextwall.cstat.masking || wall.cstat.oneWay) {
+    if (wall.cstat.masking || wall.cstat.oneWay) {
       const tex1 = art.get(wall.overpicnum);
       const info1 = art.getInfo(wall.overpicnum);
       const coords = getMaskedWallCoords(x1, y1, x2, y2, slope, nextslope,
         ceilingheinum, nextceilingheinum, ceilingz, nextceilingz,
         floorheinum, nextfloorheinum, floorz, nextfloorz);
-      const base = wall.cstat.alignBottom ? ceilingz : nextceilingz;
+      const base = wall.cstat.alignBottom ? Math.max(floorz, nextfloorz) : Math.max(ceilingz, nextceilingz);
       applyWallTextureTransform(wall, wall2, wall, info1, base, texMat_);
       genQuad(coords, normal, texMat_, ctx.lightmaps.upperWall(wallId), wall.pal, wall.shade, builder.mid.buff);
       builder.mid.tex = tex1;

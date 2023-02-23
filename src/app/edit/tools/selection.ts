@@ -2,7 +2,7 @@ import { innerWalls, loopWalls, samePicnumWalls } from "../../../build/board/loo
 import { nextwall } from "../../../build/board/query";
 import { Board } from "../../../build/board/structs";
 import { Entity, EntityType, Target } from "../../../build/hitscan";
-import { Deck } from "../../../utils/collections";
+import { Deck, map } from "../../../utils/collections";
 import { create, Dependency, getInstances, instance, lifecycle, Module, plugin } from "../../../utils/injector";
 import { detuple0, detuple1 } from "../../../utils/mathutils";
 import { STATE } from "../../apis/app";
@@ -33,9 +33,9 @@ export function getFromHitscan(factory: EntityFactory): Deck<MessageHandler> {
   const board = factory.ctx.board();
   if (target.entity.type == EntityType.WALL_POINT) {
     const w = target.entity.id;
-    list.push(fullLoop ? factory.wallSegment(fullLoop(board, w)) : factory.wall(w));
+    list.push(fullLoop ? factory.wallSegment(map(fullLoop(board, w), ww => new Entity(ww, EntityType.WALL_POINT))) : factory.wall(w));
   } else if (target.entity.isWall()) {
-    wallSegment(fullLoop, factory, target.entity.id, target.entity.type == EntityType.LOWER_WALL);
+    wallSegment(fullLoop, factory, target.entity);
   } else if (target.entity.isSector()) {
     sector(fullLoop, target, factory);
   } else if (target.entity.isSprite()) {
@@ -48,21 +48,21 @@ function sector(fullLoop: (board: Board, wallId: number) => Iterable<number>, ta
   const board = factory.ctx.board();
   if (fullLoop) {
     const firstWall = board.sectors[target.entity.id].wallptr;
-    list.push(factory.wallSegment(fullLoop(board, firstWall)));
+    list.push(factory.wallSegment(map(fullLoop(board, firstWall), w => new Entity(w, EntityType.WALL_POINT))));
     const type = target.entity.type == EntityType.CEILING ? EntityType.FLOOR : EntityType.CEILING;
     list.push(factory.sector(new Entity(target.entity.id, type)));
   }
   list.push(factory.sector(target.entity.clone()));
 }
 
-function wallSegment(fullLoop: (board: Board, wallId: number) => Iterable<number>, factory: EntityFactory, w: number, bottom: boolean) {
+function wallSegment(fullLoop: (board: Board, wallId: number) => Iterable<number>, factory: EntityFactory, wallEnt: Entity) {
   const board = factory.ctx.board();
   if (fullLoop) {
-    const loop = [...fullLoop(board, w)];
-    list.push(factory.wallSegment(loop, loop, bottom));
+    const loop = [...map(fullLoop(board, wallEnt.id), w => new Entity(w, wallEnt.type))];
+    list.push(factory.wallSegment(loop, loop));
   } else {
-    const w1 = nextwall(board, w);
-    list.push(factory.wallSegment([w, w1], [w], bottom));
+    const w1 = nextwall(board, wallEnt.id);
+    list.push(factory.wallSegment([wallEnt, new Entity(w1, wallEnt.type)], [wallEnt]));
   }
 }
 

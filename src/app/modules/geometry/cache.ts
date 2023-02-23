@@ -43,7 +43,7 @@ class CacheMap<T extends Builder> {
 
   invalidate(id: number) {
     const v = this.cache.get(id);
-    if (v == undefined) return;
+    if (!v) return;
     v.value.reset();
     v.valid = false;
   }

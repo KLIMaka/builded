@@ -49,8 +49,12 @@ export class Clipboard extends DefaultTool {
         PAL.value = board.sectors[target.entity.id].floorpal;
         PICNUM.picnum = board.sectors[target.entity.id].floorpicnum;
         break;
-      case EntityType.LOWER_WALL:
       case EntityType.MID_WALL:
+        SHADE.value = board.walls[target.entity.id].shade;
+        PAL.value = board.walls[target.entity.id].pal;
+        PICNUM.picnum = board.walls[target.entity.id].overpicnum;
+        break;
+      case EntityType.LOWER_WALL:
       case EntityType.UPPER_WALL:
         SHADE.value = board.walls[target.entity.id].shade;
         PAL.value = board.walls[target.entity.id].pal;

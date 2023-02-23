@@ -143,6 +143,11 @@ function createSector(): [HTMLElement, (id: number, sector: Sector, ceiling: boo
   const [heinum, heinumUpdater] = createRow("Heinum");
   const [lotag, lotagUpdater] = createRow("Lo-Tag");
   const [hitag, hitagUpdater] = createRow("Hi-Tag");
+  const [dubleRes, dubleResUpdater] = createRow("Double Res");
+  const [swapXY, swapXYUpdater] = createRow("Swap XY");
+  const [xflip, xflipUpdater] = createRow("X Flip");
+  const [yflip, yflipUpdater] = createRow("Y Flip");
+  const [aligned, alignedUpdater] = createRow("Aligned");
   table.appendChild(id);
   table.appendChild(picnum);
   table.appendChild(shade);
@@ -152,6 +157,11 @@ function createSector(): [HTMLElement, (id: number, sector: Sector, ceiling: boo
   table.appendChild(heinum);
   table.appendChild(lotag);
   table.appendChild(hitag);
+  table.appendChild(dubleRes);
+  table.appendChild(swapXY);
+  table.appendChild(xflip);
+  table.appendChild(yflip);
+  table.appendChild(aligned);
   return [root,
     (id: number, s: Sector, ceiling: boolean) => {
       idUpdater(id);
@@ -163,6 +173,11 @@ function createSector(): [HTMLElement, (id: number, sector: Sector, ceiling: boo
       heinumUpdater(ceiling ? s.ceilingheinum : s.floorheinum)
       lotagUpdater(s.lotag);
       hitagUpdater(s.hitag);
+      dubleResUpdater((ceiling ? s.ceilingstat : s.floorstat).doubleSmooshiness);
+      swapXYUpdater((ceiling ? s.ceilingstat : s.floorstat).swapXY);
+      xflipUpdater((ceiling ? s.ceilingstat : s.floorstat).xflip);
+      yflipUpdater((ceiling ? s.ceilingstat : s.floorstat).yflip);
+      alignedUpdater((ceiling ? s.ceilingstat : s.floorstat).alignToFirstWall);
     }];
 }
 

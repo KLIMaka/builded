@@ -2,7 +2,7 @@ import { isValidSectorId } from "../../../../build/board/query";
 import { sectorWalls } from "../../../../build/board/loops";
 import { Board, Wall } from "../../../../build/board/structs";
 import { ArtInfo } from "../../../../build/formats/art";
-import { createSlopeCalculator, getFirstWallAngle, sectorNormal, ZSCALE } from "../../../../build/utils";
+import { ANGSCALE, createSlopeCalculator, getFirstWallAngle, sectorNormal, wallNormal, ZSCALE } from "../../../../build/utils";
 import { Mat2dArray, mat4, Mat4Array, vec2, Vec2Array, vec3, Vec3Array, vec4 } from "../../../../libs_js/glmatrix";
 import { Deck, last, range } from "../../../../utils/collections";
 import { iter } from "../../../../utils/iter";
@@ -25,13 +25,15 @@ export class SectorBuilder extends Builders implements SectorRenderable {
 
 function applySectorTextureTransform(board: Board, sectorId: number, ceiling: boolean, info: ArtInfo, texMat: Mat4Array) {
   const sector = board.sectors[sectorId];
-  const xpan = (ceiling ? sector.ceilingxpanning : sector.floorxpanning) / 255.0;
-  const ypan = (ceiling ? sector.ceilingypanning : sector.floorypanning) / 255.0;
+  const xpan = (ceiling ? sector.ceilingxpanning : sector.floorxpanning) / 255;
+  const ypan = (ceiling ? sector.ceilingypanning : sector.floorypanning) / 255;
   const stats = ceiling ? sector.ceilingstat : sector.floorstat;
-  const scale = stats.doubleSmooshiness ? 8.0 : 16.0;
-  const parallaxscale = stats.parallaxing ? 6.0 : 1.0;
-  const tcscalex = (stats.xflip ? -1.0 : 1.0) / (info.w * scale * parallaxscale);
-  const tcscaley = (stats.yflip ? -1.0 : 1.0) / (info.h * scale);
+  const heinum = (ceiling ? sector.ceilingheinum : sector.floorheinum) * ANGSCALE;
+  const angscale = stats.alignToFirstWall ? Math.sqrt(1 + heinum * heinum) : 1;
+  const scale = stats.doubleSmooshiness ? 8 : 16;
+  const parallaxscale = stats.parallaxing ? 6 : 1;
+  const tcscalex = (stats.xflip ? -1 : 1) / (info.w * scale * parallaxscale);
+  const tcscaley = (stats.yflip ? -angscale : angscale) / (info.h * scale);
   mat4.identity(texMat);
   mat4.translate(texMat, texMat, [xpan, ypan, 0, 0]);
   mat4.scale(texMat, texMat, [tcscalex, -tcscaley, 1, 1]);
@@ -41,6 +43,7 @@ function applySectorTextureTransform(board: Board, sectorId: number, ceiling: bo
   }
   if (stats.alignToFirstWall) {
     const w1 = board.walls[sector.wallptr];
+    mat4.scale(texMat, texMat, [1, -1, 1, 1]);
     mat4.rotateZ(texMat, texMat, getFirstWallAngle(board, sectorId));
     mat4.translate(texMat, texMat, [-w1.x, -w1.y, 0, 0])
   }

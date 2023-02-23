@@ -2,4 +2,10 @@
 
 * render sprites in 2d and wall sprites in 3d without fract`ing tss
 * preselecting actual enity picnum in picselect dialog
-* distance shading
+* distance shading (+) 21.02.23
+
+21.02.23
+
+* skybox rotation
+* sprite offsets
+* mid wall selection and overpicnum manipulation

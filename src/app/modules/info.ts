@@ -77,7 +77,16 @@ function createWall(): [HTMLElement, (id: number, wall: Wall) => void] {
   const [repeat, repeatUpdater] = createRow("Repeat");
   const [lotag, lotagUpdater] = createRow("Lo-Tag");
   const [hitag, hitagUpdater] = createRow("Hi-Tag");
-  const [cstat, cstatUpdater] = createRow("CStat");
+  const [blocking, blockingUpdater] = createRow("Blocking");
+  const [swapBottoms, swapBottomsUpdater] = createRow("Swap Bottoms");
+  const [alignBottom, alignBottomUpdater] = createRow("Align Bottom");
+  const [xflip, xflipUpdater] = createRow("X Flip");
+  const [masking, maskingUpdater] = createRow("Masking");
+  const [oneWay, oneWayUpdater] = createRow("One Way");
+  const [blocking2, blocking2Updater] = createRow("Hit Scan");
+  const [translucent, translucentUpdater] = createRow("Translucent");
+  const [yflip, yflipUpdater] = createRow("Y Flip");
+  const [translucentReversed, translucentReversedUpdater] = createRow("Translucent 2");
   table.appendChild(id);
   table.appendChild(pos);
   table.appendChild(picnum);
@@ -87,10 +96,16 @@ function createWall(): [HTMLElement, (id: number, wall: Wall) => void] {
   table.appendChild(repeat);
   table.appendChild(lotag);
   table.appendChild(hitag);
-  table.appendChild(cstat);
-  const buff = new ArrayBuffer(2);
-  const arr = new Uint16Array(buff);
-  const stream = new Stream(buff);
+  table.appendChild(blocking);
+  table.appendChild(swapBottoms);
+  table.appendChild(alignBottom);
+  table.appendChild(xflip);
+  table.appendChild(masking);
+  table.appendChild(oneWay);
+  table.appendChild(blocking2);
+  table.appendChild(translucent);
+  table.appendChild(yflip);
+  table.appendChild(translucentReversed);
   return [root,
     (id: number, w: Wall) => {
       idUpdater(id);
@@ -102,9 +117,16 @@ function createWall(): [HTMLElement, (id: number, wall: Wall) => void] {
       repeatUpdater(`${w.xrepeat}, ${w.yrepeat}`);
       lotagUpdater(w.lotag);
       hitagUpdater(w.hitag);
-      stream.setOffset(0);
-      wallStats.write(stream, w.cstat);
-      cstatUpdater(arr[0])
+      blockingUpdater(w.cstat.blocking);
+      swapBottomsUpdater(w.cstat.swapBottoms);
+      alignBottomUpdater(w.cstat.alignBottom);
+      xflipUpdater(w.cstat.xflip);
+      maskingUpdater(w.cstat.masking);
+      oneWayUpdater(w.cstat.oneWay);
+      blocking2Updater(w.cstat.blocking2);
+      translucentUpdater(w.cstat.translucent);
+      yflipUpdater(w.cstat.yflip);
+      translucentReversedUpdater(w.cstat.translucentReversed);
     }];
 }
 

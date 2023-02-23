@@ -56,10 +56,8 @@ export function inPolygon(x: number, y: number, points: Iterable<[number, number
     if (dy1 == 0 && dy2 == 0 && (dx1 == 0 || dx2 == 0 || (dx1 ^ dx2) < 0)) return true;
 
     if ((dy1 ^ dy2) < 0) {
-      if ((dx1 ^ dx2) >= 0)
-        inter ^= dx1;
-      else
-        inter ^= cross2d(dx1, dy1, dx2, dy2) ^ dy2;
+      if ((dx1 ^ dx2) >= 0) inter ^= dx1;
+      else inter ^= cross2d(dx1, dy1, dx2, dy2) ^ dy2;
     }
   }
   return (inter >>> 31) == 1;

@@ -1,0 +1,4 @@
+21.02.23
+
+* xflip on bottom swapped walls applied from original wall, but yflip - from swapped
+* inPolygon strange logic in border cases

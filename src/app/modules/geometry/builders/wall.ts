@@ -24,18 +24,18 @@ function normals(n: Vec3Array) {
   return [n[0], n[1], n[2], n[0], n[1], n[2], n[0], n[1], n[2], n[0], n[1], n[2]];
 }
 
-function applyWallTextureTransform(wall: Wall, wall2: Wall, xflip: number, info: ArtInfo, base: number, texMat: Mat4Array) {
+function applyWallTextureTransform(wall: Wall, wall2: Wall, originalWall: Wall, info: ArtInfo, base: number, texMat: Mat4Array) {
   let wall1 = wall;
-  if (xflip) [wall1, wall2] = [wall2, wall1];
-  const flip = wall == wall ? 1 : -1;
+  if (originalWall.cstat.xflip) [wall1, wall2] = [wall2, wall1];
+  if (originalWall != wall && originalWall.cstat.swapBottoms) [wall1, wall2] = [wall2, wall1];
   const tw = info.w;
   const th = info.h;
   const dx = wall2.x - wall1.x;
   const dy = wall2.y - wall1.y;
-  const tcscalex = (wall.xrepeat * 8.0) / (flip * len2d(dx, dy) * tw);
-  const tcscaley = -(wall.yrepeat / 8.0) / (th * 16.0) * (wall.cstat.yflip ? -1 : 1);
+  const tcscalex = (originalWall.xrepeat * 8) / (len2d(dx, dy) * tw);
+  const tcscaley = -(originalWall.yrepeat / 8) / (th * 16) * (wall.cstat.yflip ? -1 : 1);
   const tcxoff = wall.xpanning / tw;
-  const tcyoff = wall.ypanning / 256.0;
+  const tcyoff = wall.ypanning / 256;
 
   mat4.identity(texMat);
   mat4.translate(texMat, texMat, [tcxoff, tcyoff, 0, 0]);
@@ -107,12 +107,11 @@ export function updateWall(ctx: RenderablesCacheContext, wallId: number, builder
   const floorz = sector.floorz;
   const trans = wall.cstat.translucent ? wall.cstat.translucentReversed ? 0.66 : 0.33 : 1;
   const normal = normals(wallNormal(wallNormal_, board, wallId));
-  // const base = getWallBaseZ(board, wallId, sectorId);
 
   if (wall.nextwall == -1) {
     const coords = getWallCoords(x1, y1, x2, y2, slope, slope, ceilingheinum, floorheinum, ceilingz, floorz, false);
     const base = wall.cstat.alignBottom ? floorz : ceilingz;
-    applyWallTextureTransform(wall, wall2, wall.cstat.xflip, info, base, texMat_);
+    applyWallTextureTransform(wall, wall2, wall, info, base, texMat_);
     genQuad(coords, normal, texMat_, ctx.lightmaps.midWall(wallId), wall.pal, wall.shade, builder.mid.buff);
     builder.mid.tex = tex;
   } else {
@@ -121,6 +120,26 @@ export function updateWall(ctx: RenderablesCacheContext, wallId: number, builder
     const nextfloorz = nextsector.floorz;
     const nextceilingz = nextsector.ceilingz;
     const nextfloorheinum = nextsector.floorheinum;
+    const nextceilingheinum = nextsector.ceilingheinum;
+
+    const ceilcoords = getWallCoords(x1, y1, x2, y2, slope, nextslope, ceilingheinum, nextceilingheinum, ceilingz, nextceilingz, true);
+    if (ceilcoords != null) {
+      let pal = 0;
+      let shade = 0;
+      if (sector.ceilingstat.parallaxing && nextsector.ceilingstat.parallaxing && sector.ceilingpicnum == nextsector.ceilingpicnum) {
+        builder.top.tex = art.getParallaxTexture(sector.ceilingpicnum);
+        shade = sector.ceilingshade;
+        pal = sector.ceilingpal;
+        builder.top.parallax = 1;
+      } else {
+        const base = wall.cstat.alignBottom ? ceilingz : nextceilingz;
+        applyWallTextureTransform(wall, wall2, wall, info, base, texMat_);
+        builder.top.tex = tex;
+        shade = wall.shade;
+        pal = wall.pal;
+      }
+      genQuad(ceilcoords, normal, texMat_, ctx.lightmaps.upperWall(wallId), pal, shade, builder.top.buff);
+    }
 
     const floorcoords = getWallCoords(x1, y1, x2, y2, nextslope, slope, nextfloorheinum, floorheinum, nextfloorz, floorz, true);
     if (floorcoords != null) {
@@ -137,32 +156,12 @@ export function updateWall(ctx: RenderablesCacheContext, wallId: number, builder
         const tex_ = wall.cstat.swapBottoms ? art.get(wall_.picnum) : tex;
         const info_ = wall.cstat.swapBottoms ? art.getInfo(wall_.picnum) : info;
         const base = wall_.cstat.alignBottom ? ceilingz : nextfloorz;
-        applyWallTextureTransform(wall_, wall2_, wall.cstat.xflip, info_, base, texMat_);
+        applyWallTextureTransform(wall_, wall2_, wall, info_, base, texMat_);
         builder.bot.tex = tex_;
         shade = wall_.shade;
         pal = wall_.pal;
       }
       genQuad(floorcoords, normal, texMat_, ctx.lightmaps.lowerWall(wallId), pal, shade, builder.bot.buff);
-    }
-
-    const nextceilingheinum = nextsector.ceilingheinum;
-    const ceilcoords = getWallCoords(x1, y1, x2, y2, slope, nextslope, ceilingheinum, nextceilingheinum, ceilingz, nextceilingz, true);
-    if (ceilcoords != null) {
-      let pal = 0;
-      let shade = 0;
-      if (sector.ceilingstat.parallaxing && nextsector.ceilingstat.parallaxing && sector.ceilingpicnum == nextsector.ceilingpicnum) {
-        builder.top.tex = art.getParallaxTexture(sector.ceilingpicnum);
-        shade = sector.ceilingshade;
-        pal = sector.ceilingpal;
-        builder.top.parallax = 1;
-      } else {
-        const base = wall.cstat.alignBottom ? ceilingz : nextceilingz;
-        applyWallTextureTransform(wall, wall2, wall.cstat.xflip, info, base, texMat_);
-        builder.top.tex = tex;
-        shade = wall.shade;
-        pal = wall.pal;
-      }
-      genQuad(ceilcoords, normal, texMat_, ctx.lightmaps.upperWall(wallId), pal, shade, builder.top.buff);
     }
 
     const nextwall = board.walls[wall.nextwall];
@@ -173,7 +172,7 @@ export function updateWall(ctx: RenderablesCacheContext, wallId: number, builder
         ceilingheinum, nextceilingheinum, ceilingz, nextceilingz,
         floorheinum, nextfloorheinum, floorz, nextfloorz);
       const base = wall.cstat.alignBottom ? ceilingz : nextceilingz;
-      applyWallTextureTransform(wall, wall2, wall.cstat.xflip, info1, base, texMat_);
+      applyWallTextureTransform(wall, wall2, wall, info1, base, texMat_);
       genQuad(coords, normal, texMat_, ctx.lightmaps.upperWall(wallId), wall.pal, wall.shade, builder.mid.buff);
       builder.mid.tex = tex1;
       builder.mid.trans = trans;

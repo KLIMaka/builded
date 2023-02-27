@@ -1,5 +1,6 @@
 import { getOrCreate, map, range } from "./collections";
 import { Interpolator, NumberInterpolator } from "./interpolator";
+import { List } from "./list";
 
 export const radsInDeg = 180 / Math.PI;
 export const degInRad = Math.PI / 180;
@@ -108,7 +109,7 @@ export function cross2d(x1: number, y1: number, x2: number, y2: number) {
 }
 
 export function monoatan2(y: number, x: number): number {
-  let atan = Math.atan2(y, x);
+  const atan = Math.atan2(y, x);
   return atan < 0 ? (2 * Math.PI) + atan : atan;
 }
 
@@ -377,4 +378,25 @@ export function optimize(f: (number) => number, count = 2, eps = 0.001): number 
     i++;
   }
   return xn;
+}
+
+export type RadialSegment = { start: number, end: number };
+export class RadialSegments {
+  private segments = new List<RadialSegment>();
+
+  has(x: number): boolean {
+    for (let seg = this.segments.first(); seg != this.segments.terminator(); seg = seg.next)
+      if (x >= seg.obj.start && x <= seg.obj.end) return true;
+    return false;
+  }
+
+
+
+  add(seg: RadialSegment) {
+
+  }
+
+  remove(seg: RadialSegment) {
+
+  }
 }

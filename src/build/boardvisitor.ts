@@ -110,8 +110,8 @@ export class AllBoardVisitorResult implements VisResult {
 
   public forWall<T>(ctx: T, wallv: WallVisitor<T>) {
     for (let s = 0; s < this.board.numsectors; s++) {
-      let sec = this.board.sectors[s];
-      let endwall = sec.wallptr + sec.wallnum;
+      const sec = this.board.sectors[s];
+      const endwall = sec.wallptr + sec.wallnum;
       for (let w = sec.wallptr; w < endwall; w++)
         wallv(ctx, w, s);
     }
@@ -146,10 +146,10 @@ export class TopDownBoardVisitorResult implements VisResult {
         this.visibleSectors.add(s);
         continue;
       }
-      let sec = this.board.sectors[s];
-      let end = sec.wallptr + sec.wallnum;
+      const sec = this.board.sectors[s];
+      const end = sec.wallptr + sec.wallnum;
       for (let w = sec.wallptr; w < end; w++) {
-        let wall = this.board.walls[w];
+        const wall = this.board.walls[w];
         if (len2d(this.cx - wall.x, this.cy - wall.y) < this.dist) {
           this.visibleSectors.add(s);
           break;
@@ -159,15 +159,15 @@ export class TopDownBoardVisitorResult implements VisResult {
   }
 
   forSector<T>(ctx: T, secv: SectorVisitor<T>): void {
-    for (let s of this.visibleSectors.keys()) secv(ctx, s);
+    for (const s of this.visibleSectors.keys()) secv(ctx, s);
   }
 
   forWall<T>(ctx: T, wallv: WallVisitor<T>): void {
-    for (let s of this.visibleSectors.keys()) {
-      let sec = this.board.sectors[s];
-      let end = sec.wallptr + sec.wallnum;
+    for (const s of this.visibleSectors.keys()) {
+      const sec = this.board.sectors[s];
+      const end = sec.wallptr + sec.wallnum;
       for (let w = sec.wallptr; w < end; w++) {
-        let wall = this.board.walls[w];
+        const wall = this.board.walls[w];
         if (len2d(this.cx - wall.x, this.cy - wall.y) < this.dist) {
           wallv(ctx, w, s);
         }
@@ -177,7 +177,7 @@ export class TopDownBoardVisitorResult implements VisResult {
 
   forSprite<T>(ctx: T, sprv: SpriteVisitor<T>): void {
     for (let s = 0; s < this.board.numsprites; s++) {
-      let spr = this.board.sprites[s];
+      const spr = this.board.sprites[s];
       if (len2d(this.cx - spr.x, this.cy - spr.y) < this.dist) sprv(ctx, s);
     }
   }
@@ -185,10 +185,10 @@ export class TopDownBoardVisitorResult implements VisResult {
 
 function wallBehind(board: Board, wallId: number, ms: U.MoveStruct, fwd: GLM.Mat3Array) {
   // return false;
-  let wall1 = board.walls[wallId];
-  let wall2 = board.walls[wall1.point2];
-  let dx1 = wall1.x - ms.x; let dy1 = wall1.y - ms.y;
-  let dx2 = wall2.x - ms.x; let dy2 = wall2.y - ms.y;
+  const wall1 = board.walls[wallId];
+  const wall2 = board.walls[wall1.point2];
+  const dx1 = wall1.x - ms.x; const dy1 = wall1.y - ms.y;
+  const dx2 = wall2.x - ms.x; const dy2 = wall2.y - ms.y;
   return dot2d(dx1, dy1, fwd[0], fwd[2]) < 0 && dot2d(dx2, dy2, fwd[0], fwd[2]) < 0;
 }
 
@@ -228,17 +228,17 @@ export class PvsBoardVisitorResult implements VisResult {
 
   private fillPVS(ms: U.MoveStruct, fwd: GLM.Mat3Array) {
     for (let i = 0; i < this.prepvs.length(); i++) {
-      let s = this.prepvs.get(i);
-      let sec = this.board.sectors[s];
+      const s = this.prepvs.get(i);
+      const sec = this.board.sectors[s];
       if (sec == undefined) continue;
-      let endwall = sec.wallptr + sec.wallnum;
+      const endwall = sec.wallptr + sec.wallnum;
       for (let w = sec.wallptr; w < endwall; w++) {
         if (!U.wallVisible(this.board, w, ms) || wallBehind(this.board, w, ms, fwd)) continue;
 
-        let wall = this.board.walls[w];
-        let nextsector = wall.nextsector;
+        const wall = this.board.walls[w];
+        const nextsector = wall.nextsector;
         if (nextsector == -1) continue;
-        let nextwall = wall.nextwall;
+        const nextwall = wall.nextwall;
         if (this.prepvs.indexOf(nextsector) == -1) {
           this.prepvs.push(nextsector);
           this.ensureEntryWalls(nextsector)
@@ -255,9 +255,9 @@ export class PvsBoardVisitorResult implements VisResult {
   private getAngForWall(wallId: number, ms: U.MoveStruct) {
     let ang = this.angCache.get(wallId);
     if (ang == undefined) {
-      let wall = this.board.walls[wallId];
-      let dx = wall.x - ms.x;
-      let dy = wall.y - ms.y;
+      const wall = this.board.walls[wallId];
+      const dx = wall.x - ms.x;
+      const dy = wall.y - ms.y;
       ang = monoatan2(dy, dx);
       this.angCache.set(wallId, ang);
     }
@@ -269,11 +269,11 @@ export class PvsBoardVisitorResult implements VisResult {
     if (entryWalls.length() == 0)
       return true;
     for (let i = 0; i < entryWalls.length(); i++) {
-      let ew = entryWalls.get(i);
-      let a1s = this.getAngForWall(nextwall(this.board, ew), ms);
-      let a1e = this.getAngForWall(ew, ms);
-      let a2s = this.getAngForWall(wallId, ms);
-      let a2e = this.getAngForWall(nextwall(this.board, wallId), ms);
+      const ew = entryWalls.get(i);
+      const a1s = this.getAngForWall(nextwall(this.board, ew), ms);
+      const a1e = this.getAngForWall(ew, ms);
+      const a2s = this.getAngForWall(wallId, ms);
+      const a2e = this.getAngForWall(nextwall(this.board, wallId), ms);
       if (arcsIntersects(a1s, a1e, a2s, a2e))
         return true;
     }
@@ -284,16 +284,16 @@ export class PvsBoardVisitorResult implements VisResult {
   public visit(board: Board, ms: U.MoveStruct, fwd: GLM.Mat3Array): VisResult {
     this.init(board, ms.sec);
     // this.fillPVS(ms, fwd);
-    let sectors = board.sectors;
-    let sec2spr = U.groupSprites(board);
+    const sectors = board.sectors;
+    const sec2spr = U.groupSprites(board);
     for (let i = 0; i < this.pvs.length(); i++) {
-      let s = this.pvs.get(i);
-      let entryWalls = this.ensureEntryWalls(s);
-      let sec = sectors[s];
+      const s = this.pvs.get(i);
+      const entryWalls = this.ensureEntryWalls(s);
+      const sec = sectors[s];
       if (sec == undefined) continue;
 
       this.sectors.push(s);
-      let endwall = sec.wallptr + sec.wallnum;
+      const endwall = sec.wallptr + sec.wallnum;
       for (let w = sec.wallptr; w < endwall; w++) {
         if (!U.wallVisible(board, w, ms)
           || wallBehind(board, w, ms, fwd)
@@ -302,15 +302,15 @@ export class PvsBoardVisitorResult implements VisResult {
 
         this.walls.push(packWallSectorId(w, s));
 
-        let wall = board.walls[w];
-        let nextsector = wall.nextsector;
+        const wall = board.walls[w];
+        const nextsector = wall.nextsector;
         if (nextsector == -1) continue;
         if (this.pvs.indexOf(nextsector) == -1) {
           this.pvs.push(nextsector);
         }
       }
 
-      let sprs = sec2spr[s];
+      const sprs = sec2spr[s];
       if (sprs != undefined) {
         for (let i = 0; i < sprs.length; i++)
           this.sprites.push(sprs[i]);
@@ -326,7 +326,7 @@ export class PvsBoardVisitorResult implements VisResult {
 
   public forWall<T>(ctx: T, wallv: WallVisitor<T>) {
     for (let i = 0; i < this.walls.length(); i++) {
-      let id = this.walls.get(i);
+      const id = this.walls.get(i);
       wallv(ctx, unpackWallId(id), unpackSectorId(id));
     }
   }

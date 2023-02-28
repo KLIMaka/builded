@@ -1,4 +1,4 @@
-import { arcsIntersects, monoatan2, dot2d, len2d } from '../utils/mathutils';
+import { arcsIntersects, monoatan2, dot2d, len2d, RadialSegments } from '../utils/mathutils';
 import * as GLM from '../libs_js/glmatrix';
 import { Deck, IndexedDeck } from '../utils/collections';
 import { Board } from './board/structs';
@@ -316,6 +316,81 @@ export class PvsBoardVisitorResult implements VisResult {
           this.sprites.push(sprs[i]);
       }
     }
+    return this;
+  }
+
+  public forSector<T>(ctx: T, secv: SectorVisitor<T>) {
+    for (let i = 0; i < this.sectors.length(); i++)
+      secv(ctx, this.sectors.get(i));
+  }
+
+  public forWall<T>(ctx: T, wallv: WallVisitor<T>) {
+    for (let i = 0; i < this.walls.length(); i++) {
+      const id = this.walls.get(i);
+      wallv(ctx, unpackWallId(id), unpackSectorId(id));
+    }
+  }
+
+  public forSprite<T>(ctx: T, sprv: SpriteVisitor<T>) {
+    for (let i = 0; i < this.sprites.length(); i++)
+      sprv(ctx, this.sprites.get(i));
+  }
+}
+
+export class RadialBoardVisitorResult implements VisResult {
+  private sectors = new Deck<number>();
+  private walls = new Deck<number>();
+  private sprites = new Deck<number>();
+  private pvs = new IndexedDeck<number>();
+
+  public visit(board: Board, ms: U.MoveStruct, fwd: GLM.Mat3Array): VisResult {
+    this.sectors.clear();
+    this.walls.clear();
+    this.sprites.clear();
+    this.pvs.clear().push(ms.sec)
+
+    const sectors = board.sectors;
+    const sec2spr = U.groupSprites(board);
+    const rad = new RadialSegments();
+
+    for (let i = 0; i < this.pvs.length(); i++) {
+      const s = this.pvs.get(i);
+
+      const sec = sectors[s];
+      if (sec == undefined) continue;
+
+      this.sectors.push(s);
+      const endwall = sec.wallptr + sec.wallnum;
+      for (let w = sec.wallptr; w < endwall; w++) {
+        if (!U.wallVisible(board, w, ms)) continue;
+
+        this.walls.push(packWallSectorId(w, s));
+
+        const wall1 = board.walls[w];
+        const wall2 = board.walls[wall1.point2];
+        const l1 = len2d(ms.x - wall1.x, ms.y - wall1.y);
+        const l2 = len2d(ms.x - wall2.x, ms.y - wall2.y);
+        const minl = Math.min(l1, l2);
+
+
+        const nextsector = wall.nextsector;
+        if (nextsector == -1) {
+          rad.
+        }
+        if (this.pvs.indexOf(nextsector) == -1) {
+          this.pvs.push(nextsector);
+        }
+
+      }
+
+      const sprs = sec2spr[s];
+      if (sprs != undefined) {
+        for (let i = 0; i < sprs.length; i++)
+          this.sprites.push(sprs[i]);
+      }
+    }
+
+
     return this;
   }
 

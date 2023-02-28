@@ -296,13 +296,12 @@ export function order(points: Iterable<[number, number]>, cw = true): Iterable<[
 export function getWallCoords(x1: number, y1: number, x2: number, y2: number,
   slope: SlopeCalculator, nextslope: SlopeCalculator,
   heinum: number, nextheinum: number,
-  z: number, nextz: number,
-  check: boolean): number[] {
+  z: number, nextz: number): number[] {
   const z1 = (slope(x1, y1, heinum) + z) / ZSCALE;
   const z2 = (slope(x2, y2, heinum) + z) / ZSCALE;
   const z3 = (nextslope(x2, y2, nextheinum) + nextz) / ZSCALE;
   const z4 = (nextslope(x1, y1, nextheinum) + nextz) / ZSCALE;
-  if (check && z4 >= z1 && z3 >= z2) return null;
+  if (z4 >= z1 && z3 >= z2) return null;
 
   if (z4 > z1) {
     const d = 1 - 1 / ((z4 - z1) / (z2 - z3) + 1);

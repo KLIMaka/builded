@@ -44,7 +44,7 @@ class CacheMap<T extends Builder> {
   invalidate(id: number) {
     const v = this.cache.get(id);
     if (!v) return;
-    v.value.reset();
+    if (v.value) v.value.reset();
     v.valid = false;
   }
 

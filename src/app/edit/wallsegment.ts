@@ -139,7 +139,7 @@ export class WallSegmentsEnt extends MessageHandlerReflective {
     } else {
       const hwalls = this.highlighted;
       for (const w of hwalls) msg.set.add(tuple(2, w.id));
-    }
+    } 13
   }
 
   public SetPicnum(msg: SetPicnum) {

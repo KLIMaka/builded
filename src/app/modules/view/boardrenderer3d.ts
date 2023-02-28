@@ -263,7 +263,7 @@ export class Boardrenderer3D {
     if (this.impl.isMirrorPic(board.walls[wallId].picnum)) return;
     const wall = board.walls[wallId];
     const wallr = this.renderables.wall(wallId);
-    if (wall.cstat.translucent == 1 || wall.cstat.translucentReversed == 1) {
+    if (wall.cstat.masking && wall.nextsector != -1 && (wall.cstat.translucent == 1 || wall.cstat.translucentReversed == 1)) {
       this.surfacesTrans.add(wallr.mid);
       this.surfaces.add(wallr.bot);
       this.surfaces.add(wallr.top);

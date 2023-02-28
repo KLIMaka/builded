@@ -34,6 +34,7 @@ view3d | K                  | msg wallcstat swapBottoms true true
 view3d | M                  | msg wallcstat alignBottom true true
 view3d | ,                  | msg wallcstat masking true true
 view3d | N                  | msg wallcstat oneWay true true
+view3d | Y                  | msg wallcstat translucent true true
 view3d | R                  | msg sprite_mode
 view3d | R                  | msg sectorcstat alignToFirstWall true true
 view3d | E                  | msg sectorcstat doubleSmooshiness true true

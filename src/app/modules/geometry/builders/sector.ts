@@ -175,8 +175,8 @@ function fillBuffersForSector(ceil: boolean, board: Board, s: number, builder: S
   fillBuffersForSectorNormal(ceil, board, s, heinum, shade, pal, z, d.buff, vtxs, vidxs, normal, t, lms);
 }
 
-const sectorNormal_ = vec3.create();
-const texMat_ = mat4.create();
+const normal = vec3.create();
+const texMat = mat4.create();
 export function updateSector(ctx: RenderablesCacheContext, sectorId: number, builder: SectorBuilder): SectorBuilder {
   builder = builder == null ? new SectorBuilder(ctx.factory) : builder;
   const board = ctx.board();
@@ -185,15 +185,15 @@ export function updateSector(ctx: RenderablesCacheContext, sectorId: number, bui
 
   const ceilinginfo = art.getInfo(sector.ceilingpicnum);
   const ceilinglms = ctx.lightmaps.ceiling(sectorId);
-  applySectorTextureTransform(board, sectorId, true, ceilinginfo, texMat_);
-  fillBuffersForSector(true, board, sectorId, builder, sectorNormal(sectorNormal_, board, sectorId, true), texMat_, ceilinglms);
+  applySectorTextureTransform(board, sectorId, true, ceilinginfo, texMat);
+  fillBuffersForSector(true, board, sectorId, builder, sectorNormal(normal, board, sectorId, true), texMat, ceilinglms);
   builder.ceiling.tex = sector.ceilingstat.parallaxing ? art.getParallaxTexture(sector.ceilingpicnum) : art.get(sector.ceilingpicnum);
   builder.ceiling.parallax = sector.ceilingstat.parallaxing;
 
   const floorinfo = art.getInfo(sector.floorpicnum);
   const floorlms = ctx.lightmaps.floor(sectorId);
-  applySectorTextureTransform(board, sectorId, false, floorinfo, texMat_);
-  fillBuffersForSector(false, board, sectorId, builder, sectorNormal(sectorNormal_, board, sectorId, false), texMat_, floorlms);
+  applySectorTextureTransform(board, sectorId, false, floorinfo, texMat);
+  fillBuffersForSector(false, board, sectorId, builder, sectorNormal(normal, board, sectorId, false), texMat, floorlms);
   builder.floor.tex = sector.floorstat.parallaxing ? art.getParallaxTexture(sector.floorpicnum) : art.get(sector.floorpicnum);
   builder.floor.parallax = sector.floorstat.parallaxing;
 

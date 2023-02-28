@@ -1,6 +1,6 @@
 import { getOrCreate, map, range } from "./collections";
 import { Interpolator, NumberInterpolator } from "./interpolator";
-import { List } from "./list";
+import { List, Node } from "./list";
 
 export const radsInDeg = 180 / Math.PI;
 export const degInRad = Math.PI / 180;
@@ -380,23 +380,46 @@ export function optimize(f: (number) => number, count = 2, eps = 0.001): number 
   return xn;
 }
 
-export type RadialSegment = { start: number, end: number };
+export type RadialSegment = { start: number, end: number, value: number };
 export class RadialSegments {
   private segments = new List<RadialSegment>();
 
-  has(x: number): boolean {
-    for (let seg = this.segments.first(); seg != this.segments.terminator(); seg = seg.next)
-      if (x >= seg.obj.start && x <= seg.obj.end) return true;
-    return false;
+  constructor() {
+    this.segments.push({ start: 0, end: 1, value: Number.MAX_VALUE });
   }
 
+  getValue(x: number): number {
+    const seg = this.findSegment(this.segments.first(), x);
+    return seg.obj.value;
+  }
+
+  private insertPoint(start: Node<RadialSegment>, x: number): Node<RadialSegment> {
+    const seg = this.findSegment(start, x);
+    if (seg.obj.start == x) return seg;
+    if (seg.obj.end == x) return seg.next;
+    const nseg = this.segments.insertAfter({ start: x, end: seg.obj.end, value: seg.obj.value }, seg);
+    seg.obj.end = x;
+    return nseg;
+  }
 
 
   add(seg: RadialSegment) {
-
+    if (seg.start > seg.end) {
+      this.add({ start: 0, end: seg.start, value: seg.value });
+      this.add({ start: seg.end, end: 1, value: seg.value });
+    } else {
+      const startSeg = this.insertPoint(this.segments.first(), seg.start);
+      const endSeg = this.insertPoint(startSeg, seg.end);
+      let ptr = startSeg;
+      while (ptr != this.segments.terminator() && ptr != endSeg) {
+        ptr.obj.value = Math.min(ptr.obj.value, seg.value);
+        ptr = ptr.next;
+      }
+    }
   }
 
-  remove(seg: RadialSegment) {
-
+  private findSegment(start: Node<RadialSegment>, x: number): Node<RadialSegment> {
+    for (let seg = start; ; seg = seg.next)
+      if (x >= seg.obj.start && x <= seg.obj.end) return seg;
   }
 }

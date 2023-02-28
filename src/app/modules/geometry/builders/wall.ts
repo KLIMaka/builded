@@ -109,11 +109,13 @@ export function updateWall(ctx: RenderablesCacheContext, wallId: number, builder
   const normal = normals(wallNormal(wallNormal_, board, wallId));
 
   if (wall.nextwall == -1) {
-    const coords = getWallCoords(x1, y1, x2, y2, slope, slope, ceilingheinum, floorheinum, ceilingz, floorz, false);
-    const base = wall.cstat.alignBottom ? floorz : ceilingz;
-    applyWallTextureTransform(wall, wall2, wall, info, base, texMat_);
-    genQuad(coords, normal, texMat_, ctx.lightmaps.midWall(wallId), wall.pal, wall.shade, builder.mid.buff);
-    builder.mid.tex = tex;
+    const coords = getWallCoords(x1, y1, x2, y2, slope, slope, ceilingheinum, floorheinum, ceilingz, floorz);
+    if (coords != null) {
+      const base = wall.cstat.alignBottom ? floorz : ceilingz;
+      applyWallTextureTransform(wall, wall2, wall, info, base, texMat_);
+      genQuad(coords, normal, texMat_, ctx.lightmaps.midWall(wallId), wall.pal, wall.shade, builder.mid.buff);
+      builder.mid.tex = tex;
+    }
   } else {
     const nextsector = board.sectors[wall.nextsector];
     const nextslope = createSlopeCalculator(board, wall.nextsector);
@@ -122,7 +124,7 @@ export function updateWall(ctx: RenderablesCacheContext, wallId: number, builder
     const nextfloorheinum = nextsector.floorheinum;
     const nextceilingheinum = nextsector.ceilingheinum;
 
-    const ceilcoords = getWallCoords(x1, y1, x2, y2, slope, nextslope, ceilingheinum, nextceilingheinum, ceilingz, nextceilingz, true);
+    const ceilcoords = getWallCoords(x1, y1, x2, y2, slope, nextslope, ceilingheinum, nextceilingheinum, ceilingz, nextceilingz);
     if (ceilcoords != null) {
       let pal = 0;
       let shade = 0;
@@ -141,7 +143,7 @@ export function updateWall(ctx: RenderablesCacheContext, wallId: number, builder
       genQuad(ceilcoords, normal, texMat_, ctx.lightmaps.upperWall(wallId), pal, shade, builder.top.buff);
     }
 
-    const floorcoords = getWallCoords(x1, y1, x2, y2, nextslope, slope, nextfloorheinum, floorheinum, nextfloorz, floorz, true);
+    const floorcoords = getWallCoords(x1, y1, x2, y2, nextslope, slope, nextfloorheinum, floorheinum, nextfloorz, floorz);
     if (floorcoords != null) {
       let pal = 0;
       let shade = 0;
@@ -170,7 +172,7 @@ export function updateWall(ctx: RenderablesCacheContext, wallId: number, builder
       const coords = getMaskedWallCoords(x1, y1, x2, y2, slope, nextslope,
         ceilingheinum, nextceilingheinum, ceilingz, nextceilingz,
         floorheinum, nextfloorheinum, floorz, nextfloorz);
-      const base = wall.cstat.alignBottom ? Math.max(floorz, nextfloorz) : Math.max(ceilingz, nextceilingz);
+      const base = wall.cstat.alignBottom ? (wall.cstat.oneWay ? ceilingz : nextfloorz) : Math.max(ceilingz, nextceilingz);
       applyWallTextureTransform(wall, wall2, wall, info1, base, texMat_);
       genQuad(coords, normal, texMat_, ctx.lightmaps.upperWall(wallId), wall.pal, wall.shade, builder.mid.buff);
       builder.mid.tex = tex1;

@@ -1,5 +1,5 @@
 import { Board } from '../../../build/board/structs';
-import { AllBoardVisitorResult, createSectorCollector, createWallCollector, PvsBoardVisitorResult, unpackWallId, VisResult } from '../../../build/boardvisitor';
+import { AllBoardVisitorResult, createSectorCollector, createWallCollector, PvsBoardVisitorResult, RadialBoardVisitorResult, unpackWallId, VisResult } from '../../../build/boardvisitor';
 import { wallVisible, ZSCALE } from '../../../build/utils';
 import { mat4, vec2, vec3 } from '../../../libs_js/glmatrix';
 import { Deck } from '../../../utils/collections';
@@ -32,16 +32,16 @@ export interface Implementation {
 export const Implementation_ = new Dependency<Implementation>('Implementation');
 
 
-const visible = new PvsBoardVisitorResult();
+const visible = new RadialBoardVisitorResult();
 const all = new AllBoardVisitorResult();
-const rorViss = new Map<RorLink, PvsBoardVisitorResult>();
+const rorViss = new Map<RorLink, RadialBoardVisitorResult>();
 const diff = vec3.create();
 const stackTransform = mat4.create();
 const srcPos = vec3.create();
 const dstPos = vec3.create();
 const npos = vec3.create();
 const mstmp = { sec: 0, x: 0, y: 0, z: 0 };
-const mirrorVis = new PvsBoardVisitorResult();
+const mirrorVis = new RadialBoardVisitorResult();
 const wallNormal = vec2.create();
 const mirrorNormal = vec3.create();
 const mirroredTransform = mat4.create();
@@ -135,7 +135,7 @@ export class Boardrenderer3D {
   private getLinkVis(link: RorLink) {
     let vis = rorViss.get(link);
     if (vis == undefined) {
-      vis = new PvsBoardVisitorResult();
+      vis = new RadialBoardVisitorResult();
       rorViss.set(link, vis);
     }
     return vis;

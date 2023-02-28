@@ -393,20 +393,26 @@ export class RadialSegments {
     return seg.obj.value;
   }
 
-  private insertPoint(start: Node<RadialSegment>, x: number): Node<RadialSegment> {
-    const seg = this.findSegment(start, x);
-    if (seg.obj.start == x) return seg;
-    if (seg.obj.end == x) return seg.next;
-    const nseg = this.segments.insertAfter({ start: x, end: seg.obj.end, value: seg.obj.value }, seg);
-    seg.obj.end = x;
-    return nseg;
+  scan(seg: RadialSegment) {
+    if (seg.start > seg.end) {
+      return this.scan({ start: 0, end: seg.start, value: seg.value })
+        || this.scan({ start: seg.end, end: 1, value: seg.value });
+    } else {
+      const startSeg = this.findSegment(this.segments.first(), seg.start);
+      const endSeg = this.findSegment(startSeg, seg.end);
+      let curr = startSeg;
+      for (; ;) {
+        if (seg.value <= curr.obj.value) return true;
+        if (curr == endSeg) return false;
+        curr = curr.next;
+      }
+    }
   }
-
 
   add(seg: RadialSegment) {
     if (seg.start > seg.end) {
-      this.add({ start: 0, end: seg.start, value: seg.value });
-      this.add({ start: seg.end, end: 1, value: seg.value });
+      this.add({ start: 0, end: seg.end, value: seg.value });
+      this.add({ start: seg.start, end: 1, value: seg.value });
     } else {
       const startSeg = this.insertPoint(this.segments.first(), seg.start);
       const endSeg = this.insertPoint(startSeg, seg.end);
@@ -416,6 +422,15 @@ export class RadialSegments {
         ptr = ptr.next;
       }
     }
+  }
+
+  private insertPoint(start: Node<RadialSegment>, x: number): Node<RadialSegment> {
+    const seg = this.findSegment(start, x);
+    if (seg.obj.start == x) return seg;
+    if (seg.obj.end == x) return seg.next;
+    const nseg = this.segments.insertAfter({ start: x, end: seg.obj.end, value: seg.obj.value }, seg);
+    seg.obj.end = x;
+    return nseg;
   }
 
   private findSegment(start: Node<RadialSegment>, x: number): Node<RadialSegment> {

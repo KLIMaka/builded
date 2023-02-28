@@ -1,3 +1,5 @@
+import { Mat2dArray, Mat4Array } from "libs_js/glmatrix";
+import { EngineApi } from "../../build/board/mutations/api";
 import { Board } from "../../build/board/structs";
 import { ArtInfoProvider } from "../../build/formats/art";
 import { Ray, Target } from "../../build/hitscan";
@@ -7,8 +9,6 @@ import { Dependency } from "../../utils/injector";
 import { MessageHandler } from "./handler";
 import { ReferenceTracker } from "./referencetracker";
 import { Renderable } from "./renderable";
-import { EngineApi } from "../../build/board/mutations/api"
-import { Mat2dArray, Mat4Array, Vec2Array, Vec3Array } from "libs_js/glmatrix";
 
 export type LogLevel = 'ERROR' | 'WARN' | 'INFO' | 'TRACE' | 'DEBUG';
 export type Logger = (level: LogLevel, ...msg: any[]) => void;

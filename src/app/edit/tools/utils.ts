@@ -9,7 +9,7 @@ import { EntityType } from "../../../build/hitscan";
 import { slope, vec2ang, wallNormal, ZSCALE } from "../../../build/utils";
 import { vec3 } from "../../../libs_js/glmatrix";
 import { create, lifecycle, Module, plugin } from "../../../utils/injector";
-import { int, trz } from "../../../utils/mathutils";
+import { int, monoatan2, PI2, trz } from "../../../utils/mathutils";
 import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, GRID, GridController, LOGGER, Logger, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
 import { BUS, busDisconnector, MessageBus } from "../../apis/handler";
 import { invalidateSectorAndWalls } from "../editutils";
@@ -55,7 +55,23 @@ class Utils extends DefaultTool {
       case 'print_info': this.print(); return;
       case 'adapt_grid': this.adaptGrid(); return;
       case 'align_texture': this.alignTexture(); return;
+      case 'test': this.test(); return;
     }
+  }
+
+  private test() {
+    const board = this.board();
+    const target = this.view.snapTarget();
+    const ent = target.entity;
+    if (ent == null || !ent.isWall()) return;
+    const wall1 = board.walls[ent.id];
+    const wall2 = board.walls[wall1.point2];
+    const tw1x = wall1.x - this.view.x;
+    const tw1y = wall1.y - this.view.y;
+    const tw2x = wall2.x - this.view.x;
+    const tw2y = wall2.y - this.view.y;
+
+    this.logger('INFO', monoatan2(tw1y, tw1x) / PI2, monoatan2(tw2y, tw2x) / PI2);
   }
 
   private adaptGrid() {

@@ -85,6 +85,7 @@ view3d | F11                | toggle_draw_portals
 view3d | F9                 | add_mount
 view3d | CTRL+C             | center
 view3d | .                  | align_texture
+view3d | F5                 | test
 
 view3d | +W                 | forward
 view3d | +S                 | backward

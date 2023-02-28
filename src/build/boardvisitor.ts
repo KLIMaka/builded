@@ -1,7 +1,7 @@
-import { arcsIntersects, monoatan2, dot2d, len2d, RadialSegments } from '../utils/mathutils';
+import { arcsIntersects, monoatan2, dot2d, len2d, RadialSegments, PI2 } from '../utils/mathutils';
 import * as GLM from '../libs_js/glmatrix';
 import { Deck, IndexedDeck } from '../utils/collections';
-import { Board } from './board/structs';
+import { Board, Wall } from './board/structs';
 import * as U from './utils';
 import { inSector, nextwall } from './board/query';
 
@@ -352,6 +352,7 @@ export class RadialBoardVisitorResult implements VisResult {
     const sectors = board.sectors;
     const sec2spr = U.groupSprites(board);
     const rad = new RadialSegments();
+    const nonvoidWalls = new Deck<Wall>();
 
     for (let i = 0; i < this.pvs.length(); i++) {
       const s = this.pvs.get(i);
@@ -361,6 +362,7 @@ export class RadialBoardVisitorResult implements VisResult {
 
       this.sectors.push(s);
       const endwall = sec.wallptr + sec.wallnum;
+      nonvoidWalls.clear();
       for (let w = sec.wallptr; w < endwall; w++) {
         if (!U.wallVisible(board, w, ms)) continue;
 
@@ -368,19 +370,24 @@ export class RadialBoardVisitorResult implements VisResult {
 
         const wall1 = board.walls[w];
         const wall2 = board.walls[wall1.point2];
-        const l1 = len2d(ms.x - wall1.x, ms.y - wall1.y);
-        const l2 = len2d(ms.x - wall2.x, ms.y - wall2.y);
+        const tw1x = wall1.x - ms.x;
+        const tw1y = wall1.y - ms.y;
+        const tw2x = wall2.x - ms.x;
+        const tw2y = wall2.y - ms.y;
+        const l1 = len2d(tw1x, tw1y);
+        const l2 = len2d(tw2x, tw2y);
         const minl = Math.min(l1, l2);
+        const start = monoatan2(tw1y, tw1x) / PI2;
+        const end = monoatan2(tw2y, tw2x) / PI2;
 
-
-        const nextsector = wall.nextsector;
-        if (nextsector == -1) {
-          rad.
+        const nextsector = wall1.nextsector;
+        const segment = { start, end, value: minl };
+        if (nextsector != -1) {
+          if (rad.scan(segment))
+            this.pvs.push(nextsector);
+        } else {
+          rad.add(segment);
         }
-        if (this.pvs.indexOf(nextsector) == -1) {
-          this.pvs.push(nextsector);
-        }
-
       }
 
       const sprs = sec2spr[s];

@@ -73,4 +73,16 @@ test('radial segments', () => {
   expect(segments.getValue(0.5)).toBe(0.001);
   expect(segments.getValue(0.9)).toBe(0.001);
   expect(segments.getValue(1)).toBe(0.001);
+
+  const segments1 = new RadialSegments();
+  expect(segments1.scan({ start: 0, end: 1, value: 1 })).toBe(true);
+
+  segments1.add({ start: 0.5, end: 0.6, value: 0.5 });
+  expect(segments1.scan({ start: 0, end: 1, value: 1 })).toBe(true);
+  expect(segments1.scan({ start: 0.51, end: 0.52, value: 1 })).toBe(false);
+
+  const segments2 = new RadialSegments();
+  segments2.add({ start: 0.9, end: 0.1, value: 1 });
+  expect(segments2.getValue(0.5)).toBe(Number.MAX_VALUE);
+  expect(segments2.getValue(0)).toBe(1);
 })

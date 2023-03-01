@@ -10,11 +10,7 @@
 ❌ sprite offsets
 ✔️ mid wall selection and overpicnum manipulation 25.02.23
 
-25.02.23
-
-❌ sprite offsets
-
 26.02.23
 
-❌ proper skybox rendering
+✔️ proper skybox rendering 01.03.23
 ✔️ phantom walls on sloped sectors 26.02.23

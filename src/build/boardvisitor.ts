@@ -1,9 +1,9 @@
-import { arcsIntersects, monoatan2, dot2d, len2d, RadialSegments, PI2 } from '../utils/mathutils';
-import * as GLM from '../libs_js/glmatrix';
+import { Vec3Array } from '../libs_js/glmatrix';
 import { Deck, IndexedDeck } from '../utils/collections';
-import { Board, Sector, Wall } from './board/structs';
-import * as U from './utils';
-import { inSector, nextwall } from './board/query';
+import { dot2d, len2d, monoatan2, PI2, RadialSegments } from '../utils/mathutils';
+import { inSector } from './board/query';
+import { Board, Sector } from './board/structs';
+import { groupSprites, MoveStruct, wallVisible, ZSCALE } from './utils';
 
 export function packWallSectorId(wallId: number, sectorId: number) {
   return wallId | (sectorId << 16)
@@ -130,7 +130,7 @@ export class TopDownBoardVisitorResult implements VisResult {
   private dist: number;
   private visibleSectors = new Set<number>();
 
-  visit(board: Board, campos: GLM.Vec3Array, dist: number): VisResult {
+  visit(board: Board, campos: Vec3Array, dist: number): VisResult {
     this.board = board;
     this.cx = campos[0];
     this.cy = campos[2];
@@ -183,13 +183,13 @@ export class TopDownBoardVisitorResult implements VisResult {
   }
 }
 
-function wallBehind(board: Board, sector: Sector, wallId: number, ms: U.MoveStruct, fwd: GLM.Mat3Array) {
+function wallBehind(board: Board, sector: Sector, wallId: number, ms: MoveStruct, fwd: Vec3Array) {
   const wall1 = board.walls[wallId];
   const wall2 = board.walls[wall1.point2];
   const dx1 = wall1.x - ms.x; const dy1 = wall1.y - ms.y;
   const dx2 = wall2.x - ms.x; const dy2 = wall2.y - ms.y;
   const minl = Math.min(len2d(dx1, dy1), len2d(dx2, dy2));
-  const lk = -Math.abs((fwd[1] < 0 ? sector.floorz : sector.ceilingz) - ms.z) / U.ZSCALE * Math.abs(fwd[1]);
+  const lk = -Math.abs((fwd[1] < 0 ? sector.floorz : sector.ceilingz) - ms.z) / ZSCALE * Math.abs(fwd[1]);
   return minl > lk * 2 && dot2d(dx1, dy1, fwd[0], fwd[2]) < 0 && dot2d(dx2, dy2, fwd[0], fwd[2]) < 0;
 }
 
@@ -201,7 +201,7 @@ export class PvsBoardVisitorResult implements VisResult {
   private nonvoidWalls = new Deck<number>();
   private rad = new RadialSegments();
 
-  private calcSegment(board: Board, wallId: number, ms: U.MoveStruct, ismin: boolean) {
+  private calcSegment(board: Board, wallId: number, ms: MoveStruct, ismin: boolean) {
     const wall1 = board.walls[wallId];
     const wall2 = board.walls[wall1.point2];
     const tw1x = wall1.x - ms.x;
@@ -216,7 +216,7 @@ export class PvsBoardVisitorResult implements VisResult {
     return { start, end, value: minl };
   }
 
-  public visit(board: Board, ms: U.MoveStruct, fwd: GLM.Mat3Array): VisResult {
+  public visit(board: Board, ms: MoveStruct, fwd: Vec3Array): VisResult {
     this.sectors.clear();
     this.walls.clear();
     this.sprites.clear();
@@ -224,7 +224,7 @@ export class PvsBoardVisitorResult implements VisResult {
     this.rad.clear();
     this.pvs.clear().push(ms.sec)
 
-    const sec2spr = U.groupSprites(board);
+    const sec2spr = groupSprites(board);
 
     for (let i = 0; i < this.pvs.length(); i++) {
       const s = this.pvs.get(i);
@@ -236,7 +236,7 @@ export class PvsBoardVisitorResult implements VisResult {
       const endwall = sec.wallptr + sec.wallnum;
       this.nonvoidWalls.clear();
       for (let w = sec.wallptr; w < endwall; w++) {
-        if (!U.wallVisible(board, w, ms) || wallBehind(board, sec, w, ms, fwd)) continue;
+        if (!wallVisible(board, w, ms) || wallBehind(board, sec, w, ms, fwd)) continue;
         const wall1 = board.walls[w];
         if (wall1.nextsector != -1) {
           this.nonvoidWalls.push(w);

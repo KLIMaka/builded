@@ -1,5 +1,5 @@
 import { Board } from '../../../build/board/structs';
-import { AllBoardVisitorResult, createSectorCollector, createWallCollector, PvsBoardVisitorResult, RadialBoardVisitorResult, unpackWallId, VisResult } from '../../../build/boardvisitor';
+import { AllBoardVisitorResult, createSectorCollector, createWallCollector, PvsBoardVisitorResult, unpackWallId, VisResult } from '../../../build/boardvisitor';
 import { wallVisible, ZSCALE } from '../../../build/utils';
 import { mat4, vec2, vec3 } from '../../../libs_js/glmatrix';
 import { Deck } from '../../../utils/collections';
@@ -9,6 +9,7 @@ import { mirrorBasis, normal2d, reflectPoint3d } from '../../../utils/vecmath';
 import { BOARD, BoardProvider } from '../../apis/app';
 import { BuildRenderableProvider, DrawCallConsumer, Renderable, SortingRenderable } from '../../apis/renderable';
 import { RENDRABLES_CACHE } from '../geometry/cache';
+import { SolidBuilder } from '../geometry/common';
 import { BuildGl, BUILD_GL } from '../gl/buildgl';
 import { View3d } from './view3d';
 
@@ -32,22 +33,24 @@ export interface Implementation {
 export const Implementation_ = new Dependency<Implementation>('Implementation');
 
 
-const visible = new RadialBoardVisitorResult();
+const visible = new PvsBoardVisitorResult();
 const all = new AllBoardVisitorResult();
-const rorViss = new Map<RorLink, RadialBoardVisitorResult>();
+const rorViss = new Map<RorLink, PvsBoardVisitorResult>();
 const diff = vec3.create();
 const stackTransform = mat4.create();
 const srcPos = vec3.create();
 const dstPos = vec3.create();
 const npos = vec3.create();
 const mstmp = { sec: 0, x: 0, y: 0, z: 0 };
-const mirrorVis = new RadialBoardVisitorResult();
+const mirrorVis = new PvsBoardVisitorResult();
 const wallNormal = vec2.create();
 const mirrorNormal = vec3.create();
 const mirroredTransform = mat4.create();
 const mpos = vec3.create();
 const transOn = (bgl: BuildGl) => { bgl.gl.enable(WebGLRenderingContext.BLEND); bgl.gl.depthMask(false); };
 const transOff = (bgl: BuildGl) => { bgl.gl.disable(WebGLRenderingContext.BLEND); bgl.gl.depthMask(true); };
+const depthOff = (bgl: BuildGl) => { bgl.gl.depthMask(false); };
+const depthOn = (bgl: BuildGl) => { bgl.gl.depthMask(true); };
 
 function list() {
   const list = new Deck<Renderable>();
@@ -135,7 +138,7 @@ export class Boardrenderer3D {
   private getLinkVis(link: RorLink) {
     let vis = rorViss.get(link);
     if (vis == undefined) {
-      vis = new RadialBoardVisitorResult();
+      vis = new PvsBoardVisitorResult();
       rorViss.set(link, vis);
     }
     return vis;
@@ -236,12 +239,14 @@ export class Boardrenderer3D {
     this.writeAll();
   }
 
+  private skybox = list();
   private surfaces = list();
   private surfacesTrans = list();
   private sprites = list();
   private spritesTrans = list();
 
   private clearDrawLists() {
+    this.skybox.clear();
     this.surfaces.clear();
     this.surfacesTrans.clear();
     this.sprites.clear();
@@ -255,7 +260,8 @@ export class Boardrenderer3D {
     //   this.surfaces.add(sector.floor);
     // if (this.impl.rorLinks().ceilLinks[sectorId] == undefined)
     //   this.surfaces.add(sector.ceiling);
-    this.surfaces.add(sector);
+    ((<SolidBuilder>sector.ceiling).parallax ? this.skybox : this.surfaces).add(sector.ceiling);
+    ((<SolidBuilder>sector.floor).parallax ? this.skybox : this.surfaces).add(sector.floor);
   }
 
   private _wallVisitor = (board: Board, wallId: number, sectorId: number) => this.wallVisitor(board, wallId, sectorId);
@@ -263,14 +269,10 @@ export class Boardrenderer3D {
     if (this.impl.isMirrorPic(board.walls[wallId].picnum)) return;
     const wall = board.walls[wallId];
     const wallr = this.renderables.wall(wallId);
-    if (wall.cstat.masking && wall.nextsector != -1 && (wall.cstat.translucent == 1 || wall.cstat.translucentReversed == 1)) {
-      this.surfacesTrans.add(wallr.mid);
-      this.surfaces.add(wallr.bot);
-      this.surfaces.add(wallr.top);
-    } else if (wall.nextwall == -1) {
-      this.surfaces.add(wallr.mid);
-    } else {
-      this.surfaces.add(wallr);
+    ((<SolidBuilder>wallr.mid).trans != 1 ? this.surfacesTrans : this.surfaces).add(wallr.mid);
+    if (wall.nextsector != -1) {
+      ((<SolidBuilder>wallr.top).parallax ? this.skybox : this.surfaces).add(wallr.top);
+      ((<SolidBuilder>wallr.bot).parallax ? this.skybox : this.surfaces).add(wallr.bot);
     }
   }
 
@@ -293,6 +295,10 @@ export class Boardrenderer3D {
   }
 
   private drawImpl() {
+    depthOff(this.bgl);
+    this.bgl.draw(this.skybox);
+    this.bgl.flush();
+    depthOn(this.bgl);
     this.bgl.draw(this.surfaces);
     this.bgl.draw(this.sprites);
     this.bgl.flush();

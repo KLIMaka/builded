@@ -385,6 +385,11 @@ export class RadialSegments {
   private segments = new List<RadialSegment>();
 
   constructor() {
+    this.clear();
+  }
+
+  clear() {
+    this.segments.clear();
     this.segments.push({ start: 0, end: 1, value: Number.MAX_VALUE });
   }
 

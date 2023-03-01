@@ -1,7 +1,7 @@
 import { arcsIntersects, monoatan2, dot2d, len2d, RadialSegments, PI2 } from '../utils/mathutils';
 import * as GLM from '../libs_js/glmatrix';
 import { Deck, IndexedDeck } from '../utils/collections';
-import { Board, Wall } from './board/structs';
+import { Board, Sector, Wall } from './board/structs';
 import * as U from './utils';
 import { inSector, nextwall } from './board/query';
 
@@ -183,211 +183,74 @@ export class TopDownBoardVisitorResult implements VisResult {
   }
 }
 
-function wallBehind(board: Board, wallId: number, ms: U.MoveStruct, fwd: GLM.Mat3Array) {
-  // return false;
+function wallBehind(board: Board, sector: Sector, wallId: number, ms: U.MoveStruct, fwd: GLM.Mat3Array) {
   const wall1 = board.walls[wallId];
   const wall2 = board.walls[wall1.point2];
   const dx1 = wall1.x - ms.x; const dy1 = wall1.y - ms.y;
   const dx2 = wall2.x - ms.x; const dy2 = wall2.y - ms.y;
-  return dot2d(dx1, dy1, fwd[0], fwd[2]) < 0 && dot2d(dx2, dy2, fwd[0], fwd[2]) < 0;
+  const minl = Math.min(len2d(dx1, dy1), len2d(dx2, dy2));
+  const lk = -Math.abs((fwd[1] < 0 ? sector.floorz : sector.ceilingz) - ms.z) / U.ZSCALE * Math.abs(fwd[1]);
+  return minl > lk * 2 && dot2d(dx1, dy1, fwd[0], fwd[2]) < 0 && dot2d(dx2, dy2, fwd[0], fwd[2]) < 0;
 }
 
 export class PvsBoardVisitorResult implements VisResult {
   private sectors = new Deck<number>();
   private walls = new Deck<number>();
   private sprites = new Deck<number>();
-
-  private prepvs = new IndexedDeck<number>();
   private pvs = new IndexedDeck<number>();
-  private entryWalls = new Map<number, Deck<number>>();
-  private angCache = new Map<number, number>();
-  private board: Board;
+  private nonvoidWalls = new Deck<number>();
+  private rad = new RadialSegments();
 
-
-  private init(board: Board, sectorId: number) {
-    this.board = board;
-    this.sectors.clear();
-    this.walls.clear();
-    this.sprites.clear();
-    this.prepvs.clear();
-    this.prepvs.push(sectorId);
-    this.pvs.clear();
-    this.pvs.push(sectorId);
-    this.angCache.clear();
-    this.entryWalls.clear();
+  private calcSegment(board: Board, wallId: number, ms: U.MoveStruct, ismin: boolean) {
+    const wall1 = board.walls[wallId];
+    const wall2 = board.walls[wall1.point2];
+    const tw1x = wall1.x - ms.x;
+    const tw1y = wall1.y - ms.y;
+    const tw2x = wall2.x - ms.x;
+    const tw2y = wall2.y - ms.y;
+    const l1 = len2d(tw1x, tw1y);
+    const l2 = len2d(tw2x, tw2y);
+    const minl = ismin ? Math.min(l1, l2) : Math.max(l1, l2);
+    const start = monoatan2(tw1y, tw1x) / PI2;
+    const end = monoatan2(tw2y, tw2x) / PI2;
+    return { start, end, value: minl };
   }
-
-  private ensureEntryWalls(sectorId: number) {
-    let ewalls = this.entryWalls.get(sectorId);
-    if (ewalls == undefined) {
-      ewalls = new Deck<number>();
-      this.entryWalls.set(sectorId, ewalls);
-    }
-    return ewalls;
-  }
-
-  private fillPVS(ms: U.MoveStruct, fwd: GLM.Mat3Array) {
-    for (let i = 0; i < this.prepvs.length(); i++) {
-      const s = this.prepvs.get(i);
-      const sec = this.board.sectors[s];
-      if (sec == undefined) continue;
-      const endwall = sec.wallptr + sec.wallnum;
-      for (let w = sec.wallptr; w < endwall; w++) {
-        if (!U.wallVisible(this.board, w, ms) || wallBehind(this.board, w, ms, fwd)) continue;
-
-        const wall = this.board.walls[w];
-        const nextsector = wall.nextsector;
-        if (nextsector == -1) continue;
-        const nextwall = wall.nextwall;
-        if (this.prepvs.indexOf(nextsector) == -1) {
-          this.prepvs.push(nextsector);
-          this.ensureEntryWalls(nextsector)
-            .clear()
-            .push(nextwall);
-        } else {
-          this.ensureEntryWalls(nextsector)
-            .push(nextwall);
-        }
-      }
-    }
-  }
-
-  private getAngForWall(wallId: number, ms: U.MoveStruct) {
-    let ang = this.angCache.get(wallId);
-    if (ang == undefined) {
-      const wall = this.board.walls[wallId];
-      const dx = wall.x - ms.x;
-      const dy = wall.y - ms.y;
-      ang = monoatan2(dy, dx);
-      this.angCache.set(wallId, ang);
-    }
-    return ang;
-  }
-
-  private visibleFromEntryWalls(wallId: number, entryWalls: Deck<number>, ms: U.MoveStruct) {
-    return true;
-    if (entryWalls.length() == 0)
-      return true;
-    for (let i = 0; i < entryWalls.length(); i++) {
-      const ew = entryWalls.get(i);
-      const a1s = this.getAngForWall(nextwall(this.board, ew), ms);
-      const a1e = this.getAngForWall(ew, ms);
-      const a2s = this.getAngForWall(wallId, ms);
-      const a2e = this.getAngForWall(nextwall(this.board, wallId), ms);
-      if (arcsIntersects(a1s, a1e, a2s, a2e))
-        return true;
-    }
-    return false;
-  }
-
-
-  public visit(board: Board, ms: U.MoveStruct, fwd: GLM.Mat3Array): VisResult {
-    this.init(board, ms.sec);
-    // this.fillPVS(ms, fwd);
-    const sectors = board.sectors;
-    const sec2spr = U.groupSprites(board);
-    for (let i = 0; i < this.pvs.length(); i++) {
-      const s = this.pvs.get(i);
-      const entryWalls = this.ensureEntryWalls(s);
-      const sec = sectors[s];
-      if (sec == undefined) continue;
-
-      this.sectors.push(s);
-      const endwall = sec.wallptr + sec.wallnum;
-      for (let w = sec.wallptr; w < endwall; w++) {
-        if (!U.wallVisible(board, w, ms)
-          || wallBehind(board, w, ms, fwd)
-          || !this.visibleFromEntryWalls(w, entryWalls, ms))
-          continue;
-
-        this.walls.push(packWallSectorId(w, s));
-
-        const wall = board.walls[w];
-        const nextsector = wall.nextsector;
-        if (nextsector == -1) continue;
-        if (this.pvs.indexOf(nextsector) == -1) {
-          this.pvs.push(nextsector);
-        }
-      }
-
-      const sprs = sec2spr[s];
-      if (sprs != undefined) {
-        for (let i = 0; i < sprs.length; i++)
-          this.sprites.push(sprs[i]);
-      }
-    }
-    return this;
-  }
-
-  public forSector<T>(ctx: T, secv: SectorVisitor<T>) {
-    for (let i = 0; i < this.sectors.length(); i++)
-      secv(ctx, this.sectors.get(i));
-  }
-
-  public forWall<T>(ctx: T, wallv: WallVisitor<T>) {
-    for (let i = 0; i < this.walls.length(); i++) {
-      const id = this.walls.get(i);
-      wallv(ctx, unpackWallId(id), unpackSectorId(id));
-    }
-  }
-
-  public forSprite<T>(ctx: T, sprv: SpriteVisitor<T>) {
-    for (let i = 0; i < this.sprites.length(); i++)
-      sprv(ctx, this.sprites.get(i));
-  }
-}
-
-export class RadialBoardVisitorResult implements VisResult {
-  private sectors = new Deck<number>();
-  private walls = new Deck<number>();
-  private sprites = new Deck<number>();
-  private pvs = new IndexedDeck<number>();
 
   public visit(board: Board, ms: U.MoveStruct, fwd: GLM.Mat3Array): VisResult {
     this.sectors.clear();
     this.walls.clear();
     this.sprites.clear();
+    this.nonvoidWalls.clear();
+    this.rad.clear();
     this.pvs.clear().push(ms.sec)
 
-    const sectors = board.sectors;
     const sec2spr = U.groupSprites(board);
-    const rad = new RadialSegments();
-    const nonvoidWalls = new Deck<Wall>();
 
     for (let i = 0; i < this.pvs.length(); i++) {
       const s = this.pvs.get(i);
 
-      const sec = sectors[s];
+      const sec = board.sectors[s];
       if (sec == undefined) continue;
 
       this.sectors.push(s);
       const endwall = sec.wallptr + sec.wallnum;
-      nonvoidWalls.clear();
+      this.nonvoidWalls.clear();
       for (let w = sec.wallptr; w < endwall; w++) {
-        if (!U.wallVisible(board, w, ms)) continue;
-
-        this.walls.push(packWallSectorId(w, s));
-
+        if (!U.wallVisible(board, w, ms) || wallBehind(board, sec, w, ms, fwd)) continue;
         const wall1 = board.walls[w];
-        const wall2 = board.walls[wall1.point2];
-        const tw1x = wall1.x - ms.x;
-        const tw1y = wall1.y - ms.y;
-        const tw2x = wall2.x - ms.x;
-        const tw2y = wall2.y - ms.y;
-        const l1 = len2d(tw1x, tw1y);
-        const l2 = len2d(tw2x, tw2y);
-        const minl = Math.min(l1, l2);
-        const start = monoatan2(tw1y, tw1x) / PI2;
-        const end = monoatan2(tw2y, tw2x) / PI2;
-
-        const nextsector = wall1.nextsector;
-        const segment = { start, end, value: minl };
-        if (nextsector != -1) {
-          if (rad.scan(segment))
-            this.pvs.push(nextsector);
-        } else {
-          rad.add(segment);
+        if (wall1.nextsector != -1) {
+          this.nonvoidWalls.push(w);
+          continue;
         }
+        this.walls.push(packWallSectorId(w, s));
+        this.rad.add(this.calcSegment(board, w, ms, false));
+      }
+
+      for (const w of this.nonvoidWalls) {
+        this.walls.push(packWallSectorId(w, s));
+        const wall1 = board.walls[w];
+        if (this.rad.scan(this.calcSegment(board, w, ms, true)))
+          this.pvs.push(wall1.nextsector);
       }
 
       const sprs = sec2spr[s];
@@ -396,8 +259,6 @@ export class RadialBoardVisitorResult implements VisResult {
           this.sprites.push(sprs[i]);
       }
     }
-
-
     return this;
   }
 

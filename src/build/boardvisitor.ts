@@ -1,9 +1,10 @@
+import { BoardUtils } from 'app/apis/app';
 import { Vec3Array } from '../libs_js/glmatrix';
 import { Deck, IndexedDeck } from '../utils/collections';
 import { dot2d, len2d, monoatan2, PI2, RadialSegments } from '../utils/mathutils';
 import { inSector } from './board/query';
 import { Board, Sector } from './board/structs';
-import { groupSprites, MoveStruct, wallVisible, ZSCALE } from './utils';
+import { MoveStruct, wallVisible, ZSCALE } from './utils';
 
 export function packWallSectorId(wallId: number, sectorId: number) {
   return wallId | (sectorId << 16)
@@ -216,15 +217,13 @@ export class PvsBoardVisitorResult implements VisResult {
     return { start, end, value: minl };
   }
 
-  public visit(board: Board, ms: MoveStruct, fwd: Vec3Array): VisResult {
+  public visit(board: Board, boardUtils: BoardUtils, ms: MoveStruct, fwd: Vec3Array): VisResult {
     this.sectors.clear();
     this.walls.clear();
     this.sprites.clear();
     this.nonvoidWalls.clear();
     this.rad.clear();
     this.pvs.clear().push(ms.sec)
-
-    const sec2spr = groupSprites(board);
 
     for (let i = 0; i < this.pvs.length(); i++) {
       const s = this.pvs.get(i);
@@ -253,7 +252,7 @@ export class PvsBoardVisitorResult implements VisResult {
           this.pvs.push(wall1.nextsector);
       }
 
-      const sprs = sec2spr[s];
+      const sprs = boardUtils.spritesBySector(s);
       if (sprs != undefined) {
         for (let i = 0; i < sprs.length; i++)
           this.sprites.push(sprs[i]);

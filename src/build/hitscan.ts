@@ -1,10 +1,11 @@
+import { BoardUtils } from "app/apis/app";
 import { vec3, Vec3Array } from "../libs_js/glmatrix";
 import { range, wrap } from "../utils/collections";
 import { cross2d, dot2d, int, len2d, sign, sqrLen2d } from "../utils/mathutils";
 import { inSector, isValidSectorId } from "./board/query";
 import { Board, FACE_SPRITE, FLOOR_SPRITE, Sector, WALL_SPRITE } from "./board/structs";
 import { ArtInfo, ArtInfoProvider } from "./formats/art";
-import { ANGSCALE, groupSprites, inPolygon, rayIntersect, slope, spriteAngle, ZSCALE } from "./utils";
+import { ANGSCALE, inPolygon, rayIntersect, slope, spriteAngle, ZSCALE } from "./utils";
 
 export enum EntityType {
   FLOOR, CEILING, UPPER_WALL, MID_WALL, LOWER_WALL, SPRITE, WALL_POINT
@@ -327,11 +328,10 @@ function resetStack(board: Board, sectorId: number): Set<number> {
   else return new Set([sectorId]);
 }
 
-export function hitscan(board: Board, artInfo: ArtInfoProvider, xs: number, ys: number, zs: number, secId: number, vx: number, vy: number, vz: number, hit: Hitscan, cliptype: number) {
+export function hitscan(board: Board, boardUtils: BoardUtils, artInfo: ArtInfoProvider, xs: number, ys: number, zs: number, secId: number, vx: number, vy: number, vz: number, hit: Hitscan, cliptype: number) {
   hit.reset(xs, ys, zs, vx, vy, vz);
 
   const stack = resetStack(board, secId);
-  const sprites = groupSprites(board);
   for (const s of stack) {
     const sec = board.sectors[s];
     intersectSectorPlanes(board, sec, s, hit);
@@ -345,7 +345,7 @@ export function hitscan(board: Board, artInfo: ArtInfoProvider, xs: number, ys: 
     }
 
     if (cliptype == 1) continue;
-    const sprs = sprites[s];
+    const sprs = boardUtils.spritesBySector(s);
     if (sprs == undefined) continue;
     for (let j = 0; j < sprs.length; j++) {
       intersectSprite(board, artInfo, sprs[j], hit);

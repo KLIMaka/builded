@@ -6,11 +6,11 @@ import { build2gl, getPlayerStart, gl2build, ZSCALE } from "../../../build/utils
 import { vec3 } from "../../../libs_js/glmatrix";
 import { CachedValue } from "../../../utils/cachedvalue";
 import { Controller3D } from "../../../utils/camera/controller3d";
-import { getInstances, lifecycle, provider } from "../../../utils/injector";
+import { getInstances, lifecycle } from "../../../utils/injector";
 import { NumberInterpolator } from "../../../utils/interpolator";
 import { int } from "../../../utils/mathutils";
 import { DelayedValue } from "../../../utils/timed";
-import { ART, ArtProvider, BOARD, BoardProvider, GRID, GridController, STATE, State, View } from "../../apis/app";
+import { ART, ArtProvider, BOARD, BoardProvider, BoardUtils, BOARD_UTILS, GRID, GridController, STATE, State, View } from "../../apis/app";
 import { MessageHandlerReflective } from "../../apis/handler";
 import { Renderable } from "../../apis/renderable";
 import { BoardInvalidate, Frame, LoadBoard, Mouse, NamedMessage } from "../../edit/messages";
@@ -19,9 +19,9 @@ import { Boardrenderer3D, Renderer3D } from "./boardrenderer3d";
 import { TargetImpl, ViewPosition } from "./view";
 
 export const View3dConstructor = lifecycle(async (injector, lifecycle) => {
-  const [buildgl, board, state, grid, art] = await getInstances(injector, BUILD_GL, BOARD, STATE, GRID, ART);
+  const [buildgl, board, boardUtils, state, grid, art] = await getInstances(injector, BUILD_GL, BOARD, BOARD_UTILS, STATE, GRID, ART);
   const renderer = await Renderer3D(injector);
-  const view = new View3d(renderer, buildgl, board, state, grid, art);
+  const view = new View3d(renderer, buildgl, board, boardUtils, state, grid, art);
   const stateCleaner = async (s: string) => state.unregister(s);
   lifecycle(state.register('forward', false), stateCleaner);
   lifecycle(state.register('backward', false), stateCleaner);
@@ -48,6 +48,7 @@ export class View3d extends MessageHandlerReflective implements View {
     private renderer: Boardrenderer3D,
     private buildgl: BuildGl,
     private board: BoardProvider,
+    private boardUtils: BoardUtils,
     private state: State,
     private gridController: GridController,
     private art: ArtProvider
@@ -146,7 +147,7 @@ export class View3d extends MessageHandlerReflective implements View {
 
   private updateHitscan(hit: Hitscan): Target {
     const { start, dir } = this.dir();
-    hitscan(this.board(), this.art, start[0], start[1], start[2], this.sec, dir[0], dir[1], dir[2], hit, 0);
+    hitscan(this.board(), this.boardUtils, this.art, start[0], start[1], start[2], this.sec, dir[0], dir[1], dir[2], hit, 0);
     return hit;
   }
 

@@ -101,20 +101,6 @@ export function setSectorPicnum(board: Board, sectorEnt: Entity, picnum: number)
   return true;
 }
 
-export function groupSprites(board: Board): { [index: number]: number[] } {
-  const sec2spr: { [index: number]: number[] } = {};
-  for (let s = 0; s < board.numsprites; s++) {
-    const spr = board.sprites[s];
-    let sprs = sec2spr[spr.sectnum];
-    if (sprs == undefined) {
-      sprs = [];
-      sec2spr[spr.sectnum] = sprs;
-    }
-    sprs.push(s);
-  }
-  return sec2spr;
-}
-
 export const ANGSCALE = (1 / 4096);
 
 export function slope(board: Board, sectorId: number, x: number, y: number, heinum: number) {

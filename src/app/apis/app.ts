@@ -1,6 +1,6 @@
 import { Mat2dArray, Mat4Array } from "libs_js/glmatrix";
 import { EngineApi } from "../../build/board/mutations/api";
-import { Board } from "../../build/board/structs";
+import { Board, Sprite } from "../../build/board/structs";
 import { ArtInfoProvider } from "../../build/formats/art";
 import { Ray, Target } from "../../build/hitscan";
 import { MoveStruct } from "../../build/utils";
@@ -44,6 +44,11 @@ export const VIEW = new Dependency<View>('View');
 export const ENGINE_API = new Dependency<EngineApi>("Engine Api");
 export type BoardProvider = () => Board;
 export const BOARD = new Dependency<BoardProvider>('Borad');
+
+export interface BoardUtils {
+  spritesBySector(sectorId: number): number[];
+}
+export const BOARD_UTILS = new Dependency<BoardUtils>('BoardUtils');
 
 export interface Portals {
   isPortalWall(wallId: number): boolean;

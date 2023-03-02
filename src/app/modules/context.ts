@@ -4,8 +4,8 @@ import { Deck } from '../../utils/collections';
 import { resize } from '../../utils/gl/gl';
 import { IndexedImgLibJsConstructor, INDEXED_IMG_LIB } from '../../utils/imglib';
 import { getInstances, instance, lifecycle, Module, plugin } from '../../utils/injector';
-import { DefaultProfiler, DefaultProfilerConstructor, Profiler, PROFILER, Timer } from '../../utils/profiler';
-import { ART, BOARD, ENGINE_API, GRID, LIGHTMAPS, PORTALS, REFERENCE_TRACKER, SCHEDULER, STATE, STORAGES, View } from '../apis/app';
+import { DefaultProfilerConstructor, Profiler, PROFILER } from '../../utils/profiler';
+import { ART, BOARD, BOARD_UTILS, ENGINE_API, GRID, LIGHTMAPS, PORTALS, REFERENCE_TRACKER, SCHEDULER, STATE, STORAGES, View } from '../apis/app';
 import { BUS, busDisconnector, DefaultMessageBusConstructor, MessageBus, MessageHandlerReflective } from '../apis/handler';
 import { Renderable } from '../apis/renderable';
 import { DefaultScheduler } from '../apis/scheduler';
@@ -20,7 +20,9 @@ import { PICNUM_SELECTOR, SelectionModule } from '../edit/tools/selection';
 import { ToolsBusConstructor, TOOLS_BUS } from '../edit/tools/toolsbus';
 import { TransformModule } from '../edit/tools/transform';
 import { UtilsModule } from '../edit/tools/utils';
+import { DefaultBoardUtilsConstructor } from '../modules/default/board-utils';
 import { DefaultFrameGenerator, FrameGenerator, FRAME_GENERATOR } from "../modules/default/framegenerator";
+import { DefaultLightmapsConstructor } from '../modules/default/lightmap';
 import { DefaultPortalsConstructor } from '../modules/default/portals';
 import { StatusBarModule } from '../modules/statusbar';
 import { TaskManagerModule } from '../modules/taskmanager';
@@ -36,7 +38,6 @@ import { BUFFER_FACTORY, DefaultBufferFactory } from './gl/buffers';
 import { BuildGlConstructor, BUILD_GL } from './gl/buildgl';
 import { InfoModule } from './info';
 import { SwappableViewModule } from './view/view';
-import { DefaultLightmapsConstructor } from '../modules/default/lightmap';
 
 function mapBackupService(module: Module) {
   module.bind(plugin('MapBackupService'), lifecycle(async (injector, lifecycle) => {
@@ -81,6 +82,7 @@ export function DefaultSetupModule(module: Module) {
   module.bind(BUS, DefaultMessageBusConstructor);
   module.bind(TOOLS_BUS, ToolsBusConstructor);
   module.bind(BOARD, DefaultBoardProviderConstructor);
+  module.bind(BOARD_UTILS, DefaultBoardUtilsConstructor);
   module.bind(ENTITY_FACTORY, EntityFactoryConstructor);
   module.bind(INDEXED_IMG_LIB, IndexedImgLibJsConstructor);
   module.bind(SCHEDULER, DefaultScheduler);

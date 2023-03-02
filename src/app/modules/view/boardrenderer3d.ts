@@ -3,14 +3,15 @@ import { AllBoardVisitorResult, createSectorCollector, createWallCollector, PvsB
 import { wallVisible, ZSCALE } from '../../../build/utils';
 import { mat4, vec2, vec3 } from '../../../libs_js/glmatrix';
 import { Deck } from '../../../utils/collections';
-import { Dependency, Injector } from '../../../utils/injector';
+import { create, Dependency, getInstances, Injector } from '../../../utils/injector';
 import { dot2d } from '../../../utils/mathutils';
 import { mirrorBasis, normal2d, reflectPoint3d } from '../../../utils/vecmath';
-import { BOARD, BoardProvider } from '../../apis/app';
+import { BOARD, BoardProvider, BoardUtils, BOARD_UTILS } from '../../apis/app';
 import { BuildRenderableProvider, DrawCallConsumer, Renderable, SortingRenderable } from '../../apis/renderable';
 import { RENDRABLES_CACHE } from '../geometry/cache';
 import { SolidBuilder } from '../geometry/common';
 import { BuildGl, BUILD_GL } from '../gl/buildgl';
+import { BoardRenderer2D } from './boardrenderer2d';
 import { View3d } from './view3d';
 
 export class RorLink {
@@ -63,13 +64,8 @@ function list() {
 }
 
 export async function Renderer3D(injector: Injector) {
-  const [impl, bgl, board, renderables] = await Promise.all([
-    injector.getInstance(Implementation_),
-    injector.getInstance(BUILD_GL),
-    injector.getInstance(BOARD),
-    injector.getInstance(RENDRABLES_CACHE),
-  ]);
-  return new Boardrenderer3D(impl, bgl, board, renderables.geometry);
+  const [impl, bgl, board, boardUtils, cache] = await getInstances(injector, Implementation_, BUILD_GL, BOARD, BOARD_UTILS, RENDRABLES_CACHE);
+  return new Boardrenderer3D(impl, bgl, board, boardUtils, cache.geometry);
 }
 
 export class Boardrenderer3D {
@@ -77,6 +73,7 @@ export class Boardrenderer3D {
     private impl: Implementation,
     private bgl: BuildGl,
     private board: BoardProvider,
+    private boardUtils: BoardUtils,
     private renderables: BuildRenderableProvider
   ) { }
 
@@ -123,7 +120,7 @@ export class Boardrenderer3D {
     const board = this.board();
     let result = view.sec == -1
       ? all.visit(board)
-      : visible.visit(board, view, view.getForward());
+      : visible.visit(board, this.boardUtils, view, view.getForward());
 
     this.bgl.setProjectionMatrix(view.getProjectionMatrix());
     this.drawMirrors(result, view);
@@ -166,7 +163,7 @@ export class Boardrenderer3D {
     this.bgl.setViewMatrix(stackTransform);
     this.bgl.setPosition(npos);
     this.writeStenciledOnly(stencilValue);
-    this.drawRooms(this.getLinkVis(link).visit(this.board(), mstmp, view.getForward()));
+    this.drawRooms(this.getLinkVis(link).visit(this.board(), this.boardUtils, mstmp, view.getForward()));
 
     this.bgl.setViewMatrix(view.getTransformMatrix());
     this.bgl.setPosition(view.getPosition());
@@ -225,7 +222,7 @@ export class Boardrenderer3D {
       reflectPoint3d(mpos, mirrorNormal, mirrorrD, mpos);
       mstmp.sec = view.sec; mstmp.x = mpos[0]; mstmp.y = mpos[2]; mstmp.z = mpos[1];
       this.writeStenciledOnly(i + 127);
-      this.drawRooms(mirrorVis.visit(board, mstmp, view.getForward()));
+      this.drawRooms(mirrorVis.visit(board, this.boardUtils, mstmp, view.getForward()));
       this.bgl.gl.cullFace(WebGLRenderingContext.BACK);
 
       // seal reflections by writing depth of mirror surface

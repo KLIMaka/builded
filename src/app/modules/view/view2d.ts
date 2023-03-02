@@ -10,7 +10,7 @@ import { getInstances, lifecycle } from "../../../utils/injector";
 import { NumberInterpolator } from "../../../utils/interpolator";
 import { int, len2d } from "../../../utils/mathutils";
 import { DelayedValue } from "../../../utils/timed";
-import { ART, ArtProvider, BOARD, BoardProvider, GRID, GridController, STATE, State, View } from "../../apis/app";
+import { ART, ArtProvider, BOARD, BoardProvider, BoardUtils, BOARD_UTILS, GRID, GridController, STATE, State, View } from "../../apis/app";
 import { Message, MessageHandlerReflective } from "../../apis/handler";
 import { Renderable } from "../../apis/renderable";
 import { BoardInvalidate, LoadBoard, Mouse } from "../../edit/messages";
@@ -20,11 +20,11 @@ import { TargetImpl, ViewPosition } from "./view";
 
 
 export const View2dConstructor = lifecycle(async (injector, lifecycle) => {
-  const [grid, bgl, board, art, state] = await getInstances(injector, GRID, BUILD_GL, BOARD, ART, STATE);
+  const [grid, bgl, board, boardUtils, art, state] = await getInstances(injector, GRID, BUILD_GL, BOARD, BOARD_UTILS, ART, STATE);
   const renderer = await Renderer2D(injector);
   lifecycle(state.register('zoom+', false), async s => state.unregister(s))
   lifecycle(state.register('zoom-', false), async s => state.unregister(s))
-  const view = new View2d(renderer, grid, bgl, board, art, state);
+  const view = new View2d(renderer, grid, bgl, board, boardUtils, art, state);
   return view;
 });
 
@@ -42,6 +42,7 @@ export class View2d extends MessageHandlerReflective implements View {
     private gridController: GridController,
     private buildgl: BuildGl,
     private board: BoardProvider,
+    private boardUtils: BoardUtils,
     private art: ArtProvider,
     private state: State
   ) {
@@ -121,7 +122,7 @@ export class View2d extends MessageHandlerReflective implements View {
   }
 
   private updateHitscan(hit: Hitscan) {
-    hitscan(this.board(), this.art, this.x, this.y, this.z, this.sec, 0, 0, -1 * ZSCALE, hit, 0);
+    hitscan(this.board(), this.boardUtils, this.art, this.x, this.y, this.z, this.sec, 0, 0, -1 * ZSCALE, hit, 0);
     return hit;
   }
 

@@ -1,16 +1,18 @@
+import { sectorZ, setSectorZ, ZSCALE } from "build/utils";
 import { canonicalWall, connectedWalls } from "../../build/board/loops";
 import { fixxrepeat, mergePoints, moveWall } from "../../build/board/mutations/walls";
 import { lastwall, sectorOfWall } from "../../build/board/query";
 import { Board, Wall } from "../../build/board/structs";
 import { Entity, EntityType, Target } from "../../build/hitscan";
 import { vec2 } from "../../libs_js/glmatrix";
-import { IndexedDeck, map } from "../../utils/collections";
+import { IndexedDeck, map, takeFirst } from "../../utils/collections";
 import { iter } from "../../utils/iter";
 import { cyclic, len2d, tuple } from "../../utils/mathutils";
 import { Message, MessageHandlerReflective } from "../apis/handler";
 import { EditContext } from "./context";
 import { invalidateSectorAndWalls } from "./editutils";
 import { BoardInvalidate, Commit, EndMove, Flip, Highlight, Move, Palette, PanRepeat, ResetPanRepeat, Rotate, SetPicnum, SetWallCstat, Shade, StartMove } from "./messages";
+import { MOVE_VERTICAL } from "./tools/transform";
 
 function getClosestWallByIds(board: Board, target: Target, ids: Iterable<number>): number {
   let id = -1;
@@ -24,7 +26,7 @@ function getClosestWallByIds(board: Board, target: Target, ids: Iterable<number>
       mindist = dist;
     }
   }
-  return id == -1 ? ids[Symbol.iterator]().next().value : id;
+  return id == -1 ? takeFirst(ids) : id;
 }
 
 function collectConnectedWalls(board: Board, walls: Iterable<number>) {
@@ -41,6 +43,8 @@ export class WallSegmentsEnt extends MessageHandlerReflective {
     public highlighted: Iterable<Entity>,
     public ctx: EditContext,
     public origin = vec2.create(),
+    public originz = 0,
+    public sectorEnt: Entity,
     public refwall = -1,
     public active = false,
     public connectedWalls = collectConnectedWalls(ctx.board(), map(walls, w => w.id)),
@@ -81,24 +85,38 @@ export class WallSegmentsEnt extends MessageHandlerReflective {
     this.refwall = getClosestWallByIds(board, this.ctx.view.target(), this.canonicalWalls);
     const wall = board.walls[this.refwall];
     vec2.set(this.origin, wall.x, wall.y);
+
+    const sectorWallId = getClosestWallByIds(board, this.ctx.view.target(), map(this.highlighted, e => e.id));
+    const sectorWall = board.walls[sectorWallId];
+    const type = this.ctx.view.target().entity.type == EntityType.UPPER_WALL ? EntityType.CEILING : EntityType.FLOOR;
+    if (sectorWall.nextsector == -1) this.sectorEnt = new Entity(sectorOfWall(board, this.refwall), type);
+    else this.sectorEnt = new Entity(sectorWall.nextsector, type);
+    this.originz = sectorZ(board, this.sectorEnt) / ZSCALE;
     this.active = true;
   }
 
   public Move(msg: Move) {
     const board = this.ctx.board();
-    const x = this.ctx.gridController.snap(this.origin[0] + msg.dx);
-    const y = this.ctx.gridController.snap(this.origin[1] + msg.dy);
-    const refwall = board.walls[this.refwall];
-    const dx = x - refwall.x;
-    const dy = y - refwall.y;
-    if (moveWall(board, this.refwall, x, y)) {
-      for (const w of this.canonicalWalls) {
-        if (w == this.refwall) continue;
-        const wall = board.walls[w];
-        moveWall(board, w, wall.x + dx, wall.y + dy);
+    if (this.ctx.state.get(MOVE_VERTICAL)) {
+      const z = this.ctx.gridController.snap(this.originz + msg.dz) * ZSCALE;
+      if (setSectorZ(this.ctx.board(), this.sectorEnt, z))
+        invalidateSectorAndWalls(this.sectorEnt.id, this.ctx.board(), this.ctx.bus);
+    } else {
+      const x = this.ctx.gridController.snap(this.origin[0] + msg.dx);
+      const y = this.ctx.gridController.snap(this.origin[1] + msg.dy);
+      const refwall = board.walls[this.refwall];
+      const dx = x - refwall.x;
+      const dy = y - refwall.y;
+      if (moveWall(board, this.refwall, x, y)) {
+        for (const w of this.canonicalWalls) {
+          if (w == this.refwall) continue;
+          const wall = board.walls[w];
+          moveWall(board, w, wall.x + dx, wall.y + dy);
+        }
+        this.invalidate();
       }
-      this.invalidate();
     }
+
   }
 
   public EndMove(msg: EndMove) {

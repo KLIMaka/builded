@@ -145,7 +145,7 @@ export class WallSegmentsEnt extends MessageHandlerReflective {
   public SetPicnum(msg: SetPicnum) {
     for (const w of this.highlighted) {
       const wall = this.getWall(w);
-      if (w.type == EntityType.MID_WALL) wall.overpicnum = msg.picnum;
+      if (w.type == EntityType.MID_WALL && wall.nextwall != -1) wall.overpicnum = msg.picnum;
       else wall.picnum = msg.picnum;
       this.invalidateWall(w);
     }

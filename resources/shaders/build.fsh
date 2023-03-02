@@ -55,7 +55,8 @@ float lightOffset() {
   return 0.0;
 #else
   float z = (1.0 / gl_FragCoord.w) ;
-  float shadowLevel = sys.w == 0.0 ? 0.0 : z / sys.w;
+  float atten = 1.0 / (clamp(sys.w, 1.0 / 4096.0, 4096.0) / 4096.0) * 125.0;
+  float shadowLevel =  z / atten;
   return tcps.w + shadowLevel;
 #endif
 }

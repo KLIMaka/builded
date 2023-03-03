@@ -1,7 +1,7 @@
 import { BoardUtils } from 'app/apis/app';
 import { Vec3Array } from '../libs_js/glmatrix';
 import { Deck, IndexedDeck } from '../utils/collections';
-import { dot2d, len2d, monoatan2, PI2, RadialSegments } from '../utils/mathutils';
+import { createSegment, dot2d, len2d, monoatan2, PI2, RadialSegments } from '../utils/mathutils';
 import { inSector } from './board/query';
 import { Board, Sector } from './board/structs';
 import { MoveStruct, wallVisible, ZSCALE } from './utils';
@@ -211,10 +211,10 @@ export class PvsBoardVisitorResult implements VisResult {
     const tw2y = wall2.y - ms.y;
     const l1 = len2d(tw1x, tw1y);
     const l2 = len2d(tw2x, tw2y);
-    const minl = ismin ? Math.min(l1, l2) : Math.max(l1, l2);
+    const value = ismin ? Math.min(l1, l2) : Math.max(l1, l2);
     const start = monoatan2(tw1y, tw1x) / PI2;
     const end = monoatan2(tw2y, tw2x) / PI2;
-    return { start, end, value: minl };
+    return createSegment(start, end, value);
   }
 
   public visit(board: Board, boardUtils: BoardUtils, ms: MoveStruct, fwd: Vec3Array): VisResult {
@@ -241,15 +241,18 @@ export class PvsBoardVisitorResult implements VisResult {
           this.nonvoidWalls.push(w);
           continue;
         }
-        this.walls.push(packWallSectorId(w, s));
-        this.rad.add(this.calcSegment(board, w, ms, false));
+        if (this.rad.scan(this.calcSegment(board, w, ms, true))) {
+          this.walls.push(packWallSectorId(w, s));
+          this.rad.add(this.calcSegment(board, w, ms, false));
+        }
       }
 
       for (const w of this.nonvoidWalls) {
-        this.walls.push(packWallSectorId(w, s));
         const wall1 = board.walls[w];
-        if (this.rad.scan(this.calcSegment(board, w, ms, true)))
+        if (this.rad.scan(this.calcSegment(board, w, ms, true))) {
+          this.walls.push(packWallSectorId(w, s));
           this.pvs.push(wall1.nextsector);
+        }
       }
 
       const sprs = boardUtils.spritesBySector(s);

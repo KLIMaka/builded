@@ -159,15 +159,15 @@ export class FastList<T> implements Iterable<T> {
   }
 
   public [Symbol.iterator]() {
-    let pointer = this.first();
-    return pointer == 0
+    let ptr = this.first();
+    return ptr == 0
       ? EMPTY_ITERATOR
       : {
         next: () => {
-          if (pointer == 0) return TERMINAL_ITERATOR_RESULT;
+          if (ptr == 0) return TERMINAL_ITERATOR_RESULT;
           else {
-            const obj = this.get(pointer);
-            pointer = this.next(pointer);
+            const obj = this.get(ptr);
+            ptr = this.next(ptr);
             return ITERATOR_RESULT(obj);
           }
         }

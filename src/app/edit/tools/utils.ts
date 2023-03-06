@@ -169,6 +169,7 @@ class Utils extends DefaultTool {
         addSprite(board, sprite);
       }
       this.commit(`Insert Sprite`);
+      this.invalidateAll();
     });
   }
 
@@ -215,10 +216,7 @@ class Utils extends DefaultTool {
 
     splitWall(board, id, x, y, this.art, this.refs, this.api.cloneWall);
     this.commit(`Split Wall ${id}`);
-    const s = sectorOfWall(board, id);
-    invalidateSectorAndWalls(s, board, this.bus);
-    const nextsector = board.walls[id].nextsector;
-    if (nextsector != -1) invalidateSectorAndWalls(nextsector, board, this.bus);
+    this.invalidateAll();
   }
 
   private print() {

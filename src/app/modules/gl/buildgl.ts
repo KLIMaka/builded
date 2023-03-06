@@ -1,5 +1,4 @@
 import { BloodBoard } from 'build/blood/structs';
-import { Board } from 'build/board/structs';
 import { mat4, Mat4Array, vec3, Vec3Array, vec4 } from '../../../libs_js/glmatrix';
 import { Shader, Texture } from '../../../utils/gl/drawstruct';
 import { createShader } from '../../../utils/gl/shaders';
@@ -25,7 +24,8 @@ export const BuildGlConstructor = lifecycle(async (injector, lifecycle) => {
   const state = new State()
   const shaderCleaner = async (s: Shader) => s.destroy(gl);
   state.registerShader('baseShader', lifecycle(await createShader(gl, SHADER_NAME, [...defs]), shaderCleaner));
-  state.registerShader('spriteShader', lifecycle(await createShader(gl, SHADER_NAME, [...defs, 'SPRITE']), shaderCleaner));
+  state.registerShader('baseNonrepeatShader', lifecycle(await createShader(gl, SHADER_NAME, [...defs, 'NONREPEAT', 'ADD_DEPTH']), shaderCleaner));
+  state.registerShader('spriteShader', lifecycle(await createShader(gl, SHADER_NAME, [...defs, 'SPRITE', 'ADD_DEPTH']), shaderCleaner));
   state.registerShader('baseFlatShader', lifecycle(await createShader(gl, SHADER_NAME, [...defs, 'FLAT']), shaderCleaner));
   state.registerShader('spriteFlatShader', lifecycle(await createShader(gl, SHADER_NAME, [...defs, 'SPRITE', 'FLAT']), shaderCleaner));
   state.registerShader('parallax', lifecycle(await createShader(gl, SHADER_NAME, [...defs, 'PARALLAX']), shaderCleaner));

@@ -86,7 +86,7 @@ function updateSpriteWireframe(ctx: RenderablesCacheContext, sprId: number, buil
   const yo = (info.attrs.yoff * spr.yrepeat) / 4 + (spr.cstat.realCenter ? 0 : hh);
 
   if (spr.cstat.type == FACE_SPRITE) {
-    builder.type = Type.FACE;
+    builder.type = Type.SPRITE;
     fillBuffersForFaceSpriteWireframe(x, y, z, xo, yo, hw, hh, builder);
   } else if (spr.cstat.type == WALL_SPRITE) {
     builder.type = Type.SURFACE;

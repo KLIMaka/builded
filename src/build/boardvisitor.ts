@@ -237,7 +237,7 @@ export class PvsBoardVisitorResult implements VisResult {
       for (let w = sec.wallptr; w < endwall; w++) {
         if (!wallVisible(board, w, ms) || wallBehind(board, sec, w, ms, fwd)) continue;
         const wall1 = board.walls[w];
-        if (wall1.nextsector != -1) {
+        if (wall1.nextsector != -1 && !wall1.cstat.oneWay) {
           this.nonvoidWalls.push(w);
           continue;
         }

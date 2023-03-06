@@ -38,7 +38,8 @@ export const DefaultBuildersFactory = provider(async (injector: Injector) => {
 
 export enum Type {
   SURFACE,
-  FACE
+  SPRITE,
+  NONREPEAT
 }
 
 export class SolidBuilder extends BufferRenderable<SolidSetup> {
@@ -52,9 +53,18 @@ export class SolidBuilder extends BufferRenderable<SolidSetup> {
   protected textureHint() { return this.tex }
 
   public applySetup(setup: SolidSetup) {
-    setup.shader(this.type == Type.SURFACE ? (this.parallax ? 'parallax' : 'baseShader') : 'spriteShader')
+    setup.shader(this.selectShader())
       .base(this.tex)
       .color(vec4.set(this.color, 1, 1, 1, this.trans))
+  }
+
+  private selectShader() {
+    if (this.parallax) return 'parallax';
+    switch (this.type) {
+      case Type.SURFACE: return 'baseShader';
+      case Type.SPRITE: return 'spriteShader';
+      case Type.NONREPEAT: return 'baseNonrepeatShader';
+    }
   }
 
   public reset() {

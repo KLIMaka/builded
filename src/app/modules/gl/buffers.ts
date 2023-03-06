@@ -18,7 +18,7 @@ export interface GenericBuildBuffer {
 }
 
 export interface BuildBuffer extends GenericBuildBuffer {
-  writeNormal(off: number, x: number, y: number, z: number): number;
+  writeNormal(off: number, x: number, y: number, z: number, w?: number): number;
   writeTcLighting(off: number, u: number, v: number, pal?: number, shade?: number): number;
   writeLightmap(off: number, x: number, y: number, z?: number, w?: number): number;
   getNormBuffer(): VertexBuffer;
@@ -137,7 +137,7 @@ class BuildBufferFactoryImpl implements BuildBufferFactory {
   private addNewBuffer(hint: string) {
     const buffer = new Buffer(this.gl, new BufferBuilder()
       .addVertexBuffer(this.gl, this.gl.FLOAT, 3)
-      .addVertexBuffer(this.gl, this.gl.FLOAT, 3)
+      .addVertexBuffer(this.gl, this.gl.FLOAT, 4)
       .addVertexBuffer(this.gl, this.gl.FLOAT, 4)
       .addVertexBuffer(this.gl, this.gl.FLOAT, 4)
     );
@@ -204,8 +204,8 @@ export class BuildBufferImpl implements BuildBuffer {
     return off + 1;
   }
 
-  public writeNormal(off: number, x: number, y: number, z: number): number {
-    this.ptr.buffer.writeVertex(this.ptr, NORMAL, off, [x, y, z]);
+  public writeNormal(off: number, x: number, y: number, z: number, w: number = 0): number {
+    this.ptr.buffer.writeVertex(this.ptr, NORMAL, off, [x, y, z, w]);
     return off + 1;
   }
 

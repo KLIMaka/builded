@@ -1,5 +1,5 @@
 import { NumberInterpolator } from "../src/utils/interpolator";
-import { bilinear, optimize, quadratic, RadialSegments } from "../src/utils/mathutils";
+import { bilinear, nextpow2, optimize, quadratic, RadialSegments } from "../src/utils/mathutils";
 
 test('interpolator', () => {
   const arr = [1, 2, 2, 1];
@@ -85,4 +85,10 @@ test('radial segments', () => {
   segments2.add({ start: 0.9, end: 0.1, value: 1 });
   expect(segments2.getValue(0.5)).toBe(Number.MAX_VALUE);
   expect(segments2.getValue(0)).toBe(1);
+})
+
+test('nextpow2', () => {
+  expect(nextpow2(7)).toBe(8);
+  expect(nextpow2(8)).toBe(8);
+  expect(nextpow2(155)).toBe(256);
 })

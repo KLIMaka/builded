@@ -114,7 +114,7 @@ export function updateWall(ctx: RenderablesCacheContext, wallId: number, builder
       const base = wall.cstat.alignBottom ? floorz : ceilingz;
       applyWallTextureTransform(wall, wall2, wall, info, base, texMat_);
       genQuad(coords, normal, texMat_, ctx.lightmaps.midWall(wallId), wall.pal, wall.shade, builder.mid.buff);
-      builder.mid.tex = tex;
+      builder.mid.texture(tex, info);
     }
   } else {
     const nextsector = board.sectors[wall.nextsector];
@@ -136,7 +136,7 @@ export function updateWall(ctx: RenderablesCacheContext, wallId: number, builder
       } else {
         const base = wall.cstat.alignBottom ? ceilingz : nextceilingz;
         applyWallTextureTransform(wall, wall2, wall, info, base, texMat_);
-        builder.top.tex = tex;
+        builder.top.texture(tex, info);
         shade = wall.shade;
         pal = wall.pal;
       }
@@ -159,7 +159,7 @@ export function updateWall(ctx: RenderablesCacheContext, wallId: number, builder
         const info_ = wall.cstat.swapBottoms ? art.getInfo(wall_.picnum) : info;
         const base = wall_.cstat.alignBottom ? ceilingz : nextfloorz;
         applyWallTextureTransform(wall_, wall2_, wall, info_, base, texMat_);
-        builder.bot.tex = tex_;
+        builder.bot.texture(tex_, info_);
         shade = wall_.shade;
         pal = wall_.pal;
       }
@@ -175,7 +175,7 @@ export function updateWall(ctx: RenderablesCacheContext, wallId: number, builder
       const base = wall.cstat.alignBottom ? (wall.cstat.oneWay ? ceilingz : nextfloorz) : Math.max(ceilingz, nextceilingz);
       applyWallTextureTransform(wall, wall2, wall, info1, base, texMat_);
       genQuad(coords, normal, texMat_, ctx.lightmaps.upperWall(wallId), wall.pal, wall.shade, builder.mid.buff);
-      builder.mid.tex = tex1;
+      builder.mid.texture(tex1, info1);
       builder.mid.trans = trans;
     }
 

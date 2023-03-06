@@ -10,9 +10,9 @@ uniform vec3 eyepos;
 uniform vec4 clipPlane;
 uniform vec4 sys;
 uniform vec4 grid;
-
 uniform vec4 color;
 uniform vec4 modulation;
+uniform vec4 tcwrap;
 
 in vec4 tcps;
 in vec2 gridtc;
@@ -33,6 +33,7 @@ const float PLU_LINES = SHADOWSTEPS * PALSWAPS;
 #define VISIBILITY (sys.w)
 #define TIME (sys.x)
 #define DETPH_OFF (wnormal.w)
+#define WARAP (tcwrap.xy)
 
 bool isTransIdx(float idx) {
   return idx >= TARANS_IDX;
@@ -145,7 +146,7 @@ vec2 repeat(vec2 tc) {
 #if defined(SPRITE) || defined(NONREPEAT)
   return tc;
 #else
-  return fract(tc);
+  return mod(mod(tc, WARAP),  vec2(1.0));
 #endif
 }
 

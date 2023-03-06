@@ -1,3 +1,5 @@
+import { ArtInfo } from "build/formats/art";
+import { nextpow2 } from "utils/mathutils";
 import { mat4, vec4 } from "../../../libs_js/glmatrix";
 import { Texture } from "../../../utils/gl/drawstruct";
 import { Dependency, Injector, provider } from "../../../utils/injector";
@@ -48,6 +50,7 @@ export class SolidBuilder extends BufferRenderable<SolidSetup> {
   public trans: number = 1;
   public parallax: number = 0;
   private color = vec4.create();
+  private wrap = vec4.fromValues(1, 1, 0, 0);
 
   constructor(setup: SolidSetup, readonly buff: BuildBuffer) { super(setup) }
   protected textureHint() { return this.tex }
@@ -56,6 +59,12 @@ export class SolidBuilder extends BufferRenderable<SolidSetup> {
     setup.shader(this.selectShader())
       .base(this.tex)
       .color(vec4.set(this.color, 1, 1, 1, this.trans))
+      .wrap(this.wrap);
+  }
+
+  public texture(tex: Texture, info: ArtInfo) {
+    this.tex = tex;
+    vec4.set(this.wrap, 1, nextpow2(info.h) / info.h, 0, 0);
   }
 
   private selectShader() {
@@ -74,6 +83,7 @@ export class SolidBuilder extends BufferRenderable<SolidSetup> {
     vec4.set(this.color, 1, 1, 1, 1);
     this.parallax = 0;
     this.tex = null;
+    vec4.set(this.wrap, 1, 1, 0, 0);
   }
 }
 

@@ -79,15 +79,18 @@ export class BufferSetup extends GenericBufferSetup {
 export class SolidSetup extends BufferSetup {
   protected baseIdx: number;
   protected colorIdx: number;
+  protected tcWrapIdx: number;
 
   constructor(state: State) {
     super(state);
     this.baseIdx = this.register('base', state);
     this.colorIdx = this.register('color', state);
+    this.tcWrapIdx = this.register('tcwrap', state);
   }
 
   public base(tex: Texture) { this.values.set(this.baseIdx, tex); return this }
   public color(color: Vec4Array) { this.values.set(this.colorIdx, color); return this }
+  public wrap(wrap: Vec4Array) { this.values.set(this.tcWrapIdx, wrap); return this }
   textureHint() { return this.values.get(this.baseIdx) }
 }
 

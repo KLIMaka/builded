@@ -1,4 +1,4 @@
-import { Mat2dArray, Mat4Array } from "libs_js/glmatrix";
+import { mat2d, mat4 } from "gl-matrix";
 import { EngineApi } from "../../build/board/mutations/api";
 import { Board, Sprite } from "../../build/board/structs";
 import { ArtInfoProvider } from "../../build/formats/art";
@@ -61,11 +61,11 @@ export interface LightmapHandle {
 }
 
 export interface Lightmaps {
-  ceiling(sectorId: number): Mat2dArray;
-  floor(sectorId: number): Mat2dArray;
-  lowerWall(wallId: number): Mat4Array;
-  upperWall(wallId: number): Mat4Array;
-  midWall(wallId: number): Mat4Array;
+  ceiling(sectorId: number): mat2d;
+  floor(sectorId: number): mat2d;
+  lowerWall(wallId: number): mat4;
+  upperWall(wallId: number): mat4;
+  midWall(wallId: number): mat4;
 }
 export const LIGHTMAPS = new Dependency<Lightmaps>('Lightmaps');
 

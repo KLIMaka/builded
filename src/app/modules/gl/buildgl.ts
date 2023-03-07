@@ -1,5 +1,5 @@
 import { BloodBoard } from 'build/blood/structs';
-import { mat4, Mat4Array, vec3, Vec3Array, vec4 } from '../../../libs_js/glmatrix';
+import { mat4, vec3, vec4 } from 'gl-matrix';
 import { Shader, Texture } from '../../../utils/gl/drawstruct';
 import { createShader } from '../../../utils/gl/shaders';
 import { Profile, State } from '../../../utils/gl/stategl';
@@ -54,10 +54,10 @@ export class BuildGl {
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
   }
 
-  public setProjectionMatrix(proj: Mat4Array) { this.state.setUniform('P', proj) }
-  public setPosition(pos: Vec3Array) { this.state.setUniform('eyepos', pos) }
+  public setProjectionMatrix(proj: mat4) { this.state.setUniform('P', proj) }
+  public setPosition(pos: vec3) { this.state.setUniform('eyepos', pos) }
 
-  public setViewMatrix(view: Mat4Array) {
+  public setViewMatrix(view: mat4) {
     this.state.setUniform('V', view);
     if (this.state.isUniformEnabled('IV')) this.state.setUniform('IV', mat4.invert(inv, view));
   }

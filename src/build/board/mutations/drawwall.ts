@@ -1,6 +1,6 @@
 import { Board } from "../structs";
 import { ArtProvider, BuildReferenceTracker } from "../../../app/apis/app";
-import { vec3 } from "../../../libs_js/glmatrix";
+import { vec3 } from "gl-matrix";
 import { Deck } from "../../../utils/collections";
 import { wallNormal, ZSCALE, ANGSCALE } from "../../utils";
 import { sectorWalls } from "../loops";

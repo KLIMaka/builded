@@ -3,7 +3,7 @@ import { buildHull, drawWall, Point, point_3d, PortalType } from "../../../build
 import { sectorOfWall } from "../../../build/board/query";
 import { Board } from "../../../build/board/structs";
 import { build2gl, createSlopeCalculator, wallNormal, ZSCALE } from "../../../build/utils";
-import { vec2, vec3 } from "../../../libs_js/glmatrix";
+import { vec2, vec3 } from "gl-matrix";
 import { create, getInstances, lifecycle, Module, plugin } from "../../../utils/injector";
 import { dot2d } from "../../../utils/mathutils";
 import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, GRID, GridController, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";

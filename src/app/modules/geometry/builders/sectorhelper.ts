@@ -6,7 +6,7 @@ import { BuildBuffer } from "../../gl/buffers";
 import { RenderablesCacheContext } from "../cache";
 import { BuildersFactory, PointSpriteBuilder, SolidBuilder, WireframeBuilder } from "../common";
 import { buildCeilingHinge, buildFloorHinge, GRID_SECTOR_MATRIX } from "./common";
-import { vec4, mat4 } from "../../../../libs_js/glmatrix";
+import { vec4, mat4 } from "gl-matrix";
 import { sectorOfWall } from "../../../../build/board/query";
 
 export class SectorHelperBuilder extends Builders implements SectorRenderable {

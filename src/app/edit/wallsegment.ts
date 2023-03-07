@@ -4,7 +4,7 @@ import { fixxrepeat, mergePoints, moveWall } from "../../build/board/mutations/w
 import { lastwall, sectorOfWall } from "../../build/board/query";
 import { Board, Wall } from "../../build/board/structs";
 import { Entity, EntityType, Target } from "../../build/hitscan";
-import { vec2 } from "../../libs_js/glmatrix";
+import { vec2 } from "gl-matrix";
 import { IndexedDeck, map, takeFirst } from "../../utils/collections";
 import { iter } from "../../utils/iter";
 import { cyclic, len2d, tuple } from "../../utils/mathutils";

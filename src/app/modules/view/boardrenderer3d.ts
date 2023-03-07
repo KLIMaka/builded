@@ -1,7 +1,7 @@
 import { Board } from '../../../build/board/structs';
 import { AllBoardVisitorResult, createSectorCollector, createWallCollector, PvsBoardVisitorResult, unpackWallId, VisResult } from '../../../build/boardvisitor';
 import { wallVisible, ZSCALE } from '../../../build/utils';
-import { mat4, vec2, vec3 } from '../../../libs_js/glmatrix';
+import { mat4, vec2, vec3 } from 'gl-matrix';
 import { Deck } from '../../../utils/collections';
 import { create, Dependency, getInstances, Injector } from '../../../utils/injector';
 import { dot2d } from '../../../utils/mathutils';

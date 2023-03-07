@@ -1,4 +1,4 @@
-import { vec4 } from "../../../../libs_js/glmatrix";
+import { vec4 } from "gl-matrix";
 import { Builders } from "../../../apis/builder";
 import { WallRenderable } from "../../../apis/renderable";
 import { INTERSECTOR_WALL_COLOR, MASKED_WALL_COLOR, PORTAL_WALL_COLOR, RenderablesCacheContext, WALL_COLOR } from "../cache";

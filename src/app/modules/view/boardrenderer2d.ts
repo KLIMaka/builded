@@ -1,6 +1,6 @@
 import { Board } from '../../../build/board/structs';
 import { AllBoardVisitorResult, VisResult } from '../../../build/boardvisitor';
-import { mat4, Vec3Array } from '../../../libs_js/glmatrix';
+import { mat4, vec3 } from 'gl-matrix';
 import { Controller2D } from '../../../utils/camera/controller2d';
 import { Deck } from '../../../utils/collections';
 import { Injector } from '../../../utils/injector';
@@ -75,7 +75,7 @@ export class BoardRenderer2D {
     this.bgl.gl.enable(WebGLRenderingContext.DEPTH_TEST);
   }
 
-  public draw(view: View2d, campos: Vec3Array, dist: number, controller: Controller2D) {
+  public draw(view: View2d, campos: vec3, dist: number, controller: Controller2D) {
     this.upp = controller.getUnitsPerPixel();
     const result = visible.visit(this.board());
 

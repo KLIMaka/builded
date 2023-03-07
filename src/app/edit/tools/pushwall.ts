@@ -2,7 +2,7 @@ import { EngineApi } from "../../../build/board/mutations/api";
 import { pushWall } from "../../../build/board/mutations/walls";
 import { sectorOfWall } from "../../../build/board/query";
 import { build2gl, createSlopeCalculator, wallNormal, ZSCALE } from "../../../build/utils";
-import { vec3 } from "../../../libs_js/glmatrix";
+import { vec3 } from "gl-matrix";
 import { create, lifecycle, Module, plugin } from "../../../utils/injector";
 import { dot2d, int } from "../../../utils/mathutils";
 import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, GRID, GridController, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";

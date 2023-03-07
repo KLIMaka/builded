@@ -1,5 +1,5 @@
 import { BuildReferenceTracker } from "../../../app/apis/app";
-import { vec3 } from "../../../libs_js/glmatrix";
+import { vec3 } from "gl-matrix";
 import { forEach, length } from "../../../utils/collections";
 import { cross2d, int } from "../../../utils/mathutils";
 import { ArtInfoProvider } from "../../formats/art";

@@ -1,4 +1,4 @@
-import { vec3, Vec3Array } from "../../libs_js/glmatrix";
+import { vec3 } from "gl-matrix";
 import { len2d } from "../../utils/mathutils";
 
 export class MovingHandle {
@@ -9,14 +9,14 @@ export class MovingHandle {
   private vertical = false;
   private parallel = false;
 
-  public start(pos: Vec3Array) {
+  public start(pos: vec3) {
     vec3.copy(this.startPoint, pos);
     vec3.copy(this.currentPoint, this.startPoint);
     this.dzoff = 0;
     this.active = true;
   }
 
-  public update(vertical: boolean, parallel: boolean, start: Vec3Array, dir: Vec3Array) {
+  public update(vertical: boolean, parallel: boolean, start: vec3, dir: vec3) {
     this.parallel = parallel;
     this.vertical = vertical;
     if (vertical) {

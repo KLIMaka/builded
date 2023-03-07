@@ -1,5 +1,5 @@
 import { BoardUtils } from "app/apis/app";
-import { vec3, Vec3Array } from "../libs_js/glmatrix";
+import { vec3 } from "gl-matrix";
 import { range, wrap } from "../utils/collections";
 import { cross2d, dot2d, int, len2d, sign, sqrLen2d } from "../utils/mathutils";
 import { inSector, isValidSectorId } from "./board/query";
@@ -60,7 +60,7 @@ export class Ray {
 
 const SPRITE_OFF = 0.1;
 
-export function pointOnRay(out: Vec3Array, ray: Ray, t: number) {
+export function pointOnRay(out: vec3, ray: Ray, t: number) {
   vec3.copy(out, ray.dir);
   vec3.scale(out, out, t);
   vec3.add(out, out, ray.start);
@@ -95,7 +95,7 @@ export class Hitscan implements Target {
     }
   }
 
-  private target(): Vec3Array {
+  private target(): vec3 {
     return this.t == -1
       ? vec3.copy(this.targetPoint, this.ray.start)
       : pointOnRay(this.targetPoint, this.ray, this.t);

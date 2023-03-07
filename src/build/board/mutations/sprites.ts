@@ -1,5 +1,5 @@
 import { GridController } from "../../../app/apis/app";
-import { vec3 } from "../../../libs_js/glmatrix";
+import { vec3 } from "gl-matrix";
 import { findFirst } from "../../../utils/collections";
 import { int } from "../../../utils/mathutils";
 import { slope, wallNormal } from "../../utils";

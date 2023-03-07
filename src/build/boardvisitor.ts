@@ -1,5 +1,5 @@
 import { BoardUtils } from 'app/apis/app';
-import { Vec3Array } from '../libs_js/glmatrix';
+import { vec3 } from 'gl-matrix';
 import { Deck, IndexedDeck } from '../utils/collections';
 import { createSegment, dot2d, len2d, monoatan2, PI2, RadialSegments } from '../utils/mathutils';
 import { inSector } from './board/query';
@@ -131,7 +131,7 @@ export class TopDownBoardVisitorResult implements VisResult {
   private dist: number;
   private visibleSectors = new Set<number>();
 
-  visit(board: Board, campos: Vec3Array, dist: number): VisResult {
+  visit(board: Board, campos: vec3, dist: number): VisResult {
     this.board = board;
     this.cx = campos[0];
     this.cy = campos[2];
@@ -184,7 +184,7 @@ export class TopDownBoardVisitorResult implements VisResult {
   }
 }
 
-function wallBehind(board: Board, sector: Sector, wallId: number, ms: MoveStruct, fwd: Vec3Array) {
+function wallBehind(board: Board, sector: Sector, wallId: number, ms: MoveStruct, fwd: vec3) {
   const wall1 = board.walls[wallId];
   const wall2 = board.walls[wall1.point2];
   const dx1 = wall1.x - ms.x; const dy1 = wall1.y - ms.y;
@@ -217,7 +217,7 @@ export class PvsBoardVisitorResult implements VisResult {
     return createSegment(start, end, value);
   }
 
-  public visit(board: Board, boardUtils: BoardUtils, ms: MoveStruct, fwd: Vec3Array): VisResult {
+  public visit(board: Board, boardUtils: BoardUtils, ms: MoveStruct, fwd: vec3): VisResult {
     this.sectors.clear();
     this.walls.clear();
     this.sprites.clear();

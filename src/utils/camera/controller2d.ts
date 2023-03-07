@@ -1,5 +1,5 @@
 import { Camera } from "./camera";
-import { mat4, Vec3Array, vec3 } from "../../libs_js/glmatrix";
+import { mat4, vec3 } from "gl-matrix";
 
 export class Controller2D {
   private camera = new Camera(0, 0, 0, 0, 0);
@@ -34,7 +34,7 @@ export class Controller2D {
   public getPosition() { return this.camera.getPosition() }
   public getTransformMatrix() { return this.camera.getTransformMatrix() }
 
-  public getPointerPosition(pointer: Vec3Array, x: number, y: number) {
+  public getPointerPosition(pointer: vec3, x: number, y: number) {
     let pos = this.camera.getPosition();
     return vec3.set(pointer, pos[0] + (this.width / 2) * x * this.scale, 0, pos[2] + (this.height / 2) * y * this.scale);
   }

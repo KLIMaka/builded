@@ -1,6 +1,6 @@
 import { FACE_SPRITE, FLOOR_SPRITE, WALL_SPRITE } from "../../../../build/board/structs";
 import { ang2vec, spriteAngle, ZSCALE } from "../../../../build/utils";
-import { vec3, vec4 } from "../../../../libs_js/glmatrix";
+import { vec3, vec4 } from "gl-matrix";
 import { Builders } from "../../../apis/builder";
 import { RenderablesCacheContext } from "../cache";
 import { BuildersFactory, Type, WireframeBuilder } from "../common";

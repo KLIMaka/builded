@@ -1,16 +1,16 @@
-import * as GLM from '../libs_js/glmatrix';
+import { mat2d, mat3, mat4, vec2, vec3 } from 'gl-matrix';
 import * as MU from './mathutils';
 import { loopPairs, pairs } from "./collections";
 
-export function intersect2d(p1s: GLM.Vec2Array, p1e: GLM.Vec2Array, p2s: GLM.Vec2Array, p2e: GLM.Vec2Array): GLM.Vec2Array {
+export function intersect2d(p1s: vec2, p1e: vec2, p2s: vec2, p2e: vec2): vec2 {
   const t = intersect2dT(p1s, p1e, p2s, p2e);
   if (t == null)
     return null;
-  return GLM.vec2.lerp(GLM.vec2.create(), p1s, p1e, t);
+  return vec2.lerp(vec2.create(), p1s, p1e, t);
 }
 
 
-export function intersect2dT(p1s: GLM.Vec2Array, p1e: GLM.Vec2Array, p2s: GLM.Vec2Array, p2e: GLM.Vec2Array): number {
+export function intersect2dT(p1s: vec2, p1e: vec2, p2s: vec2, p2e: vec2): number {
   const d = (p1s[0] - p1e[0]) * (p2s[1] - p2e[1]) - (p1s[1] - p1e[1]) * (p2s[0] - p2e[0]);
   if (Math.abs(d) < MU.EPS) return null;
 
@@ -31,21 +31,21 @@ export function intersect2dT(p1s: GLM.Vec2Array, p1e: GLM.Vec2Array, p2s: GLM.Ve
   return dot1;
 }
 
-export function direction3d(ps: GLM.Vec3Array, pe: GLM.Vec3Array): GLM.Vec3Array {
-  const dir = GLM.vec3.sub(GLM.vec3.create(), pe, ps);
-  return GLM.vec3.normalize(dir, dir);
+export function direction3d(ps: vec3, pe: vec3): vec3 {
+  const dir = vec3.sub(vec3.create(), pe, ps);
+  return vec3.normalize(dir, dir);
 }
 
-export function direction2d(ps: GLM.Vec2Array, pe: GLM.Vec2Array): GLM.Vec2Array {
-  const dir = GLM.vec2.sub(GLM.vec2.create(), pe, ps);
-  return GLM.vec2.normalize(dir, dir);
+export function direction2d(ps: vec2, pe: vec2): vec2 {
+  const dir = vec2.sub(vec2.create(), pe, ps);
+  return vec2.normalize(dir, dir);
 }
 
-export function projectXY(p: GLM.Vec3Array): GLM.Vec2Array { return GLM.vec2.fromValues(p[0], p[1]) }
-export function projectXZ(p: GLM.Vec3Array): GLM.Vec2Array { return GLM.vec2.fromValues(p[0], p[2]) }
-export function projectYZ(p: GLM.Vec3Array): GLM.Vec2Array { return GLM.vec2.fromValues(p[1], p[2]) }
+export function projectXY(p: vec3): vec2 { return vec2.fromValues(p[0], p[1]) }
+export function projectXZ(p: vec3): vec2 { return vec2.fromValues(p[0], p[2]) }
+export function projectYZ(p: vec3): vec2 { return vec2.fromValues(p[1], p[2]) }
 
-export function intersect3d(p1s: GLM.Vec3Array, p1e: GLM.Vec3Array, p2s: GLM.Vec3Array, p2e: GLM.Vec3Array): GLM.Vec3Array {
+export function intersect3d(p1s: vec3, p1e: vec3, p2s: vec3, p2e: vec3): vec3 {
   const dir1 = direction3d(p1s, p1e);
   const dir2 = direction3d(p2s, p2e);
 
@@ -65,50 +65,50 @@ export function intersect3d(p1s: GLM.Vec3Array, p1e: GLM.Vec3Array, p2s: GLM.Vec
 
   if (t == null)
     return null;
-  return GLM.vec3.lerp(GLM.vec3.create(), p1s, p1e, t);
+  return vec3.lerp(vec3.create(), p1s, p1e, t);
 }
 
-export function reflectVec3d(out: GLM.Vec3Array, id: GLM.Vec3Array, n: GLM.Vec3Array): GLM.Vec3Array {
-  const dot = GLM.vec3.dot(n, id);
-  GLM.vec3.scale(out, n, dot * 2);
-  GLM.vec3.sub(out, id, out);
+export function reflectVec3d(out: vec3, id: vec3, n: vec3): vec3 {
+  const dot = vec3.dot(n, id);
+  vec3.scale(out, n, dot * 2);
+  vec3.sub(out, id, out);
   return out;
 }
 
-const tmp = GLM.vec3.create();
-export function reflectPoint3d(out: GLM.Vec3Array, mirrorNormal: GLM.Vec3Array, mirrorD: number, point: GLM.Vec3Array) {
-  const t = GLM.vec3.dot(point, mirrorNormal) + mirrorD;
-  GLM.vec3.scale(tmp, mirrorNormal, t * 2)
-  return GLM.vec3.sub(out, point, tmp);
+const tmp = vec3.create();
+export function reflectPoint3d(out: vec3, mirrorNormal: vec3, mirrorD: number, point: vec3) {
+  const t = vec3.dot(point, mirrorNormal) + mirrorD;
+  vec3.scale(tmp, mirrorNormal, t * 2)
+  return vec3.sub(out, point, tmp);
 }
 
-export function normal2d(out: GLM.Vec2Array, vec: GLM.Vec2Array) {
-  GLM.vec2.set(out, vec[1], -vec[0]);
-  return GLM.vec2.normalize(out, out);
+export function normal2d(out: vec2, vec: vec2) {
+  vec2.set(out, vec[1], -vec[0]);
+  return vec2.normalize(out, out);
 }
 
-const side = GLM.vec3.create();
-const up = GLM.vec3.create();
-const forward = GLM.vec3.create();
-const oside = GLM.vec3.create();
-const oup = GLM.vec3.create();
-const oforward = GLM.vec3.create();
-const mirroredPos = GLM.vec3.create();
-export function mirrorBasis(out: GLM.Mat4Array, mat: GLM.Mat4Array, point: GLM.Vec3Array, mirrorNormal: GLM.Vec3Array, mirrorD: number) {
-  GLM.vec3.set(oside, mat[0], mat[4], mat[8]);
-  GLM.vec3.set(oup, mat[1], mat[5], mat[9]);
-  GLM.vec3.set(oforward, mat[2], mat[6], mat[10]);
+const side = vec3.create();
+const up = vec3.create();
+const forward = vec3.create();
+const oside = vec3.create();
+const oup = vec3.create();
+const oforward = vec3.create();
+const mirroredPos = vec3.create();
+export function mirrorBasis(out: mat4, mat: mat4, point: vec3, mirrorNormal: vec3, mirrorD: number) {
+  vec3.set(oside, mat[0], mat[4], mat[8]);
+  vec3.set(oup, mat[1], mat[5], mat[9]);
+  vec3.set(oforward, mat[2], mat[6], mat[10]);
   reflectVec3d(side, oside, mirrorNormal);
   reflectVec3d(up, oup, mirrorNormal);
   reflectVec3d(forward, oforward, mirrorNormal);
   reflectPoint3d(mirroredPos, mirrorNormal, mirrorD, point);
 
-  GLM.mat4.identity(out);
+  mat4.identity(out);
   out[0] = side[0]; out[1] = up[0]; out[2] = forward[0]; out[3] = 0;
   out[4] = side[1]; out[5] = up[1]; out[6] = forward[1]; out[7] = 0;
   out[8] = side[2]; out[9] = up[2]; out[10] = forward[2]; out[11] = 0;
-  GLM.vec3.negate(mirroredPos, mirroredPos);
-  GLM.mat4.translate(out, out, mirroredPos);
+  vec3.negate(mirroredPos, mirroredPos);
+  mat4.translate(out, out, mirroredPos);
   return out;
 }
 
@@ -119,7 +119,7 @@ export function mirrorBasis(out: GLM.Mat4Array, mat: GLM.Mat4Array, point: GLM.V
 //     \ ^ /
 //      \ /
 //      p2
-// export function ang2d(p1:GLM.Vec2Array, p2:GLM.Vec2Array, p3:GLM.Vec2Array):number {
+// export function ang2d(p1:vec2, p2:vec2, p3:vec2):number {
 //   const toNext = subCopy2d(p3, p2); normalize2d(toNext);
 //   const toPrev = subCopy2d(p1, p2); normalize2d(toPrev);
 //   const angToNext = Math.acos(toNext[0]);
@@ -145,11 +145,11 @@ export function mirrorBasis(out: GLM.Mat4Array, mat: GLM.Mat4Array, point: GLM.V
 // }
 
 
-export function projectionSpace(vtxs: GLM.Vec3Array[], n: GLM.Vec3Array): GLM.Mat3Array {
-  const a = GLM.vec3.create();
-  GLM.vec3.normalize(a, GLM.vec3.sub(a, vtxs[0], vtxs[1]));
-  const c = GLM.vec3.create();
-  GLM.vec3.normalize(c, GLM.vec3.cross(c, n, a));
+export function projectionSpace(vtxs: vec3[], n: vec3): mat3 {
+  const a = vec3.create();
+  vec3.normalize(a, vec3.sub(a, vtxs[0], vtxs[1]));
+  const c = vec3.create();
+  vec3.normalize(c, vec3.cross(c, n, a));
   return [
     a[0], c[0], n[0],
     a[1], c[1], n[1],
@@ -157,37 +157,37 @@ export function projectionSpace(vtxs: GLM.Vec3Array[], n: GLM.Vec3Array): GLM.Ma
   ];
 }
 
-export function project3d(vtxs: GLM.Vec3Array[], normal: GLM.Vec3Array): GLM.Vec2Array[] {
+export function project3d(vtxs: vec3[], normal: vec3): vec2[] {
   const mat = projectionSpace(vtxs, normal);
   const ret = [];
-  const t = GLM.vec3.create();
+  const t = vec3.create();
   for (let i = 0; i < vtxs.length; i++) {
-    const vtx = GLM.vec3.transformMat3(t, vtxs[i], mat);
+    const vtx = vec3.transformMat3(t, vtxs[i], mat);
     ret.push([vtx[0], vtx[1]]);
   }
   return ret;
 }
 
-export function polygonNormal(vtxs: GLM.Vec3Array[]): GLM.Vec3Array {
-  const normal = GLM.vec3.create();
+export function polygonNormal(vtxs: vec3[]): vec3 {
+  const normal = vec3.create();
   for (const [v1, v2] of loopPairs(vtxs)) {
-    const cross = GLM.vec3.cross(normal, v1, v2);
-    const l = GLM.vec3.length(cross)
+    const cross = vec3.cross(normal, v1, v2);
+    const l = vec3.length(cross)
     if (l <= 0) continue;
-    return GLM.vec3.scale(normal, normal, 1 / l);
+    return vec3.scale(normal, normal, 1 / l);
   }
   return null;
 }
 
-function norm(verts: GLM.Vec2Array[], rad: number): number {
-  const mat = GLM.mat2d.fromRotation(GLM.mat2d.create(), rad);
+function norm(verts: vec2[], rad: number): number {
+  const mat = mat2d.fromRotation(mat2d.create(), rad);
   let minx = Number.MAX_VALUE;
   let miny = Number.MAX_VALUE;
   let maxx = Number.MIN_VALUE;
   let maxy = Number.MIN_VALUE;
-  const vtx = GLM.vec2.create();
+  const vtx = vec2.create();
   verts.forEach(v => {
-    GLM.vec2.transformMat2d(vtx, v, mat);
+    vec2.transformMat2d(vtx, v, mat);
     minx = Math.min(minx, vtx[0]);
     miny = Math.min(miny, vtx[1]);
     maxx = Math.max(maxx, vtx[0]);
@@ -196,7 +196,7 @@ function norm(verts: GLM.Vec2Array[], rad: number): number {
   return (maxx - minx) * (maxy - miny);
 }
 
-export function optimizeRotation(verts: GLM.Vec2Array[]) {
+export function optimizeRotation(verts: vec2[]) {
 
 }
 

@@ -1,4 +1,4 @@
-import { vec2, vec3, Vec3Array } from '../libs_js/glmatrix';
+import { vec2, vec3 } from 'gl-matrix';
 import { cyclicPairs, loopPairs } from '../utils/collections';
 import { cross2d, cyclic, int, len2d, monoatan2, PI2 } from '../utils/mathutils';
 import { normal2d } from '../utils/vecmath';
@@ -7,11 +7,11 @@ import { Entity, EntityType } from './hitscan';
 
 export const ZSCALE = -16;
 
-export function build2gl(out: Vec3Array, vec: Vec3Array): Vec3Array {
+export function build2gl(out: vec3, vec: vec3): vec3 {
   return vec3.set(out, vec[0], vec[2] / ZSCALE, vec[1]);
 }
 
-export function gl2build(out: Vec3Array, vec: Vec3Array): Vec3Array {
+export function gl2build(out: vec3, vec: vec3): vec3 {
   return vec3.set(out, vec[0], vec[2], vec[1] * ZSCALE);
 }
 
@@ -216,7 +216,7 @@ export function wallVisible(board: Board, wallId: number, ms: MoveStruct) {
 }
 
 const _normal = vec2.create();
-export function wallNormal(out: Vec3Array, board: Board, wallId: number): Vec3Array {
+export function wallNormal(out: vec3, board: Board, wallId: number): vec3 {
   const w1 = board.walls[wallId];
   const w2 = board.walls[w1.point2];
   vec2.set(_normal, w1.x - w2.x, w1.y - w2.y);
@@ -228,7 +228,7 @@ export function wallNormal(out: Vec3Array, board: Board, wallId: number): Vec3Ar
 const _wn = vec3.create();
 const _up = vec3.fromValues(0, 1, 0);
 const _down = vec3.fromValues(0, -1, 0);
-export function sectorNormal(out: Vec3Array, board: Board, sectorId: number, ceiling: boolean): Vec3Array {
+export function sectorNormal(out: vec3, board: Board, sectorId: number, ceiling: boolean): vec3 {
   const sector = board.sectors[sectorId];
   wallNormal(_wn, board, sector.wallptr);
   vec3.negate(_wn, _wn);
@@ -238,7 +238,7 @@ export function sectorNormal(out: Vec3Array, board: Board, sectorId: number, cei
   return out;
 }
 
-export function ang2vec(ang: number): Vec3Array {
+export function ang2vec(ang: number): vec3 {
   ang += Math.PI / 2;
   return vec3.fromValues(Math.sin(ang), 0, Math.cos(ang))
 }

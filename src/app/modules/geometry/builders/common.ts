@@ -1,6 +1,6 @@
 import { Board, Sector, Wall } from '../../../../build/board/structs';
 import { slope, ZSCALE } from '../../../../build/utils';
-import { mat4, vec4 } from '../../../../libs_js/glmatrix';
+import { mat4, vec3, vec4 } from 'gl-matrix';
 import { Texture } from '../../../../utils/gl/drawstruct';
 import { int, len2d } from '../../../../utils/mathutils';
 import { Tiler } from '../../../../utils/tiler';
@@ -25,7 +25,7 @@ function getBaseZ(type: WallGridType, wall: Wall, sector: Sector, nextsector: Se
   }
 }
 
-let tmp = vec4.create();
+let tmp = vec3.create();
 let texMat = mat4.create();
 export function createGridWallMatrix(board: Board, id: number, type: WallGridType) {
   const wall1 = board.walls[id];
@@ -39,9 +39,9 @@ export function createGridWallMatrix(board: Board, id: number, type: WallGridTyp
   const sx = (wall1.xrepeat * DEFAULT_REPEAT_RATE) / wlen;
   const sy = wall1.yrepeat / 8;
   mat4.identity(texMat);
-  mat4.scale(texMat, texMat, vec4.set(tmp, sx, sy, 1, 1));
+  mat4.scale(texMat, texMat, vec3.set(tmp, sx, sy, 1));
   mat4.rotateY(texMat, texMat, -Math.atan2(-dy, dx));
-  mat4.translate(texMat, texMat, vec4.set(tmp, -wall1.x, -zbase / ZSCALE, -wall1.y, 0));
+  mat4.translate(texMat, texMat, vec3.set(tmp, -wall1.x, -zbase / ZSCALE, -wall1.y));
   return texMat;
 }
 

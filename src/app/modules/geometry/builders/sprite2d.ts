@@ -1,6 +1,6 @@
 import { FACE_SPRITE, WALL_SPRITE } from "../../../../build/board/structs";
 import { spriteAngle, ZSCALE } from "../../../../build/utils";
-import { vec4 } from "../../../../libs_js/glmatrix";
+import { vec4 } from "gl-matrix";
 import { cyclicPairs } from "../../../../utils/collections";
 import { Builders } from "../../../apis/builder";
 import { SPRITE_LABEL } from "../../../apis/renderable";

@@ -7,7 +7,7 @@ import { findContainingSectorMidPoints, sectorOfWall, wallInSector } from "../..
 import { Board } from "../../../build/board/structs";
 import { Target } from "../../../build/hitscan";
 import { ZSCALE } from "../../../build/utils";
-import { vec3 } from "../../../libs_js/glmatrix";
+import { vec3 } from "gl-matrix";
 import { Deck, wrap } from "../../../utils/collections";
 import { create, lifecycle, Module, plugin } from "../../../utils/injector";
 import { int, len2d } from "../../../utils/mathutils";
@@ -285,7 +285,7 @@ export class DrawSector extends DefaultTool {
   }
 
   private findContainingSector() {
-    const sectors = findContainingSectorMidPoints(this.board(), [...this.points, <[number, number]>this.pointer]);
+    const sectors = findContainingSectorMidPoints(this.board(), [...this.points, [this.pointer[0], this.pointer[1]]]);
     return sectors.size == 1 ? sectors.values().next().value : -1;
   }
 
@@ -303,7 +303,7 @@ export class DrawSector extends DefaultTool {
   }
 
   private splitSector(sectorId: number): void {
-    splitSector(this.board(), sectorId, wrap([...this.points, <[number, number]>this.pointer]), this.refs, this.api);
+    splitSector(this.board(), sectorId, wrap([...this.points, [this.pointer[0], this.pointer[1]]]), this.refs, this.api);
     this.bus.handle(new Commit(`Split Sector ${sectorId}`));
     this.bus.handle(new BoardInvalidate(null));
     this.points.clear();

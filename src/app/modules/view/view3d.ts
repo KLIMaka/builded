@@ -3,7 +3,7 @@ import { findSector, inSector, sectorOfWall, snapWall } from "../../../build/boa
 import { Board } from "../../../build/board/structs";
 import { Entity, EntityType, Hitscan, hitscan, Ray, Target } from "../../../build/hitscan";
 import { build2gl, getPlayerStart, gl2build, ZSCALE } from "../../../build/utils";
-import { vec3 } from "../../../libs_js/glmatrix";
+import { vec3 } from "gl-matrix";
 import { CachedValue } from "../../../utils/cachedvalue";
 import { Controller3D } from "../../../utils/camera/controller3d";
 import { getInstances, lifecycle } from "../../../utils/injector";

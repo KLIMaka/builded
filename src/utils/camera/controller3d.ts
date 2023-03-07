@@ -1,6 +1,6 @@
 import * as MU from '../../utils/mathutils';
 import * as camera from './camera';
-import { mat4, vec3, Mat4Array, Vec3Array } from '../../libs_js/glmatrix';
+import { mat4, vec3 } from 'gl-matrix';
 
 let invertTrans = mat4.create();
 let invTP = mat4.create();
@@ -23,13 +23,13 @@ export class Controller3D {
     return this.fov;
   }
 
-  public getMatrix(aspect: number): Mat4Array {
+  public getMatrix(aspect: number): mat4 {
     let projection = this.getProjectionMatrix(aspect);
     mat4.mul(projection, projection, this.camera.getTransformMatrix());
     return projection;
   }
 
-  public getProjectionMatrix(aspect: number): Mat4Array {
+  public getProjectionMatrix(aspect: number): mat4 {
     return mat4.perspective(this.projection, this.fovRad, aspect, 1, null);
   }
 
@@ -49,7 +49,7 @@ export class Controller3D {
     return this.camera.forward();
   }
 
-  public getForwardUnprojected(aspect: number, x: number, y: number): Vec3Array {
+  public getForwardUnprojected(aspect: number, x: number, y: number): vec3 {
     mat4.invert(invertTrans, this.getTransformMatrix());
     mat4.invert(invTP, this.getProjectionMatrix(aspect));
     mat4.mul(invTP, invertTrans, invTP);

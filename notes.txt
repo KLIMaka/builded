@@ -2,3 +2,7 @@
 
 * xflip on bottom swapped walls applied from original wall, but yflip - from swapped
 * inPolygon strange logic in border cases
+
+03.03.23
+
+* strange wrapping nonpow2 textures vertically

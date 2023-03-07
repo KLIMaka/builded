@@ -3,7 +3,7 @@ import { moveSpriteX } from "../../build/board/mutations/sprites";
 import { isValidSectorId } from "../../build/board/query";
 import { Entity, EntityType } from "../../build/hitscan";
 import { slope, ZSCALE } from "../../build/utils";
-import * as GLM from "../../libs_js/glmatrix";
+import { vec3 } from "gl-matrix";
 import { cyclic, tuple } from "../../utils/mathutils";
 import { Message, MessageHandlerReflective } from "../apis/handler";
 import { EditContext } from "./context";
@@ -16,7 +16,7 @@ export class SpriteEnt extends MessageHandlerReflective {
   constructor(
     public spriteId: number,
     private ctx: EditContext,
-    public origin = GLM.vec3.create(),
+    public origin = vec3.create(),
     public origAng = 0,
     private valid = true) { super() }
 
@@ -28,7 +28,7 @@ export class SpriteEnt extends MessageHandlerReflective {
       const newSprite = this.ctx.api.cloneSprite(spr);
       this.spriteId = addSprite(board, newSprite);
     }
-    GLM.vec3.set(this.origin, spr.x, spr.z / ZSCALE, spr.y);
+    vec3.set(this.origin, spr.x, spr.z / ZSCALE, spr.y);
     this.origAng = spr.ang;
   }
 

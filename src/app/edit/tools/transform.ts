@@ -1,5 +1,5 @@
 import { build2gl } from "../../../build/utils";
-import { vec3 } from "../../../libs_js/glmatrix";
+import { vec3 } from "gl-matrix";
 import { create, getInstances, lifecycle, Module, plugin } from "../../../utils/injector";
 import { detuple0, detuple1 } from "../../../utils/mathutils";
 import { LOGGER, Logger, STATE } from "../../apis/app";

@@ -2,7 +2,7 @@ import { sectorOfWall } from "build/board/query";
 import { EntityType } from "build/hitscan";
 import { sectorWalls } from "../../../build/board/loops";
 import { ANGSCALE, createSlopeCalculator, getWallCoords, wallNormal, ZSCALE } from "../../../build/utils";
-import { mat2d, Mat2dArray, mat4, Mat4Array, vec2, Vec2Array, vec3, vec4 } from "../../../libs_js/glmatrix";
+import { mat2d, mat4, vec2, vec3, vec4 } from "gl-matrix";
 import { first, map, range } from "../../../utils/collections";
 import { create, Injector, provider } from "../../../utils/injector";
 import { BOARD, BoardProvider, Lightmaps } from "../../apis/app";
@@ -19,7 +19,7 @@ class BoundingBox {
   height() { return this.maxy - this.miny }
 };
 
-function boundingBox(vtxs: Iterable<Vec2Array>): BoundingBox {
+function boundingBox(vtxs: Iterable<vec2>): BoundingBox {
   let minx = Number.POSITIVE_INFINITY;
   let miny = Number.POSITIVE_INFINITY;
   let maxx = Number.NEGATIVE_INFINITY;
@@ -44,13 +44,13 @@ class LightmapsImpl implements Lightmaps {
     private packer = new Packer(1024, 1024)
   ) { }
 
-  ceiling(sectorId: number): Mat2dArray { return this.sector(sectorId, true) }
-  floor(sectorId: number): Mat2dArray { return this.sector(sectorId, false) }
-  lowerWall(wallId: number): Mat4Array { return this.wall1(wallId, EntityType.LOWER_WALL) }
-  upperWall(wallId: number): Mat4Array { return this.wall1(wallId, EntityType.UPPER_WALL) }
-  midWall(wallId: number): Mat4Array { return this.wall1(wallId, EntityType.MID_WALL) }
+  ceiling(sectorId: number): mat2d { return this.sector(sectorId, true) }
+  floor(sectorId: number): mat2d { return this.sector(sectorId, false) }
+  lowerWall(wallId: number): mat4 { return this.wall1(wallId, EntityType.LOWER_WALL) }
+  upperWall(wallId: number): mat4 { return this.wall1(wallId, EntityType.UPPER_WALL) }
+  midWall(wallId: number): mat4 { return this.wall1(wallId, EntityType.MID_WALL) }
 
-  private sector(sectorId: number, ceiling: boolean): Mat2dArray {
+  private sector(sectorId: number, ceiling: boolean): mat2d {
     return mat2d.create();
     const board = this.board();
     const sector = board.sectors[sectorId];
@@ -75,7 +75,7 @@ class LightmapsImpl implements Lightmaps {
     return m;
   }
 
-  private wall1(wallId: number, type: (EntityType.LOWER_WALL | EntityType.MID_WALL | EntityType.UPPER_WALL)): Mat4Array {
+  private wall1(wallId: number, type: (EntityType.LOWER_WALL | EntityType.MID_WALL | EntityType.UPPER_WALL)): mat4 {
     return mat4.create();
     const coords = this.getCoords(wallId, type);
     if (coords == null) return mat4.create();

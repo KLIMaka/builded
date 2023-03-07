@@ -1,9 +1,9 @@
-import { mat4, Mat4Array, vec3, Vec3Array } from '../../libs_js/glmatrix';
+import { mat4, vec3 } from 'gl-matrix';
 import { deg2rad } from '../mathutils';
 
 export class Camera {
-  private transform: Mat4Array;
-  private position: Vec3Array;
+  private transform: mat4;
+  private position: vec3;
   private angleX: number;
   private angleY: number;
   private needUpdate: boolean = true;
@@ -27,16 +27,16 @@ export class Camera {
     this.needUpdate = true;
   }
 
-  public getPosition(): Vec3Array {
+  public getPosition(): vec3 {
     return this.position;
   }
 
-  public forward(): Vec3Array {
+  public forward(): vec3 {
     var mat4 = this.getTransformMatrix()
     return vec3.fromValues(-mat4[2], -mat4[6], -mat4[10]);
   }
 
-  public side(): Vec3Array {
+  public side(): vec3 {
     var mat4 = this.getTransformMatrix()
     return vec3.fromValues(mat4[0], mat4[4], mat4[8]);
   }
@@ -54,7 +54,7 @@ export class Camera {
     this.needUpdate = true;
   }
 
-  public getTransformMatrix(): Mat4Array {
+  public getTransformMatrix(): mat4 {
     var mat = this.transform;
     if (this.needUpdate) {
       var pos = this.position;

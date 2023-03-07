@@ -218,7 +218,7 @@ export class RenderablesCacheImpl extends MessageHandlerReflective implements Re
     this.helpers = new CachedHelperBuildRenderableProvider(ctx, this.geometry);
     this.topdown = new CachedTopDownBuildRenderableProvider(ctx);
     this.selected = new CachedSelectedRenderableProvider(ctx, this.geometry);
-    this.launchPrebuild();
+    // this.launchPrebuild();
   }
 
   public stop() {

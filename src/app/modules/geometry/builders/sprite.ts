@@ -1,12 +1,12 @@
 import { FACE_SPRITE, FLOOR_SPRITE, WALL_SPRITE } from "../../../../build/board/structs";
 import { ang2vec, spriteAngle, ZSCALE } from "../../../../build/utils";
-import { Vec3Array } from "../../../../libs_js/glmatrix";
 import { rand } from "../../../../utils/random";
 import { BuildBuffer } from "../../gl/buffers";
 import { RenderablesCacheContext } from "../cache";
 import { SolidBuilder, Type } from "../common";
+import { mat2d, vec2, vec3 } from "gl-matrix";
 
-function normals(n: Vec3Array) {
+function normals(n: vec3) {
   return [n[0], n[1], n[2], n[0], n[1], n[2], n[0], n[1], n[2], n[0], n[1], n[2]];
 }
 
@@ -49,10 +49,10 @@ function fillbuffersForWallSprite(
   const dx = Math.sin(ang) * hw;
   const dy = Math.cos(ang) * hw;
   genQuad([
-    x - dx, y - dy, z - hh + yo,
-    x + dx, y + dy, z - hh + yo,
-    x + dx, y + dy, z + hh + yo,
-    x - dx, y - dy, z + hh + yo],
+    x - dx, y - dy + xo, z - hh + yo,
+    x + dx, y + dy + xo, z - hh + yo,
+    x + dx, y + dy + xo, z + hh + yo,
+    x - dx, y - dy + xo, z + hh + yo],
     normals(ang2vec(ang)), [
     xf ? 0 : 1, yf ? 0 : 1,
     xf ? 1 : 0, yf ? 0 : 1,
@@ -64,10 +64,18 @@ function fillbuffersForWallSprite(
 
 function fillbuffersForFloorSprite(x: number, y: number, z: number, xo: number, yo: number, hw: number, hh: number, ang: number, xf: number, yf: number,
   onesided: number, pal: number, shade: number, renderable: SolidBuilder) {
+  const mat = mat2d.create();
+  mat2d.rotate(mat, mat, -ang);
+
   const dwx = Math.sin(ang) * hw;
   const dwy = Math.cos(ang) * hw;
   const dhx = Math.sin(ang + Math.PI / 2) * hh;
   const dhy = Math.cos(ang + Math.PI / 2) * hh;
+
+  const [dx, dy] = vec2.transformMat2d(vec2.create(), [xo, yo], mat);
+
+  x += dx;
+  y += dy;
 
   genQuad([
     x - dwx - dhx, y - dwy - dhy, z,
@@ -75,10 +83,10 @@ function fillbuffersForFloorSprite(x: number, y: number, z: number, xo: number, 
     x + dwx + dhx, y + dwy + dhy, z,
     x - dwx + dhx, y - dwy + dhy, z],
     normals([0, 1, 0]), [
-    xf ? 0 : 1, yf ? 0 : 1,
     xf ? 1 : 0, yf ? 0 : 1,
-    xf ? 1 : 0, yf ? 1 : 0,
-    xf ? 0 : 1, yf ? 1 : 0],
+    xf ? 0 : 1, yf ? 0 : 1,
+    xf ? 0 : 1, yf ? 1 : 0,
+    xf ? 1 : 0, yf ? 1 : 0],
     pal, shade,
     renderable.buff, onesided);
 }
@@ -110,10 +118,10 @@ function fillBuffersForFaceSprite(x: number, y: number, z: number, xo: number, y
   const xfmul = xf ? -1 : 1;
   const yfmul = yf ? -1 : 1;
   genSpriteQuad(x, y, z, [
-    -hw * xfmul + xo, +hh * yfmul + yo, 0,
-    +hw * xfmul + xo, +hh * yfmul + yo, 0,
-    +hw * xfmul + xo, -hh * yfmul + yo, 0,
-    -hw * xfmul + xo, -hh * yfmul + yo, 0
+    -hw * xfmul - xo, +hh * yfmul + yo, 0,
+    +hw * xfmul - xo, +hh * yfmul + yo, 0,
+    +hw * xfmul - xo, -hh * yfmul + yo, 0,
+    -hw * xfmul - xo, -hh * yfmul + yo, 0
   ], [0, 0, 1, 0, 1, 1, 0, 1],
     pal, shade, renderable.buff);
 }
@@ -134,8 +142,8 @@ export function updateSprite(ctx: RenderablesCacheContext, sprId: number, builde
   const h = (info.h * spr.yrepeat) / 4;
   const hh = h / 2;
   const ang = spriteAngle(spr.ang);
-  const xo = (info.attrs.xoff * spr.xrepeat) / 4;
-  const yo = (info.attrs.yoff * spr.yrepeat) / 4 + (spr.cstat.realCenter ? 0 : hh);
+  const xo = ((info.attrs.xoff + spr.xoffset) * spr.xrepeat) / 4;
+  const yo = ((info.attrs.yoff + spr.yoffset) * spr.yrepeat) / 4 + (spr.cstat.realCenter ? 0 : hh);
   const xf = spr.cstat.xflip;
   const yf = spr.cstat.yflip;
   const sec = board.sectors[spr.sectnum];

@@ -2,7 +2,7 @@ import { connectedWalls as connected } from "../../build/board/loops";
 import { splitWall, moveWall, mergePoints, deleteWall } from "../../build/board/mutations/walls";
 import { lastwall, sectorOfWall } from "../../build/board/query";
 import { Entity, EntityType } from "../../build/hitscan";
-import { vec2 } from "../../libs_js/glmatrix";
+import { vec2 } from "gl-matrix";
 import { IndexedDeck } from "../../utils/collections";
 import { cyclic, tuple } from "../../utils/mathutils";
 import { Message, MessageHandlerReflective } from "../apis/handler";

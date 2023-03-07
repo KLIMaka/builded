@@ -3,7 +3,7 @@ import { deleteSector } from "../../build/board/mutations/internal";
 import { Board } from "../../build/board/structs";
 import { Entity, EntityType } from "../../build/hitscan";
 import { sectorHeinum, sectorZ, setSectorHeinum, setSectorPicnum, setSectorZ, ZSCALE } from "../../build/utils";
-import * as GLM from "../../libs_js/glmatrix";
+import { vec2 } from "gl-matrix";
 import { cyclic, tuple } from "../../utils/mathutils";
 import { Message, MessageHandlerReflective } from "../apis/handler";
 import { EditContext } from "./context";
@@ -22,7 +22,7 @@ export class SectorEnt extends MessageHandlerReflective {
     public sectorEnt: Entity,
     private ctx: EditContext,
     public originz = 0,
-    public origin = GLM.vec2.create(),
+    public origin = vec2.create(),
     private valid = true
   ) { super() }
 
@@ -32,7 +32,7 @@ export class SectorEnt extends MessageHandlerReflective {
     // const slope = createSlopeCalculator(sec, ctx.board.walls);
     // this.originz = slope(x, y, this.type == HitType.CEILING ? sec.ceilingheinum : sec.floorheinum) + sectorZ(ctx.board, this.sectorId, this.type)) / ZSCALE;
     this.originz = sectorZ(this.ctx.board(), this.sectorEnt) / ZSCALE;
-    GLM.vec2.set(this.origin, x, y);
+    vec2.set(this.origin, x, y);
   }
 
   private setZ(z: number) {

@@ -38,8 +38,8 @@
   },
   "dependencies": {
     "crc-32": "^1.2.0",
+    "gl-matrix": "^3.4.3",
     "stage0": "0.0.25",
-    "tippy.js": "6.2.7",
-    "wasm_rust": "file:./libs/wasm"
+    "tippy.js": "6.2.7"
   }
 }

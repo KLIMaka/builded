@@ -1,4 +1,4 @@
-import * as GLM from '../../libs_js/glmatrix';
+import { mat4, vec3, vec4 } from 'gl-matrix';
 import { Deck, isEmpty } from '../collections';
 import { Buffer } from './buffergl';
 import { Definition, IndexBuffer, Shader, Texture, VertexBuffer } from './drawstruct';
@@ -8,9 +8,11 @@ import { StateValueMatrix, StateValueGeneric, StateValue } from './statevalue';
 function createStateValue(type: string, changecb: () => void): StateValue<any> {
   switch (type) {
     case "mat4":
+      return new StateValueMatrix<mat4>(changecb, mat4.create(), mat4.exactEquals, mat4.copy)
     case "vec3":
+      return new StateValueMatrix<vec3>(changecb, vec3.create(), vec3.exactEquals, vec3.copy)
     case "vec4":
-      return new StateValueMatrix<GLM.Mat4Array>(changecb, GLM[type].create(), GLM[type].exactEquals, GLM[type].copy)
+      return new StateValueMatrix<vec4>(changecb, vec4.create(), vec4.exactEquals, vec4.copy)
     default:
       return new StateValueGeneric<number>(changecb, 0);
   }
@@ -27,7 +29,7 @@ export class Profile {
   public uniqTextures = new Set<Texture>();
 
   public changeShader(from: string, to: string) {
-    const key = `${from}->${to}`;
+    const key = `${from} -> ${to}`;
     const swap = this.shaderSwaps[key];
     this.shaderSwaps[key] = !swap ? 1 : swap + 1;
   }
@@ -107,7 +109,7 @@ export class State {
     if (this.batchUniform == -1) {
       this.batchUniform = this.getState('sys');
     }
-    const value = [...<GLM.Vec4Array>this.states[this.batchUniform].get()];
+    const value = [...<vec4>this.states[this.batchUniform].get()];
     value[3] = nextBatch(value[3])
     this.states[this.batchUniform].set(value);
   }

@@ -1,4 +1,4 @@
-import { Mat4Array, Vec4Array } from "../../../../libs_js/glmatrix";
+import { mat4, vec4 } from "gl-matrix";
 import { Deck } from "../../../../utils/collections";
 import { Buffer } from "../../../../utils/gl/buffergl";
 import { Texture } from "../../../../utils/gl/drawstruct";
@@ -89,8 +89,8 @@ export class SolidSetup extends BufferSetup {
   }
 
   public base(tex: Texture) { this.values.set(this.baseIdx, tex); return this }
-  public color(color: Vec4Array) { this.values.set(this.colorIdx, color); return this }
-  public wrap(wrap: Vec4Array) { this.values.set(this.tcWrapIdx, wrap); return this }
+  public color(color: vec4) { this.values.set(this.colorIdx, color); return this }
+  public wrap(wrap: vec4) { this.values.set(this.tcWrapIdx, wrap); return this }
   textureHint() { return this.values.get(this.baseIdx) }
 }
 
@@ -104,8 +104,8 @@ export class GridSetup extends BufferSetup {
     this.gridIdx = this.register('grid', state);
   }
 
-  public grid(grid: Mat4Array) { this.values.set(this.GTIdx, grid); return this }
-  public gridSettings(settings: Vec4Array) { this.values.set(this.gridIdx, settings); return this }
+  public grid(grid: mat4) { this.values.set(this.GTIdx, grid); return this }
+  public gridSettings(settings: vec4) { this.values.set(this.gridIdx, settings); return this }
 }
 
 export class WireframeSetup extends BufferSetup {
@@ -116,7 +116,7 @@ export class WireframeSetup extends BufferSetup {
     this.colorIdx = this.register('color', state);
   }
 
-  public color(color: Vec4Array) { this.values.set(this.colorIdx, color); return this }
+  public color(color: vec4) { this.values.set(this.colorIdx, color); return this }
 }
 
 export class PointSpriteSetup extends BufferSetup {
@@ -130,7 +130,7 @@ export class PointSpriteSetup extends BufferSetup {
   }
 
   public base(tex: Texture) { this.values.set(this.baseIdx, tex); return this }
-  public color(color: Vec4Array) { this.values.set(this.colorIdx, color); return this }
+  public color(color: vec4) { this.values.set(this.colorIdx, color); return this }
   textureHint() { return this.values.get(this.baseIdx) }
 }
 

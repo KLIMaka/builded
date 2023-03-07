@@ -2,7 +2,7 @@ import { getWallBaseZ, sectorOfWall } from "../../../../build/board/query";
 import { Wall } from "../../../../build/board/structs";
 import { ArtInfo } from "../../../../build/formats/art";
 import { createSlopeCalculator, getMaskedWallCoords, getWallCoords, wallNormal, ZSCALE } from "../../../../build/utils";
-import { mat4, Mat4Array, vec3, Vec3Array, vec4 } from "../../../../libs_js/glmatrix";
+import { mat4, vec3, vec4 } from "gl-matrix";
 import { len2d } from "../../../../utils/mathutils";
 import { Builders } from "../../../apis/builder";
 import { WallRenderable } from "../../../apis/renderable";
@@ -20,11 +20,11 @@ export class WallBuilder extends Builders implements WallRenderable {
   ) { super([top, mid, bot, tdf]) }
 }
 
-function normals(n: Vec3Array) {
+function normals(n: vec3) {
   return [n[0], n[1], n[2], n[0], n[1], n[2], n[0], n[1], n[2], n[0], n[1], n[2]];
 }
 
-function applyWallTextureTransform(wall: Wall, wall2: Wall, originalWall: Wall, info: ArtInfo, base: number, texMat: Mat4Array) {
+function applyWallTextureTransform(wall: Wall, wall2: Wall, originalWall: Wall, info: ArtInfo, base: number, texMat: mat4) {
   let wall1 = wall;
   if (originalWall.cstat.xflip) [wall1, wall2] = [wall2, wall1];
   if (originalWall != wall && originalWall.cstat.swapBottoms) [wall1, wall2] = [wall2, wall1];
@@ -38,10 +38,10 @@ function applyWallTextureTransform(wall: Wall, wall2: Wall, originalWall: Wall, 
   const tcyoff = wall.ypanning / 256;
 
   mat4.identity(texMat);
-  mat4.translate(texMat, texMat, [tcxoff, tcyoff, 0, 0]);
-  mat4.scale(texMat, texMat, [tcscalex, tcscaley, 1, 1]);
+  mat4.translate(texMat, texMat, [tcxoff, tcyoff, 0]);
+  mat4.scale(texMat, texMat, [tcscalex, tcscaley, 1]);
   mat4.rotateY(texMat, texMat, -Math.atan2(-dy, dx));
-  mat4.translate(texMat, texMat, [-wall1.x, -base / ZSCALE, -wall1.y, 0]);
+  mat4.translate(texMat, texMat, [-wall1.x, -base / ZSCALE, -wall1.y]);
 }
 
 function writePos(buff: BuildBuffer, c: number[]) {
@@ -52,7 +52,7 @@ function writePos(buff: BuildBuffer, c: number[]) {
 }
 
 const tc = vec4.create();
-function writeTransformTc(buff: BuildBuffer, t: Mat4Array, lmt: Mat4Array, c: number[], pal: number, shade: number) {
+function writeTransformTc(buff: BuildBuffer, t: mat4, lmt: mat4, c: number[], pal: number, shade: number) {
   vec4.transformMat4(tc, vec4.set(tc, c[0], c[2], c[1], 1), t);
   buff.writeTcLighting(0, tc[0], tc[1], pal, shade);
   vec4.transformMat4(tc, vec4.set(tc, c[0], c[2], c[1], 1), lmt);
@@ -78,7 +78,7 @@ function writeNormal(buff: BuildBuffer, n: number[]) {
   buff.writeNormal(3, n[9], n[10], n[11]);
 }
 
-function genQuad(c: number[], n: number[], t: Mat4Array, lmt: Mat4Array, pal: number, shade: number, buff: BuildBuffer) {
+function genQuad(c: number[], n: number[], t: mat4, lmt: mat4, pal: number, shade: number, buff: BuildBuffer) {
   buff.allocate(4, 6);
   writePos(buff, c);
   writeTransformTc(buff, t, lmt, c, pal, shade);

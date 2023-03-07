@@ -33,7 +33,7 @@ const float PLU_LINES = SHADOWSTEPS * PALSWAPS;
 #define VISIBILITY (sys.w)
 #define TIME (sys.x)
 #define DETPH_OFF (wnormal.w)
-#define WARAP (tcwrap.xy)
+#define WRAP (tcwrap.xy)
 
 bool isTransIdx(float idx) {
   return idx >= TARANS_IDX;
@@ -146,7 +146,7 @@ vec2 repeat(vec2 tc) {
 #if defined(SPRITE) || defined(NONREPEAT)
   return tc;
 #else
-  return mod(mod(tc, WARAP),  vec2(1.0));
+  return mod(mod(tc, WRAP),  vec2(1.0));
 #endif
 }
 
@@ -225,7 +225,7 @@ void main() {
   writeColor(vec3(1.0), color * modulation);
 #elif defined PARALLAX
   vec3 toPixel = normalize(wpos - eyepos);
-  float hang = (atan(toPixel.z, toPixel.x) + PI) / (2.0 * PI);
+  float hang = 0.5 + (PI - atan(-toPixel.z, toPixel.x)) / (2.0 * PI);
   float vang = (1.0 - toPixel.y) / 2.0;
   vec3 c = palLookup(vec2(hang, vang));
   writeColor(c, vec4(1.0));

@@ -7,7 +7,7 @@ import { BuildBuffer } from "../../gl/buffers";
 import { RenderablesCacheContext } from "../cache";
 import { BuildersFactory, PointSpriteBuilder, SolidBuilder } from "../common";
 import { text, createGridWallMatrix, WallGridType } from "./common";
-import { vec4, mat4 } from "../../../../libs_js/glmatrix";
+import { vec4, mat4 } from "gl-matrix";
 import { sectorOfWall, walllen } from "../../../../build/board/query";
 
 export class WallHelperBuilder extends Builders implements WallRenderable {

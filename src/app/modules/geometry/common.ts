@@ -1,6 +1,6 @@
 import { ArtInfo } from "build/formats/art";
 import { nextpow2 } from "utils/mathutils";
-import { mat4, vec4 } from "../../../libs_js/glmatrix";
+import { mat4, vec4 } from "gl-matrix";
 import { Texture } from "../../../utils/gl/drawstruct";
 import { Dependency, Injector, provider } from "../../../utils/injector";
 import { GRID, GridController } from "../../apis/app";

@@ -3,7 +3,7 @@ import { sectorWalls } from "../../../../build/board/loops";
 import { Board, Wall } from "../../../../build/board/structs";
 import { ArtInfo } from "../../../../build/formats/art";
 import { ANGSCALE, createSlopeCalculator, getFirstWallAngle, sectorNormal, wallNormal, ZSCALE } from "../../../../build/utils";
-import { Mat2dArray, mat4, Mat4Array, vec2, Vec2Array, vec3, Vec3Array, vec4 } from "../../../../libs_js/glmatrix";
+import { mat2, mat2d, mat4, vec2, vec3, vec4 } from "gl-matrix"
 import { Deck, last, range } from "../../../../utils/collections";
 import { iter } from "../../../../utils/iter";
 import { Builders } from "../../../apis/builder";
@@ -23,7 +23,7 @@ export class SectorBuilder extends Builders implements SectorRenderable {
   ) { super([ceiling, floor, tdceiling, tdfloor]) }
 }
 
-function applySectorTextureTransform(board: Board, sectorId: number, ceiling: boolean, info: ArtInfo, texMat: Mat4Array) {
+function applySectorTextureTransform(board: Board, sectorId: number, ceiling: boolean, info: ArtInfo, texMat: mat4) {
   const sector = board.sectors[sectorId];
   const xpan = (ceiling ? sector.ceilingxpanning : sector.floorxpanning) / 255;
   const ypan = (ceiling ? sector.ceilingypanning : sector.floorypanning) / 255;
@@ -35,17 +35,17 @@ function applySectorTextureTransform(board: Board, sectorId: number, ceiling: bo
   const tcscalex = (stats.xflip ? -1 : 1) / (info.w * scale * parallaxscale);
   const tcscaley = (stats.yflip ? -angscale : angscale) / (info.h * scale);
   mat4.identity(texMat);
-  mat4.translate(texMat, texMat, [xpan, ypan, 0, 0]);
-  mat4.scale(texMat, texMat, [tcscalex, -tcscaley, 1, 1]);
+  mat4.translate(texMat, texMat, [xpan, ypan, 0]);
+  mat4.scale(texMat, texMat, [tcscalex, -tcscaley, 1]);
   if (stats.swapXY) {
-    mat4.scale(texMat, texMat, [1, -1, 1, 1]);
+    mat4.scale(texMat, texMat, [1, -1, 1]);
     mat4.rotateZ(texMat, texMat, Math.PI / 2);
   }
   if (stats.alignToFirstWall) {
     const w1 = board.walls[sector.wallptr];
-    mat4.scale(texMat, texMat, [1, -1, 1, 1]);
+    mat4.scale(texMat, texMat, [1, -1, 1]);
     mat4.rotateZ(texMat, texMat, getFirstWallAngle(board, sectorId));
-    mat4.translate(texMat, texMat, [-w1.x, -w1.y, 0, 0])
+    mat4.translate(texMat, texMat, [-w1.x, -w1.y, 0])
   }
   mat4.rotateX(texMat, texMat, -Math.PI / 2);
 }
@@ -55,7 +55,7 @@ const lm_ = vec2.create();
 function fillBuffersForSectorNormal(ceil: boolean, board: Board, sectorId: number,
   heinum: number, shade: number, pal: number, z: number,
   buff: BuildBuffer,
-  vtxs: number[][], vidxs: number[], normal: Vec3Array, t: Mat4Array, lms: Mat2dArray) {
+  vtxs: number[][], vidxs: number[], normal: vec3, t: mat4, lms: mat2d) {
   const slope = createSlopeCalculator(board, sectorId);
   for (let i = 0; i < vtxs.length; i++) {
     const vx = vtxs[i][0];
@@ -163,7 +163,7 @@ export function triangulate(board: Board, sectorId: number) {
   return compress(triangles);
 }
 
-function fillBuffersForSector(ceil: boolean, board: Board, s: number, builder: SectorBuilder, normal: Vec3Array, t: Mat4Array, lms: Mat2dArray) {
+function fillBuffersForSector(ceil: boolean, board: Board, s: number, builder: SectorBuilder, normal: vec3, t: mat4, lms: mat2d) {
   const [vtxs, vidxs] = triangulate(board, s);
   const d = ceil ? builder.ceiling : builder.floor;
   d.buff.allocate(vtxs.length, vidxs.length);

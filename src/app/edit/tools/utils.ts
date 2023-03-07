@@ -1,4 +1,5 @@
 import { connectedWalls } from "build/board/loops";
+import { vec3 } from "gl-matrix";
 import { EngineApi } from "../../../build/board/mutations/api";
 import { addSprite } from "../../../build/board/mutations/internal";
 import { deleteLoop, deleteLoopFull, deleteSectorFull, fillInnerLoop, setFirstWall } from "../../../build/board/mutations/sectors";
@@ -7,12 +8,10 @@ import { getWallBaseZ, sectorOfWall } from "../../../build/board/query";
 import { Board, WALL_SPRITE } from "../../../build/board/structs";
 import { EntityType } from "../../../build/hitscan";
 import { slope, vec2ang, wallNormal, ZSCALE } from "../../../build/utils";
-import { vec3 } from "../../../libs_js/glmatrix";
 import { create, lifecycle, Module, plugin } from "../../../utils/injector";
 import { int, monoatan2, PI2, trz } from "../../../utils/mathutils";
 import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, GRID, GridController, LOGGER, Logger, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
 import { BUS, busDisconnector, MessageBus } from "../../apis/handler";
-import { invalidateSectorAndWalls } from "../editutils";
 import { Commit, INVALIDATE_ALL, NamedMessage, SetPicnum } from "../messages";
 import { PicNumSelector, PICNUM_SELECTOR, Selected, SELECTED } from "./selection";
 import { DefaultTool, TOOLS_BUS } from "./toolsbus";

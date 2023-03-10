@@ -1,13 +1,13 @@
 07.02.23
 
 ✔️ render sprites in 2d and wall sprites in 3d without fract`ing tss 06.03.23
-❌ preselecting actual enity picnum in picselect dialog
+❌ preselecting actual entity picnum in picselect dialog
 ✔️ distance shading 21.02.23
 
 21.02.23
 
 ✔️ skybox rotation 06.03.23
-❌ sprite offsets
+✔️ sprite offsets 11.03.23
 ✔️ mid wall selection and overpicnum manipulation 25.02.23
 
 26.02.23
@@ -17,4 +17,4 @@
 
 06.03.23
 
-❌ fix hitscan sprites
+✔️ fix hitscan sprites 11.03.23

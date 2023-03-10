@@ -1,5 +1,6 @@
+import { mat2d, vec2 } from "gl-matrix";
 import { NumberInterpolator } from "../src/utils/interpolator";
-import { bilinear, nextpow2, optimize, quadratic, RadialSegments } from "../src/utils/mathutils";
+import { bilinear, deg2rad, nextpow2, optimize, quadratic, RadialSegments } from "../src/utils/mathutils";
 
 test('interpolator', () => {
   const arr = [1, 2, 2, 1];

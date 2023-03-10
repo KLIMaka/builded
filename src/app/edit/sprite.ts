@@ -9,6 +9,8 @@ import { Message, MessageHandlerReflective } from "../apis/handler";
 import { EditContext } from "./context";
 import { BoardInvalidate, Commit, EndMove, Flip, Highlight, Move, NamedMessage, Palette, PanRepeat, Rotate, SetPicnum, SetSpriteCstat, Shade, SpriteMode, StartMove } from "./messages";
 import { MOVE_COPY } from "./tools/transform";
+import { spriteInfo } from "build/sprites";
+import { FLOOR_SPRITE } from "build/board/structs";
 
 export class SpriteEnt extends MessageHandlerReflective {
   private moveActive = false;
@@ -145,7 +147,9 @@ export class SpriteEnt extends MessageHandlerReflective {
       case 'fly': {
         if (!isValidSectorId(board, sprite.sectnum)) return;
         const sector = board.sectors[sprite.sectnum];
-        sprite.z = slope(board, sprite.sectnum, sprite.x, sprite.y, sector.ceilingheinum) + sector.ceilingz;
+        const sinfo = spriteInfo(board, this.spriteId, this.ctx.art);
+        const zoff = sprite.cstat.type == FLOOR_SPRITE ? 1 : -(sinfo.hh + sinfo.yo) * ZSCALE;
+        sprite.z = zoff + slope(board, sprite.sectnum, sprite.x, sprite.y, sector.ceilingheinum) + sector.ceilingz;
         this.ctx.bus.handle(new Commit(`Fly Sprite ${this.spriteId}`, true));
         this.ctx.bus.handle(new BoardInvalidate(new Entity(this.spriteId, EntityType.SPRITE)));
         return;
@@ -153,7 +157,9 @@ export class SpriteEnt extends MessageHandlerReflective {
       case 'fall': {
         if (!isValidSectorId(board, sprite.sectnum)) return;
         const sector = board.sectors[sprite.sectnum];
-        sprite.z = slope(board, sprite.sectnum, sprite.x, sprite.y, sector.floorheinum) + sector.floorz;
+        const sinfo = spriteInfo(board, this.spriteId, this.ctx.art);
+        const zoff = sprite.cstat.type == FLOOR_SPRITE ? -1 : (sinfo.hh - sinfo.yo) * ZSCALE;
+        sprite.z = zoff + slope(board, sprite.sectnum, sprite.x, sprite.y, sector.floorheinum) + sector.floorz;
         this.ctx.bus.handle(new Commit(`Fall Sprite ${this.spriteId}`, true));
         this.ctx.bus.handle(new BoardInvalidate(new Entity(this.spriteId, EntityType.SPRITE)));
         return;

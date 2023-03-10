@@ -39,6 +39,7 @@ view3d | R                  | msg sprite_mode
 view3d | R                  | msg sectorcstat alignToFirstWall true true
 view3d | E                  | msg sectorcstat doubleSmooshiness true true
 view3d | C                  | msg spritecstat realCenter true true
+view3d | CTRL+F             | msg spritecstat onesided true true
 
 view3d | PAGEUP             | fly
 view3d | PAGEDOWN           | fall

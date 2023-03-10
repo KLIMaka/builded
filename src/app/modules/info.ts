@@ -42,6 +42,7 @@ function createSprite(): [HTMLElement, (id: number, sprite: Sprite) => void] {
   const [lotag, lotagUpdater] = createRow("Lo-Tag");
   const [hitag, hitagUpdater] = createRow("Hi-Tag");
   const [clipdist, clipdistUpdater] = createRow("Clip Dist");
+  const [angle, angleUpdater] = createRow("Angle");
   table.appendChild(id);
   table.appendChild(pos);
   table.appendChild(picnum);
@@ -52,6 +53,7 @@ function createSprite(): [HTMLElement, (id: number, sprite: Sprite) => void] {
   table.appendChild(lotag);
   table.appendChild(hitag);
   table.appendChild(clipdist);
+  table.appendChild(angle);
   return [root,
     (id: number, s: Sprite) => {
       idUpdater(id);
@@ -64,6 +66,7 @@ function createSprite(): [HTMLElement, (id: number, sprite: Sprite) => void] {
       lotagUpdater(s.lotag);
       hitagUpdater(s.hitag);
       clipdistUpdater(s.clipdist);
+      angleUpdater(s.ang);
     }];
 }
 

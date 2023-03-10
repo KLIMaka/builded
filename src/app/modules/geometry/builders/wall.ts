@@ -3,7 +3,7 @@ import { Wall } from "../../../../build/board/structs";
 import { ArtInfo } from "../../../../build/formats/art";
 import { createSlopeCalculator, getMaskedWallCoords, getWallCoords, wallNormal, ZSCALE } from "../../../../build/utils";
 import { mat4, vec3, vec4 } from "gl-matrix";
-import { len2d } from "../../../../utils/mathutils";
+import { len2d, nextpow2 } from "../../../../utils/mathutils";
 import { Builders } from "../../../apis/builder";
 import { WallRenderable } from "../../../apis/renderable";
 import { BuildBuffer } from "../../gl/buffers";
@@ -35,7 +35,8 @@ function applyWallTextureTransform(wall: Wall, wall2: Wall, originalWall: Wall, 
   const tcscalex = (originalWall.xrepeat * 8) / (len2d(dx, dy) * tw);
   const tcscaley = -(originalWall.yrepeat / 8) / (th * 16) * (wall.cstat.yflip ? -1 : 1);
   const tcxoff = wall.xpanning / tw;
-  const tcyoff = wall.ypanning / 256;
+  const nonpow2adj = nextpow2(info.h) / info.h;
+  const tcyoff = wall.ypanning * nonpow2adj / 255;
 
   mat4.identity(texMat);
   mat4.translate(texMat, texMat, [tcxoff, tcyoff, 0]);

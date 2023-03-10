@@ -1,4 +1,4 @@
-import { vec3 } from "../src/libs_js/glmatrix";
+import { vec3 } from "gl-matrix";
 import { polygonNormal, project3d, projectionSpace } from "../src/utils/vecmath";
 
 test('VecMath', () => {

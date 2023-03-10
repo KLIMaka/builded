@@ -1,10 +1,19 @@
+import { vec3 } from "gl-matrix";
 import { FACE_SPRITE, FLOOR_SPRITE, WALL_SPRITE } from "../../../../build/board/structs";
-import { ang2vec, spriteAngle, ZSCALE } from "../../../../build/utils";
+import { floorSprite, SpriteInfo, spriteInfo, wallSprite } from "../../../../build/sprites";
 import { rand } from "../../../../utils/random";
 import { BuildBuffer } from "../../gl/buffers";
 import { RenderablesCacheContext } from "../cache";
 import { SolidBuilder, Type } from "../common";
-import { mat2d, vec2, vec3 } from "gl-matrix";
+
+const NORMAL = [0, 0, 1, 0, 1, 1, 0, 1];
+const XFLIP = [1, 0, 0, 0, 0, 1, 1, 1];
+const YFLIP = [0, 1, 1, 1, 1, 0, 0, 0];
+const XYFLIP = [1, 1, 0, 1, 0, 0, 1, 0];
+
+function tcs(xflip: boolean, yflip: boolean) {
+  return xflip ? (yflip ? XYFLIP : XFLIP) : (yflip ? YFLIP : NORMAL);
+}
 
 function normals(n: vec3) {
   return [n[0], n[1], n[2], n[0], n[1], n[2], n[0], n[1], n[2], n[0], n[1], n[2]];
@@ -31,68 +40,24 @@ function writeNormal(buff: BuildBuffer, n: number[], addDepth = rand(72, 90), of
   buff.writeNormal(off + 3, n[9], n[10], n[11], addDepth);
 }
 
-function genQuad(c: number[], n: number[], tc: number[], pal: number, shade: number, buff: BuildBuffer, onesided: number = 1) {
+function genQuad(c: number[], n: number[], tc: number[], pal: number, shade: number, buff: BuildBuffer, onesided: number = 1, yf = false) {
   buff.allocate(4, onesided ? 6 : 12);
 
   writePos(buff, c);
   writeTc(buff, tc, pal, shade);
   writeNormal(buff, n);
 
-  buff.writeQuad(0, 0, 1, 2, 3);
-  if (!onesided)
-    buff.writeQuad(6, 3, 2, 1, 0);
-}
-
-function fillbuffersForWallSprite(
-  x: number, y: number, z: number, xo: number, yo: number, hw: number, hh: number, ang: number, xf: number, yf: number,
-  onesided: number, pal: number, shade: number, renderable: SolidBuilder) {
-  const dx = Math.sin(ang) * hw;
-  const dy = Math.cos(ang) * hw;
-  genQuad([
-    x - dx, y - dy + xo, z - hh + yo,
-    x + dx, y + dy + xo, z - hh + yo,
-    x + dx, y + dy + xo, z + hh + yo,
-    x - dx, y - dy + xo, z + hh + yo],
-    normals(ang2vec(ang)), [
-    xf ? 0 : 1, yf ? 0 : 1,
-    xf ? 1 : 0, yf ? 0 : 1,
-    xf ? 1 : 0, yf ? 1 : 0,
-    xf ? 0 : 1, yf ? 1 : 0],
-    pal, shade,
-    renderable.buff, onesided);
-}
-
-function fillbuffersForFloorSprite(x: number, y: number, z: number, xo: number, yo: number, hw: number, hh: number, ang: number, xf: number, yf: number,
-  onesided: number, pal: number, shade: number, renderable: SolidBuilder) {
-  const mat = mat2d.create();
-  mat2d.rotate(mat, mat, -ang);
-
-  const dwx = Math.sin(ang) * hw;
-  const dwy = Math.cos(ang) * hw;
-  const dhx = Math.sin(ang + Math.PI / 2) * hh;
-  const dhy = Math.cos(ang + Math.PI / 2) * hh;
-
-  const [dx, dy] = vec2.transformMat2d(vec2.create(), [xo, yo], mat);
-
-  x += dx;
-  y += dy;
-
-  genQuad([
-    x - dwx - dhx, y - dwy - dhy, z,
-    x + dwx - dhx, y + dwy - dhy, z,
-    x + dwx + dhx, y + dwy + dhy, z,
-    x - dwx + dhx, y - dwy + dhy, z],
-    normals([0, 1, 0]), [
-    xf ? 1 : 0, yf ? 0 : 1,
-    xf ? 0 : 1, yf ? 0 : 1,
-    xf ? 0 : 1, yf ? 1 : 0,
-    xf ? 1 : 0, yf ? 1 : 0],
-    pal, shade,
-    renderable.buff, onesided);
+  if (onesided && yf) {
+    buff.writeQuad(0, 3, 2, 1, 0);
+  } else {
+    buff.writeQuad(0, 0, 1, 2, 3);
+    if (!onesided)
+      buff.writeQuad(6, 3, 2, 1, 0);
+  }
 }
 
 function genSpriteQuad(x: number, y: number, z: number, n: number[], t: number[], pal: number, shade: number, buff: BuildBuffer) {
-  buff.allocate(4, 6);
+  buff.allocate(4, 12);
   writePos(buff, [x, y, z, x, y, z, x, y, z, x, y, z]);
   writeTc(buff, t, pal, shade);
   writeNormal(buff, n);
@@ -102,27 +67,36 @@ function genSpriteQuad(x: number, y: number, z: number, n: number[], t: number[]
   // writeNormal(buff, shadowScale(n), addDepth - 16, 4);
 
   buff.writeQuad(0, 0, 1, 2, 3);
-  // buff.writeQuad(6, 4, 5, 6, 7);
+  buff.writeQuad(6, 3, 2, 1, 0);
 }
 
-function shadowScale(n: number[]): number[] {
-  const y1 = n[1];
-  const y2 = n[7];
-  const dy = Math.abs(y1 - y2);
-  n[1] = y2 + dy * 0.2;
-  n[4] = y2 + dy * 0.2;
-  return n;
+function fillbuffersForWallSprite(sinfo: SpriteInfo, onesided: number, pal: number, shade: number, renderable: SolidBuilder) {
+  const sprite = wallSprite(sinfo);
+  genQuad(sprite.coords(),
+    normals(sprite.normal()),
+    tcs(sinfo.xf, sinfo.yf),
+    pal, shade,
+    renderable.buff, onesided);
 }
 
-function fillBuffersForFaceSprite(x: number, y: number, z: number, xo: number, yo: number, hw: number, hh: number, xf: number, yf: number, pal: number, shade: number, renderable: SolidBuilder) {
-  const xfmul = xf ? -1 : 1;
-  const yfmul = yf ? -1 : 1;
-  genSpriteQuad(x, y, z, [
-    -hw * xfmul - xo, +hh * yfmul + yo, 0,
-    +hw * xfmul - xo, +hh * yfmul + yo, 0,
-    +hw * xfmul - xo, -hh * yfmul + yo, 0,
-    -hw * xfmul - xo, -hh * yfmul + yo, 0
-  ], [0, 0, 1, 0, 1, 1, 0, 1],
+function fillbuffersForFloorSprite(sinfo: SpriteInfo, onesided: number, pal: number, shade: number, renderable: SolidBuilder) {
+  const sprite = floorSprite(sinfo);
+  genQuad(sprite.coords(),
+    normals(sprite.normal()),
+    tcs(sinfo.xf, !onesided && sinfo.yf),
+    pal, shade,
+    renderable.buff, onesided, sinfo.yf);
+}
+
+function fillBuffersForFaceSprite(sinfo: SpriteInfo, pal: number, shade: number, renderable: SolidBuilder) {
+  const xfmul = sinfo.xf ? -1 : 1;
+  const yfmul = sinfo.yf ? -1 : 1;
+  genSpriteQuad(sinfo.x, sinfo.y, sinfo.z, [
+    (-sinfo.hw - sinfo.xo) * xfmul, +sinfo.hh * yfmul + sinfo.yo, 0,
+    (+sinfo.hw - sinfo.xo) * xfmul, +sinfo.hh * yfmul + sinfo.yo, 0,
+    (+sinfo.hw - sinfo.xo) * xfmul, -sinfo.hh * yfmul + sinfo.yo, 0,
+    (-sinfo.hw - sinfo.xo) * xfmul, -sinfo.hh * yfmul + sinfo.yo, 0
+  ], NORMAL,
     pal, shade, renderable.buff);
 }
 
@@ -132,35 +106,22 @@ export function updateSprite(ctx: RenderablesCacheContext, sprId: number, builde
   const spr = board.sprites[sprId];
   if (spr.picnum == 0 || spr.cstat.invisible) return builder;
 
-  const x = spr.x;
-  const y = spr.y;
-  const z = spr.z / ZSCALE;
-  const info = ctx.art.getInfo(spr.picnum);
-  const tex = ctx.art.get(spr.picnum);
-  const w = (info.w * spr.xrepeat) / 4;
-  const hw = w / 2;
-  const h = (info.h * spr.yrepeat) / 4;
-  const hh = h / 2;
-  const ang = spriteAngle(spr.ang);
-  const xo = ((info.attrs.xoff + spr.xoffset) * spr.xrepeat) / 4;
-  const yo = ((info.attrs.yoff + spr.yoffset) * spr.yrepeat) / 4 + (spr.cstat.realCenter ? 0 : hh);
-  const xf = spr.cstat.xflip;
-  const yf = spr.cstat.yflip;
+  const sinfo = spriteInfo(board, sprId, ctx.art);
   const sec = board.sectors[spr.sectnum];
   const sectorShade = sec && sec.ceilingstat.parallaxing ? 0 : sec.floorshade;
   const shade = sectorShade + spr.shade;
   const trans = spr.cstat.translucent ? spr.cstat.tranclucentReversed ? 0.66 : 0.33 : 1;
-  builder.tex = tex;
+  builder.tex = ctx.art.get(spr.picnum);
   builder.trans = trans;
   builder.type = Type.NONREPEAT;
 
   if (spr.cstat.type == FACE_SPRITE) {
-    fillBuffersForFaceSprite(x, y, z, xo, yo, hw, hh, xf, yf, spr.pal, shade, builder);
+    fillBuffersForFaceSprite(sinfo, spr.pal, shade, builder);
     builder.type = Type.SPRITE;
   } else if (spr.cstat.type == WALL_SPRITE) {
-    fillbuffersForWallSprite(x, y, z, xo, yo, hw, hh, ang, xf, yf, spr.cstat.onesided, spr.pal, shade, builder);
+    fillbuffersForWallSprite(sinfo, spr.cstat.onesided, spr.pal, shade, builder);
   } else if (spr.cstat.type == FLOOR_SPRITE) {
-    fillbuffersForFloorSprite(x, y, z, xo, yo, hw, hh, ang, xf, yf, spr.cstat.onesided, spr.pal, shade, builder);
+    fillbuffersForFloorSprite(sinfo, spr.cstat.onesided, spr.pal, shade, builder);
   }
 
   return builder;

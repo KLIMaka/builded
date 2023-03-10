@@ -1,6 +1,6 @@
-import { vec2, vec3 } from 'gl-matrix';
+import { mat2d, vec2, vec3 } from 'gl-matrix';
 import { cyclicPairs, loopPairs } from '../utils/collections';
-import { cross2d, cyclic, int, len2d, monoatan2, PI2 } from '../utils/mathutils';
+import { cross2d, cyclic, deg2rad, int, len2d, monoatan2, PI2 } from '../utils/mathutils';
 import { normal2d } from '../utils/vecmath';
 import { Board, Sprite } from './board/structs';
 import { Entity, EntityType } from './hitscan';
@@ -225,26 +225,43 @@ export function wallNormal(out: vec3, board: Board, wallId: number): vec3 {
   return out;
 }
 
-const _wn = vec3.create();
-const _up = vec3.fromValues(0, 1, 0);
-const _down = vec3.fromValues(0, -1, 0);
+const wn = vec3.create();
+const up = vec3.fromValues(0, 1, 0);
+const down = vec3.fromValues(0, -1, 0);
 export function sectorNormal(out: vec3, board: Board, sectorId: number, ceiling: boolean): vec3 {
   const sector = board.sectors[sectorId];
-  wallNormal(_wn, board, sector.wallptr);
-  vec3.negate(_wn, _wn);
+  wallNormal(wn, board, sector.wallptr);
+  vec3.negate(wn, wn);
   const h = ceiling ? sector.ceilingheinum : sector.floorheinum;
-  const normal = ceiling ? _down : _up;
-  vec3.lerp(out, normal, _wn, Math.atan(h * ANGSCALE) / (Math.PI / 2));
+  const normal = ceiling ? down : up;
+  vec3.lerp(out, normal, wn, Math.atan(h * ANGSCALE) / (Math.PI / 2));
   return out;
 }
 
-export function ang2vec(ang: number): vec3 {
-  ang += Math.PI / 2;
-  return vec3.fromValues(Math.sin(ang), 0, Math.cos(ang))
+export function posOffRotate(x: number, y: number, xo: number, yo: number, ang: number): mat2d {
+  const mat = mat2d.create();
+  mat2d.translate(mat, mat, [x, y]);
+  mat2d.rotate(mat, mat, ang);
+  mat2d.scale(mat, mat, [1, -1]);
+  mat2d.rotate(mat, mat, deg2rad(-90));
+  mat2d.translate(mat, mat, [xo, yo]);
+  return mat;
+}
+
+export function rotate(ang: number): mat2d {
+  const mat = mat2d.create();
+  mat2d.rotate(mat, mat, ang);
+  mat2d.scale(mat, mat, [1, -1]);
+  mat2d.rotate(mat, mat, deg2rad(-90));
+  return mat;
+}
+
+export function ang2vec(ang: number): vec2 {
+  return vec2.transformMat2d(vec2.create(), [0, 1], rotate(ang));
 }
 
 export function spriteAngle(ang: number): number {
-  return PI2 - (ang * ANGSCALE * 2) * PI2;
+  return ang * ANGSCALE * 2 * PI2;
 }
 
 export function vec2ang(x: number, y: number) {
@@ -323,4 +340,30 @@ export function getMaskedWallCoords(x1: number, y1: number, x2: number, y2: numb
   const z3 = Math.max(currz3, nextz3);
   const z4 = Math.max(currz4, nextz4);
   return [x1, y1, z1, x2, y2, z2, x2, y2, z3, x1, y1, z4];
+}
+
+export function wallSpriteCoords(x: number, y: number, z: number, xo: number, yo: number, hw: number, hh: number, ang: number) {
+  const mat = posOffRotate(x, y, xo, 0, ang);
+  const [x1, y1] = vec2.transformMat2d(vec2.create(), [hw, 0], mat);
+  const [x2, y2] = vec2.transformMat2d(vec2.create(), [-hw, 0], mat);
+  return [
+    x1, y1, z + hh + yo,
+    x2, y2, z + hh + yo,
+    x2, y2, z - hh + yo,
+    x1, y1, z - hh + yo
+  ];
+}
+
+export function floorSpriteCoords(x: number, y: number, z: number, xo: number, yo: number, hw: number, hh: number, ang: number) {
+  const mat = posOffRotate(x, y, xo, yo, ang);
+  const [x1, y1] = vec2.transformMat2d(vec2.create(), [-hw, hh], mat)
+  const [x2, y2] = vec2.transformMat2d(vec2.create(), [hw, hh], mat)
+  const [x3, y3] = vec2.transformMat2d(vec2.create(), [hw, -hh], mat)
+  const [x4, y4] = vec2.transformMat2d(vec2.create(), [-hw, -hh], mat)
+  return [
+    x1, y1, z,
+    x2, y2, z,
+    x3, y3, z,
+    x4, y4, z
+  ];
 }

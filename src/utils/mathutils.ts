@@ -1,6 +1,6 @@
 import { getOrCreate, map, range } from "./collections";
 import { Interpolator, NumberInterpolator } from "./interpolator";
-import { FastList, List, Node } from "./list";
+import { FastList } from "./list";
 
 export const radsInDeg = 180 / Math.PI;
 export const degInRad = Math.PI / 180;
@@ -104,6 +104,10 @@ export function dot2d(x1: number, y1: number, x2: number, y2: number) {
   return x1 * x2 + y1 * y2;
 }
 
+export function orto2d(x: number, y: number): [number, number] {
+  return [-y, x];
+}
+
 export function cross2d(x1: number, y1: number, x2: number, y2: number) {
   return x1 * y2 - y1 * x2;
 }
@@ -134,19 +138,6 @@ export function smothstep(x: number, min: number, max: number) {
   if (x < min) return 0;
   if (x > max) return 1;
   return cubic((x - min) / (max - min));
-}
-
-export function ubyte2byte(n: number) {
-  var minus = (n & 0x80) != 0;
-  return minus ? -(~n & 0xFF) - 1 : n;
-}
-
-export function int2vec4(int: number) {
-  return [(int & 0xff), ((int >>> 8) & 0xff), ((int >>> 16) & 0xff), ((int >>> 24) & 0xff)];
-}
-
-export function int2vec4norm(int: number) {
-  return [(int & 0xff) / 256, ((int >>> 8) & 0xff) / 256, ((int >>> 16) & 0xff) / 256, ((int >>> 24) & 0xff) / 256];
 }
 
 export function vec42int(x: number, y: number, z: number, w: number) {
@@ -324,34 +315,6 @@ export function octaves2d(f: (x: number, y: number) => number, octaves: number) 
       norm += k;
     }
     return sum / norm;
-  }
-}
-
-export class HashMap<K, V> {
-  private map = new Map<number, [K, V][]>();
-  constructor(private hash: (k: K) => number, private eq: (lh: K, rh: K) => boolean) { }
-
-  get(key: K): V {
-    const hash = this.hash(key);
-    const slot = this.findSlot(getOrCreate(this.map, hash, _ => []), key);
-    return slot == undefined ? undefined : slot[1];
-  }
-
-  set(key: K, value: V) {
-    const hash = this.hash(key);
-    const slot = this.findSlot(getOrCreate(this.map, hash, _ => []), key);
-    if (slot == undefined) {
-      const newSlot: [K, V] = [key, value];
-      this.map.get(hash).push(newSlot);
-    } else {
-      slot[1] = value;
-    }
-  }
-
-  private findSlot(bucket: [K, V][], key: K): [K, V] {
-    for (const kv of bucket)
-      if (this.eq(kv[0], key)) return kv;
-    return undefined;
   }
 }
 

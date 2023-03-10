@@ -44,7 +44,7 @@ export class WallSegmentsEnt extends MessageHandlerReflective {
     public ctx: EditContext,
     public origin = vec2.create(),
     public originz = 0,
-    public sectorEnt: Entity,
+    public sectorEnt: Entity = null,
     public refwall = -1,
     public active = false,
     public connectedWalls = collectConnectedWalls(ctx.board(), map(walls, w => w.id)),

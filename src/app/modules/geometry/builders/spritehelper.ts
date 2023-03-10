@@ -1,9 +1,11 @@
 import { FACE_SPRITE, FLOOR_SPRITE, WALL_SPRITE } from "../../../../build/board/structs";
-import { ang2vec, spriteAngle, ZSCALE } from "../../../../build/utils";
-import { vec3, vec4 } from "gl-matrix";
+import { ang2vec, floorSpriteCoords, spriteAngle, wallSpriteCoords, ZSCALE } from "../../../../build/utils";
+import { mat2d, vec2, vec3, vec4 } from "gl-matrix";
 import { Builders } from "../../../apis/builder";
 import { RenderablesCacheContext } from "../cache";
 import { BuildersFactory, Type, WireframeBuilder } from "../common";
+import { deg2rad } from "utils/mathutils";
+import { floorSprite, SpriteInfo, spriteInfo, wallSprite } from "build/sprites";
 
 export class SpriteHelperBuillder extends Builders {
   constructor(
@@ -33,41 +35,28 @@ function genQuadWireframe(coords: number[], normals: number[], builder: Wirefram
   buff.writeLine(6, 3, 0);
 }
 
-function fillbuffersForWallSpriteWireframe(x: number, y: number, z: number, xo: number, yo: number, hw: number, hh: number, ang: number, builder: WireframeBuilder) {
-  const dx = Math.sin(ang) * hw;
-  const dy = Math.cos(ang) * hw;
-  genQuadWireframe([
-    x - dx, y - dy, z - hh + yo,
-    x + dx, y + dy, z - hh + yo,
-    x + dx, y + dy, z + hh + yo,
-    x - dx, y - dy, z + hh + yo],
-    null, builder);
+function fillbuffersForWallSpriteWireframe(sinfo: SpriteInfo, builder: WireframeBuilder) {
+  genQuadWireframe(wallSprite(sinfo).coords(), null, builder);
 }
 
-function fillbuffersForFloorSpriteWireframe(x: number, y: number, z: number, xo: number, yo: number, hw: number, hh: number, ang: number, builder: WireframeBuilder) {
-  const dwx = Math.sin(ang) * hw;
-  const dwy = Math.cos(ang) * hw;
-  const dhx = Math.sin(ang + Math.PI / 2) * hh;
-  const dhy = Math.cos(ang + Math.PI / 2) * hh;
-  genQuadWireframe([
-    x - dwx - dhx, y - dwy - dhy, z,
-    x + dwx - dhx, y + dwy - dhy, z,
-    x + dwx + dhx, y + dwy + dhy, z,
-    x - dwx + dhx, y - dwy + dhy, z],
-    null, builder);
+function fillbuffersForFloorSpriteWireframe(sinfo: SpriteInfo, builder: WireframeBuilder) {
+  genQuadWireframe(floorSprite(sinfo).coords(), null, builder);
 }
 
-function fillBuffersForFaceSpriteWireframe(x: number, y: number, z: number, xo: number, yo: number, hw: number, hh: number, builder: WireframeBuilder) {
+function fillBuffersForFaceSpriteWireframe(sinfo: SpriteInfo, builder: WireframeBuilder) {
+  const xfmul = sinfo.xf ? -1 : 1;
+  const yfmul = sinfo.yf ? -1 : 1;
   genQuadWireframe([
-    x, y, z,
-    x, y, z,
-    x, y, z,
-    x, y, z
+    sinfo.x, sinfo.y, sinfo.z,
+    sinfo.x, sinfo.y, sinfo.z,
+    sinfo.x, sinfo.y, sinfo.z,
+    sinfo.x, sinfo.y, sinfo.z
   ], [
-    -hw + xo, +hh + yo,
-    +hw + xo, +hh + yo,
-    +hw + xo, -hh + yo,
-    -hw + xo, -hh + yo],
+    (-sinfo.hw - sinfo.xo) * xfmul, +sinfo.hh * yfmul + sinfo.yo,
+    (+sinfo.hw - sinfo.xo) * xfmul, +sinfo.hh * yfmul + sinfo.yo,
+    (+sinfo.hw - sinfo.xo) * xfmul, -sinfo.hh * yfmul + sinfo.yo,
+    (-sinfo.hw - sinfo.xo) * xfmul, -sinfo.hh * yfmul + sinfo.yo,
+  ],
     builder);
 }
 
@@ -76,24 +65,17 @@ function updateSpriteWireframe(ctx: RenderablesCacheContext, sprId: number, buil
   vec4.set(builder.color, 1, 1, 1, -100);
   const spr = board.sprites[sprId];
   if (spr.picnum == 0 || spr.cstat.invisible) return builder;
-
-  const x = spr.x; const y = spr.y; const z = spr.z / ZSCALE;
-  const info = ctx.art.getInfo(spr.picnum);
-  const w = (info.w * spr.xrepeat) / 4; const hw = w >> 1;
-  const h = (info.h * spr.yrepeat) / 4; const hh = h >> 1;
-  const ang = spriteAngle(spr.ang);
-  const xo = (info.attrs.xoff * spr.xrepeat) / 4;
-  const yo = (info.attrs.yoff * spr.yrepeat) / 4 + (spr.cstat.realCenter ? 0 : hh);
+  const sinfo = spriteInfo(board, sprId, ctx.art);
 
   if (spr.cstat.type == FACE_SPRITE) {
     builder.type = Type.SPRITE;
-    fillBuffersForFaceSpriteWireframe(x, y, z, xo, yo, hw, hh, builder);
+    fillBuffersForFaceSpriteWireframe(sinfo, builder);
   } else if (spr.cstat.type == WALL_SPRITE) {
     builder.type = Type.SURFACE;
-    fillbuffersForWallSpriteWireframe(x, y, z, xo, yo, hw, hh, ang, builder);
+    fillbuffersForWallSpriteWireframe(sinfo, builder);
   } else if (spr.cstat.type == FLOOR_SPRITE) {
     builder.type = Type.SURFACE;
-    fillbuffersForFloorSpriteWireframe(x, y, z, xo, yo, hw, hh, ang, builder);
+    fillbuffersForFloorSpriteWireframe(sinfo, builder);
   }
   return builder;
 }
@@ -107,13 +89,13 @@ function updateSpriteAngle(ctx: RenderablesCacheContext, spriteId: number, rende
   const x = spr.x, y = spr.y, z = spr.z / ZSCALE;
   const ang = spriteAngle(spr.ang);
   const size = 128;
-  const vec1 = ang2vec(ang);
-  vec3.scale(vec1, vec1, size);
-  const vec2 = ang2vec(ang + Math.PI / 2);
-  vec3.scale(vec2, vec2, size / 4);
-  buff.writePos(0, x + vec1[0], z, y + vec1[2]);
-  buff.writePos(1, x + vec2[0], z, y + vec2[2]);
-  buff.writePos(2, x - vec2[0], z, y - vec2[2]);
+  const v1 = ang2vec(ang);
+  vec2.scale(v1, v1, size);
+  const v2 = ang2vec(ang + Math.PI / 2);
+  vec2.scale(v2, v2, size / 4);
+  buff.writePos(0, x + v1[0], z, y + v1[1]);
+  buff.writePos(1, x - v2[0], z, y - v2[1]);
+  buff.writePos(2, x + v2[0], z, y + v2[1]);
   buff.writeTriangle(0, 0, 1, 2);
   buff.writeTriangle(3, 2, 1, 0);
   return renderable;

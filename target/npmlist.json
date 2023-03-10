@@ -1,1 +1,0 @@
-{"name":"builded","version":"0.1.0","dependencies":{"crc-32":{"version":"1.2.0","dependencies":{"exit-on-epipe":{"version":"1.0.1"},"printj":{"version":"1.1.2"}}},"stage0":{"version":"0.0.25"},"tippy.js":{"version":"6.2.7","dependencies":{"@popperjs/core":{"version":"2.5.4"}}},"wasm_rust":{"version":"0.1.0"}}}

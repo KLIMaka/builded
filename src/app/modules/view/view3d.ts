@@ -145,12 +145,16 @@ export class View3d extends MessageHandlerReflective implements View {
     this.hit.invalidate();
   }
 
-  private updateHitscan(hit: Hitscan): Target {
+  private updateHitscan(hit: Hitscan): Hitscan {
     const { start, dir } = this.dir();
     const fwd = gl2build(vec3.create(), this.getForward());
-    hit.reset(start[0], start[1], start[2], dir[0], dir[1], dir[2], fwd[0], fwd[1], fwd[2])
+    hit.reset(start[0], start[1], start[2], dir[0], dir[1], dir[2], fwd[0], fwd[1], fwd[2]);
     hitscan(this.board(), this.boardUtils, this.art, this.sec, hit, 0);
     return hit;
+  }
+
+  hitscan(hit: Hitscan): Hitscan {
+    return this.updateHitscan(hit);
   }
 
   private getClosestWall(target: Target, d: number): number {

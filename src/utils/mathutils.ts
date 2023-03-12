@@ -107,6 +107,11 @@ export function dot2d(x1: number, y1: number, x2: number, y2: number) {
 export function orto2d(x: number, y: number): [number, number] {
   return [-y, x];
 }
+export function ortonorm2d(x: number, y: number): [number, number] {
+  const [ox, oy] = orto2d(x, y);
+  const l = len2d(ox, oy);
+  return [ox / l, oy / l];
+}
 
 export function cross2d(x1: number, y1: number, x2: number, y2: number) {
   return x1 * y2 - y1 * x2;

@@ -127,6 +127,10 @@ export class View2d extends MessageHandlerReflective implements View {
     return hit;
   }
 
+  hitscan(hit: Hitscan): Hitscan {
+    return this.updateHitscan(hit);
+  }
+
   private updateTarget(target: TargetImpl, x: number, y: number, z: number, ent: Entity) {
     target.coords_[0] = x;
     target.coords_[1] = y;

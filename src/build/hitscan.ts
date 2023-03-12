@@ -1,7 +1,8 @@
 import { BoardUtils } from "app/apis/app";
 import { vec2, vec3 } from "gl-matrix";
+import { iter } from "utils/iter";
 import { range, wrap } from "../utils/collections";
-import { cross2d, dot2d, int, len2d, orto2d, sign, sqrLen2d } from "../utils/mathutils";
+import { cross2d, dot2d, int, len2d, orto2d, ortonorm2d, sign, sqrLen2d } from "../utils/mathutils";
 import { inSector, isValidSectorId } from "./board/query";
 import { Board, FACE_SPRITE, FLOOR_SPRITE, Sector, WALL_SPRITE } from "./board/structs";
 import { ArtInfo, ArtInfoProvider } from "./formats/art";
@@ -68,13 +69,17 @@ export function pointOnRay(out: vec3, ray: Ray, t: number) {
   return out;
 }
 
+export type HitscanFilter = (t: number, id: number, type: EntityType) => boolean;
+export const NULL_FILTER: HitscanFilter = (t, id, type) => true;
+
 export class Hitscan implements Target {
   constructor(
     public t: number = -1,
     public ent: Entity = null,
     public ray = new Ray(),
     public forward = vec3.create(),
-    private targetPoint = vec3.create()) { }
+    private targetPoint = vec3.create(),
+    public filter = NULL_FILTER) { }
 
   public reset(xs: number, ys: number, zs: number, vx: number, vy: number, vz: number, fx = vx, fy = vy, fz = vz) {
     this.ent = null;
@@ -93,6 +98,7 @@ export class Hitscan implements Target {
   }
 
   public hit(t: number, id: number, type: EntityType) {
+    if (!this.filter(t, id, type)) return;
     if (this.testHit(t)) {
       this.ent = new Entity(id, type)
     }
@@ -168,8 +174,10 @@ function intersectSectorPlanes(board: Board, sec: Sector, secId: number, hit: Hi
 function intersectWall(board: Board, wallId: number, hit: Hitscan): number {
   const wall = board.walls[wallId];
   const wall2 = board.walls[wall.point2];
-  const x1 = wall.x, y1 = wall.y;
-  const x2 = wall2.x, y2 = wall2.y;
+  const x1 = wall.x;
+  const y1 = wall.y;
+  const x2 = wall2.x;
+  const y2 = wall2.y;
   const [xs, ys, zs] = hit.ray.start;
   const [vx, vy, vz] = hit.ray.dir;
 
@@ -217,23 +225,20 @@ function intersectFaceSprite(sprId: number, sinfo: SpriteInfo, hit: Hitscan) {
   const [vx, vy, vz] = hit.ray.dir;
   const [fx, fy, fz] = hit.forward;
   if (vx == 0 && vy == 0) return;
-  const dx = sinfo.x - xs;
-  const dy = sinfo.y - ys;
-  const vl = sqrLen2d(vx, vy);
-  const t = dot2d(vx, vy, dx, dy) / vl;
-  if (t <= 0) return;
-  const zss = zs / ZSCALE;
-  const vzs = vz / ZSCALE;
-  const intz = zss + int(vzs * t);
-  if ((intz > sinfo.z + sinfo.hh + sinfo.yo) || (intz < sinfo.z - sinfo.hh + sinfo.yo)) return;
-  const intx = xs + vx * t;
-  const inty = ys + vy * t;
-  const dix = sinfo.x - intx;
-  const diy = sinfo.y - inty;
-  const [ovx, ovy] = orto2d(vx, vy);
-  const t1 = dot2d(ovx, ovy, dix, diy) / vl;
-  if (t1 < -sinfo.hw + sinfo.xo || t1 > sinfo.hw + sinfo.xo) return;
-  hit.hit(t, sprId, EntityType.SPRITE);
+
+  const [ofx, ofy] = ortonorm2d(fx, fy);
+  const p1 = -sinfo.hw - sinfo.xo;
+  const p2 = sinfo.hw - sinfo.xo;
+  const x1 = sinfo.x + ofx * p1;
+  const y1 = sinfo.y + ofy * p1;
+  const x2 = sinfo.x + ofx * p2;
+  const y2 = sinfo.y + ofy * p2;
+
+  const inter = rayIntersect(xs, ys, zs / ZSCALE, vx, vy, vz / ZSCALE, x1, y1, x2, y2);
+  if (inter == null) return;
+  const [, , iz, it] = inter;
+  if ((iz > sinfo.z + sinfo.hh + sinfo.yo) || (iz < sinfo.z - sinfo.hh + sinfo.yo)) return;
+  hit.hit(it, sprId, EntityType.SPRITE);
 }
 
 function intersectWallSprite(board: Board, sprId: number, sinfo: SpriteInfo, hit: Hitscan) {

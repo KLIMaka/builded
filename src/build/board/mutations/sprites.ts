@@ -49,22 +49,23 @@ function tryMoveSprite(sprite: Sprite, x: number, y: number, z: number, sectorId
 }
 
 export function moveSpriteX(board: Board, spriteId: number, x: number, y: number, z: number, grid: GridController): boolean {
-  const sprite = board.sprites[spriteId];
-  if (sprite.x == x && sprite.y == y && sprite.z == z) return false;
-  const tsectorId = findSector(board, x, y, sprite.sectnum);
-  const newSectorId = tsectorId == -1 ? sprite.sectnum : tsectorId;
-  const d = grid.getGridSize() / 4;
-  const w = findFirst(sectorWalls(board, newSectorId), w => distanceToWallSegment(board, w, x, y) <= d, -1);
-  if (w != -1) {
-    const ow = selectOrnamentWall(board, newSectorId, w, x, y, sprite.z);
-    if (ow[0] == -1) {
-      return tryMoveSprite(sprite, x, y, z, newSectorId);
-    } else {
-      const [nx, ny] = ornamentWall(board, ow[0], x, y, grid);
-      return tryMoveSprite(sprite, nx, ny, z, ow[1]);
-    }
-  } else {
-    if (tsectorId == -1) return false;
-    return tryMoveSprite(sprite, x, y, z, newSectorId);
-  }
+  // const sprite = board.sprites[spriteId];
+  // if (sprite.x == x && sprite.y == y && sprite.z == z) return false;
+  // const tsectorId = findSector(board, x, y, sprite.sectnum);
+  // const newSectorId = tsectorId == -1 ? sprite.sectnum : tsectorId;
+  // const d = grid.getGridSize() / 4;
+  // const w = findFirst(sectorWalls(board, newSectorId), w => distanceToWallSegment(board, w, x, y) <= d, -1);
+  // if (w != -1) {
+  //   const ow = selectOrnamentWall(board, newSectorId, w, x, y, sprite.z);
+  //   if (ow[0] == -1) {
+  //     return tryMoveSprite(sprite, x, y, z, newSectorId);
+  //   } else {
+  //     const [nx, ny] = ornamentWall(board, ow[0], x, y, grid);
+  //     return tryMoveSprite(sprite, nx, ny, z, ow[1]);
+  //   }
+  // } else {
+  //   if (tsectorId == -1) return false;
+  //   return tryMoveSprite(sprite, x, y, z, newSectorId);
+  // }
+  return moveSprite(board, spriteId, x, y, z);
 }

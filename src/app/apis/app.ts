@@ -2,7 +2,7 @@ import { mat2d, mat4 } from "gl-matrix";
 import { EngineApi } from "../../build/board/mutations/api";
 import { Board, Sprite } from "../../build/board/structs";
 import { ArtInfoProvider } from "../../build/formats/art";
-import { Ray, Target } from "../../build/hitscan";
+import { Hitscan, Ray, Target } from "../../build/hitscan";
 import { MoveStruct } from "../../build/utils";
 import { Texture } from "../../utils/gl/drawstruct";
 import { Dependency } from "../../utils/injector";
@@ -38,6 +38,7 @@ export interface View extends MoveStruct, MessageHandler {
   target(): Target;
   snapTarget(): Target;
   dir(): Ray;
+  hitscan(hit: Hitscan): Hitscan;
 }
 export const VIEW = new Dependency<View>('View');
 

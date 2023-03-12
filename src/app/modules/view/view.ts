@@ -1,4 +1,4 @@
-import { Entity, Target } from "../../../build/hitscan";
+import { Entity, Hitscan, Target } from "../../../build/hitscan";
 import { create, Dependency, getInstances, lifecycle, Module, Plugin } from "../../../utils/injector";
 import { GRID, GridController, STATE, View, VIEW } from "../../apis/app";
 import { BUS, busDisconnector, Message, MessageHandler } from "../../apis/handler";
@@ -62,7 +62,7 @@ export class SwappableView implements View, MessageHandler {
   snapTarget() { return this.view.snapTarget() }
   dir() { return this.view.dir() }
   drawTools(renderables: Iterable<Renderable>) { this.view.drawTools(renderables) }
-
+  hitscan(hit: Hitscan): Hitscan { return this.view.hitscan(hit) }
   handle(message: Message) {
     if (message instanceof NamedMessage && message.name == 'view_mode') {
       const viewPos = this.view.getViewPosition();

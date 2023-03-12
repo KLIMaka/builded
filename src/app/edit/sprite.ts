@@ -1,7 +1,7 @@
 import { addSprite, deleteSprite } from "../../build/board/mutations/internal";
 import { moveSpriteX } from "../../build/board/mutations/sprites";
 import { isValidSectorId } from "../../build/board/query";
-import { Entity, EntityType } from "../../build/hitscan";
+import { Entity, EntityType, Hitscan } from "../../build/hitscan";
 import { slope, ZSCALE } from "../../build/utils";
 import { vec3 } from "gl-matrix";
 import { cyclic, tuple } from "../../utils/mathutils";
@@ -10,7 +10,9 @@ import { EditContext } from "./context";
 import { BoardInvalidate, Commit, EndMove, Flip, Highlight, Move, NamedMessage, Palette, PanRepeat, Rotate, SetPicnum, SetSpriteCstat, Shade, SpriteMode, StartMove } from "./messages";
 import { MOVE_COPY } from "./tools/transform";
 import { spriteInfo } from "build/sprites";
-import { FLOOR_SPRITE } from "build/board/structs";
+import { Board, FLOOR_SPRITE } from "build/board/structs";
+
+const HITSCAN = new Hitscan();
 
 export class SpriteEnt extends MessageHandlerReflective {
   private moveActive = false;
@@ -40,12 +42,24 @@ export class SpriteEnt extends MessageHandlerReflective {
 
   public Move(msg: Move) {
     const board = this.ctx.board();
-    const x = this.ctx.gridController.snap(this.origin[0] + msg.dx);
-    const y = this.ctx.gridController.snap(this.origin[2] + msg.dy);
-    const z = this.ctx.gridController.snap(this.origin[1] + msg.dz) * ZSCALE;
+    HITSCAN.filter = (t, id, type) => (id == this.spriteId && type == EntityType.SPRITE) ? false : true;
+    const hit = this.ctx.view.hitscan(HITSCAN);
+    const [nx, ny, nz] = hit.coords;
+    const ent = hit.ent;
+    const bottom = ent != null && ent.type != EntityType.CEILING;
+    const x = this.ctx.gridController.snap(nx);
+    const y = this.ctx.gridController.snap(ny);
+    const z = this.ctx.gridController.snap((nz + this.zoff(board, bottom)) / ZSCALE) * ZSCALE;
     if (moveSpriteX(board, this.spriteId, x, y, z, this.ctx.gridController)) {
       this.ctx.bus.handle(new BoardInvalidate(new Entity(this.spriteId, EntityType.SPRITE)));
     }
+    // const board = this.ctx.board();
+    // const x = this.ctx.gridController.snap(this.origin[0] + msg.dx);
+    // const y = this.ctx.gridController.snap(this.origin[2] + msg.dy);
+    // const z = this.ctx.gridController.snap(this.origin[1] + msg.dz) * ZSCALE;
+    // if (moveSpriteX(board, this.spriteId, x, y, z, this.ctx.gridController)) {
+    //   this.ctx.bus.handle(new BoardInvalidate(new Entity(this.spriteId, EntityType.SPRITE)));
+    // }
   }
 
   public Rotate(msg: Rotate) {
@@ -135,6 +149,14 @@ export class SpriteEnt extends MessageHandlerReflective {
     this.ctx.bus.handle(new BoardInvalidate(new Entity(this.spriteId, EntityType.SPRITE)));
   }
 
+  private zoff(board: Board, bottom = true): number {
+    const sprite = board.sprites[this.spriteId];
+    const sinfo = spriteInfo(board, this.spriteId, this.ctx.art);
+    return bottom
+      ? sprite.cstat.type == FLOOR_SPRITE ? -1 : (sinfo.hh - sinfo.yo) * ZSCALE
+      : sprite.cstat.type == FLOOR_SPRITE ? 1 : -(sinfo.hh + sinfo.yo) * ZSCALE;
+  }
+
   public NamedMessage(msg: NamedMessage) {
     const board = this.ctx.board();
     const sprite = board.sprites[this.spriteId];
@@ -147,8 +169,7 @@ export class SpriteEnt extends MessageHandlerReflective {
       case 'fly': {
         if (!isValidSectorId(board, sprite.sectnum)) return;
         const sector = board.sectors[sprite.sectnum];
-        const sinfo = spriteInfo(board, this.spriteId, this.ctx.art);
-        const zoff = sprite.cstat.type == FLOOR_SPRITE ? 1 : -(sinfo.hh + sinfo.yo) * ZSCALE;
+        const zoff = this.zoff(board, false);
         sprite.z = zoff + slope(board, sprite.sectnum, sprite.x, sprite.y, sector.ceilingheinum) + sector.ceilingz;
         this.ctx.bus.handle(new Commit(`Fly Sprite ${this.spriteId}`, true));
         this.ctx.bus.handle(new BoardInvalidate(new Entity(this.spriteId, EntityType.SPRITE)));
@@ -157,8 +178,7 @@ export class SpriteEnt extends MessageHandlerReflective {
       case 'fall': {
         if (!isValidSectorId(board, sprite.sectnum)) return;
         const sector = board.sectors[sprite.sectnum];
-        const sinfo = spriteInfo(board, this.spriteId, this.ctx.art);
-        const zoff = sprite.cstat.type == FLOOR_SPRITE ? -1 : (sinfo.hh - sinfo.yo) * ZSCALE;
+        const zoff = this.zoff(board, true);
         sprite.z = zoff + slope(board, sprite.sectnum, sprite.x, sprite.y, sector.floorheinum) + sector.floorz;
         this.ctx.bus.handle(new Commit(`Fall Sprite ${this.spriteId}`, true));
         this.ctx.bus.handle(new BoardInvalidate(new Entity(this.spriteId, EntityType.SPRITE)));

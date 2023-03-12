@@ -147,7 +147,9 @@ export class View3d extends MessageHandlerReflective implements View {
 
   private updateHitscan(hit: Hitscan): Target {
     const { start, dir } = this.dir();
-    hitscan(this.board(), this.boardUtils, this.art, start[0], start[1], start[2], this.sec, dir[0], dir[1], dir[2], hit, 0);
+    const fwd = gl2build(vec3.create(), this.getForward());
+    hit.reset(start[0], start[1], start[2], dir[0], dir[1], dir[2], fwd[0], fwd[1], fwd[2])
+    hitscan(this.board(), this.boardUtils, this.art, this.sec, hit, 0);
     return hit;
   }
 

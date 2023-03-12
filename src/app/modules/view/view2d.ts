@@ -122,7 +122,8 @@ export class View2d extends MessageHandlerReflective implements View {
   }
 
   private updateHitscan(hit: Hitscan) {
-    hitscan(this.board(), this.boardUtils, this.art, this.x, this.y, this.z, this.sec, 0, 0, -1 * ZSCALE, hit, 0);
+    hit.reset(this.x, this.y, this.z, 0, 0, -1 * ZSCALE);
+    hitscan(this.board(), this.boardUtils, this.art, this.sec, hit, 0);
     return hit;
   }
 

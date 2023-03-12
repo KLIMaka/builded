@@ -73,13 +73,15 @@ export class Hitscan implements Target {
     public t: number = -1,
     public ent: Entity = null,
     public ray = new Ray(),
+    public forward = vec3.create(),
     private targetPoint = vec3.create()) { }
 
-  public reset(xs: number, ys: number, zs: number, vx: number, vy: number, vz: number) {
+  public reset(xs: number, ys: number, zs: number, vx: number, vy: number, vz: number, fx = vx, fy = vy, fz = vz) {
     this.ent = null;
     this.t = -1;
     vec3.set(this.ray.start, xs, ys, zs);
     vec3.set(this.ray.dir, vx, vy, vz);
+    vec3.set(this.forward, fx, fy, fz);
   }
 
   private testHit(t: number): boolean {
@@ -213,6 +215,7 @@ function intersectWall(board: Board, wallId: number, hit: Hitscan): number {
 function intersectFaceSprite(sprId: number, sinfo: SpriteInfo, hit: Hitscan) {
   const [xs, ys, zs] = hit.ray.start;
   const [vx, vy, vz] = hit.ray.dir;
+  const [fx, fy, fz] = hit.forward;
   if (vx == 0 && vy == 0) return;
   const dx = sinfo.x - xs;
   const dy = sinfo.y - ys;
@@ -277,7 +280,6 @@ function intersectFloorSprite(sprId: number, sinfo: SpriteInfo, hit: Hitscan) {
   hit.hit(t - SPRITE_OFF, sprId, EntityType.SPRITE);
 }
 
-
 function intersectSprite(board: Board, artInfo: ArtInfoProvider, sprId: number, hit: Hitscan) {
   const spr = board.sprites[sprId];
   if (spr.picnum == 0 || spr.cstat.invisible) return;
@@ -296,9 +298,7 @@ function resetStack(board: Board, sectorId: number): Set<number> {
   else return new Set([sectorId]);
 }
 
-export function hitscan(board: Board, boardUtils: BoardUtils, artInfo: ArtInfoProvider, xs: number, ys: number, zs: number, secId: number, vx: number, vy: number, vz: number, hit: Hitscan, cliptype: number) {
-  hit.reset(xs, ys, zs, vx, vy, vz);
-
+export function hitscan(board: Board, boardUtils: BoardUtils, artInfo: ArtInfoProvider, secId: number, hit: Hitscan, cliptype: number) {
   const stack = resetStack(board, secId);
   for (const s of stack) {
     const sec = board.sectors[s];

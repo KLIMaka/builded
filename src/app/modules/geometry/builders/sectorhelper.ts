@@ -81,18 +81,18 @@ export function updateSectorHelper(cache: BuildRenderableProvider, ctx: Renderab
   builder = builder == null ? new SectorHelperBuilder(ctx.factory) : builder;
   const pointTex = ctx.art.get(-1);
   const board = ctx.board();
-  builder.ceilpoints.tex = pointTex;
-  builder.floorpoints.tex = pointTex;
+  // builder.ceilpoints.tex = pointTex;
+  // builder.floorpoints.tex = pointTex;
 
   const sec = board.sectors[secId];
-  const wallnum = sec.wallnum;
-  builder.ceilpoints.buff.allocate(wallnum * 4, wallnum * 6);
-  builder.floorpoints.buff.allocate(wallnum * 4, wallnum * 6);
-  for (let i = 0; i < wallnum; i++) {
-    const w = sec.wallptr + i;
-    addWallPoint(i, builder.ceilpoints, ctx, true, w, 2.5);
-    addWallPoint(i, builder.floorpoints, ctx, false, w, 2.5);
-  }
+  // const wallnum = sec.wallnum;
+  // builder.ceilpoints.buff.allocate(wallnum * 4, wallnum * 6);
+  // builder.floorpoints.buff.allocate(wallnum * 4, wallnum * 6);
+  // for (let i = 0; i < wallnum; i++) {
+  //   const w = sec.wallptr + i;
+  //   addWallPoint(i, builder.ceilpoints, ctx, true, w, 2.5);
+  //   addWallPoint(i, builder.floorpoints, ctx, false, w, 2.5);
+  // }
 
   vec4.set(builder.ceilwire.color, 1, 1, 1, -100);
   vec4.set(builder.floorwire.color, 1, 1, 1, -100);

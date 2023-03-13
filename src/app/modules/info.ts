@@ -1,18 +1,36 @@
-import { wallStats } from "build/maploader";
+import { art } from "build/artraster";
+import { ArtInfoProvider } from "build/formats/art";
 import h from "stage0";
+import { createEmptyCanvas, clearCanvas, drawToCanvas } from "utils/imgutils";
+import { fit, palRasterizer, Rasterizer, transform } from "utils/pixelprovider";
 import { Sector, Sprite, Wall } from "../../build/board/structs";
 import { Entity, EntityType } from "../../build/hitscan";
 import { create, lifecycle, Module, plugin } from "../../utils/injector";
-import { BOARD, BoardProvider, View, VIEW } from "../apis/app";
+import { ART, ArtProvider, BOARD, BoardProvider, View, VIEW } from "../apis/app";
 import { BUS, busDisconnector, MessageHandlerReflective } from "../apis/handler";
 import { BoardInvalidate, Frame } from "../edit/messages";
-import { Stream } from "../../utils/stream";
+import { Palette, RAW_PAL, RAW_PLUs } from "../modules/artselector"
 
+type ArtRenderer = { canvas: HTMLCanvasElement, renderer: (picnum: number, pal: number) => void };
+function artRenderer(arts: ArtInfoProvider, rasterizer: Rasterizer<number>, pals: Palette[]): ArtRenderer {
+  const canvas = createEmptyCanvas(140, 140);
+  const renderer = (picnum: number, pal: number) => {
+    const info = arts.getInfo(picnum);
+    if (info == null) {
+      clearCanvas(canvas, 'white');
+    } else {
+      const raster = transform(fit(140, 140, art(info), 0), x => pals[pal].plu[x]);
+      const ctx = canvas.getContext('2d');
+      drawToCanvas(raster, ctx, rasterizer);
+    }
+  }
+  return { canvas, renderer };
+}
 
 export async function InfoModule(module: Module) {
   module.bind(plugin('Info'), lifecycle(async (injector, lifecycle) => {
     const bus = await injector.getInstance(BUS);
-    const info = await create(injector, Info, VIEW, BOARD);
+    const info = await create(injector, Info, VIEW, BOARD, ART, RAW_PAL, RAW_PLUs);
     lifecycle(bus.connect(info), busDisconnector(bus));
     lifecycle(info, async i => i.stop());
   }));
@@ -27,10 +45,10 @@ function createRow(name: string): [Node, (v: any) => void] {
   return [root, update];
 }
 
-const rowsTemplate = h`<table class="table-striped"><thead><tr><th style="width:50px">Type</th><th>#type</th></tr></thead><tbody #table></tbody></table>`;
-function createSprite(): [HTMLElement, (id: number, sprite: Sprite) => void] {
+const rowsTemplate = h`<div><table class="table-striped"><thead><tr><th style="width:50px">Type</th><th>#type</th></tr></thead><tbody #table></tbody></table><div #pic style="padding:10px; position:absolute; bottom:0;"></div></div>`;
+function createSprite(artRenderer: ArtRenderer): [HTMLElement, (id: number, sprite: Sprite) => void] {
   const root = <HTMLElement>rowsTemplate.cloneNode(true);
-  const { type, table } = rowsTemplate.collect(root);
+  const { type, table, pic } = rowsTemplate.collect(root);
   type.nodeValue = 'Sprite';
   const [id, idUpdater] = createRow("Id");
   const [pos, posUpdater] = createRow("Position");
@@ -43,6 +61,7 @@ function createSprite(): [HTMLElement, (id: number, sprite: Sprite) => void] {
   const [hitag, hitagUpdater] = createRow("Hi-Tag");
   const [clipdist, clipdistUpdater] = createRow("Clip Dist");
   const [angle, angleUpdater] = createRow("Angle");
+
   table.appendChild(id);
   table.appendChild(pos);
   table.appendChild(picnum);
@@ -54,6 +73,7 @@ function createSprite(): [HTMLElement, (id: number, sprite: Sprite) => void] {
   table.appendChild(hitag);
   table.appendChild(clipdist);
   table.appendChild(angle);
+  pic.appendChild(artRenderer.canvas);
   return [root,
     (id: number, s: Sprite) => {
       idUpdater(id);
@@ -67,12 +87,13 @@ function createSprite(): [HTMLElement, (id: number, sprite: Sprite) => void] {
       hitagUpdater(s.hitag);
       clipdistUpdater(s.clipdist);
       angleUpdater(s.ang);
+      artRenderer.renderer(s.picnum, s.pal);
     }];
 }
 
-function createWall(): [HTMLElement, (id: number, wall: Wall) => void] {
+function createWall(artRenderer: ArtRenderer): [HTMLElement, (id: number, wall: Wall, type: EntityType) => void] {
   const root = <HTMLElement>rowsTemplate.cloneNode(true);
-  const { type, table } = rowsTemplate.collect(root);
+  const { type, table, pic } = rowsTemplate.collect(root);
   type.nodeValue = 'Wall';
   const [id, idUpdater] = createRow("Id");
   const [pos, posUpdater] = createRow("Position");
@@ -112,8 +133,9 @@ function createWall(): [HTMLElement, (id: number, wall: Wall) => void] {
   table.appendChild(translucent);
   table.appendChild(yflip);
   table.appendChild(translucentReversed);
+  pic.appendChild(artRenderer.canvas);
   return [root,
-    (id: number, w: Wall) => {
+    (id: number, w: Wall, type: EntityType) => {
       idUpdater(id);
       posUpdater(`${w.x}, ${w.y}`);
       picnumUpdater(w.picnum);
@@ -133,12 +155,14 @@ function createWall(): [HTMLElement, (id: number, wall: Wall) => void] {
       translucentUpdater(w.cstat.translucent);
       yflipUpdater(w.cstat.yflip);
       translucentReversedUpdater(w.cstat.translucentReversed);
+      if (type == EntityType.MID_WALL && w.nextwall != -1) artRenderer.renderer(w.overpicnum, w.pal);
+      else artRenderer.renderer(w.picnum, w.pal)
     }];
 }
 
-function createSector(): [HTMLElement, (id: number, sector: Sector, ceiling: boolean) => void] {
+function createSector(artRenderer: ArtRenderer): [HTMLElement, (id: number, sector: Sector, type: EntityType) => void] {
   const root = <HTMLElement>rowsTemplate.cloneNode(true);
-  const { type, table } = rowsTemplate.collect(root);
+  const { type, table, pic } = rowsTemplate.collect(root);
   type.nodeValue = 'Sector';
   const [id, idUpdater] = createRow("Id");
   const [picnum, picnumUpdater] = createRow("Picnum");
@@ -168,8 +192,10 @@ function createSector(): [HTMLElement, (id: number, sector: Sector, ceiling: boo
   table.appendChild(xflip);
   table.appendChild(yflip);
   table.appendChild(aligned);
+  pic.appendChild(artRenderer.canvas);
   return [root,
-    (id: number, s: Sector, ceiling: boolean) => {
+    (id: number, s: Sector, type: EntityType) => {
+      const ceiling = type == EntityType.CEILING;
       idUpdater(id);
       picnumUpdater(ceiling ? s.ceilingpicnum : s.floorpicnum);
       shadeUpdater(ceiling ? s.ceilingshade : s.floorshade);
@@ -184,6 +210,7 @@ function createSector(): [HTMLElement, (id: number, sector: Sector, ceiling: boo
       xflipUpdater((ceiling ? s.ceilingstat : s.floorstat).xflip);
       yflipUpdater((ceiling ? s.ceilingstat : s.floorstat).yflip);
       alignedUpdater((ceiling ? s.ceilingstat : s.floorstat).alignToFirstWall);
+      artRenderer.renderer(ceiling ? s.ceilingpicnum : s.floorpicnum, ceiling ? s.ceilingpal : s.floorpal);
     }];
 }
 
@@ -194,8 +221,8 @@ export class Info extends MessageHandlerReflective {
   private sector: HTMLElement;
   private wall: HTMLElement;
   private sprite: HTMLElement;
-  private sectorUpdate: (id: number, sector: Sector, ceiling: boolean) => void;
-  private wallUpdate: (id: number, wall: Wall) => void;
+  private sectorUpdate: (id: number, sector: Sector, type: EntityType) => void;
+  private wallUpdate: (id: number, wall: Wall, type: EntityType) => void;
   private spriteUpdate: (id: number, sprite: Sprite) => void;
   private lastEnt: Entity = NULL_ENT;
 
@@ -203,12 +230,16 @@ export class Info extends MessageHandlerReflective {
 
   constructor(
     private view: View,
-    private board: BoardProvider
+    private board: BoardProvider,
+    private arts: ArtProvider,
+    private pal: Uint8Array,
+    private pals: Palette[],
   ) {
     super();
-    [this.sector, this.sectorUpdate] = createSector();
-    [this.wall, this.wallUpdate] = createWall();
-    [this.sprite, this.spriteUpdate] = createSprite();
+    const rasterizer = palRasterizer(pal);
+    [this.sector, this.sectorUpdate] = createSector(artRenderer(arts, rasterizer, pals));
+    [this.wall, this.wallUpdate] = createWall(artRenderer(arts, rasterizer, pals));
+    [this.sprite, this.spriteUpdate] = createSprite(artRenderer(arts, rasterizer, pals));
     const panel = document.getElementById('info_panel');
     panel.appendChild(this.sector);
     panel.appendChild(this.wall);
@@ -227,7 +258,7 @@ export class Info extends MessageHandlerReflective {
     } else if (ent.isSector()) {
       this.wall.classList.add('hidden');
       this.sprite.classList.add('hidden');
-      this.sectorUpdate(ent.id, board.sectors[ent.id], ent.type == EntityType.CEILING);
+      this.sectorUpdate(ent.id, board.sectors[ent.id], ent.type);
       this.sector.classList.remove('hidden');
     } else if (ent.isSprite()) {
       this.wall.classList.add('hidden');
@@ -237,7 +268,7 @@ export class Info extends MessageHandlerReflective {
     } else if (ent.isWall()) {
       this.sector.classList.add('hidden');
       this.sprite.classList.add('hidden');
-      this.wallUpdate(ent.id, board.walls[ent.id]);
+      this.wallUpdate(ent.id, board.walls[ent.id], ent.type);
       this.wall.classList.remove('hidden');
     }
   }

@@ -33,7 +33,7 @@ export function getFromHitscan(factory: EntityFactory): Deck<MessageHandler> {
   const board = factory.ctx.board();
   if (target.entity.type == EntityType.WALL_POINT) {
     const w = target.entity.id;
-    list.push(fullLoop ? factory.wallSegment(map(fullLoop(board, w), ww => new Entity(ww, EntityType.WALL_POINT))) : factory.wall(w));
+    list.push(fullLoop ? factory.wallSegment([...map(fullLoop(board, w), ww => new Entity(ww, EntityType.WALL_POINT))]) : factory.wall(w));
   } else if (target.entity.isWall()) {
     wallSegment(fullLoop, factory, target.entity);
   } else if (target.entity.isSector()) {
@@ -48,7 +48,7 @@ function sector(fullLoop: (board: Board, wallId: number) => Iterable<number>, ta
   const board = factory.ctx.board();
   if (fullLoop) {
     const firstWall = board.sectors[target.entity.id].wallptr;
-    list.push(factory.wallSegment(map(fullLoop(board, firstWall), w => new Entity(w, EntityType.WALL_POINT))));
+    list.push(factory.wallSegment([...map(fullLoop(board, firstWall), w => new Entity(w, EntityType.WALL_POINT))]));
     const type = target.entity.type == EntityType.CEILING ? EntityType.FLOOR : EntityType.CEILING;
     list.push(factory.sector(new Entity(target.entity.id, type)));
   }

@@ -1,4 +1,5 @@
 import { connectedWalls } from "build/board/loops";
+import { splitSectorFromPoint } from "build/board/mutations/splitsector";
 import { spriteInfo } from "build/sprites";
 import { vec3 } from "gl-matrix";
 import { EngineApi } from "../../../build/board/mutations/api";
@@ -51,6 +52,7 @@ class Utils extends DefaultTool {
       case 'delete_full': this.deleteFull(); return;
       case 'print_usage': this.printPicUsage(); return;
       case 'split_wall': this.splitWall(); return;
+      case 'split_sector_point': this.splitSectorPoint(); return;
       case 'set_picnum': this.setTexture(); return;
       case 'print_info': this.print(); return;
       case 'adapt_grid': this.adaptGrid(); return;
@@ -219,6 +221,18 @@ class Utils extends DefaultTool {
     splitWall(board, id, x, y, this.art, this.refs, this.api.cloneWall);
     this.commit(`Split Wall ${id}`);
     this.invalidateAll();
+  }
+
+  private splitSectorPoint() {
+    const target = this.view.snapTarget();
+    if (target.entity == null || !target.entity.isWall()) return;
+    const [x, y] = target.coords;
+    const id = target.entity.id;
+    const board = this.board();
+    if (splitSectorFromPoint(board, id, [x, y], this.art, this.refs, this.api)) {
+      this.commit(`Split Sector on Wall ${id} from point [${x}, ${y}]`);
+      this.invalidateAll();
+    }
   }
 
   private print() {

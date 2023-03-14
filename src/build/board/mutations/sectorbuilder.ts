@@ -3,6 +3,7 @@ import { track } from "../../../app/apis/referencetracker";
 import { forEach, map } from "../../../utils/collections";
 import { Board, Wall } from "../structs";
 import { resizeWalls } from "./internal";
+import { fixxrepeat } from "./walls";
 
 export class SectorBuilder {
   private currentLoop: Wall[] = [];
@@ -29,6 +30,7 @@ export class SectorBuilder {
       for (let i = 0; i < walls.length; i++) walls[i].nextwall = wallRefs.val(nextWallPtrs[i]);
     });
     const sec = board.sectors[sectorId];
+    const repeatsToFix = [];
     let ptr = sec.wallptr;
     for (const ws of this.walls) {
       const start = ptr;
@@ -43,8 +45,10 @@ export class SectorBuilder {
           nextwall.nextsector = sectorId;
           nextwall.nextwall = w;
         }
+        if (wall.xrepeat == 0) repeatsToFix.push(w);
       }
       lastWall.point2 = start;
     }
+    repeatsToFix.forEach(w => fixxrepeat(board, w));
   }
 }

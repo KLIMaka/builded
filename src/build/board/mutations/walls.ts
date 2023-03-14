@@ -13,7 +13,7 @@ import { track } from "../../../app/apis/referencetracker";
 
 export function fixxrepeat(board: Board, wallId: number, reprate: number = DEFAULT_REPEAT_RATE) {
   const wall = board.walls[wallId];
-  wall.xrepeat = Math.min(255, Math.max(1, Math.round((walllen(board, wallId) + 0.5) / reprate)))
+  wall.xrepeat = Math.min(255, Math.max(1, Math.round((walllen(board, wallId) + 0.5) / reprate)));
 }
 
 function fixpoint2xpan(board: Board, wallId: number, art: ArtInfoProvider) {

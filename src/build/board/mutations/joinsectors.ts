@@ -36,7 +36,7 @@ function getJoinedWallsLoops(board: Board, s1: number, s2: number, api: EngineAp
   return builder;
 }
 
-export function joinSectors(board: Board, s1: number, s2: number, refs: BuildReferenceTracker, api: EngineApi) {
+export function joinSectors<B extends Board>(board: B, s1: number, s2: number, refs: BuildReferenceTracker, api: EngineApi<B>) {
   if (!isJoinedSectors(board, s1, s2)) throw new Error(`Sectors ${s1} and ${s2} is not connected`);
   getJoinedWallsLoops(board, s1, s2, api).build(board, s1, refs);
   deleteSector(board, s2, refs);

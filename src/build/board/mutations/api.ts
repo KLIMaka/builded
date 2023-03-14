@@ -13,7 +13,7 @@ export type BoardWall<B extends Board> = B['walls'][number];
 export type BoardSector<B extends Board> = B['sectors'][number];
 export type BoardSprite<B extends Board> = B['sprites'][number];
 
-export type EngineApi<B extends Board> = {
+export type EngineApi<B extends Board = Board> = {
   readonly cloneBoard: BoardCloner<B>,
   readonly cloneWall: WallCloner<BoardWall<B>>,
   readonly cloneSprite: SpriteCloner<BoardSprite<B>>,

@@ -3,7 +3,7 @@ import { Collection, enumerate, loopPairs, wrap } from "../../../utils/collectio
 import { iter } from "../../../utils/iter";
 import { order } from "../../utils";
 import { Board, Sector, Wall } from "../structs";
-import { EngineApi } from "./api";
+import { BoardSector, BoardWall, EngineApi } from "./api";
 import { addSector } from "./internal";
 import { SectorBuilder } from "./sectorbuilder";
 import { fixxrepeat } from "./walls";
@@ -28,7 +28,7 @@ function matchWalls(board: Board, points: Iterable<[number, number]>): [number, 
   return iter(loopPairs(points)).map(([p1, p2]) => searchMatchWall(board, p1, p2)).collect();
 }
 
-function commonSectorWall(board: Board, matched: [number, number][], api: EngineApi): [Sector, Wall] {
+function commonSectorWall<B extends Board>(board: B, matched: [number, number][], api: EngineApi<B>): [BoardSector<B>, BoardWall<B>] {
   for (let m of matched) if (m != null) return [board.sectors[m[0]], board.walls[m[1]]];
   return [api.newSector(), api.newWall()];
 }
@@ -51,7 +51,7 @@ function* createNewWalls(points: Iterable<[number, number]>, matchedWalls: [numb
   }
 }
 
-export function createNewSector(board: Board, points: Collection<[number, number]>, refs: BuildReferenceTracker, api: EngineApi) {
+export function createNewSector<B extends Board>(board: B, points: Collection<[number, number]>, refs: BuildReferenceTracker, api: EngineApi<B>) {
   points = wrap([...order(points)]);
   const mwalls = matchWalls(board, points);
   const [commonSector, commonWall] = commonSectorWall(board, mwalls, api);

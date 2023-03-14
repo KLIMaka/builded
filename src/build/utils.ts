@@ -184,8 +184,7 @@ export function rayIntersect(
   } else {
     if (topt > 0) return null;
     const topu = cross2d(vx, vy, x31, y31);
-    if ((topu > 0) || (topu <= bot))
-      return null;
+    if ((topu > 0) || (topu <= bot)) return null;
   }
 
   const t = topt / bot;

@@ -87,6 +87,7 @@ view3d | F9                 | add_mount
 view3d | CTRL+C             | center
 view3d | .                  | align_texture
 view3d | F5                 | test
+view3d | CTRL+INSERT        | split_sector_point
 
 view3d | +W                 | forward
 view3d | +S                 | backward

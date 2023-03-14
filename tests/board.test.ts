@@ -7,7 +7,7 @@ import { createNewSector } from "../src/build/board/mutations/ceatesector";
 import { deleteSector } from '../src/build/board/mutations/internal';
 import { createInnerLoop, deleteLoop, fillInnerLoop, setFirstWall } from "../src/build/board/mutations/sectors";
 import { joinSectors } from "../src/build/board/mutations/joinsectors";
-import { splitSector } from '../src/build/board/mutations/splitsector';
+import { splitSector, splitSectorFromPoint } from '../src/build/board/mutations/splitsector';
 import { deleteWall, mergePoints, splitWall } from '../src/build/board/mutations/walls';
 import { findContainingSector, findContainingSectorMidPoints, findSector, findSectorsAtPoint, inSector, wallInSector, walllen } from '../src/build/board/query';
 import { ArtInfo, ArtInfoProvider, Attributes } from '../src/build/formats/art';
@@ -36,7 +36,7 @@ const BLOOD_API: EngineApi<BloodBoard> = {
   newWall: BLOOD.newWall
 };
 
-const BUILD_API: EngineApi<Board> = {
+const BUILD_API: EngineApi = {
   newBoard: BUILD.newBoard,
   cloneBoard: BUILD.cloneBoard,
   cloneSector: BUILD.cloneSector,
@@ -379,7 +379,7 @@ test('splitSector3', () => {
 })
 
 test('inPolygon', () => {
-  const LOOP = wrap(<[number, number][]>[[-256, 384], [-256, -384], [768, -256], [768, 384]]);
+  const LOOP: [number, number][] = [[-256, 384], [-256, -384], [768, -256], [768, 384]];
   expect(inPolygon(-1600, -800, LOOP)).toBe(false);
   expect(clockwise(LOOP)).toBe(true);
 });
@@ -408,4 +408,22 @@ test('joinSectors', () => {
   expect(findSector(board, 800, 512)).toBe(0);
   expect([...map(sectorWalls(board, 0), w => board.walls[w].nextsector)]).toStrictEqual([1, 1, 1, 1, -1, -1, -1, 1]);
   expect([...map(sectorWalls(board, 1), w => board.walls[w].nextsector)]).toStrictEqual([-1, -1, -1, 0, 0, 0, 0, 0]);
+});
+
+test('splitSectorFromPoint', () => {
+  const board = BLOOD_API.newBoard();
+  const COORDS = (w: number): number[] => [board.walls[w].x, board.walls[w].y];
+
+  createNewSector(board, wrap([[0, 0], [1024, 0], [1024, 1024], [0, 1024]]), REFS, BLOOD_API);
+  expect(splitSectorFromPoint(board, 0, [512, 0], ART, REFS, BLOOD_API)).toBe(true);
+  expect([...map(loopWalls(board, 0), COORDS)]).toStrictEqual([[512, 1024], [512, 0], [1024, 0], [1024, 1024]]);
+  expect([...map(loopWalls(board, 4), COORDS)]).toStrictEqual([[512, 1024], [0, 1024], [0, 0], [512, 0]]);
+});
+
+test('splitSectorFromPoint1', () => {
+  const board = BLOOD_API.newBoard();
+  const COORDS = (w: number): number[] => [board.walls[w].x, board.walls[w].y];
+
+  createNewSector(board, wrap([[0, 0], [256, 0], [256, -256], [512, -256], [512, 0], [1024, 0], [1024, 1024], [0, 1024]]), REFS, BLOOD_API);
+  expect(splitSectorFromPoint(board, 1, [256, 0], ART, REFS, BLOOD_API)).toBe(true);
 });

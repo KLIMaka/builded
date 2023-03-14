@@ -11,7 +11,7 @@ import { deleteSector, moveWalls, resizeWalls } from "./internal";
 import { SectorBuilder } from "./sectorbuilder";
 import { fixxrepeat } from "./walls";
 
-export function fillInnerLoop(board: Board, wallId: number, refs: BuildReferenceTracker, api: EngineApi) {
+export function fillInnerLoop<B extends Board>(board: B, wallId: number, refs: BuildReferenceTracker, api: EngineApi<B>) {
   if (isOuterLoop(board, wallId)) throw new Error('Only inner loops can be filled');
   if (any(loopWalls(board, wallId), w => board.walls[w].nextsector != -1)) throw new Error(`Already filled`);
   const WALL_MAPPER = (w: number) => <[number, number]>[board.walls[w].x, board.walls[w].y];
@@ -19,7 +19,7 @@ export function fillInnerLoop(board: Board, wallId: number, refs: BuildReference
   createNewSector(board, points, refs, api);
 }
 
-export function createInnerLoop(board: Board, sectorId: number, points: Iterable<[number, number]>, refs: BuildReferenceTracker, api: EngineApi) {
+export function createInnerLoop<B extends Board>(board: B, sectorId: number, points: Iterable<[number, number]>, refs: BuildReferenceTracker, api: EngineApi<B>) {
   const sector = board.sectors[sectorId];
   const pointsLength = length(points);
   resizeWalls(board, sectorId, sector.wallnum + pointsLength, refs);
@@ -37,7 +37,7 @@ export function createInnerLoop(board: Board, sectorId: number, points: Iterable
   for (let w = wallPtr; w < sector.wallptr + sector.wallnum; w++) fixxrepeat(board, w);
 }
 
-export function setFirstWall(board: Board, sectorId: number, newFirstWall: number, refs: BuildReferenceTracker) {
+export function setFirstWall<B extends Board>(board: B, sectorId: number, newFirstWall: number, refs: BuildReferenceTracker) {
   const sector = board.sectors[sectorId];
   if (sector.wallptr == newFirstWall) return;
   const end = sector.wallptr + sector.wallnum;
@@ -66,7 +66,7 @@ export function setFirstWall(board: Board, sectorId: number, newFirstWall: numbe
   builder.build(board, sectorId, refs);
 }
 
-export function deleteLoop(board: Board, wallId: number, refs: BuildReferenceTracker) {
+export function deleteLoop<B extends Board>(board: B, wallId: number, refs: BuildReferenceTracker) {
   if (isOuterLoop(board, wallId)) throw new Error('Cannot delete outer loops');
   const loop = [...loopWalls(board, wallId)];
   if (any(loop, w => board.walls[w].nextsector != -1)) throw new Error('Cannot delete filled loop');
@@ -74,18 +74,17 @@ export function deleteLoop(board: Board, wallId: number, refs: BuildReferenceTra
   moveWalls(board, sectorId, loop[0], -loop.length, refs);
 }
 
-function deleteSectors(board: Board, sectors: Iterable<number>, refs: BuildReferenceTracker) {
+function deleteSectors<B extends Board>(board: B, sectors: Iterable<number>, refs: BuildReferenceTracker) {
   track(refs.sectors, sectorRefs => {
     const secs = [...map(sectors, s => sectorRefs.ref(s))];
     for (const s of secs) deleteSector(board, sectorRefs.val(s), refs);
   });
 }
 
-export function deleteSectorFull(board: Board, sectorId: number, refs: BuildReferenceTracker) {
+export function deleteSectorFull<B extends Board>(board: B, sectorId: number, refs: BuildReferenceTracker) {
   deleteSectors(board, chain(innerSectors(board, sectorId), [sectorId]), refs);
 }
 
-export function deleteLoopFull(board: Board, wallId: number, refs: BuildReferenceTracker) {
+export function deleteLoopFull<B extends Board>(board: B, wallId: number, refs: BuildReferenceTracker) {
   deleteSectors(board, innerSectorsOfLoop(board, wallId), refs);
 }
-

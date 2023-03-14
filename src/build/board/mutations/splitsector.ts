@@ -1,13 +1,18 @@
+import { ArtInfoProvider } from 'build/formats/art';
+import { vec3 } from 'gl-matrix';
+import { cross2d, dot2d, int, len2d } from '../../../utils/mathutils';
 import { BuildReferenceTracker } from '../../../app/apis/app';
-import { all, Collection, enumerate, first, last, map, range, reversed, wrap } from '../../../utils/collections';
+import { track } from '../../../app/apis/referencetracker';
+import { all, Collection, enumerate, first, last, map, range, reversed, takeFirst, wrap } from '../../../utils/collections';
 import { iter } from '../../../utils/iter';
+import { clockwise, inPolygon, rayIntersect, wallNormal } from '../../utils';
+import { loopPoints, loopStart, loopWalls, sectorWalls, wallsBetween } from '../loops';
+import { sectorOfWall, wallInSector } from '../query';
 import { Board, Wall } from '../structs';
-import { clockwise, inPolygon } from '../../utils';
-import { loopPoints, loopStart, loopWalls, wallsBetween } from '../loops';
-import { SectorBuilder } from './sectorbuilder';
-import { wallInSector } from '../query';
 import { BoardWall, EngineApi, WallCloner } from './api';
 import { addSector } from './internal';
+import { SectorBuilder } from './sectorbuilder';
+import { fixxrepeat, splitWall } from './walls';
 
 type point2d = [number, number];
 
@@ -24,6 +29,7 @@ function* createNewWalls<B extends Board>(points: Iterable<[number, number]>, ma
     } else {
       wall.nextwall = -1;
       wall.nextsector = -1;
+      wall.xrepeat = 0;
     }
     yield wall;
   }
@@ -93,4 +99,43 @@ export function splitSector<B extends Board>(board: B, sectorId: number, points:
     return splitSectorImpl(board, sectorId, firstWall, lastWall, loop, points, refs, api);
   else
     return splitSectorImpl(board, sectorId, lastWall, firstWall, loop, wrap([...reversed(points)]), refs, api);
+}
+
+export function splitSectorFromPoint<B extends Board>(board: B, wallId: number, pointonWall: point2d, art: ArtInfoProvider, refs: BuildReferenceTracker, api: EngineApi<B>) {
+  const wall = board.walls[wallId];
+  const wall2 = board.walls[wall.point2];
+  const px = int(pointonWall[0]);
+  const py = int(pointonWall[1]);
+  const [nx, , ny] = wallNormal(vec3.create(), board, wallId);
+  const sectorId = sectorOfWall(board, wallId);
+  const inters: { x: number, y: number, t: number, w: number }[] = [];
+  for (const w of sectorWalls(board, sectorId)) {
+    if (w == wallId) continue;
+    const wall = board.walls[w];
+    const wall2 = board.walls[wall.point2];
+    const dx = wall.x - px;
+    const dy = wall.y - py;
+    if (cross2d(nx, ny, dx, dy) == 0 && dot2d(nx, ny, dx, dy) > 0) {
+      inters.push({ x: wall.x, y: wall.y, w, t: len2d(dx, dy) });
+    } else {
+      const inter = rayIntersect(px, py, 0, nx, ny, 0, wall.x, wall.y, wall2.x, wall2.y);
+      if (inter != null) {
+        const [x, y, , t] = inter;
+        inters.push({ x: int(x), y: int(y), t, w });
+      }
+    }
+  }
+  inters.sort((l, r) => l.t - r.t);
+  const closest = takeFirst(inters);
+  if (closest == null) return false;
+  if (loopStart(board, closest.w) != loopStart(board, wallId)) return false;
+  track(refs.walls, refwalls => {
+    const closestWallRef = refwalls.ref(closest.w);
+    const onWallPoint = px == wall.x && py == wall.y || px == wall2.x && py == wall2.y;
+    if (!onWallPoint) splitWall(board, wallId, px, py, art, refs, api.cloneWall);
+    const endWall = wallInSector(board, sectorId, closest.x, closest.y);
+    if (endWall == -1) splitWall(board, refwalls.val(closestWallRef), closest.x, closest.y, art, refs, api.cloneWall);
+  })
+  splitSector(board, sectorId, wrap([[px, py], [closest.x, closest.y]]), refs, api);
+  return true;
 }

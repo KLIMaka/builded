@@ -241,7 +241,7 @@ export function initSpriteStats(stats: SpriteStats) {
   stats.invisible = 0;
   stats.noautoshading = 0;
   stats.onesided = 0;
-  stats.realCenter = 0;
+  stats.realCenter = 1;
   stats.tranclucentReversed = 0;
   stats.translucent = 0;
   stats.type = FACE_SPRITE;
@@ -253,7 +253,7 @@ export function initSpriteStats(stats: SpriteStats) {
 
 export function initSprite(sprite: Sprite) {
   sprite.ang = 0;
-  sprite.clipdist = 0;
+  sprite.clipdist = 32;
   sprite.cstat = initSpriteStats(new SpriteStats());
   sprite.extra = 65535;
   sprite.hitag = 0;
@@ -271,8 +271,8 @@ export function initSprite(sprite: Sprite) {
   sprite.yoffset = 0;
   sprite.xvel = 0;
   sprite.yvel = 0;
-  sprite.xrepeat = 64;
-  sprite.yrepeat = 64;
+  sprite.xrepeat = 40;
+  sprite.yrepeat = 40;
   sprite.filler = 0;
   return sprite;
 }

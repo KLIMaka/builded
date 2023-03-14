@@ -1,7 +1,7 @@
 import { vec2, vec3 } from "gl-matrix";
-import { ArtInfoProvider } from "../build/formats/art";
+import { ArtInfo, ArtInfoProvider } from "../build/formats/art";
 import { ang2vec, posOffRotate, spriteAngle, ZSCALE } from "../build/utils";
-import { Board, FLOOR_SPRITE } from "./board/structs";
+import { Board, FLOOR_SPRITE, Sprite } from "./board/structs";
 
 export class WallSprite {
   constructor(
@@ -90,7 +90,7 @@ export function spriteInfo(board: Board, spriteId: number, infos: ArtInfoProvide
   const hh = h >> 1;
   const ang = spriteAngle(spr.ang);
   const xo = ((info.attrs.xoff + spr.xoffset) * spr.xrepeat) >> 2;
-  const yo = ((info.attrs.yoff + spr.yoffset) * spr.yrepeat) >> 2 + (spr.cstat.realCenter ? 0 : hh);
+  const yo = (((info.attrs.yoff + spr.yoffset) * spr.yrepeat) >> 2) + (spr.cstat.realCenter == 1 ? 0 : hh);
   const xf = spr.cstat.xflip == 1;
   const yf = spr.cstat.yflip == 1;
   const ztop = spr.cstat.type == FLOOR_SPRITE ? 0 : hh + yo;

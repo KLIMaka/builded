@@ -104,7 +104,7 @@ export function updateSprite(ctx: RenderablesCacheContext, sprId: number, builde
   builder = builder == null ? ctx.factory.solid('sprite') : builder;
   const board = ctx.board();
   const spr = board.sprites[sprId];
-  if (spr.picnum == 0 || spr.cstat.invisible) return builder;
+  if (spr.picnum == 0 || spr.cstat.invisible || spr.sectnum == -1) return builder;
 
   const sinfo = spriteInfo(board, sprId, ctx.art);
   const sec = board.sectors[spr.sectnum];

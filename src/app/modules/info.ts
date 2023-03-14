@@ -61,6 +61,9 @@ function createSprite(artRenderer: ArtRenderer): [HTMLElement, (id: number, spri
   const [hitag, hitagUpdater] = createRow("Hi-Tag");
   const [clipdist, clipdistUpdater] = createRow("Clip Dist");
   const [angle, angleUpdater] = createRow("Angle");
+  const [realCenter, realCenterUpdater] = createRow("Real Center");
+  const [xflip, xflipUpdater] = createRow("X Flip");
+  const [yflip, yflipUpdater] = createRow("Y Flip");
 
   table.appendChild(id);
   table.appendChild(pos);
@@ -73,6 +76,9 @@ function createSprite(artRenderer: ArtRenderer): [HTMLElement, (id: number, spri
   table.appendChild(hitag);
   table.appendChild(clipdist);
   table.appendChild(angle);
+  table.appendChild(realCenter);
+  table.appendChild(xflip);
+  table.appendChild(yflip);
   pic.appendChild(artRenderer.canvas);
   return [root,
     (id: number, s: Sprite) => {
@@ -87,6 +93,9 @@ function createSprite(artRenderer: ArtRenderer): [HTMLElement, (id: number, spri
       hitagUpdater(s.hitag);
       clipdistUpdater(s.clipdist);
       angleUpdater(s.ang);
+      realCenterUpdater(s.cstat.realCenter);
+      xflipUpdater(s.cstat.xflip);
+      yflipUpdater(s.cstat.yflip);
       artRenderer.renderer(s.picnum, s.pal);
     }];
 }

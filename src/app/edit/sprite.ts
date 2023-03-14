@@ -49,7 +49,7 @@ export class SpriteEnt extends MessageHandlerReflective {
     const bottom = ent != null && ent.type != EntityType.CEILING;
     const x = this.ctx.gridController.snap(nx);
     const y = this.ctx.gridController.snap(ny);
-    const z = this.ctx.gridController.snap((nz + this.zoff(board, bottom)) / ZSCALE) * ZSCALE;
+    const z = nz + this.zoff(board, bottom);
     if (moveSpriteX(board, this.spriteId, x, y, z, this.ctx.gridController)) {
       this.ctx.bus.handle(new BoardInvalidate(new Entity(this.spriteId, EntityType.SPRITE)));
     }

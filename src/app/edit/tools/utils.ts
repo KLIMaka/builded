@@ -1,4 +1,5 @@
 import { connectedWalls } from "build/board/loops";
+import { spriteInfo } from "build/sprites";
 import { vec3 } from "gl-matrix";
 import { EngineApi } from "../../../build/board/mutations/api";
 import { addSprite } from "../../../build/board/mutations/internal";
@@ -161,11 +162,13 @@ class Utils extends DefaultTool {
         const sectorId = ent.isSector() ? ent.id : ent.isSprite() ? board.sprites[ent.id].sectnum : -1;
         const sprite = this.api.newSprite();
         sprite.x = int(x);
-        sprite.y = int(y)
+        sprite.y = int(y);
         sprite.z = int(z);
         sprite.sectnum = sectorId;
         sprite.picnum = picnum;
-        addSprite(board, sprite);
+        const spriteId = addSprite(board, sprite);
+        const info = spriteInfo(board, spriteId, this.art);
+        sprite.z -= (ent.type == EntityType.CEILING ? info.ztop : info.zbottom) * ZSCALE;
       }
       this.commit(`Insert Sprite`);
       this.invalidateAll();

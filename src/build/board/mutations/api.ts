@@ -1,21 +1,26 @@
 import { Board, Sector, Sprite, Wall } from "../structs";
 
-export type BoardCloner = (board: Board) => Board;
-export type WallCloner = (wall: Wall) => Wall;
-export type SpriteCloner = (sprite: Sprite) => Sprite;
-export type SectorCloner = (sector: Sector) => Sector;
-export type WallCreator = () => Wall;
-export type SpriteCreator = () => Sprite;
-export type SectorCreator = () => Sector;
-export type BoardCreator = () => Board;
+export type BoardCloner<T extends Board> = (board: T) => T;
+export type WallCloner<T extends Wall> = (wall: T) => T;
+export type SpriteCloner<T extends Sprite> = (sprite: T) => T;
+export type SectorCloner<T extends Sector> = (sector: T) => T;
+export type WallCreator<T extends Wall> = () => T;
+export type SpriteCreator<T extends Sprite> = () => T;
+export type SectorCreator<T extends Sector> = () => T;
+export type BoardCreator<T extends Board> = () => T;
 
-export type EngineApi = {
-  readonly cloneBoard: BoardCloner,
-  readonly cloneWall: WallCloner,
-  readonly cloneSprite: SpriteCloner,
-  readonly cloneSector: SectorCloner,
-  readonly newWall: WallCreator,
-  readonly newSector: SectorCreator,
-  readonly newSprite: SpriteCreator,
-  readonly newBoard: BoardCreator,
+export type BoardWall<B extends Board> = B['walls'][number];
+export type BoardSector<B extends Board> = B['sectors'][number];
+export type BoardSprite<B extends Board> = B['sprites'][number];
+
+export type EngineApi<B extends Board> = {
+  readonly cloneBoard: BoardCloner<B>,
+  readonly cloneWall: WallCloner<BoardWall<B>>,
+  readonly cloneSprite: SpriteCloner<BoardSprite<B>>,
+  readonly cloneSector: SectorCloner<BoardSector<B>>,
+  readonly newWall: WallCreator<BoardWall<B>>,
+  readonly newSector: SectorCreator<BoardSector<B>>,
+  readonly newSprite: SpriteCreator<BoardSprite<B>>,
+  readonly newBoard: BoardCreator<B>,
 }
+

@@ -189,9 +189,6 @@ export class BloodSprite extends Sprite {
   public extraData: SpriteExtra;
 }
 
-export class BloodBoard extends Board {
-  declare public sectors: BloodSector[];
-  declare public walls: BloodWall[];
-  declare public sprites: BloodSprite[];
+export class BloodBoard extends Board<BloodWall, BloodSector, BloodSprite> {
   public visibility: number;
 }

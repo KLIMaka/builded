@@ -8,7 +8,7 @@ import { connectedWalls, loopWalls } from "../loops";
 import { walllen, sectorOfWall, lastwall, isValidWallId, nextwall, isTJunction } from "../query";
 import { Board, Wall } from "../structs";
 import { DEFAULT_REPEAT_RATE, moveWalls } from "./internal";
-import { EngineApi } from "./api";
+import { BoardWall, EngineApi, WallCloner } from "./api";
 import { track } from "../../../app/apis/referencetracker";
 
 export function fixxrepeat(board: Board, wallId: number, reprate: number = DEFAULT_REPEAT_RATE) {
@@ -37,7 +37,7 @@ function insertWall(board: Board, wallId: number, x: number, y: number, art: Art
   fixxrepeat(board, wallId + 1, lenperrep);
 }
 
-export function splitWall(board: Board, wallId: number, x: number, y: number, art: ArtInfoProvider, refs: BuildReferenceTracker, cloneWall: (w: Wall) => Wall): number {
+export function splitWall<B extends Board>(board: B, wallId: number, x: number, y: number, art: ArtInfoProvider, refs: BuildReferenceTracker, cloneWall: WallCloner<BoardWall<B>>): number {
   if (!isValidWallId(board, wallId)) throw new Error('Invalid wall: ' + wallId);
   const wall = board.walls[wallId];
   insertWall(board, wallId, x, y, art, refs, cloneWall);
@@ -70,7 +70,7 @@ export function moveWall(board: Board, wallId: number, x: number, y: number): bo
 
 
 const _wallNormal = vec3.create();
-export function pushWall(board: Board, wallId: number, len: number, art: ArtInfoProvider, alwaysNewPoints = false, refs: BuildReferenceTracker, api: EngineApi) {
+export function pushWall<B extends Board>(board: B, wallId: number, len: number, art: ArtInfoProvider, alwaysNewPoints = false, refs: BuildReferenceTracker, api: EngineApi<B>) {
   if (len == 0) return wallId;
   let w1 = wallId;
   const wall1 = board.walls[w1];

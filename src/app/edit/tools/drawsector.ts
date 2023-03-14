@@ -131,7 +131,7 @@ export async function DrawSectorModule(module: Module) {
   }));
 }
 
-export class DrawSector extends DefaultTool {
+export class DrawSector<B extends Board> extends DefaultTool {
   private points = new Deck<[number, number]>();
   private pointer = vec3.create();
   private isRect = true;
@@ -140,7 +140,7 @@ export class DrawSector extends DefaultTool {
   constructor(
     factory: BuildersFactory,
     art: ArtProvider,
-    private api: EngineApi,
+    private api: EngineApi<B>,
     private view: View,
     private board: BoardProvider,
     private refs: BuildReferenceTracker,

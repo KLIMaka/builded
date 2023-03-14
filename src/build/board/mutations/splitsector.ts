@@ -6,12 +6,12 @@ import { clockwise, inPolygon } from '../../utils';
 import { loopPoints, loopStart, loopWalls, wallsBetween } from '../loops';
 import { SectorBuilder } from './sectorbuilder';
 import { wallInSector } from '../query';
-import { EngineApi, WallCloner } from './api';
+import { BoardWall, EngineApi, WallCloner } from './api';
 import { addSector } from './internal';
 
 type point2d = [number, number];
 
-function* createNewWalls(points: Iterable<[number, number]>, matchWalls: [number, number][], commonWall: Wall, board: Board, cloneWall: WallCloner): Generator<Wall> {
+function* createNewWalls<B extends Board>(points: Iterable<[number, number]>, matchWalls: [number, number][], commonWall: BoardWall<B>, board: B, cloneWall: WallCloner<BoardWall<B>>): Generator<Wall> {
   for (const [p, i] of enumerate(points)) {
     const matchWall = matchWalls[i];
     const baseWall = matchWall == null ? commonWall : board.walls[matchWall[1]];
@@ -44,7 +44,7 @@ function checkSplitSector(board: Board, sectorId: number, points: Collection<poi
   return [firstWall, lastWall, start];
 }
 
-function splitSectorImpl(board: Board, sectorId: number, firstWall: number, lastWall: number, start: number, points: Collection<point2d>, refs: BuildReferenceTracker, api: EngineApi) {
+function splitSectorImpl<B extends Board>(board: B, sectorId: number, firstWall: number, lastWall: number, start: number, points: Collection<point2d>, refs: BuildReferenceTracker, api: EngineApi<B>) {
   const WALL_MAPPER = (w: number) => board.walls[w];
   const refWall = board.walls[firstWall];
   const lengthWoLast = points.length() - 1;
@@ -75,19 +75,19 @@ function splitSectorImpl(board: Board, sectorId: number, firstWall: number, last
 }
 
 const POINT_MAPPER = (w: Wall) => <point2d>[w.x, w.y];
-function getSplitLoop(board: Board, firstWall: number, lastWall: number, points: Iterable<point2d>, cloneWall: WallCloner): [Iterable<point2d>, Iterable<Wall>, Iterable<point2d>] {
+function getSplitLoop<B extends Board>(board: B, firstWall: number, lastWall: number, points: Iterable<point2d>, cloneWall: WallCloner<BoardWall<B>>): [Iterable<point2d>, Iterable<Wall>, Iterable<point2d>] {
   const newWalls = iter(points).butLast().collect();
   const existedWalls = [...iter(wallsBetween(board, lastWall, firstWall)).map(w => cloneWall(board.walls[w]))];
   const loopPoly = iter(map(existedWalls, POINT_MAPPER)).chain(newWalls).collect();
   return [newWalls, existedWalls, loopPoly];
 }
 
-function checkPointsOrder(board: Board, firstWall: number, lastWall: number, points: Collection<point2d>, cloneWall: WallCloner): boolean {
+function checkPointsOrder<B extends Board>(board: B, firstWall: number, lastWall: number, points: Collection<point2d>, cloneWall: WallCloner<BoardWall<B>>): boolean {
   const [, , loop] = getSplitLoop(board, firstWall, lastWall, points, cloneWall);
   return clockwise(loop);
 }
 
-export function splitSector(board: Board, sectorId: number, points: Collection<point2d>, refs: BuildReferenceTracker, api: EngineApi) {
+export function splitSector<B extends Board>(board: B, sectorId: number, points: Collection<point2d>, refs: BuildReferenceTracker, api: EngineApi<B>) {
   const [firstWall, lastWall, loop] = checkSplitSector(board, sectorId, points);
   if (checkPointsOrder(board, firstWall, lastWall, points, api.cloneWall))
     return splitSectorImpl(board, sectorId, firstWall, lastWall, loop, points, refs, api);

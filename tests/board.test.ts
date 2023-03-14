@@ -1,6 +1,6 @@
 import { BuildReferenceTrackerImpl } from '../src/app/modules/default/reftracker';
 import * as BLOOD from '../src/build/blood/maploader';
-import { BloodBoard } from '../src/build/blood/structs';
+import { BloodBoard, BloodSector, BloodSprite, BloodWall } from '../src/build/blood/structs';
 import { canonicalWall, innerSectors, innerSectorsOfLoop, innerWalls, isOuterLoop, loopPoints, loopStart, loopWalls, sectorWalls, wallsBetween } from '../src/build/board/loops';
 import { EngineApi } from '../src/build/board/mutations/api';
 import { createNewSector } from "../src/build/board/mutations/ceatesector";
@@ -16,14 +16,16 @@ import { clockwise, inPolygon } from '../src/build/utils';
 import { map, wrap } from '../src/utils/collections';
 import { iter } from '../src/utils/iter';
 import { Stream } from '../src/utils/stream';
+import { Board, Sector, Sprite, Wall } from '../src/build/board/structs';
 
 const REFS = new BuildReferenceTrackerImpl();
+const NULL_IMG = new Uint8Array();
 const ART: ArtInfoProvider = {
   getInfo(picnum: number): ArtInfo {
-    return { w: 64, h: 64, attrs: new Attributes(), img: null };
+    return { w: 64, h: 64, attrs: new Attributes(), img: NULL_IMG };
   }
 }
-const BLOOD_API: EngineApi = {
+const BLOOD_API: EngineApi<BloodBoard> = {
   newBoard: BLOOD.newBoard,
   cloneBoard: BLOOD.cloneBoard,
   cloneSector: BLOOD.cloneSector,
@@ -34,7 +36,7 @@ const BLOOD_API: EngineApi = {
   newWall: BLOOD.newWall
 };
 
-const BUILD_API: EngineApi = {
+const BUILD_API: EngineApi<Board> = {
   newBoard: BUILD.newBoard,
   cloneBoard: BUILD.cloneBoard,
   cloneSector: BUILD.cloneSector,
@@ -48,7 +50,7 @@ const BUILD_API: EngineApi = {
 
 function xy(x: number, y: number): [number, number] { return [x, y] }
 
-function createBoardWSector(api: EngineApi) {
+function createBoardWSector<T extends Board>(api: EngineApi<T>): T {
   const board = api.newBoard();
   createNewSector(board, wrap([[0, 0], [1024, 0], [1024, 1024], [0, 1024]]), REFS, api);
   return board;
@@ -118,8 +120,7 @@ test('deleteWall2', () => {
 })
 
 test('splitWall', () => {
-  const board = createBoardWSector(BUILD_API);
-
+  const board = createBoardWSector(BLOOD_API);
   const wallRefs = REFS.walls.start();
   const wall1 = wallRefs.ref(1);
   splitWall(board, 0, 512, 0, ART, REFS, BLOOD_API.cloneWall);

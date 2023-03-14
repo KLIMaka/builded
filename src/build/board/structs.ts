@@ -190,7 +190,7 @@ export class Sprite {
   public extra: number;
 }
 
-export class Board {
+export class Board<W extends Wall = Wall, S extends Sector = Sector, SPR extends Sprite = Sprite> {
   public version: number;
   public posx: number;
   public posy: number;
@@ -198,11 +198,11 @@ export class Board {
   public ang: number;
   public cursectnum: number;
   public numsectors: number;
-  public sectors: Sector[];
+  public sectors: S[];
   public numwalls: number;
-  public walls: Wall[];
+  public walls: W[];
   public numsprites: number;
-  public sprites: Sprite[];
+  public sprites: SPR[];
 }
 
 

@@ -77,7 +77,7 @@ export class PushWall extends DefaultTool {
     switch (msg.name) {
       case 'push_wall': this.movingHandle.isActive() ? this.stop() : this.start(false); return;
       case 'push_wall_copy': this.movingHandle.isActive() ? this.stop() : this.start(true); return;
-      case 'push_wall_stop': this.abort(); return;
+      case 'push_wall_stop': this.movingHandle.isActive() ? this.abort() : null; return;
     }
   }
 

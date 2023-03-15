@@ -1,7 +1,7 @@
 import { vec2, vec3 } from "gl-matrix";
 import { loopStart, sectorWalls } from "../../../build/board/loops";
 import { EngineApi } from "../../../build/board/mutations/api";
-import { sectorOfWall } from "../../../build/board/query";
+import { sectorOfWall, wallInSector } from "../../../build/board/query";
 import { createSlopeCalculator, rayIntersect, wallNormal, ZSCALE } from "../../../build/utils";
 import { takeFirst } from "../../../utils/collections";
 import { create, lifecycle, Module, plugin } from "../../../utils/injector";
@@ -50,17 +50,17 @@ export class SplitWall extends DefaultTool {
     for (const w of sectorWalls(board, sectorId)) {
       if (w == wallId) continue;
       const wall = board.walls[w];
-      if (wall.point2 == wallId) continue;
       const wall2 = board.walls[wall.point2];
       const dx = wall.x - sx;
       const dy = wall.y - sy;
-      if (cross2d(nx, ny, dx, dy) == 0 && dot2d(nx, ny, dx, dy) > 0) {
-        inters.push({ x: wall.x, y: wall.y, w, t: len2d(dx, dy) });
+      const t = len2d(dx, dy);
+      if (t > 0 && cross2d(nx, ny, dx, dy) == 0 && dot2d(nx, ny, dx, dy) > 0) {
+        inters.push({ x: wall.x, y: wall.y, w, t });
       } else {
         const inter = rayIntersect(sx, sy, 0, nx, ny, 0, wall.x, wall.y, wall2.x, wall2.y);
         if (inter != null) {
           const [x, y, , t] = inter;
-          inters.push({ x: int(x), y: int(y), t, w });
+          if (t > 0) inters.push({ x: int(x), y: int(y), t, w });
         }
       }
     }
@@ -69,12 +69,13 @@ export class SplitWall extends DefaultTool {
     const closest = takeFirst(inters);
     if (closest == null) return false;
     if (loopStart(board, closest.w) != loopStart(board, wallId)) return false;
-
     const [ex, ey] = [closest.x, closest.y];
+    const startWall = wallInSector(board, sectorId, sx, sy);
+    const endWall = wallInSector(board, sectorId, ex, ey);
+    if (startWall != -1 && endWall != -1 && (board.walls[startWall].point2 == endWall || board.walls[endWall].point2 == startWall)) return false;
 
     const slope = createSlopeCalculator(board, sectorId);
     const sector = board.sectors[sectorId];
-
     const z1 = (slope(sx, sy, sector.floorheinum) + sector.floorz) / ZSCALE;
     const z2 = (slope(ex, ey, sector.floorheinum) + sector.floorz) / ZSCALE;
     const z3 = (slope(ex, ey, sector.ceilingheinum) + sector.ceilingz) / ZSCALE;

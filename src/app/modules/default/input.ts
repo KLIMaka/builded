@@ -33,6 +33,7 @@ export function InputModule(module: Module) {
     gl.canvas.addEventListener('wheel', wheel);
     document.addEventListener('keyup', keyup);
     document.addEventListener('keydown', keydown);
+    document.addEventListener('wheel', e => { if (e.ctrlKey) e.preventDefault(); return false; }, { passive: false });
     window.addEventListener('blur', () => consumer.reset(state));
 
     const queue = new Deck<Key>();

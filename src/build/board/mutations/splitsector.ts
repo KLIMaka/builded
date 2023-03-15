@@ -112,6 +112,7 @@ export function splitSectorFromPoint<B extends Board>(board: B, wallId: number, 
   for (const w of sectorWalls(board, sectorId)) {
     if (w == wallId) continue;
     const wall = board.walls[w];
+    if (wall.point2 == wallId) continue;
     const wall2 = board.walls[wall.point2];
     const dx = wall.x - px;
     const dy = wall.y - py;

@@ -38,6 +38,7 @@ import { BUFFER_FACTORY, DefaultBufferFactory } from './gl/buffers';
 import { BuildGlConstructor, BUILD_GL } from './gl/buildgl';
 import { InfoModule } from './info';
 import { SwappableViewModule } from './view/view';
+import { SplitWallModule } from "../edit/tools/splitwall";
 
 function mapBackupService(module: Module) {
   module.bind(plugin('MapBackupService'), lifecycle(async (injector, lifecycle) => {
@@ -96,6 +97,7 @@ export function DefaultSetupModule(module: Module) {
   module.install(DrawSectorModule);
   module.install(DrawWallModule);
   module.install(PushWallModule);
+  module.install(SplitWallModule);
   module.install(RenderablesCacheModule);
   module.install(TransformModule);
   module.install(SelectionModule);

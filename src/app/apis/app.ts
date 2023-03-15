@@ -1,6 +1,6 @@
 import { mat2d, mat4 } from "gl-matrix";
 import { EngineApi } from "../../build/board/mutations/api";
-import { Board, Sprite } from "../../build/board/structs";
+import { Board } from "../../build/board/structs";
 import { ArtInfoProvider } from "../../build/formats/art";
 import { Hitscan, Ray, Target } from "../../build/hitscan";
 import { MoveStruct } from "../../build/utils";
@@ -137,4 +137,4 @@ export interface Scheduler {
   removeHandler(handler: ScheddulerHandler): void;
   currentTasks(): Iterable<TaskHandle>;
 }
-export const SCHEDULER = new Dependency<Scheduler>('Scheduler');
+export const SCHEDULER = new Dependency<Scheduler>('Scheduler'); 

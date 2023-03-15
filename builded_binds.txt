@@ -58,9 +58,9 @@ view3d | INSERT             | split_wall
 view3d | SPACE              | draw
 view3d | SHIFT+SPACE        | draw_rect
 view3d | BACKSPACE          | undo_draw
-view3d | [                  | grid+
-view3d | ]                  | grid-
-view3d | Q                  | adapt_grid
+view3d | CTRL+wheelUp       | grid+
+view3d | CTRL+wheelDown     | grid-
+view3d | CTRL+mouse1        | adapt_grid
 view3d | J                  | join_sectors
 view3d | CTRL+Z             | undo
 view3d | CTRL+Y             | redo
@@ -87,7 +87,7 @@ view3d | F9                 | add_mount
 view3d | CTRL+C             | center
 view3d | .                  | align_texture
 view3d | F5                 | test
-view3d | CTRL+INSERT        | split_sector_point
+view3d | CTRL+INSERT        | split_wall_line
 
 view3d | +W                 | forward
 view3d | +S                 | backward

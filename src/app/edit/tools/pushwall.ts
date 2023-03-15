@@ -13,11 +13,11 @@ import { MovingHandle } from "../handle";
 import { Commit, Frame, INVALIDATE_ALL, NamedMessage, Render } from "../messages";
 import { DefaultTool, TOOLS_BUS } from "./toolsbus";
 
-const wallNormal_ = vec3.create();
-const wallNormal1_ = vec3.create();
-const target_ = vec3.create();
-const start_ = vec3.create();
-const dir_ = vec3.create();
+const wnTmp = vec3.create();
+const wn1Tmap = vec3.create();
+const targetTmp = vec3.create();
+const startTmp = vec3.create();
+const dirTmp = vec3.create();
 
 export async function PushWallModule(module: Module) {
   module.bind(plugin('PushWall'), lifecycle(async (injector, lifecycle) => {
@@ -50,7 +50,7 @@ export class PushWall extends DefaultTool {
     const target = this.view.snapTarget();
     if (target.entity == null || !target.entity.isWall()) return;
     this.wallId = target.entity.id;
-    this.movingHandle.start(build2gl(target_, target.coords));
+    this.movingHandle.start(build2gl(targetTmp, target.coords));
   }
 
   private abort() {
@@ -69,7 +69,7 @@ export class PushWall extends DefaultTool {
   private getDistance(): number {
     const dx = this.movingHandle.dx;
     const dy = this.movingHandle.dy;
-    const [nx, , ny] = wallNormal(wallNormal1_, this.board(), this.wallId);
+    const [nx, , ny] = wallNormal(wn1Tmap, this.board(), this.wallId);
     return this.grid.snap(dot2d(nx, ny, dx, dy));
   }
 
@@ -84,7 +84,7 @@ export class PushWall extends DefaultTool {
   public Frame(msg: Frame) {
     if (this.movingHandle.isActive()) {
       const { start, dir } = this.view.dir();
-      this.movingHandle.update(false, false, build2gl(start_, start), build2gl(dir_, dir));
+      this.movingHandle.update(false, false, build2gl(startTmp, start), build2gl(dirTmp, dir));
     }
   }
 
@@ -96,7 +96,7 @@ export class PushWall extends DefaultTool {
 
   private updateWireframe() {
     const board = this.board();
-    const normal = wallNormal(wallNormal_, board, this.wallId);
+    const normal = wallNormal(wnTmp, board, this.wallId);
     const [nx, , ny] = vec3.scale(normal, normal, this.getDistance());
     const wall = board.walls[this.wallId];
     const wall2 = board.walls[wall.point2];

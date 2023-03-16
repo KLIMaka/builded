@@ -1,4 +1,6 @@
+import exp from "constants";
 import { Deck, IndexedDeck, first, last, map, reduce, sub, wrap, reversed, enumerate, range, cyclicRange, cyclicPairs, rect, all, take, isEmpty, flatten } from "../src/utils/collections";
+import { SortedHeap } from "../src/utils/list";
 
 
 test('Deck', () => {
@@ -105,3 +107,17 @@ test('Utils', () => {
   expect(() => [...rect(-2, 2)]).toThrow();
   expect([...flatten([[1, 2, 3], [4], [], [5, [6, 7]]])]).toStrictEqual([1, 2, 3, 4, 5, [6, 7]]);
 });
+
+test('SortedHeap', () => {
+  const heap = new SortedHeap<string>();
+  heap.add('nil', Number.MAX_VALUE);
+  expect([...heap.get()]).toStrictEqual(['nil']);
+  heap.add('first', 10);
+  expect([...heap.get()]).toStrictEqual(['first', 'nil']);
+  heap.add('second', 100);
+  expect([...heap.get()]).toStrictEqual(['first', 'second', 'nil']);
+  heap.add('third', -10);
+  expect([...heap.get()]).toStrictEqual(['third', 'first', 'second', 'nil']);
+  heap.add('fourth', 15);
+  expect([...heap.get()]).toStrictEqual(['third', 'first', 'fourth', 'second', 'nil']);
+})

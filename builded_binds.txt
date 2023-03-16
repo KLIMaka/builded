@@ -86,8 +86,12 @@ view3d | F11                | toggle_draw_portals
 view3d | F9                 | add_mount
 view3d | CTRL+C             | center
 view3d | .                  | align_texture
-view3d | F5                 | test
 view3d | CTRL+INSERT        | split_wall_line
+view3d | F5                 | select_wall
+view3d | F6                 | select_wall_point
+view3d | F7                 | select_sector
+view3d | F8                 | select_sprite
+
 
 view3d | +W                 | forward
 view3d | +S                 | backward

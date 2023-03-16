@@ -5,7 +5,7 @@ import { build2gl, createSlopeCalculator, wallNormal, ZSCALE } from "../../../bu
 import { vec3 } from "gl-matrix";
 import { create, lifecycle, Module, plugin } from "../../../utils/injector";
 import { dot2d, int } from "../../../utils/mathutils";
-import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, GRID, GridController, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
+import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, GRID, GridController, REFERENCE_TRACKER, SnapType, View, VIEW } from "../../apis/app";
 import { BUS, busDisconnector, MessageBus } from "../../apis/handler";
 import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
 import { LineBuilder } from "../../modules/gl/buffers";
@@ -47,7 +47,7 @@ export class PushWall extends DefaultTool {
   private start(copy: boolean) {
     this.activate();
     this.copy = copy;
-    const target = this.view.snapTarget();
+    const target = this.view.snapTarget(SnapType.WALL);
     if (target.entity == null || !target.entity.isWall()) return;
     this.wallId = target.entity.id;
     this.movingHandle.start(build2gl(targetTmp, target.coords));

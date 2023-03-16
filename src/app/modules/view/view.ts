@@ -1,6 +1,6 @@
 import { Entity, Hitscan, Target } from "../../../build/hitscan";
 import { create, Dependency, getInstances, lifecycle, Module, Plugin } from "../../../utils/injector";
-import { GRID, GridController, STATE, View, VIEW } from "../../apis/app";
+import { GRID, GridController, SnapType, STATE, View, VIEW } from "../../apis/app";
 import { BUS, busDisconnector, Message, MessageHandler } from "../../apis/handler";
 import { Renderable } from "../../apis/renderable";
 import { LoadBoard, NamedMessage } from "../../edit/messages";
@@ -59,7 +59,8 @@ export class SwappableView implements View, MessageHandler {
   get z() { return this.view.z }
 
   target() { return this.view.target() }
-  snapTarget() { return this.view.snapTarget() }
+  targets() { return this.view.targets() }
+  snapTarget(type: SnapType) { return this.view.snapTarget(type) }
   dir() { return this.view.dir() }
   drawTools(renderables: Iterable<Renderable>) { this.view.drawTools(renderables) }
   hitscan(hit: Hitscan): Hitscan { return this.view.hitscan(hit) }

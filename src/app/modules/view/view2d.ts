@@ -1,4 +1,4 @@
-import { closestSpriteInSector, closestWallPoint, closestWallSegment } from "../../../build/board/distances";
+import { closestSpriteInSector, closestSpriteInSectorDist, closestWallPoint, closestWallPointDist, closestWallSegment, closestWallSegmentDist } from "../../../build/board/distances";
 import { findSector, inSector, snapWall } from "../../../build/board/query";
 import { Board } from "../../../build/board/structs";
 import { Entity, EntityType, Hitscan, hitscan, Ray, Target } from "../../../build/hitscan";
@@ -10,7 +10,7 @@ import { getInstances, lifecycle } from "../../../utils/injector";
 import { NumberInterpolator } from "../../../utils/interpolator";
 import { int, len2d } from "../../../utils/mathutils";
 import { DelayedValue } from "../../../utils/timed";
-import { ART, ArtProvider, BOARD, BoardProvider, BoardUtils, BOARD_UTILS, GRID, GridController, STATE, State, View } from "../../apis/app";
+import { ART, ArtProvider, BOARD, BoardProvider, BoardUtils, BOARD_UTILS, GRID, GridController, SnapType, STATE, State, View } from "../../apis/app";
 import { Message, MessageHandlerReflective } from "../../apis/handler";
 import { Renderable } from "../../apis/renderable";
 import { BoardInvalidate, LoadBoard, Mouse } from "../../edit/messages";
@@ -33,7 +33,7 @@ export class View2d extends MessageHandlerReflective implements View {
   private control = new Controller2D();
   private pointer = vec3.create();
   private hit = new CachedValue((h: Hitscan) => this.updateHitscan(h), new Hitscan());
-  private snapTargetValue = new CachedValue((t: TargetImpl) => this.updateSnapTarget(t), new TargetImpl());
+  private snapTargetValue = new TargetImpl();
   private direction = new CachedValue((r: Ray) => this.updateDir(r), new Ray());
   private upp = new DelayedValue(100, 1, NumberInterpolator);
 
@@ -59,8 +59,9 @@ export class View2d extends MessageHandlerReflective implements View {
   getTransformMatrix() { return this.control.getTransformMatrix() }
   getPosition() { return this.pointer }
   drawTools(renderables: Iterable<Renderable>) { this.renderer.drawTools(renderables) }
-  target(): Target { return this.hit.get() }
-  snapTarget(): Target { return this.snapTargetValue.get() }
+  target(): Target { return this.hit.get().target() }
+  targets(): Iterable<Target> { return this.hit.get().targets() }
+  snapTarget(type: SnapType): Target { return this.getSnapTarget(type) }
   dir(): Ray { return this.direction.get() }
   isWireframe() { return true }
   getViewPosition() { return this.position }
@@ -101,7 +102,6 @@ export class View2d extends MessageHandlerReflective implements View {
 
 
   private invalidateTarget() {
-    this.snapTargetValue.invalidate();
     this.direction.invalidate();
     this.hit.invalidate();
   }
@@ -139,29 +139,64 @@ export class View2d extends MessageHandlerReflective implements View {
     return target;
   }
 
-  private updateSnapTarget(target: TargetImpl) {
+  private getSnapTarget(type: SnapType) {
     const board = this.board();
-    const d = this.gridController.getGridSize() / 4;
-    const s = closestSpriteInSector(board, this.sec, this.x, this.y, d);
-    if (s != -1) {
-      const sprite = board.sprites[s];
-      return this.updateTarget(target, sprite.x, sprite.y, sprite.z, new Entity(s, EntityType.SPRITE));
-    }
-    const w = closestWallPoint(board, this.x, this.y, d);
-    if (w != -1) {
-      const wall = board.walls[w];
-      return this.updateTarget(target, wall.x, wall.y, 0, new Entity(w, EntityType.WALL_POINT));
-    }
-    const ws = closestWallSegment(board, this.x, this.y, d);
-    if (ws != -1) {
-      const [x, y] = snapWall(board, ws, this.x, this.y, this.gridController);
-      return this.updateTarget(target, x, y, 0, new Entity(ws, EntityType.MID_WALL));
-    }
     const x = this.gridController.snap(this.x);
     const y = this.gridController.snap(this.y);
-    const sectorId = findSector(board, this.x, this.y, this.sec);
-    const ent = sectorId == -1 ? null : new Entity(sectorId, EntityType.FLOOR);
-    return this.updateTarget(target, x, y, 0, ent);
+
+    switch (type) {
+      case SnapType.WALL: {
+        const [wallId,] = closestWallSegmentDist(board, x, y);
+        if (wallId == -1) return this.updateTarget(this.snapTargetValue, x, y, 0, null);
+        const [sx, sy] = snapWall(board, wallId, x, y, this.gridController);
+        return this.updateTarget(this.snapTargetValue, sx, sy, 0, new Entity(wallId, EntityType.MID_WALL));
+      }
+
+      case SnapType.WALL_POINT: {
+        const [wallId,] = closestWallPointDist(board, x, y);
+        if (wallId == -1) return this.updateTarget(this.snapTargetValue, x, y, 0, null);
+        const wall = board.walls[wallId];
+        return this.updateTarget(this.snapTargetValue, wall.x, wall.y, 0, new Entity(wallId, EntityType.WALL_POINT));
+      }
+
+      case SnapType.SECTOR: {
+        const sectorId = findSector(board, this.x, this.y, this.sec);
+        const ent = sectorId == -1 ? null : new Entity(sectorId, EntityType.FLOOR);
+        return this.updateTarget(this.snapTargetValue, x, y, 0, ent);
+      }
+
+      case SnapType.SPRITE: {
+        const [spriteId,] = closestSpriteInSectorDist(board, this.sec, this.x, this.y);
+        if (spriteId != -1) {
+          const sprite = board.sprites[spriteId];
+          return this.updateTarget(this.snapTargetValue, sprite.x, sprite.y, sprite.z, new Entity(spriteId, EntityType.SPRITE))
+        }
+        return this.updateTarget(this.snapTargetValue, x, y, 0, null);
+      }
+    }
+
+
+
+    // const s = closestSpriteInSector(board, this.sec, this.x, this.y, d);
+    // if (s != -1) {
+    //   const sprite = board.sprites[s];
+    //   return this.updateTarget(target, sprite.x, sprite.y, sprite.z, new Entity(s, EntityType.SPRITE));
+    // }
+    // const w = closestWallPoint(board, this.x, this.y, d);
+    // if (w != -1) {
+    //   const wall = board.walls[w];
+    //   return this.updateTarget(target, wall.x, wall.y, 0, new Entity(w, EntityType.WALL_POINT));
+    // }
+    // const ws = closestWallSegment(board, this.x, this.y, d);
+    // if (ws != -1) {
+    //   const [x, y] = snapWall(board, ws, this.x, this.y, this.gridController);
+    //   return this.updateTarget(target, x, y, 0, new Entity(ws, EntityType.MID_WALL));
+    // }
+    // const x = this.gridController.snap(this.x);
+    // const y = this.gridController.snap(this.y);
+    // const sectorId = findSector(board, this.x, this.y, this.sec);
+    // const ent = sectorId == -1 ? null : new Entity(sectorId, EntityType.FLOOR);
+    // return this.updateTarget(target, x, y, 0, ent);
   }
 
   private updateDir(ray: Ray): Ray {

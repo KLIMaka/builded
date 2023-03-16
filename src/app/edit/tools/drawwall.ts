@@ -6,7 +6,7 @@ import { build2gl, createSlopeCalculator, wallNormal, ZSCALE } from "../../../bu
 import { vec2, vec3 } from "gl-matrix";
 import { create, getInstances, lifecycle, Module, plugin } from "../../../utils/injector";
 import { dot2d } from "../../../utils/mathutils";
-import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, GRID, GridController, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
+import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, GRID, GridController, REFERENCE_TRACKER, SnapType, View, VIEW } from "../../apis/app";
 import { BUS, busDisconnector, MessageBus } from "../../apis/handler";
 import { Renderables } from "../../apis/renderable";
 import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
@@ -228,7 +228,7 @@ export class DrawWall extends DefaultTool {
 
   private start() {
     const target = this.view.target();
-    const snapTarget = this.view.snapTarget();
+    const snapTarget = this.view.snapTarget(SnapType.WALL);
     if (snapTarget.entity == null || target == null || !snapTarget.entity.isWall() && target.entity == null || target.entity.isSector()) return;
     this.activate();
     const [x, y, z] = snapTarget.coords;
@@ -267,7 +267,7 @@ export class DrawWall extends DefaultTool {
   }
 
   private pushPortal() {
-    const target = this.view.snapTarget();
+    const target = this.view.snapTarget(SnapType.SECTOR);
     this.movingHandle.start(build2gl(vec3.create(), target.coords));
   }
 
@@ -295,7 +295,7 @@ export class DrawWall extends DefaultTool {
       const { start, dir } = this.view.dir();
       this.movingHandle.update(false, false, build2gl(this._start, start), build2gl(this._dir, dir));
     } else {
-      const target = this.view.snapTarget();
+      const target = this.view.snapTarget(SnapType.SECTOR);
       const [x, y, z] = target.coords;
       this.portal.move(x, y, z);
     }

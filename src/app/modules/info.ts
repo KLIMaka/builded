@@ -256,7 +256,7 @@ export class Info extends MessageHandlerReflective {
   }
 
   public Frame(msg: Frame) {
-    const ent = this.view.snapTarget().entity;
+    const ent = this.view.target().entity;
     const board = this.board();
     if (this.lastEnt.equals(ent)) return;
     this.lastEnt = ent == null ? NULL_ENT : ent;

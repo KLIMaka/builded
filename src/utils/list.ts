@@ -151,6 +151,7 @@ export class FastList<T> implements Iterable<T> {
   public last(idx: number): number { return this.lastIdx.get(idx) }
   public push(value: T): number { return this.insertAfter(value) }
   public first() { return this.next(0) }
+  public isEmpty() { return this.nextIdx.get(0) == 0 }
 
   public clear() {
     this.elements.clear().push(null);
@@ -187,7 +188,6 @@ function length(list: FastList<any>, from: number, to: number) {
 }
 
 function binaryIndexOf(list: FastList<number>, searchElement: number) {
-  const refMin = list.first();
   let min = list.first();
   let max = list.last(0);
   if (searchElement < list.get(min)) return 0;
@@ -204,7 +204,7 @@ function binaryIndexOf(list: FastList<number>, searchElement: number) {
     else break;
     size--;
   }
-  return current == refMin ? refMin : current;
+  return min == max ? max : current;
 }
 
 export class SortedHeap<T> {
@@ -223,4 +223,6 @@ export class SortedHeap<T> {
   }
 
   public get(): Iterable<T> { return this.values }
+  public isEmpty(): boolean { return this.values.isEmpty() }
+  public first(): T { return this.values.get(this.values.first()) }
 }

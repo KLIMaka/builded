@@ -11,8 +11,7 @@ import { BoardInvalidate, Commit, EndMove, Flip, Highlight, Move, NamedMessage, 
 import { MOVE_COPY } from "./tools/transform";
 import { spriteInfo } from "build/sprites";
 import { Board, FLOOR_SPRITE } from "build/board/structs";
-
-const HITSCAN = new Hitscan();
+import { findFirst } from "utils/collections";
 
 export class SpriteEnt extends MessageHandlerReflective {
   private moveActive = false;
@@ -42,10 +41,10 @@ export class SpriteEnt extends MessageHandlerReflective {
 
   public Move(msg: Move) {
     const board = this.ctx.board();
-    HITSCAN.filter = (t, id, type) => (id == this.spriteId && type == EntityType.SPRITE) ? false : true;
-    const hit = this.ctx.view.hitscan(HITSCAN);
+    const hit = findFirst(this.ctx.view.targets(), t => t.entity != null && !t.entity.isSprite(), null);
+    if (hit == null) return;
     const [nx, ny, nz] = hit.coords;
-    const ent = hit.ent;
+    const ent = hit.entity;
     const bottom = ent != null && ent.type != EntityType.CEILING;
     const x = this.ctx.gridController.snap(nx);
     const y = this.ctx.gridController.snap(ny);

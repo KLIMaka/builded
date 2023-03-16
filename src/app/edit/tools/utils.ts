@@ -12,7 +12,7 @@ import { EntityType } from "../../../build/hitscan";
 import { slope, vec2ang, wallNormal, ZSCALE } from "../../../build/utils";
 import { create, lifecycle, Module, plugin } from "../../../utils/injector";
 import { int, monoatan2, PI2, trz } from "../../../utils/mathutils";
-import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, GRID, GridController, LOGGER, Logger, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
+import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, GRID, GridController, LOGGER, Logger, REFERENCE_TRACKER, SnapType, View, VIEW } from "../../apis/app";
 import { BUS, busDisconnector, MessageBus } from "../../apis/handler";
 import { Commit, INVALIDATE_ALL, NamedMessage, SetPicnum } from "../messages";
 import { PicNumSelector, PICNUM_SELECTOR, Selected, SELECTED } from "./selection";
@@ -57,28 +57,12 @@ class Utils extends DefaultTool {
       case 'print_info': this.print(); return;
       case 'adapt_grid': this.adaptGrid(); return;
       case 'align_texture': this.alignTexture(); return;
-      case 'test': this.test(); return;
     }
-  }
-
-  private test() {
-    const board = this.board();
-    const target = this.view.snapTarget();
-    const ent = target.entity;
-    if (ent == null || !ent.isWall()) return;
-    const wall1 = board.walls[ent.id];
-    const wall2 = board.walls[wall1.point2];
-    const tw1x = wall1.x - this.view.x;
-    const tw1y = wall1.y - this.view.y;
-    const tw2x = wall2.x - this.view.x;
-    const tw2y = wall2.y - this.view.y;
-
-    this.logger('INFO', monoatan2(tw1y, tw1x) / PI2, monoatan2(tw2y, tw2x) / PI2);
   }
 
   private adaptGrid() {
     const board = this.board();
-    const target = this.view.snapTarget();
+    const target = this.view.snapTarget(SnapType.SECTOR);
     const ent = target.entity;
     const scale = (...xs: number[]) => Math.min.apply(null, xs.map(x => Math.pow(2, trz(x))));
     if (ent == null) {
@@ -97,7 +81,7 @@ class Utils extends DefaultTool {
 
   private alignTexture() {
     const board = this.board();
-    const target = this.view.snapTarget();
+    const target = this.view.snapTarget(SnapType.WALL);
     const ent = target.entity;
     if (ent == null || !ent.isWall()) return;
     const wallId = ent.id;
@@ -140,7 +124,7 @@ class Utils extends DefaultTool {
   }
 
   private insertSprite() {
-    const target = this.view.snapTarget();
+    const target = this.view.snapTarget(SnapType.SECTOR);
     if (target.entity == null) return;
     const [x, y, z] = target.coords;
     const ent = target.entity;
@@ -178,7 +162,7 @@ class Utils extends DefaultTool {
   }
 
   private setFirstWall() {
-    const target = this.view.snapTarget();
+    const target = this.view.snapTarget(SnapType.WALL);
     if (target.entity == null || !target.entity.isWall()) return;
     setFirstWall(this.board(), sectorOfWall(this.board(), target.entity.id), target.entity.id, this.refs);
     this.commit(`Set First Wall ${target.entity.id}`);
@@ -186,7 +170,7 @@ class Utils extends DefaultTool {
   }
 
   private fillInnerLoop() {
-    const target = this.view.snapTarget();
+    const target = this.view.snapTarget(SnapType.WALL);
     if (target.entity == null || !target.entity.isWall()) return;
     fillInnerLoop(this.board(), target.entity.id, this.refs, this.api);
     this.commit(`Fill Loop ${target.entity.id}`);
@@ -194,7 +178,7 @@ class Utils extends DefaultTool {
   }
 
   private deleteLoop() {
-    const target = this.view.snapTarget();
+    const target = this.view.snapTarget(SnapType.WALL);
     if (target.entity == null || !target.entity.isWall()) return;
     deleteLoop(this.board(), target.entity.id, this.refs);
     this.commit('Delete');
@@ -202,7 +186,7 @@ class Utils extends DefaultTool {
   }
 
   private deleteFull() {
-    const target = this.view.snapTarget();
+    const target = this.view.snapTarget(SnapType.WALL);
     if (target.entity == null) return;
     if (target.entity.isWall()) deleteLoopFull(this.board(), target.entity.id, this.refs);
     else if (target.entity.isSector()) deleteSectorFull(this.board(), target.entity.id, this.refs);
@@ -212,7 +196,7 @@ class Utils extends DefaultTool {
   }
 
   private splitWall() {
-    const target = this.view.snapTarget();
+    const target = this.view.snapTarget(SnapType.WALL);
     if (target.entity == null || !target.entity.isWall()) return;
     const [x, y] = target.coords;
     const id = target.entity.id;
@@ -224,7 +208,7 @@ class Utils extends DefaultTool {
   }
 
   private splitSectorPoint() {
-    const target = this.view.snapTarget();
+    const target = this.view.snapTarget(SnapType.WALL);
     if (target.entity == null || !target.entity.isWall()) return;
     const [x, y] = target.coords;
     const id = target.entity.id;

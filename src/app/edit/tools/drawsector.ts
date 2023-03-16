@@ -11,7 +11,7 @@ import { vec3 } from "gl-matrix";
 import { Deck, wrap } from "../../../utils/collections";
 import { create, lifecycle, Module, plugin } from "../../../utils/injector";
 import { int, len2d } from "../../../utils/mathutils";
-import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, REFERENCE_TRACKER, View, VIEW } from "../../apis/app";
+import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, REFERENCE_TRACKER, SnapType, View, VIEW } from "../../apis/app";
 import { BUS, busDisconnector, MessageBus } from "../../apis/handler";
 import { NULL_RENDERABLE, Renderable, Renderables } from "../../apis/renderable";
 import { writeText } from "../../modules/geometry/builders/common";
@@ -154,7 +154,7 @@ export class DrawSector<B extends Board> extends DefaultTool {
   private update() {
     if (this.predrawUpdate()) return;
     const z = this.contour.getZ();
-    const [x, y] = this.view.snapTarget().coords;
+    const [x, y] = this.view.snapTarget(SnapType.SECTOR).coords;
     vec3.set(this.pointer, x, y, z);
 
     if (this.isRect) {
@@ -179,7 +179,7 @@ export class DrawSector<B extends Board> extends DefaultTool {
   private predrawUpdate() {
     if (this.points.length() > 0) return false;
     const target = this.view.target();
-    const snapTarget = this.view.snapTarget();
+    const snapTarget = this.view.snapTarget(SnapType.SECTOR);
     const board = this.board();
     if (snapTarget.entity == null) {
       const [x, y] = snapTarget.coords;

@@ -33,12 +33,15 @@ export interface ArtProvider extends ArtInfoProvider {
 }
 export const ART = new Dependency<ArtProvider>('ArtProvider');
 
+export enum SnapType {
+  WALL, WALL_POINT, SECTOR, SPRITE
+}
 export interface View extends MoveStruct, MessageHandler {
   drawTools(renderables: Iterable<Renderable>): void;
+  targets(): Iterable<Target>;
   target(): Target;
-  snapTarget(): Target;
+  snapTarget(type: SnapType): Target;
   dir(): Ray;
-  hitscan(hit: Hitscan): Hitscan;
 }
 export const VIEW = new Dependency<View>('View');
 

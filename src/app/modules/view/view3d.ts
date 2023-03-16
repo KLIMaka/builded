@@ -1,6 +1,6 @@
-import { closestWallInSector, closestWallSegmentInSector } from "../../../build/board/distances";
+import { closestSpriteInSector, closestSpriteInSectorDist, closestWallInSector, closestWallInSectorDist, closestWallSegmentInSectorDist } from "../../../build/board/distances";
 import { findSector, inSector, sectorOfWall, snapWall } from "../../../build/board/query";
-import { Board } from "../../../build/board/structs";
+import { Board, Sector } from "../../../build/board/structs";
 import { Entity, EntityType, Hitscan, hitscan, Ray, Target } from "../../../build/hitscan";
 import { build2gl, getPlayerStart, gl2build, ZSCALE } from "../../../build/utils";
 import { vec3 } from "gl-matrix";
@@ -10,13 +10,14 @@ import { getInstances, lifecycle } from "../../../utils/injector";
 import { NumberInterpolator } from "../../../utils/interpolator";
 import { int } from "../../../utils/mathutils";
 import { DelayedValue } from "../../../utils/timed";
-import { ART, ArtProvider, BOARD, BoardProvider, BoardUtils, BOARD_UTILS, GRID, GridController, STATE, State, View } from "../../apis/app";
+import { ART, ArtProvider, BOARD, BoardProvider, BoardUtils, BOARD_UTILS, GRID, GridController, SnapType, STATE, State, View } from "../../apis/app";
 import { MessageHandlerReflective } from "../../apis/handler";
 import { Renderable } from "../../apis/renderable";
 import { BoardInvalidate, Frame, LoadBoard, Mouse, NamedMessage } from "../../edit/messages";
 import { BuildGl, BUILD_GL } from "../gl/buildgl";
 import { Boardrenderer3D, Renderer3D } from "./boardrenderer3d";
 import { TargetImpl, ViewPosition } from "./view";
+import { findFirst } from "utils/collections";
 
 export const View3dConstructor = lifecycle(async (injector, lifecycle) => {
   const [buildgl, board, boardUtils, state, grid, art] = await getInstances(injector, BUILD_GL, BOARD, BOARD_UTILS, STATE, GRID, ART);
@@ -38,7 +39,7 @@ export class View3d extends MessageHandlerReflective implements View {
   private mouseX = 0;
   private mouseY = 0;
   private hit = new CachedValue((h: Hitscan) => this.updateHitscan(h), new Hitscan());
-  private snapTargetValue = new CachedValue((t: TargetImpl) => this.updateSnapTarget(t), new TargetImpl());
+  private snapTargetValue = new TargetImpl();
   private direction = new CachedValue((r: Ray) => this.updateDir(r), new Ray());
   private cursor = vec3.create();
   private forwardDamper = new DelayedValue(100, 0, NumberInterpolator);
@@ -71,8 +72,9 @@ export class View3d extends MessageHandlerReflective implements View {
   getPosition() { return this.control.getPosition() }
   getForward() { return this.control.getForward() }
   drawTools(renderables: Iterable<Renderable>) { this.renderer.drawTools(renderables) }
-  target(): Target { return this.hit.get() }
-  snapTarget(): Target { return this.snapTargetValue.get() }
+  target(): Target { return this.hit.get().target() }
+  targets(): Iterable<Target> { return this.hit.get().targets() }
+  snapTarget(type: SnapType): Target { return this.getSnapTarget(type) }
   dir(): Ray { return this.direction.get() }
   getViewPosition() { return this.position }
 
@@ -89,7 +91,7 @@ export class View3d extends MessageHandlerReflective implements View {
 
   Frame(msg: Frame) {
     this.invalidateTarget();
-    build2gl(this.cursor, this.snapTarget().coords);
+    build2gl(this.cursor, this.snapTarget(SnapType.SECTOR).coords);
     this.aspect = this.buildgl.gl.drawingBufferWidth / this.buildgl.gl.drawingBufferHeight;
     this.buildgl.setCursorPosiotion(this.cursor[0], this.cursor[1], this.cursor[2]);
     this.buildgl.newFrame();
@@ -140,7 +142,6 @@ export class View3d extends MessageHandlerReflective implements View {
   }
 
   private invalidateTarget() {
-    this.snapTargetValue.invalidate();
     this.direction.invalidate();
     this.hit.invalidate();
   }
@@ -210,21 +211,61 @@ export class View3d extends MessageHandlerReflective implements View {
     return t;
   }
 
-  private updateSnapTarget(t: TargetImpl): Target {
+  private getSnapTarget(type: SnapType): Target {
     const target = this.target();
-    if (target.entity == null) return this.copyTarget(target, t);
-    const d = this.gridController.getGridSize() / 8;
-    const w = this.getClosestWall(target, d);
-    if (w != -1) {
-      return this.snapWallPoint(target, w, t);
-    } else if (target.entity.isSector()) {
-      const w = closestWallSegmentInSector(this.board(), target.entity.id, target.coords[0], target.coords[1], d);
-      return w == -1 ? this.snapGrid(target, t) : this.snapWall(target.coords, target.entity.type == EntityType.FLOOR ? EntityType.LOWER_WALL : EntityType.UPPER_WALL, w, t);
-    } else if (target.entity.isSprite()) {
-      return this.snapSprite(target, t);
-    } else if (target.entity.isWall()) {
-      return this.snapWall(target.coords, target.entity.type, target.entity.id, t);
+    if (target.entity == null) return this.copyTarget(target, this.snapTargetValue);
+    const board = this.board();
+    switch (type) {
+      case SnapType.WALL: {
+        const first = findFirst(this.targets(), t => t.entity != null && !t.entity.isSprite(), null);
+        if (first == null) return this.copyTarget(target, this.snapTargetValue);
+        if (first.entity.isWall())
+          return this.snapWall(first.coords, first.entity.type, target.entity.id, this.snapTargetValue);
+        const [x, y] = first.coords;
+        const [wallId,] = closestWallSegmentInSectorDist(board, first.entity.id, x, y);
+        const wall = board.walls[wallId];
+        const type = wall.nextsector == -1
+          ? EntityType.MID_WALL
+          : first.entity.type == EntityType.FLOOR
+            ? EntityType.LOWER_WALL
+            : EntityType.UPPER_WALL;
+        return this.snapWall(first.coords, type, wallId, this.snapTargetValue);
+      }
+
+      case SnapType.WALL_POINT: {
+        const first = findFirst(this.targets(), t => t.entity != null && !t.entity.isSprite(), null);
+        if (first == null) return this.copyTarget(target, this.snapTargetValue);
+        const [x, y] = first.coords;
+        if (first.entity.isWall()) {
+          const [wallId,] = closestWallInSectorDist(board, sectorOfWall(board, first.entity.id), x, y);
+          return this.snapWallPoint(first, wallId, this.snapTargetValue);
+        }
+        const [wallId,] = closestWallInSectorDist(board, first.entity.id, x, y);
+        return this.snapWallPoint(first, wallId, this.snapTargetValue);
+      }
+
+      case SnapType.SECTOR: {
+        return this.snapGrid(target, this.snapTargetValue);
+      }
+
+      case SnapType.SPRITE: {
+        if (target.entity.isSprite()) return this.snapSprite(target, this.snapTargetValue);
+        else return this.copyTarget(target, this.snapTargetValue);
+      }
     }
+    // if (target.entity == null) return this.copyTarget(target, t);
+    // const d = this.gridController.getGridSize() / 8;
+    // const w = this.getClosestWall(target, d);
+    // if (w != -1) {
+    //   return this.snapWallPoint(target, w, t);
+    // } else if (target.entity.isSector()) {
+    //   const w = closestWallSegmentInSector(this.board(), target.entity.id, target.coords[0], target.coords[1], d);
+    //   return w == -1 ? this.snapGrid(target, t) : this.snapWall(target.coords, target.entity.type == EntityType.FLOOR ? EntityType.LOWER_WALL : EntityType.UPPER_WALL, w, t);
+    // } else if (target.entity.isSprite()) {
+    //   return this.snapSprite(target, t);
+    // } else if (target.entity.isWall()) {
+    //   return this.snapWall(target.coords, target.entity.type, target.entity.id, t);
+    // }
   }
 
   private updateDir(r: Ray): Ray {

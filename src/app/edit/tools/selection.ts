@@ -5,7 +5,7 @@ import { Entity, EntityType, Target } from "../../../build/hitscan";
 import { Deck, map } from "../../../utils/collections";
 import { create, Dependency, getInstances, instance, lifecycle, Module, plugin } from "../../../utils/injector";
 import { detuple0, detuple1 } from "../../../utils/mathutils";
-import { STATE } from "../../apis/app";
+import { SnapType, STATE } from "../../apis/app";
 import { busDisconnector, Message, MessageHandler, MessageHandlerList, NULL_MESSAGE_HANDLER } from "../../apis/handler";
 import { RenderablesCache, RENDRABLES_CACHE } from "../../modules/geometry/cache";
 import { EntityFactory, ENTITY_FACTORY } from "../context";
@@ -21,26 +21,38 @@ const LOOP_STATE = 'select_loop_mod';
 const FULL_LOOP_STATE = 'select_full_loop_mod';
 
 const list = new Deck<MessageHandler>();
-export function getFromHitscan(factory: EntityFactory): Deck<MessageHandler> {
-  const target = factory.ctx.view.target();
+export function getFromHitscan(factory: EntityFactory, snapType: SnapType): Deck<MessageHandler> {
+  const target = factory.ctx.view.snapTarget(snapType);
+  const board = factory.ctx.board();
   list.clear();
   if (target.entity == null) return list;
-  const fullLoop = factory.ctx.state.get<boolean>(FULL_LOOP_STATE)
-    ? innerWalls
-    : factory.ctx.state.get<boolean>(LOOP_STATE)
-      ? loopWalls
-      : null;
-  const board = factory.ctx.board();
   if (target.entity.type == EntityType.WALL_POINT) {
-    const w = target.entity.id;
-    list.push(fullLoop ? factory.wallSegment([...map(fullLoop(board, w), ww => new Entity(ww, EntityType.WALL_POINT))]) : factory.wall(w));
+    list.push(factory.wall(target.entity.id));
   } else if (target.entity.isWall()) {
-    wallSegment(fullLoop, factory, target.entity);
+    const w1 = nextwall(board, target.entity.id);
+    list.push(factory.wallSegment([target.entity.clone(), new Entity(w1, target.entity.type)], [target.entity.clone()]));
   } else if (target.entity.isSector()) {
-    sector(fullLoop, target, factory);
+    list.push(factory.sector(target.entity.clone()));
   } else if (target.entity.isSprite()) {
     list.push(factory.sprite(target.entity.id));
   }
+
+  // const fullLoop = factory.ctx.state.get<boolean>(FULL_LOOP_STATE)
+  //   ? innerWalls
+  //   : factory.ctx.state.get<boolean>(LOOP_STATE)
+  //     ? loopWalls
+  //     : null;
+  // const board = factory.ctx.board();
+  // if (target.entity.type == EntityType.WALL_POINT) {
+  //   const w = target.entity.id;
+  //   list.push(fullLoop ? factory.wallSegment([...map(fullLoop(board, w), ww => new Entity(ww, EntityType.WALL_POINT))]) : factory.wall(w));
+  // } else if (target.entity.isWall()) {
+  //   wallSegment(fullLoop, factory, target.entity);
+  // } else if (target.entity.isSector()) {
+  //   sector(fullLoop, target, factory);
+  // } else if (target.entity.isSprite()) {
+  //   list.push(factory.sprite(target.entity.id));
+  // }
   return list;
 }
 
@@ -85,6 +97,7 @@ export async function SelectionModule(module: Module) {
 export class Selection extends DefaultTool {
   private selection = new MessageHandlerList();
   private highlighted = new MessageHandlerList();
+  private selectionType = SnapType.WALL;
 
   constructor(
     private renderables: RenderablesCache,
@@ -96,7 +109,7 @@ export class Selection extends DefaultTool {
   }
 
   private updateSelection() {
-    const underCursor = getFromHitscan(this.factory);
+    const underCursor = getFromHitscan(this.factory, this.selectionType);
     this.highlighted.list().clear().pushAll(underCursor.clone());
   }
 
@@ -123,6 +136,10 @@ export class Selection extends DefaultTool {
     switch (msg.name) {
       case 'add_selection': this.selection.list().pushAll(this.highlighted.list().clone()); return;
       case 'clear_selection': this.selection.list().clear(); return;
+      case 'select_wall': this.selectionType = SnapType.WALL; return;
+      case 'select_wall_point': this.selectionType = SnapType.WALL_POINT; return;
+      case 'select_sector': this.selectionType = SnapType.SECTOR; return;
+      case 'select_sprite': this.selectionType = SnapType.SPRITE; return;
       default: this.handleSelected(msg);
     }
   }

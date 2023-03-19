@@ -2,11 +2,11 @@
   --bg: #303030;
   --border: #3d3d3d;
   --fg-gray: #545454;
+  --fg-highlight: #797979;
   --fg-gray-hover: #656565;
   --input-active-bg: #222222;
   --font-color: #dadada;
-  --font-shadow: #101010;
-  --box-shadow: #282828;
+  --shadow-color: #282828;
   --selected: #4772b3;
   --menu-bar-bg: #262626;
   --menu-bar-selected: #3a5986;
@@ -20,7 +20,8 @@
   --window-border-color-top: #606060;
   --window-border-color-bottom: #404040;
   --window-border: solid 1px var(--window-border-color);
-  --window-border-shadow: 0px 1px 4px var(--box-shadow);
+  --window-border-shadow: 0px 1px 4px var(--shadow-color);
+  --shadow: 0px 1px 1px var(--shadow-color);
 }
 
 .side {
@@ -58,7 +59,7 @@
 .block>li:last-child {
   border-bottom-left-radius: 3px;
   border-bottom-right-radius: 3px;
-  box-shadow: 0px 1px 0px var(--box-shadow);
+  box-shadow: var(--shadow);
 }
 
 .block>li:hover {
@@ -71,11 +72,11 @@ li.selected:hover {
 }
 
 .btn-group {
-  display: inline-block;
+  display: flex;
+  justify-content: space-around
 }
 
-.btn-group>button {
-  float: left;
+.btn {
   background-color: var(--fg-gray);
   border-bottom: solid;
   border-top: solid;
@@ -84,27 +85,29 @@ li.selected:hover {
   border-color: var(--border);
   border-width: 1px;
   list-style-type: none;
-  padding: 3px 15px;
-  box-shadow: 0px 1px 0px var(--box-shadow);
+  padding: 2px 15px;
+  box-shadow: var(--shadow);
+  width: 100%;
+  text-align: center;
 }
 
-.btn-group>button:first-child {
+.btn:first-child {
   border-bottom-left-radius: 3px;
   border-top-left-radius: 3px;
   border-left: solid 1px var(--border);
 }
 
-.btn-group>button:last-child {
+.btn:last-child {
   border-bottom-right-radius: 3px;
   border-top-right-radius: 3px;
 }
 
-.btn-group>button:hover {
+.btn:hover {
   background-color: var(--fg-gray-hover);
 }
 
-button.selected,
-button.selected:hover {
+.btn.selected,
+.btn.selected:hover {
   background-color: var(--selected);
 }
 
@@ -134,7 +137,7 @@ button.selected:hover {
   border: solid 1px var(--menu-border);
   border-bottom-left-radius: 3px;
   border-bottom-right-radius: 3px;
-  box-shadow: 0px 1px 2px var(--box-shadow);
+  box-shadow: var(--shadow);
 }
 
 .menu>li {
@@ -158,15 +161,16 @@ button.selected:hover {
 
 .title {
   text-align: center;
+  font-weight: 600;
 }
 
 .window {
-  width: 500px;
-  display: grid;
+  width: 600px;
+  display: flex;
+  flex-direction: column;
 }
 
 .window-head {
-  grid-row: 1;
   border-top-left-radius: 5px;
   border-top-right-radius: 5px;
   padding: 5px 20px;
@@ -174,29 +178,24 @@ button.selected:hover {
   border: var(--window-border);
   border-top: solid 1px var(--window-border-color-top);
   box-shadow: var(--window-border-shadow);
-  /* background: linear-gradient(0deg, var(--window-title-bg), var(--window-border-color) 20%); */
 }
 
 .window-menu {
-  grid-row: 2;
   background-color: var(--bg);
   border-left: var(--window-border);
   border-right: var(--window-border);
   border-bottom: var(--window-border);
-  box-shadow: var(--window-border-shadow), inset 0px 7px 4px -6px var(--box-shadow);
+  box-shadow: var(--window-border-shadow), inset 0px 7px 4px -6px var(--shadow-color);
 }
 
 .window-body {
-  grid-row: 3;
-  display: grid;
   background-color: var(--bg);
   border-left: var(--window-border);
   border-right: var(--window-border);
-  box-shadow: var(--window-border-shadow), inset 0px 7px 4px -6px var(--box-shadow);
+  box-shadow: var(--window-border-shadow), inset 0px 7px 4px -6px var(--shadow-color);
 }
 
 .window-footer {
-  grid-row: 4;
   border-bottom-left-radius: 5px;
   border-bottom-right-radius: 5px;
   min-height: 5px;
@@ -205,7 +204,6 @@ button.selected:hover {
   border-right: var(--window-border);
   border-bottom: var(--window-border);
   box-shadow: var(--window-border-shadow);
-  /* border-bottom: solid 1px var(--window-border-color-top); */
 }
 
 .nav-content {
@@ -224,20 +222,24 @@ button.selected:hover {
 }
 
 .props {
-  padding: 10px;
   display: grid;
-  grid-template-columns: 40% 60%;
-  gap: 5px 10px;
+  grid-template-columns: 30% 70%;
 }
 
 .prop-label {
   grid-column: 1;
   justify-self: end;
-  padding-top: 4px;
+  padding-top: 3px;
+  padding-right: 10px;
 }
 
 .prop-content {
   grid-column: 2;
+}
+
+.prop-spacer {
+  grid-column: 1 / -1;
+  height: 5px;
 }
 
 .check {
@@ -262,7 +264,7 @@ button.selected:hover {
   width: 12px;
   background-color: var(--fg-gray);
   border-radius: 2px;
-  box-shadow: 0px 1px 1px var(--box-shadow);
+  box-shadow: var(--shadow);
   border: solid 1px var(--border);
 }
 
@@ -295,23 +297,96 @@ button.selected:hover {
   border-radius: 1px;
 }
 
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.stack-center {
+  align-self: center;
+}
+
+.select {
+  background-color: var(--input-active-bg);
+  border: solid 1px var(--border);
+  border-radius: 3px;
+  box-shadow: 0px 1px 1px var(--shadow-color);
+  padding: 2px 5px;
+  position: relative;
+}
+
+.select:hover {
+  background-color: var(--bg);
+}
+
+.select:after {
+  position: absolute;
+  content: "";
+  top: 5px;
+  right: 6px;
+  width: 5px;
+  height: 5px;
+  border: solid var(--font-color);
+  border-width: 0px 2px 2px 0;
+  transform: rotate(45deg);
+  border-radius: 1px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  border-radius: 3px;
+  background-color: var(--border);
+  border: solid 1px var(--fg-gray);
+  box-shadow: var(--shadow);
+}
+
+.section-head {
+  padding: 5px 10px;
+}
+
+.section-content {
+  padding: 5px;
+}
 
 input[type=text] {
   background-color: var(--fg-gray);
   border: solid 1px var(--border);
   border-radius: 3px;
-  box-shadow: 0px 1px 1px var(--box-shadow);
+  box-shadow: var(--shadow);
   padding: 2px 5px;
+  text-align: center;
+  width: 100%;
+}
+
+input[type=text].top {
+  border-radius: 3px 3px 0px 0px;
+}
+
+input[type=text].mid {
+  border-radius: 0px;
+  border-bottom: none;
+}
+
+input[type=text].bottom {
+  border-radius: 0px 0px 3px 3px;
+  border-top: none;
+}
+
+input[type=text]:hover {
+  background-color: var(--fg-gray-hover);
 }
 
 input[type=text]:focus-visible {
   outline: none;
   background-color: var(--input-active-bg);
+  text-align: left;
 }
 
 * {
   color: var(--font-color);
-  text-shadow: 0px 1px 2px var(--font-shadow);
+  text-shadow: var(--shadow);
   font-size: 12px;
   font-family: sans-serif;
 }

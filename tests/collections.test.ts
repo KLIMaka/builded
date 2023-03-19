@@ -1,4 +1,3 @@
-import exp from "constants";
 import { Deck, IndexedDeck, first, last, map, reduce, sub, wrap, reversed, enumerate, range, cyclicRange, cyclicPairs, rect, all, take, isEmpty, flatten } from "../src/utils/collections";
 import { SortedHeap } from "../src/utils/list";
 

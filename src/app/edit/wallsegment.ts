@@ -77,7 +77,7 @@ export class WallSegmentsEnt extends MessageHandlerReflective {
     const wall = board.walls[wallEnt.id];
     if (wall.cstat.swapBottoms && wall.nextwall != -1 ||
       wall.nextwall != -1 && board.walls[wall.nextwall].cstat.swapBottoms)
-      this.ctx.bus.handle(new BoardInvalidate(new Entity(wall.nextwall, EntityType.WALL_POINT)));
+      this.ctx.bus.handle(new BoardInvalidate(Entity.wallPoint(wall.nextwall)));
   }
 
   public StartMove(msg: StartMove) {
@@ -89,8 +89,8 @@ export class WallSegmentsEnt extends MessageHandlerReflective {
     const sectorWallId = getClosestWallByIds(board, this.ctx.view.target(), map(this.highlighted, e => e.id));
     const sectorWall = board.walls[sectorWallId];
     const type = this.ctx.view.target().entity.type == EntityType.UPPER_WALL ? EntityType.CEILING : EntityType.FLOOR;
-    if (sectorWall.nextsector == -1) this.sectorEnt = new Entity(sectorOfWall(board, this.refwall), type);
-    else this.sectorEnt = new Entity(sectorWall.nextsector, type);
+    if (sectorWall.nextsector == -1) this.sectorEnt = Entity.of(sectorOfWall(board, this.refwall), type);
+    else this.sectorEnt = Entity.of(sectorWall.nextsector, type);
     this.originz = sectorZ(board, this.sectorEnt) / ZSCALE;
     this.active = true;
   }

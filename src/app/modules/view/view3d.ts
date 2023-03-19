@@ -181,7 +181,7 @@ export class View3d extends MessageHandlerReflective implements View {
     t.coords_[0] = x;
     t.coords_[1] = y;
     t.coords_[2] = this.gridController.snap(coords[2] / ZSCALE) * ZSCALE;
-    t.entity_ = new Entity(wallId, type);
+    t.entity_ = Entity.of(wallId, type);
     return t;
   }
 
@@ -190,7 +190,7 @@ export class View3d extends MessageHandlerReflective implements View {
     t.coords_[0] = wall.x;
     t.coords_[1] = wall.y;
     t.coords_[2] = target.coords[2];
-    t.entity_ = new Entity(wallId, EntityType.WALL_POINT);
+    t.entity_ = Entity.wallPoint(wallId);
     return t;
   }
 

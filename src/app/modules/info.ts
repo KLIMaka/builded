@@ -224,7 +224,7 @@ function createSector(artRenderer: ArtRenderer): [HTMLElement, (id: number, sect
 }
 
 
-const NULL_ENT = new Entity(-1, EntityType.SPRITE);
+const NULL_ENT = Entity.of(-1, EntityType.SPRITE);
 
 export class Info extends MessageHandlerReflective {
   private sector: HTMLElement;

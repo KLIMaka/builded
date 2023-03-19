@@ -50,14 +50,14 @@ export class SpriteEnt extends MessageHandlerReflective {
     const y = this.ctx.gridController.snap(ny);
     const z = nz + this.zoff(board, bottom);
     if (moveSpriteX(board, this.spriteId, x, y, z, this.ctx.gridController)) {
-      this.ctx.bus.handle(new BoardInvalidate(new Entity(this.spriteId, EntityType.SPRITE)));
+      this.ctx.bus.handle(new BoardInvalidate(Entity.sprite(this.spriteId)));
     }
     // const board = this.ctx.board();
     // const x = this.ctx.gridController.snap(this.origin[0] + msg.dx);
     // const y = this.ctx.gridController.snap(this.origin[2] + msg.dy);
     // const z = this.ctx.gridController.snap(this.origin[1] + msg.dz) * ZSCALE;
     // if (moveSpriteX(board, this.spriteId, x, y, z, this.ctx.gridController)) {
-    //   this.ctx.bus.handle(new BoardInvalidate(new Entity(this.spriteId, EntityType.SPRITE)));
+    //   this.ctx.bus.handle(new BoardInvalidate(Entity.sprite(this.spriteId)));
     // }
   }
 
@@ -67,7 +67,7 @@ export class SpriteEnt extends MessageHandlerReflective {
     const nang = msg.absolute ? msg.da : this.ctx.gridController.snap(spr.ang + msg.da + Math.sign(msg.da));
     spr.ang = nang;
     this.ctx.bus.handle(new Commit(`Set Sprite ${this.spriteId} Angle`, true));
-    this.ctx.bus.handle(new BoardInvalidate(new Entity(this.spriteId, EntityType.SPRITE)));
+    this.ctx.bus.handle(new BoardInvalidate(Entity.sprite(this.spriteId)));
   }
 
   public Highlight(msg: Highlight) {
@@ -84,7 +84,7 @@ export class SpriteEnt extends MessageHandlerReflective {
     const sprite = board.sprites[this.spriteId];
     sprite.picnum = msg.picnum;
     this.ctx.bus.handle(new Commit(`Set Sprite ${this.spriteId} Picnum`));
-    this.ctx.bus.handle(new BoardInvalidate(new Entity(this.spriteId, EntityType.SPRITE)));
+    this.ctx.bus.handle(new BoardInvalidate(Entity.sprite(this.spriteId)));
   }
 
   public Shade(msg: Shade) {
@@ -94,7 +94,7 @@ export class SpriteEnt extends MessageHandlerReflective {
     if (msg.absolute && shade == msg.value) return;
     if (msg.absolute) sprite.shade = msg.value; else sprite.shade += msg.value;
     this.ctx.bus.handle(new Commit(`Set Sprite ${this.spriteId} Shade`, true));
-    this.ctx.bus.handle(new BoardInvalidate(new Entity(this.spriteId, EntityType.SPRITE)));
+    this.ctx.bus.handle(new BoardInvalidate(Entity.sprite(this.spriteId)));
   }
 
   public PanRepeat(msg: PanRepeat) {
@@ -113,7 +113,7 @@ export class SpriteEnt extends MessageHandlerReflective {
       sprite.yrepeat += msg.yrepeat;
     }
     this.ctx.bus.handle(new Commit(`Set Sprite ${this.spriteId} PanRepeat`, true));
-    this.ctx.bus.handle(new BoardInvalidate(new Entity(this.spriteId, EntityType.SPRITE)));
+    this.ctx.bus.handle(new BoardInvalidate(Entity.sprite(this.spriteId)));
   }
 
   public Palette(msg: Palette) {
@@ -126,7 +126,7 @@ export class SpriteEnt extends MessageHandlerReflective {
       spr.pal = cyclic(spr.pal + msg.value, msg.max);
     }
     this.ctx.bus.handle(new Commit(`Set Sprite ${this.spriteId} Palette`, true));
-    this.ctx.bus.handle(new BoardInvalidate(new Entity(this.spriteId, EntityType.SPRITE)));
+    this.ctx.bus.handle(new BoardInvalidate(Entity.sprite(this.spriteId)));
   }
 
   public SpriteMode(msg: SpriteMode) {
@@ -134,7 +134,7 @@ export class SpriteEnt extends MessageHandlerReflective {
     const spr = board.sprites[this.spriteId];
     spr.cstat.type = cyclic(spr.cstat.type + 1, 3);
     this.ctx.bus.handle(new Commit(`Set Sprite ${this.spriteId} Mode`, true));
-    this.ctx.bus.handle(new BoardInvalidate(new Entity(this.spriteId, EntityType.SPRITE)));
+    this.ctx.bus.handle(new BoardInvalidate(Entity.sprite(this.spriteId)));
   }
 
   public Flip(msg: Flip) {
@@ -145,7 +145,7 @@ export class SpriteEnt extends MessageHandlerReflective {
     spr.cstat.xflip = nflip & 1;
     spr.cstat.yflip = (nflip & 2) >> 1;
     this.ctx.bus.handle(new Commit(`Flip Sprite ${this.spriteId}`, true));
-    this.ctx.bus.handle(new BoardInvalidate(new Entity(this.spriteId, EntityType.SPRITE)));
+    this.ctx.bus.handle(new BoardInvalidate(Entity.sprite(this.spriteId)));
   }
 
   private zoff(board: Board, bottom = true): number {
@@ -171,7 +171,7 @@ export class SpriteEnt extends MessageHandlerReflective {
         const zoff = this.zoff(board, false);
         sprite.z = zoff + slope(board, sprite.sectnum, sprite.x, sprite.y, sector.ceilingheinum) + sector.ceilingz;
         this.ctx.bus.handle(new Commit(`Fly Sprite ${this.spriteId}`, true));
-        this.ctx.bus.handle(new BoardInvalidate(new Entity(this.spriteId, EntityType.SPRITE)));
+        this.ctx.bus.handle(new BoardInvalidate(Entity.sprite(this.spriteId)));
         return;
       }
       case 'fall': {
@@ -180,7 +180,7 @@ export class SpriteEnt extends MessageHandlerReflective {
         const zoff = this.zoff(board, true);
         sprite.z = zoff + slope(board, sprite.sectnum, sprite.x, sprite.y, sector.floorheinum) + sector.floorz;
         this.ctx.bus.handle(new Commit(`Fall Sprite ${this.spriteId}`, true));
-        this.ctx.bus.handle(new BoardInvalidate(new Entity(this.spriteId, EntityType.SPRITE)));
+        this.ctx.bus.handle(new BoardInvalidate(Entity.sprite(this.spriteId)));
         return;
       }
     }
@@ -196,7 +196,7 @@ export class SpriteEnt extends MessageHandlerReflective {
     const stat = spr.cstat[msg.name];
     spr.cstat[msg.name] = stat ? 0 : 1;
     this.ctx.bus.handle(new Commit(`Set Sprite ${this.spriteId} Cstat ${msg.name}`, true));
-    this.ctx.bus.handle(new BoardInvalidate(new Entity(this.spriteId, EntityType.SPRITE)));
+    this.ctx.bus.handle(new BoardInvalidate(Entity.sprite(this.spriteId)));
   }
 
   public handle(msg: Message) {

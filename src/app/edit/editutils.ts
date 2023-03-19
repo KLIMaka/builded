@@ -6,12 +6,12 @@ import { MessageBus } from "../apis/handler";
 import { BoardInvalidate } from "./messages";
 
 export function invalidateSectorAndWalls(sectorId: number, board: Board, bus: MessageBus) {
-  bus.handle(new BoardInvalidate(new Entity(sectorId, EntityType.CEILING)));
+  bus.handle(new BoardInvalidate(Entity.ceiling(sectorId)));
   let sec = board.sectors[sectorId];
   let end = sec.wallnum + sec.wallptr;
   for (let w = sec.wallptr; w < end; w++) {
-    bus.handle(new BoardInvalidate(new Entity(w, EntityType.WALL_POINT)));
-    bus.handle(new BoardInvalidate(new Entity(board.walls[w].nextwall, EntityType.WALL_POINT)));
+    bus.handle(new BoardInvalidate(Entity.wallPoint(w)));
+    bus.handle(new BoardInvalidate(Entity.wallPoint(board.walls[w].nextwall)));
   }
 }
 

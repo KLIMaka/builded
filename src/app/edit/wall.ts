@@ -78,7 +78,7 @@ export class WallEnt extends MessageHandlerReflective {
     let wall = this.ctx.board().walls[this.wallId];
     wall.picnum = msg.picnum;
     this.ctx.bus.handle(new Commit(`Set Wall ${this.wallId} Picnum`));
-    this.ctx.bus.handle(new BoardInvalidate(new Entity(this.wallId, EntityType.WALL_POINT)));
+    this.ctx.bus.handle(new BoardInvalidate(Entity.wallPoint(this.wallId)));
   }
 
   public Shade(msg: Shade) {
@@ -87,7 +87,7 @@ export class WallEnt extends MessageHandlerReflective {
     if (msg.absolute && shade == msg.value) return;
     if (msg.absolute) wall.shade = msg.value; else wall.shade += msg.value;
     this.ctx.bus.handle(new Commit(`Set Wall ${this.wallId} Shade`, true));
-    this.ctx.bus.handle(new BoardInvalidate(new Entity(this.wallId, EntityType.WALL_POINT)));
+    this.ctx.bus.handle(new BoardInvalidate(Entity.wallPoint(this.wallId)));
   }
 
   public PanRepeat(msg: PanRepeat) {
@@ -105,7 +105,7 @@ export class WallEnt extends MessageHandlerReflective {
       wall.yrepeat += msg.yrepeat;
     }
     this.ctx.bus.handle(new Commit(`Set Wall ${this.wallId} PanRepeat`, true));
-    this.ctx.bus.handle(new BoardInvalidate(new Entity(this.wallId, EntityType.WALL_POINT)));
+    this.ctx.bus.handle(new BoardInvalidate(Entity.wallPoint(this.wallId)));
   }
 
   public Palette(msg: Palette) {
@@ -117,7 +117,7 @@ export class WallEnt extends MessageHandlerReflective {
       wall.pal = cyclic(wall.pal + msg.value, msg.max);
     }
     this.ctx.bus.handle(new Commit(`Set Wall ${this.wallId} Palette`, true));
-    this.ctx.bus.handle(new BoardInvalidate(new Entity(this.wallId, EntityType.WALL_POINT)));
+    this.ctx.bus.handle(new BoardInvalidate(Entity.wallPoint(this.wallId)));
   }
 
   public Flip(msg: Flip) {
@@ -127,7 +127,7 @@ export class WallEnt extends MessageHandlerReflective {
     wall.cstat.xflip = nflip & 1;
     wall.cstat.yflip = (nflip & 2) >> 1;
     this.ctx.bus.handle(new Commit(`Flip Wall ${this.wallId}`, true));
-    this.ctx.bus.handle(new BoardInvalidate(new Entity(this.wallId, EntityType.WALL_POINT)));
+    this.ctx.bus.handle(new BoardInvalidate(Entity.wallPoint(this.wallId)));
   }
 
   public NamedMessage(msg: NamedMessage) {

@@ -14,6 +14,15 @@ export enum EntityType {
 }
 
 export class Entity {
+  static of(id: number, type: EntityType) { return new Entity(id, type) }
+  static floor(id: number) { return Entity.of(id, EntityType.FLOOR) }
+  static ceiling(id: number) { return Entity.of(id, EntityType.CEILING) }
+  static upperWal(id: number) { return Entity.of(id, EntityType.UPPER_WALL) }
+  static midWall(id: number) { return Entity.of(id, EntityType.MID_WALL) }
+  static lowerWall(id: number) { return Entity.of(id, EntityType.LOWER_WALL) }
+  static sprite(id: number) { return Entity.of(id, EntityType.SPRITE) }
+  static wallPoint(id: number) { return Entity.of(id, EntityType.WALL_POINT) }
+
   constructor(
     readonly id: number,
     readonly type: EntityType
@@ -24,6 +33,10 @@ export class Entity {
   isSprite() { return isSprite(this.type) }
   clone() { return new Entity(this.id, this.type) }
   equals(ent: Entity) { return ent == null ? false : ent == this ? true : ent.id == this.id && ent.type == this.type }
+}
+
+export class Target {
+
 }
 
 export interface Target {

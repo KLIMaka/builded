@@ -149,19 +149,19 @@ export class View2d extends MessageHandlerReflective implements View {
         const [wallId,] = closestWallSegmentDist(board, x, y);
         if (wallId == -1) return this.updateTarget(this.snapTargetValue, x, y, 0, null);
         const [sx, sy] = snapWall(board, wallId, x, y, this.gridController);
-        return this.updateTarget(this.snapTargetValue, sx, sy, 0, new Entity(wallId, EntityType.MID_WALL));
+        return this.updateTarget(this.snapTargetValue, sx, sy, 0, Entity.midWall(wallId));
       }
 
       case SnapType.WALL_POINT: {
         const [wallId,] = closestWallPointDist(board, x, y);
         if (wallId == -1) return this.updateTarget(this.snapTargetValue, x, y, 0, null);
         const wall = board.walls[wallId];
-        return this.updateTarget(this.snapTargetValue, wall.x, wall.y, 0, new Entity(wallId, EntityType.WALL_POINT));
+        return this.updateTarget(this.snapTargetValue, wall.x, wall.y, 0, Entity.wallPoint(wallId));
       }
 
       case SnapType.SECTOR: {
         const sectorId = findSector(board, this.x, this.y, this.sec);
-        const ent = sectorId == -1 ? null : new Entity(sectorId, EntityType.FLOOR);
+        const ent = sectorId == -1 ? null : Entity.floor(sectorId);
         return this.updateTarget(this.snapTargetValue, x, y, 0, ent);
       }
 
@@ -169,7 +169,7 @@ export class View2d extends MessageHandlerReflective implements View {
         const [spriteId,] = closestSpriteInSectorDist(board, this.sec, this.x, this.y);
         if (spriteId != -1) {
           const sprite = board.sprites[spriteId];
-          return this.updateTarget(this.snapTargetValue, sprite.x, sprite.y, sprite.z, new Entity(spriteId, EntityType.SPRITE))
+          return this.updateTarget(this.snapTargetValue, sprite.x, sprite.y, sprite.z, Entity.sprite(spriteId))
         }
         return this.updateTarget(this.snapTargetValue, x, y, 0, null);
       }

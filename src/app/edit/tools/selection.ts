@@ -30,7 +30,7 @@ export function getFromHitscan(factory: EntityFactory, snapType: SnapType): Deck
     list.push(factory.wall(target.entity.id));
   } else if (target.entity.isWall()) {
     const w1 = nextwall(board, target.entity.id);
-    list.push(factory.wallSegment([target.entity.clone(), new Entity(w1, target.entity.type)], [target.entity.clone()]));
+    list.push(factory.wallSegment([target.entity.clone(), Entity.of(w1, target.entity.type)], [target.entity.clone()]));
   } else if (target.entity.isSector()) {
     list.push(factory.sector(target.entity.clone()));
   } else if (target.entity.isSprite()) {
@@ -60,9 +60,9 @@ function sector(fullLoop: (board: Board, wallId: number) => Iterable<number>, ta
   const board = factory.ctx.board();
   if (fullLoop) {
     const firstWall = board.sectors[target.entity.id].wallptr;
-    list.push(factory.wallSegment([...map(fullLoop(board, firstWall), w => new Entity(w, EntityType.WALL_POINT))]));
+    list.push(factory.wallSegment([...map(fullLoop(board, firstWall), w => Entity.wallPoint(w))]));
     const type = target.entity.type == EntityType.CEILING ? EntityType.FLOOR : EntityType.CEILING;
-    list.push(factory.sector(new Entity(target.entity.id, type)));
+    list.push(factory.sector(Entity.of(target.entity.id, type)));
   }
   list.push(factory.sector(target.entity.clone()));
 }
@@ -70,11 +70,11 @@ function sector(fullLoop: (board: Board, wallId: number) => Iterable<number>, ta
 function wallSegment(fullLoop: (board: Board, wallId: number) => Iterable<number>, factory: EntityFactory, wallEnt: Entity) {
   const board = factory.ctx.board();
   if (fullLoop) {
-    const loop = [...map(fullLoop(board, wallEnt.id), w => new Entity(w, wallEnt.type))];
+    const loop = [...map(fullLoop(board, wallEnt.id), w => Entity.of(w, wallEnt.type))];
     list.push(factory.wallSegment(loop, loop));
   } else {
     const w1 = nextwall(board, wallEnt.id);
-    list.push(factory.wallSegment([wallEnt, new Entity(w1, wallEnt.type)], [wallEnt]));
+    list.push(factory.wallSegment([wallEnt, Entity.of(w1, wallEnt.type)], [wallEnt]));
   }
 }
 

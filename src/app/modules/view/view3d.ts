@@ -220,7 +220,7 @@ export class View3d extends MessageHandlerReflective implements View {
         const first = findFirst(this.targets(), t => t.entity != null && !t.entity.isSprite(), null);
         if (first == null) return this.copyTarget(target, this.snapTargetValue);
         if (first.entity.isWall())
-          return this.snapWall(first.coords, first.entity.type, target.entity.id, this.snapTargetValue);
+          return this.snapWall(first.coords, first.entity.type, first.entity.id, this.snapTargetValue);
         const [x, y] = first.coords;
         const [wallId,] = closestWallSegmentInSectorDist(board, first.entity.id, x, y);
         const wall = board.walls[wallId];
@@ -253,19 +253,6 @@ export class View3d extends MessageHandlerReflective implements View {
         else return this.copyTarget(target, this.snapTargetValue);
       }
     }
-    // if (target.entity == null) return this.copyTarget(target, t);
-    // const d = this.gridController.getGridSize() / 8;
-    // const w = this.getClosestWall(target, d);
-    // if (w != -1) {
-    //   return this.snapWallPoint(target, w, t);
-    // } else if (target.entity.isSector()) {
-    //   const w = closestWallSegmentInSector(this.board(), target.entity.id, target.coords[0], target.coords[1], d);
-    //   return w == -1 ? this.snapGrid(target, t) : this.snapWall(target.coords, target.entity.type == EntityType.FLOOR ? EntityType.LOWER_WALL : EntityType.UPPER_WALL, w, t);
-    // } else if (target.entity.isSprite()) {
-    //   return this.snapSprite(target, t);
-    // } else if (target.entity.isWall()) {
-    //   return this.snapWall(target.coords, target.entity.type, target.entity.id, t);
-    // }
   }
 
   private updateDir(r: Ray): Ray {

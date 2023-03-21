@@ -5,7 +5,7 @@ import { cyclicPairs } from "../../../../utils/collections";
 import { Builders } from "../../../apis/builder";
 import { SPRITE_LABEL } from "../../../apis/renderable";
 import { RenderablesCacheContext, SPRITE_COLOR } from "../cache";
-import { BuildersFactory, SolidBuilder, WireframeBuilder } from "../common";
+import { BuildersFactory, SolidBuilder, Type, WireframeBuilder } from "../common";
 
 export class Sprite2dBuilder extends Builders {
   constructor(
@@ -71,6 +71,7 @@ function updateSpriteImage(ctx: RenderablesCacheContext, spriteId: number, build
   const sprite = board.sprites[spriteId];
   if (sprite.picnum == 0 || sprite.cstat.type != FACE_SPRITE) return;
   builder.tex = ctx.art.get(sprite.picnum);
+  builder.type = Type.NONREPEAT;
   const buff = builder.buff;
   const x = sprite.x;
   const y = sprite.y;

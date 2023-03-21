@@ -333,7 +333,7 @@ export function* interpolate<T>(ii: Iterable<T>, f: (lh: T, rh: T, t: number) =>
   }
 }
 
-export function* flatten<T>(i: Iterable<T[]>): Generator<T> {
+export function* flatten<T>(i: Iterable<Iterable<T>>): Generator<T> {
   const ii = i[Symbol.iterator]();
   let item = ii.next();
   while (!item.done) {

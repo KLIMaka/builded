@@ -1,3 +1,4 @@
+import { isValidSectorId } from "build/board/query";
 import { vec3 } from "gl-matrix";
 import { FACE_SPRITE, FLOOR_SPRITE, WALL_SPRITE } from "../../../../build/board/structs";
 import { floorSprite, SpriteInfo, spriteInfo, wallSprite } from "../../../../build/sprites";
@@ -104,7 +105,7 @@ export function updateSprite(ctx: RenderablesCacheContext, sprId: number, builde
   builder = builder == null ? ctx.factory.solid('sprite') : builder;
   const board = ctx.board();
   const spr = board.sprites[sprId];
-  if (spr.picnum == 0 || spr.cstat.invisible || spr.sectnum == -1) return builder;
+  if (spr.picnum == 0 || spr.cstat.invisible || !isValidSectorId(board, spr.sectnum)) return builder;
 
   const sinfo = spriteInfo(board, sprId, ctx.art);
   const sec = board.sectors[spr.sectnum];

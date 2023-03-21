@@ -62,7 +62,7 @@ class Utils extends DefaultTool {
 
   private adaptGrid() {
     const board = this.board();
-    const target = this.view.snapTarget(SnapType.SECTOR);
+    const target = this.view.snapTarget(SnapType.GRID);
     const ent = target.entity;
     const scale = (...xs: number[]) => Math.min.apply(null, xs.map(x => Math.pow(2, trz(x))));
     if (ent == null) {
@@ -124,7 +124,7 @@ class Utils extends DefaultTool {
   }
 
   private insertSprite() {
-    const target = this.view.snapTarget(SnapType.SECTOR);
+    const target = this.view.snapTarget(SnapType.GRID);
     if (target.entity == null) return;
     const [x, y, z] = target.coords;
     const ent = target.entity;

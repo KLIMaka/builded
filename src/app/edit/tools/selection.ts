@@ -22,9 +22,11 @@ const FULL_LOOP_STATE = 'select_full_loop_mod';
 
 const list = new Deck<MessageHandler>();
 export function getFromHitscan(factory: EntityFactory, snapType: SnapType): Deck<MessageHandler> {
-  const target = factory.ctx.view.snapTarget(snapType);
-  const board = factory.ctx.board();
   list.clear();
+  const targets = factory.ctx.view.snapTargets().get();
+  if (targets.length == 0) return list;
+  const target = targets[0].target;
+  const board = factory.ctx.board();
   if (target.entity == null) return list;
   if (target.entity.type == EntityType.WALL_POINT) {
     list.push(factory.wall(target.entity.id));
@@ -97,7 +99,7 @@ export async function SelectionModule(module: Module) {
 export class Selection extends DefaultTool {
   private selection = new MessageHandlerList();
   private highlighted = new MessageHandlerList();
-  private selectionType = SnapType.WALL;
+  private selectionType = SnapType.GRID;
 
   constructor(
     private renderables: RenderablesCache,
@@ -137,8 +139,8 @@ export class Selection extends DefaultTool {
       case 'add_selection': this.selection.list().pushAll(this.highlighted.list().clone()); return;
       case 'clear_selection': this.selection.list().clear(); return;
       case 'select_wall': this.selectionType = SnapType.WALL; return;
-      case 'select_wall_point': this.selectionType = SnapType.WALL_POINT; return;
-      case 'select_sector': this.selectionType = SnapType.SECTOR; return;
+      case 'select_wall_point': this.selectionType = SnapType.POINT_ON_WALL; return;
+      case 'select_sector': this.selectionType = SnapType.GRID; return;
       case 'select_sprite': this.selectionType = SnapType.SPRITE; return;
       default: this.handleSelected(msg);
     }

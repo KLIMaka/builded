@@ -1,17 +1,30 @@
+import { vec3 } from "gl-matrix";
 import { Entity, Hitscan, Target } from "../../../build/hitscan";
 import { create, Dependency, getInstances, lifecycle, Module, Plugin } from "../../../utils/injector";
-import { GRID, GridController, SnapType, STATE, View, VIEW } from "../../apis/app";
+import { GRID, GridController, SnapTarget, SnapTargets, SnapType, STATE, View, VIEW } from "../../apis/app";
 import { BUS, busDisconnector, Message, MessageHandler } from "../../apis/handler";
 import { Renderable } from "../../apis/renderable";
 import { LoadBoard, NamedMessage } from "../../edit/messages";
 import { View2d, View2dConstructor } from "./view2d";
 import { View3d, View3dConstructor } from "./view3d";
+import { Deck, filter, takeFirst } from "utils/collections";
+import { Comparator, SortedHeap } from "utils/list";
 
 export class TargetImpl implements Target {
-  public coords_: [number, number, number] = [0, 0, 0];
+  public coords_ = vec3.create();
   public entity_: Entity = null;
   get coords() { return this.coords_ }
   get entity() { return this.entity_ }
+}
+
+const SNAP_TARGET_ORDER: Comparator<SnapTarget> = (lh, rh) => lh.type - rh.type;
+export class SnapTargetsImpl implements SnapTargets {
+  private targets = new SortedHeap<SnapTarget>(SNAP_TARGET_ORDER);
+  get(): SnapTarget[] { return [... this.targets.get()] }
+  getByType(...types: SnapType[]): SnapTarget[] { return [...filter(this.targets.get(), t => types.includes(t.type))] }
+  closest(): SnapTarget { return this.targets.first() }
+  clear(): void { this.targets.clear() }
+  add(target: SnapTarget, dist: number) { this.targets.add(target, dist) }
 }
 
 export interface ViewPosition {
@@ -60,7 +73,7 @@ export class SwappableView implements View, MessageHandler {
 
   target() { return this.view.target() }
   targets() { return this.view.targets() }
-  snapTarget(type: SnapType) { return this.view.snapTarget(type) }
+  snapTargets() { return this.view.snapTargets() }
   dir() { return this.view.dir() }
   drawTools(renderables: Iterable<Renderable>) { this.view.drawTools(renderables) }
   hitscan(hit: Hitscan): Hitscan { return this.view.hitscan(hit) }

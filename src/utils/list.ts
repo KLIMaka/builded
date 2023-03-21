@@ -1,4 +1,5 @@
 import { TERMINAL_ITERATOR_RESULT, EMPTY_ITERATOR, Deck, ITERATOR_RESULT } from "./collections";
+import { eq } from "./mathutils";
 
 export class Node<T> {
   constructor(
@@ -207,14 +208,24 @@ function binaryIndexOf(list: FastList<number>, searchElement: number) {
   return min == max ? max : current;
 }
 
+export type Comparator<T> = (lh: T, rh: T) => number;
+
 export class SortedHeap<T> {
   private values = new FastList<T>();
   private sortValues = new FastList<number>();
+  private eqOrder: Comparator<T>;
+
+  constructor(eqOrder: Comparator<T> = (lh, rh) => 0) {
+    this.eqOrder = eqOrder;
+  }
 
   public add(value: T, sortValue: number) {
     const ptr = binaryIndexOf(this.sortValues, sortValue);
-    this.values.insertAfter(value, ptr);
-    this.sortValues.insertAfter(sortValue, ptr);
+    let nptr = ptr;
+    while (nptr != 0 && this.sortValues.get(nptr) == sortValue && this.eqOrder(value, this.values.get(nptr)) > 0)
+      nptr = this.sortValues.last(nptr);
+    this.values.insertAfter(value, nptr);
+    this.sortValues.insertAfter(sortValue, nptr);
   }
 
   public clear() {

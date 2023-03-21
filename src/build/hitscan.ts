@@ -35,12 +35,8 @@ export class Entity {
   equals(ent: Entity) { return ent == null ? false : ent == this ? true : ent.id == this.id && ent.type == this.type }
 }
 
-export class Target {
-
-}
-
 export interface Target {
-  readonly coords: [number, number, number];
+  readonly coords: vec3;
   readonly entity: Entity;
 }
 

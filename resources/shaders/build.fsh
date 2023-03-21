@@ -34,6 +34,8 @@ const float PLU_LINES = SHADOWSTEPS * PALSWAPS;
 #define TIME (sys.x)
 #define DETPH_OFF (wnormal.w)
 #define WRAP (tcwrap.xy)
+#define GRID_SIZE (grid.x)
+#define GRID_RANGE (grid.y)
 
 bool isTransIdx(float idx) {
   return idx >= TARANS_IDX;
@@ -150,35 +152,33 @@ vec2 repeat(vec2 tc) {
 #endif
 }
 
-float mipLevel(in vec2 tc, vec2 size) {
-  vec2  dx_vtc = dFdx(tc * size);
-  vec2  dy_vtc = dFdy(tc * size);
-  float delta_max_sqr = max(dot(dx_vtc, dx_vtc), dot(dy_vtc, dy_vtc));
-  return max(0.0, 0.5 * log2(delta_max_sqr) + 1.0);
-}
+// float mipLevel(in vec2 tc, vec2 size) {
+//   vec2  dx_vtc = dFdx(tc * size);
+//   vec2  dy_vtc = dFdy(tc * size);
+//   float delta_max_sqr = max(dot(dx_vtc, dx_vtc), dot(dy_vtc, dy_vtc));
+//   return max(0.0, 0.5 * log2(delta_max_sqr) + 1.0);
+// }
 
 vec3 scale2xSample(vec2 tc) {
   vec2 pixel = repeat(tc);
-  vec2 dx = dFdx(tc);
-  vec2 dy = dFdy(tc);
-  
   vec2 size = vec2(textureSize(base, 0));
   vec2 frac = floor(2.0 * fract(tc * size));
-  float ORIG = textureGrad(base, pixel, dx, dy).r;
+  float ORIG = texture(base, pixel).r;
   float ADD1 = frac.x == 0.0
-    ? textureGradOffset(base, pixel, dx, dy, ivec2(-1, 0)).r
-    : textureGradOffset(base, pixel, dx, dy, ivec2(+1, 0)).r;
+    ? textureOffset(base, pixel, ivec2(-1, 0)).r
+    : textureOffset(base, pixel, ivec2(+1, 0)).r;
   float ADD2 = frac.y == 0.0
-    ? textureGradOffset(base, pixel, dx, dy, ivec2(0, -1)).r
-    : textureGradOffset(base, pixel, dx, dy, ivec2(0, +1)).r;
+    ? textureOffset(base, pixel, ivec2(0, -1)).r
+    : textureOffset(base, pixel, ivec2(0, +1)).r;
 
   return vec3(ORIG, ADD1, ADD2);
 }
 
 vec3 getPalSamples(vec2 tc) {
-  return mipLevel(tc, vec2(textureSize(base, 0))) > 0.0 
-    ? vec3(textureGrad(base, repeat(tc), dFdx(tc), dFdy(tc)).r) 
-    : scale2xSample(tc);
+  return scale2xSample(tc);
+  // return mipLevel(tc, vec2(textureSize(base, 0))) > 0.0 
+  //   ? vec3(texture(base, repeat(tc)).r) 
+  //   : scale2xSample(tc);
 }
 
 vec3 palLookup(vec2 tc) {
@@ -201,12 +201,23 @@ void writeColor(vec3 c, vec4 m) {
 }
 
 vec4 renderGrid() {
-  vec2 coord = gridtc.xy / grid.x;
-  vec2 gridDet = abs(fract(coord - 0.5) - 0.5) / fwidth(coord);
-  float line = min(gridDet.x, gridDet.y);
-  float a = 1.0 - min(line, 1.0);
-  float dist = 1.0 - pow(smoothstep(0.0, grid.x * grid.y, length(curpos - wpos)), 32.0);
-  return vec4(0.4, 0.4, 0.4, a * dist);
+  // vec2 coord = gridtc / GRID_SIZE;
+  // vec2 gridDet = abs(fract(coord - 0.5) - 0.5) / fwidth(coord);
+  // vec2 coord2 = coord / 4.0;
+  // vec2 gridDet2 = abs(fract(coord2 - 0.5) - 0.5) / fwidth(coord2);
+  // float line = min(gridDet.x, gridDet.y);
+  // float line2 = min(gridDet2.x, gridDet2.y);
+  // float a = 1.0 - min(line, 1.0);
+  // float b = 1.0 - min(line2, 1.0);
+  // float dist = 1.0 - pow(smoothstep(0.0, GRID_SIZE * GRID_RANGE, length(curpos - wpos)), 32.0);
+  // // return vec4(0.4, 0.4, 0.4, a * dist) + vec4(0.4, 0.6, 0.4, b * dist);
+  // // return  vec4(0.4, 0.6, 0.4, b * dist);
+  // return b > 0.0 ? vec4(0.984, 0.78, 0.118, b * dist) : vec4(0.4, 0.4, 0.4, a * dist);
+  
+  vec2 coord = gridtc / (GRID_SIZE * 2.0);
+  bvec2 odd = greaterThan(fract(coord - 0.5), vec2(0.5));
+  // return vec4(0.984, 0.78, 0.118, odd.x ^^ odd.y ? 0.1 : 0.0 );
+  return vec4(1.0, 1.0, 1.0, odd.x ^^ odd.y ? 0.1 : 0.0);
 }
 
 void addDepth(float dd) {

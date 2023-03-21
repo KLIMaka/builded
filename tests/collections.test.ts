@@ -120,3 +120,42 @@ test('SortedHeap', () => {
   heap.add('fourth', 15);
   expect([...heap.get()]).toStrictEqual(['third', 'first', 'fourth', 'second', 'nil']);
 })
+
+test('SortedHeapEqOrder', () => {
+  const heap = new SortedHeap<string>((lh, rh) => lh < rh ? 1 : lh == rh ? 0 : -1);
+  heap.add("c", 10);
+  heap.add("a", 10);
+  heap.add("b", 10);
+  expect([...heap.get()]).toStrictEqual(['a', 'b', 'c']);
+
+  heap.clear();
+  heap.add("c", 10);
+  heap.add("b", 10);
+  heap.add("a", 10);
+  expect([...heap.get()]).toStrictEqual(['a', 'b', 'c']);
+
+  heap.clear();
+  heap.add("a", 10);
+  heap.add("b", 10);
+  heap.add("c", 10);
+  expect([...heap.get()]).toStrictEqual(['a', 'b', 'c']);
+
+
+  heap.clear();
+  heap.add("a", 10);
+  heap.add("c", 10);
+  heap.add("b", 10);
+  expect([...heap.get()]).toStrictEqual(['a', 'b', 'c']);
+
+  heap.clear();
+  heap.add("b", 10);
+  heap.add("c", 10);
+  heap.add("a", 10);
+  expect([...heap.get()]).toStrictEqual(['a', 'b', 'c']);
+
+  heap.clear();
+  heap.add("b", 10);
+  heap.add("a", 10);
+  heap.add("c", 10);
+  expect([...heap.get()]).toStrictEqual(['a', 'b', 'c']);
+})

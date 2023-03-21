@@ -267,7 +267,7 @@ export class DrawWall extends DefaultTool {
   }
 
   private pushPortal() {
-    const target = this.view.snapTarget(SnapType.SECTOR);
+    const target = this.view.snapTarget(SnapType.GRID);
     this.movingHandle.start(build2gl(vec3.create(), target.coords));
   }
 
@@ -295,7 +295,7 @@ export class DrawWall extends DefaultTool {
       const { start, dir } = this.view.dir();
       this.movingHandle.update(false, false, build2gl(this._start, start), build2gl(this._dir, dir));
     } else {
-      const target = this.view.snapTarget(SnapType.SECTOR);
+      const target = this.view.snapTarget(SnapType.GRID);
       const [x, y, z] = target.coords;
       this.portal.move(x, y, z);
     }

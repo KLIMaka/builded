@@ -1,4 +1,4 @@
-import { chain, filter, flatten, map, pairs, reduce } from './collections';
+import { chain, filter, flatten, getOrCreate, map, pairs, reduce } from './collections';
 import { memoize } from './mathutils';
 
 export type Links<T> = { to: Set<T>, from: Set<T> };
@@ -6,12 +6,7 @@ export class DirecredGraph<T> {
   readonly nodes = new Map<T, Links<T>>();
 
   private ensureNode(label: T) {
-    let links = this.nodes.get(label);
-    if (links == undefined) {
-      links = { to: new Set(), from: new Set() };
-      this.nodes.set(label, links);
-    }
-    return links;
+    return getOrCreate(this.nodes, label, k => { return { to: new Set(), from: new Set() } });
   }
 
   public add(from: T, to: T) {

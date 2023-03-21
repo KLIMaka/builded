@@ -154,7 +154,7 @@ export class DrawSector<B extends Board> extends DefaultTool {
   private update() {
     if (this.predrawUpdate()) return;
     const z = this.contour.getZ();
-    const [x, y] = this.view.snapTarget(SnapType.SECTOR).coords;
+    const [x, y] = this.view.snapTargets().closest().target.coords;
     vec3.set(this.pointer, x, y, z);
 
     if (this.isRect) {
@@ -179,7 +179,7 @@ export class DrawSector<B extends Board> extends DefaultTool {
   private predrawUpdate() {
     if (this.points.length() > 0) return false;
     const target = this.view.target();
-    const snapTarget = this.view.snapTarget(SnapType.SECTOR);
+    const snapTarget = this.view.snapTargets().closest().target;
     const board = this.board();
     if (snapTarget.entity == null) {
       const [x, y] = snapTarget.coords;

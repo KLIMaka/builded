@@ -36,7 +36,7 @@ export async function InfoModule(module: Module) {
   }));
 }
 
-const rowTemplate = h`<tr><td>#nameNode</td><td>#valueNode</td></tr>`;
+const rowTemplate = h`<tr><td style="text-align: right">#nameNode</td><td>#valueNode</td></tr>`;
 function createRow(name: string): [Node, (v: any) => void] {
   const root = rowTemplate.cloneNode(true);
   const { nameNode, valueNode } = rowTemplate.collect(root);
@@ -256,7 +256,7 @@ export class Info extends MessageHandlerReflective {
   }
 
   public Frame(msg: Frame) {
-    const ent = this.view.target().entity;
+    const ent = this.view.snapTargets().closest().target.entity;
     const board = this.board();
     if (this.lastEnt.equals(ent)) return;
     this.lastEnt = ent == null ? NULL_ENT : ent;

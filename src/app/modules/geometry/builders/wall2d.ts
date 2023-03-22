@@ -1,3 +1,4 @@
+import { LineBuilder } from "app/modules/gl/buffers";
 import { vec4 } from "gl-matrix";
 import { Builders } from "../../../apis/builder";
 import { WallRenderable } from "../../../apis/renderable";
@@ -17,12 +18,12 @@ export function updateWall2d(ctx: RenderablesCacheContext, wallId: number, build
   builder = builder == null ? new Wall2dBuilder(ctx.factory) : builder;
   const board = ctx.board();
   const buff = builder.mid.buff;
-  buff.allocate(2, 2);
+  buff.allocate(4, 4);
   const wall = board.walls[wallId];
   const wall2 = board.walls[wall.point2];
-  buff.writePos(0, wall.x, 0, wall.y);
-  buff.writePos(1, wall2.x, 0, wall2.y);
-  buff.writeLine(0, 0, 1);
+  const line = new LineBuilder();
+  line.segment(wall.x, 0, wall.y, wall2.x, 0, wall2.y);
+  line.build(builder.mid.buff);
   const state = ctx.state;
   vec4.copy(builder.mid.color, wall.cstat.masking
     ? state.get(MASKED_WALL_COLOR)

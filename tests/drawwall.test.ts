@@ -4,7 +4,7 @@ import { cyclic } from '../src/utils/mathutils';
 const proj = (x: number, y: number) => <[number, number, number]>[0, 0, x];
 
 function shift(points: point_3d[], off: number): point_3d[] {
-  const npoints = [];
+  const npoints: point_3d[] = [];
   for (let i = 0; i < points.length; i++)npoints.push(points[cyclic(i + off, points.length)]);
   return npoints;
 }

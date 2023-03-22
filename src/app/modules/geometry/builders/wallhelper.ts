@@ -3,12 +3,13 @@ import { createSlopeCalculator, slope, ZSCALE } from "../../../../build/utils";
 import { int } from "../../../../utils/mathutils";
 import { Builders } from "../../../apis/builder";
 import { BuildRenderableProvider, WallRenderable, Renderables } from "../../../apis/renderable";
-import { BuildBuffer } from "../../gl/buffers";
+import { BuildBuffer, LineBuilder } from "../../gl/buffers";
 import { RenderablesCacheContext } from "../cache";
 import { BuildersFactory, PointSpriteBuilder, SolidBuilder } from "../common";
 import { text, createGridWallMatrix, WallGridType } from "./common";
-import { vec4, mat4 } from "gl-matrix";
+import { vec4, mat4, vec2 } from "gl-matrix";
 import { sectorOfWall, walllen } from "../../../../build/board/query";
+import { normal2d } from "utils/vecmath";
 
 export class WallHelperBuilder extends Builders implements WallRenderable {
   constructor(
@@ -31,23 +32,21 @@ export class WallHelperBuilder extends Builders implements WallRenderable {
   }
 }
 
-function genQuadWireframe(coords: number[], normals: number[], buff: BuildBuffer) {
-  buff.allocate(4, 8);
+function genQuadWireframe(coords: number[], buff: BuildBuffer) {
   const [x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4] = coords;
-  buff.writePos(0, x1, z1, y1);
-  buff.writePos(1, x2, z2, y2);
-  buff.writePos(2, x3, z3, y3);
-  buff.writePos(3, x4, z4, y4);
-  if (normals != null) {
-    buff.writeNormal(0, normals[0], normals[1], 0);
-    buff.writeNormal(1, normals[2], normals[3], 0);
-    buff.writeNormal(2, normals[4], normals[5], 0);
-    buff.writeNormal(3, normals[6], normals[7], 0);
-  }
-  buff.writeLine(0, 0, 1);
-  buff.writeLine(2, 1, 2);
-  buff.writeLine(4, 2, 3);
-  buff.writeLine(6, 3, 0);
+  const line = new LineBuilder();
+  line.rect(x1, z1, y1, x2, z2, y2, x3, z3, y3, x4, z4, y4);
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const n = vec2.fromValues(dx, dy);
+  normal2d(n, n);
+  const cx = x1 + dx / 2;
+  const cy = y1 + dy / 2;
+  const cz12 = z1 + (z2 - z1) / 2;
+  const cz34 = z3 + (z4 - z3) / 2;
+  const cz = cz12 + (cz34 - cz12) / 2;
+  line.segment(cx, cz, cy, cx - n[0] * 32, cz, cy - n[1] * 32);
+  line.build(buff);
 }
 
 function getWallCoords(x1: number, y1: number, x2: number, y2: number,
@@ -100,7 +99,7 @@ export function updateWallWireframe(ctx: RenderablesCacheContext, wallId: number
 
   if (wall.nextwall == -1 || wall.cstat.oneWay) {
     const coords = getWallCoords(x1, y1, x2, y2, slope, slope, ceilingheinum, floorheinum, ceilingz, floorz, false);
-    genQuadWireframe(coords, null, builder.midWire.buff);
+    genQuadWireframe(coords, builder.midWire.buff);
   } else {
     const nextsector = board.sectors[wall.nextsector];
     const nextslope = createSlopeCalculator(board, wall.nextsector);
@@ -109,17 +108,17 @@ export function updateWallWireframe(ctx: RenderablesCacheContext, wallId: number
 
     const nextfloorheinum = nextsector.floorheinum;
     const botcoords = getWallCoords(x1, y1, x2, y2, nextslope, slope, nextfloorheinum, floorheinum, nextfloorz, floorz, true, true);
-    if (botcoords != null) genQuadWireframe(botcoords, null, builder.botWire.buff);
+    if (botcoords != null) genQuadWireframe(botcoords, builder.botWire.buff);
 
     const nextceilingheinum = nextsector.ceilingheinum;
     const topcoords = getWallCoords(x1, y1, x2, y2, slope, nextslope, ceilingheinum, nextceilingheinum, ceilingz, nextceilingz, true, true);
-    if (topcoords != null) genQuadWireframe(topcoords, null, builder.topWire.buff);
+    if (topcoords != null) genQuadWireframe(topcoords, builder.topWire.buff);
 
     if (wall.cstat.masking) {
       const coords = getMaskedWallCoords(x1, y1, x2, y2, slope, nextslope,
         ceilingheinum, nextceilingheinum, ceilingz, nextceilingz,
         floorheinum, nextfloorheinum, floorz, nextfloorz);
-      genQuadWireframe(coords, null, builder.midWire.buff);
+      genQuadWireframe(coords, builder.midWire.buff);
     }
   }
   return builder;

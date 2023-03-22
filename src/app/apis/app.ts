@@ -63,12 +63,6 @@ export interface BoardUtils {
 }
 export const BOARD_UTILS = new Dependency<BoardUtils>('BoardUtils');
 
-export interface Portals {
-  isPortalWall(wallId: number): boolean;
-}
-export const PORTALS = new Dependency<Portals>('Portals');
-
-
 export interface LightmapHandle {
   texture(): Texture;
 }

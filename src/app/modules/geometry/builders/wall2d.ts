@@ -1,7 +1,7 @@
 import { vec4 } from "gl-matrix";
 import { Builders } from "../../../apis/builder";
 import { WallRenderable } from "../../../apis/renderable";
-import { INTERSECTOR_WALL_COLOR, MASKED_WALL_COLOR, PORTAL_WALL_COLOR, RenderablesCacheContext, WALL_COLOR } from "../cache";
+import { INTERSECTOR_WALL_COLOR, MASKED_WALL_COLOR, RenderablesCacheContext, WALL_COLOR } from "../cache";
 import { BuildersFactory } from "../common";
 
 export class Wall2dBuilder extends Builders implements WallRenderable {
@@ -28,8 +28,6 @@ export function updateWall2d(ctx: RenderablesCacheContext, wallId: number, build
     ? state.get(MASKED_WALL_COLOR)
     : wall.nextwall == -1
       ? state.get(WALL_COLOR)
-      : ctx.portals.isPortalWall(wallId)
-        ? state.get(PORTAL_WALL_COLOR)
-        : state.get(INTERSECTOR_WALL_COLOR))
+      : state.get(INTERSECTOR_WALL_COLOR))
   return builder;
 }

@@ -5,7 +5,7 @@ import { resize } from '../../utils/gl/gl';
 import { IndexedImgLibJsConstructor, INDEXED_IMG_LIB } from '../../utils/imglib';
 import { getInstances, instance, lifecycle, Module, plugin } from '../../utils/injector';
 import { DefaultProfilerConstructor, Profiler, PROFILER } from '../../utils/profiler';
-import { ART, BOARD, BOARD_UTILS, ENGINE_API, GRID, LIGHTMAPS, PORTALS, REFERENCE_TRACKER, SCHEDULER, STATE, STORAGES, View } from '../apis/app';
+import { ART, BOARD, BOARD_UTILS, ENGINE_API, GRID, LIGHTMAPS, REFERENCE_TRACKER, SCHEDULER, STATE, STORAGES, View } from '../apis/app';
 import { BUS, busDisconnector, DefaultMessageBusConstructor, MessageBus, MessageHandlerReflective } from '../apis/handler';
 import { Renderable } from '../apis/renderable';
 import { DefaultScheduler } from '../apis/scheduler';
@@ -23,7 +23,6 @@ import { UtilsModule } from '../edit/tools/utils';
 import { DefaultBoardUtilsConstructor } from '../modules/default/board-utils';
 import { DefaultFrameGenerator, FrameGenerator, FRAME_GENERATOR } from "../modules/default/framegenerator";
 import { DefaultLightmapsConstructor } from '../modules/default/lightmap';
-import { DefaultPortalsConstructor } from '../modules/default/portals';
 import { StatusBarModule } from '../modules/statusbar';
 import { TaskManagerModule } from '../modules/taskmanager';
 import { BuildArtProviderConstructor, TEXTURES_OVERRIDE } from './buildartprovider';
@@ -87,7 +86,6 @@ export function DefaultSetupModule(module: Module) {
   module.bind(ENTITY_FACTORY, EntityFactoryConstructor);
   module.bind(INDEXED_IMG_LIB, IndexedImgLibJsConstructor);
   module.bind(SCHEDULER, DefaultScheduler);
-  module.bind(PORTALS, DefaultPortalsConstructor);
   module.bind(LIGHTMAPS, DefaultLightmapsConstructor)
   module.bind(PROFILER, DefaultProfilerConstructor);
   module.bind(FRAME_GENERATOR, DefaultFrameGenerator);

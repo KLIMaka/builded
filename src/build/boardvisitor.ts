@@ -184,6 +184,7 @@ export class TopDownBoardVisitorResult implements VisResult {
   }
 }
 
+
 function wallBehind(board: Board, sector: Sector, wallId: number, ms: MoveStruct, fwd: vec3) {
   const wall1 = board.walls[wallId];
   const wall2 = board.walls[wall1.point2];
@@ -194,28 +195,28 @@ function wallBehind(board: Board, sector: Sector, wallId: number, ms: MoveStruct
   return minl > lk * 2 && dot2d(dx1, dy1, fwd[0], fwd[2]) < 0 && dot2d(dx2, dy2, fwd[0], fwd[2]) < 0;
 }
 
+function calcSegment(board: Board, wallId: number, ms: MoveStruct, ismin: boolean) {
+  const wall1 = board.walls[wallId];
+  const wall2 = board.walls[wall1.point2];
+  const tw1x = wall1.x - ms.x;
+  const tw1y = wall1.y - ms.y;
+  const tw2x = wall2.x - ms.x;
+  const tw2y = wall2.y - ms.y;
+  const l1 = len2d(tw1x, tw1y);
+  const l2 = len2d(tw2x, tw2y);
+  const value = ismin ? Math.min(l1, l2) : Math.max(l1, l2);
+  const start = monoatan2(tw1y, tw1x) / PI2;
+  const end = monoatan2(tw2y, tw2x) / PI2;
+  return createSegment(start, end, value);
+}
+
 export class PvsBoardVisitorResult implements VisResult {
   private sectors = new Deck<number>();
   private walls = new Deck<number>();
   private sprites = new Deck<number>();
-  private pvs = new IndexedDeck<number>();
+  private pvs = new Set<number>();
   private nonvoidWalls = new Deck<number>();
   private rad = new RadialSegments();
-
-  private calcSegment(board: Board, wallId: number, ms: MoveStruct, ismin: boolean) {
-    const wall1 = board.walls[wallId];
-    const wall2 = board.walls[wall1.point2];
-    const tw1x = wall1.x - ms.x;
-    const tw1y = wall1.y - ms.y;
-    const tw2x = wall2.x - ms.x;
-    const tw2y = wall2.y - ms.y;
-    const l1 = len2d(tw1x, tw1y);
-    const l2 = len2d(tw2x, tw2y);
-    const value = ismin ? Math.min(l1, l2) : Math.max(l1, l2);
-    const start = monoatan2(tw1y, tw1x) / PI2;
-    const end = monoatan2(tw2y, tw2x) / PI2;
-    return createSegment(start, end, value);
-  }
 
   public visit(board: Board, boardUtils: BoardUtils, ms: MoveStruct, fwd: vec3): VisResult {
     this.sectors.clear();
@@ -223,11 +224,10 @@ export class PvsBoardVisitorResult implements VisResult {
     this.sprites.clear();
     this.nonvoidWalls.clear();
     this.rad.clear();
-    this.pvs.clear().push(ms.sec)
+    this.pvs.clear();
+    this.pvs.add(ms.sec);
 
-    for (let i = 0; i < this.pvs.length(); i++) {
-      const s = this.pvs.get(i);
-
+    for (const s of this.pvs) {
       const sec = board.sectors[s];
       if (sec == undefined) continue;
 
@@ -241,17 +241,17 @@ export class PvsBoardVisitorResult implements VisResult {
           this.nonvoidWalls.push(w);
           continue;
         }
-        if (this.rad.scan(this.calcSegment(board, w, ms, true))) {
+        if (this.rad.scan(calcSegment(board, w, ms, true))) {
           this.walls.push(packWallSectorId(w, s));
-          this.rad.add(this.calcSegment(board, w, ms, false));
+          this.rad.add(calcSegment(board, w, ms, false));
         }
       }
 
       for (const w of this.nonvoidWalls) {
         const wall1 = board.walls[w];
-        if (this.rad.scan(this.calcSegment(board, w, ms, true))) {
+        if (this.rad.scan(calcSegment(board, w, ms, true))) {
           this.walls.push(packWallSectorId(w, s));
-          this.pvs.push(wall1.nextsector);
+          this.pvs.add(wall1.nextsector);
         }
       }
 

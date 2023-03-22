@@ -1,13 +1,13 @@
 import { BoardUtils } from "app/apis/app";
 import { vec3 } from "gl-matrix";
-import { FastList, SortedHeap } from "utils/list";
-import { Deck, range } from "../utils/collections";
+import { range } from "../utils/collections";
+import { SortedHeap } from "../utils/list";
 import { cross2d, int, len2d, ortonorm2d, sign } from "../utils/mathutils";
 import { inSector, isValidSectorId } from "./board/query";
 import { Board, FACE_SPRITE, FLOOR_SPRITE, Sector, WALL_SPRITE } from "./board/structs";
 import { ArtInfoProvider } from "./formats/art";
-import { floorSprite, SpriteInfo, spriteInfo, wallSprite } from "./sprites";
-import { ANGSCALE, inPolygon, rayIntersect, slope, ZSCALE } from "./utils";
+import { SpriteInfo, floorSprite, spriteInfo, wallSprite } from "./sprites";
+import { ANGSCALE, ZSCALE, inPolygon, rayIntersect, slope } from "./utils";
 
 export enum EntityType {
   FLOOR, CEILING, UPPER_WALL, MID_WALL, LOWER_WALL, SPRITE, WALL_POINT

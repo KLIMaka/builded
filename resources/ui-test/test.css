@@ -1,6 +1,13 @@
 :root {
   --bg: #303030;
   --border: #3d3d3d;
+  --table-header-color: #333333;
+  --table-header-border-color: #1e1e1e;
+  --table-odd-color: #282828;
+  --table-even-color: #2b2b2b;
+  --table-hover-color: #3f3f3f;
+  --table-select-color: #3d5984;
+  --table-hover-select-color: #54709a;
   --fg-gray: #545454;
   --fg-highlight: #797979;
   --fg-gray-hover: #656565;
@@ -351,6 +358,64 @@ li.selected:hover {
 .section-content {
   padding: 5px;
 }
+
+.table {
+  background-color: var(--table-odd-color);
+  border-radius: 3px;
+  box-shadow: var(--shadow);
+  border: solid 1px var(--fg-gray);
+  overflow: auto;
+  padding-bottom: 5px;
+  height: 100%;
+}
+
+.table::-webkit-scrollbar {
+  width: 5px;
+}
+
+.table::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+.table::-webkit-scrollbar-thumb {
+  background-color: var(--fg-gray);
+  border-radius: 3px;
+}
+
+.table-row-content {
+  display: grid;
+  grid-template-columns: 1fr 200px;
+  margin: 0px 5px;
+  padding: 2px 5px;
+}
+
+.table-head {
+  background-color: var(--table-header-color);
+  position: sticky;
+  top: 0px;
+  border-bottom: solid 1px var(--table-header-border-color);
+  padding: 2px 0px;
+}
+
+.table-head>.table-row-content {
+  margin-top: 0px;
+  margin-bottom: 0px;
+}
+
+
+.table-row {
+  background-color: var(--table-odd-color);
+}
+
+.table-row:nth-child(even) {
+  background-color: var(--table-even-color);
+}
+
+.table-row>.table-row-content:hover {
+  background-color: var(--table-hover-color);
+  border-radius: 3px;
+}
+
 
 input[type=text] {
   background-color: var(--fg-gray);

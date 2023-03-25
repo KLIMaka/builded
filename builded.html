@@ -8,21 +8,27 @@
   <script type="module" src="app.bundle.js"></script>
   <!-- <link rel="stylesheet" type="text/css" href="resources/css/photon.css"> -->
   <link rel="stylesheet" type="text/css" href="resources/ui-test/test.css">
+  <link rel="stylesheet" href="//code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
 </head>
 
 <body>
-  <div class="window" style="height: 100%; width: 100%;">
-    <div class="window-content" style="height: 100%; width: 100%;">
+  <!-- <div class="window">
+    <div class="window-content">
       <div style="display: grid; grid-template-columns: 1fr 250px; height: 100%;">
-        <div style="height: 100%; width: 100%;">
-          <canvas style="height: 99%; width: 100%;" id="display" height="784px" width="1024px"></canvas>
-        </div>
         <div id="info_panel">
         </div>
       </div>
     </div>
 
     <footer id="footer" class="window-footer global"> </footer>
+  </div> -->
+
+  <div class="window" id="viewport">
+    <div class="window-head">Viewport</div>
+    <div class="window-content">
+      <canvas id="display" height="400px" width="400px"></canvas>
+    </div>
+    <div class="window-footer"></div>
   </div>
 </body>
 

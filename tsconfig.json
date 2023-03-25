@@ -19,7 +19,8 @@
       "utils": [
         "utils"
       ]
-    }
+    },
+    "allowSyntheticDefaultImports": true,
   },
   "files": [
     "src/builded.ts"

@@ -166,42 +166,42 @@ export class View2d extends MessageHandlerReflective implements View {
       : closestWallSegmentInSectorDist(board, sectorId, x, y);
     if (wallId != -1) {
       const [sx, sy] = snapWall(board, wallId, x, y, this.gridController);
-      const wall = board.walls[wallId];
-      const wall2 = board.walls[wall.point2];
-      if (sx == wall.x && sy == wall.y) {
-        this.pointOnWallTarget.entity_ = Entity.wallPoint(wallId);
-        vec3.set(this.pointOnWallTarget.coords_, wall.x, wall.y, 0);
-        this.pointOnWallSnapTarget.type = SnapType.WALL;
-        targets.add(this.pointOnWallSnapTarget, len2d(x - wall.x, y - wall.y));
-      } else if (sx == wall2.x && sy == wall2.y) {
-        this.pointOnWallTarget.entity_ = Entity.wallPoint(wall.point2);
-        vec3.set(this.pointOnWallTarget.coords_, wall2.x, wall2.y, 0);
-        this.pointOnWallSnapTarget.type = SnapType.WALL;
-        targets.add(this.pointOnWallSnapTarget, len2d(x - wall2.x, y - wall2.y));
-      } else {
-        this.pointOnWallTarget.entity_ = Entity.midWall(wallId);
-        vec3.set(this.pointOnWallTarget.coords_, sx, sy, 0);
-        this.pointOnWallSnapTarget.type = SnapType.POINT_ON_WALL;
-        targets.add(this.pointOnWallSnapTarget, len2d(x - sx, y - sy));
-      }
+      // const wall = board.walls[wallId];
+      // const wall2 = board.walls[wall.point2];
+      // if (sx == wall.x && sy == wall.y) {
+      //   this.pointOnWallTarget.entity_ = Entity.wallPoint(wallId);
+      //   vec3.set(this.pointOnWallTarget.coords_, wall.x, wall.y, 0);
+      //   this.pointOnWallSnapTarget.type = SnapType.WALL;
+      //   targets.add(this.pointOnWallSnapTarget, len2d(x - wall.x, y - wall.y));
+      // } else if (sx == wall2.x && sy == wall2.y) {
+      //   this.pointOnWallTarget.entity_ = Entity.wallPoint(wall.point2);
+      //   vec3.set(this.pointOnWallTarget.coords_, wall2.x, wall2.y, 0);
+      //   this.pointOnWallSnapTarget.type = SnapType.WALL;
+      //   targets.add(this.pointOnWallSnapTarget, len2d(x - wall2.x, y - wall2.y));
+      // } else {
+      this.pointOnWallTarget.entity_ = Entity.midWall(wallId);
+      vec3.set(this.pointOnWallTarget.coords_, sx, sy, 0);
+      this.pointOnWallSnapTarget.type = SnapType.POINT_ON_WALL;
+      targets.add(this.pointOnWallSnapTarget, len2d(x - sx, y - sy));
+      // }
     }
 
-    const [wallPointId,] = sectorId == -1
+    const [wallPointId, wallDist] = sectorId == -1
       ? closestWallPointDist(board, x, y)
       : closestWallInSectorDist(board, sectorId, x, y);
     if (wallPointId != -1) {
       const wall = board.walls[wallPointId];
       this.wallTarget.entity_ = Entity.wallPoint(wallPointId);
       vec3.set(this.wallTarget.coords_, wall.x, wall.y, 0);
-      targets.add(this.wallSnapTarget, len2d(x - wall.x, y - wall.y));
+      targets.add(this.wallSnapTarget, wallDist);
     }
 
-    const [spriteId,] = closestSpriteInSectorDist(board, this.sec, x, y);
+    const [spriteId, spriteDist] = closestSpriteInSectorDist(board, this.sec, x, y);
     if (spriteId != -1) {
       const sprite = board.sprites[spriteId];
       this.spriteTarget.entity_ = Entity.sprite(spriteId);
       vec3.set(this.spriteTarget.coords_, sprite.x, sprite.y, sprite.z);
-      targets.add(this.spriteSnapTarget, len2d(x - sprite.x, y - sprite.y));
+      targets.add(this.spriteSnapTarget, spriteDist);
     }
 
     return targets;

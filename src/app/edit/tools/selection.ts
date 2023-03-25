@@ -24,19 +24,20 @@ const list = new Deck<MessageHandler>();
 export function getFromHitscan(factory: EntityFactory, snapType: SnapType): Deck<MessageHandler> {
   list.clear();
   const targets = factory.ctx.view.snapTargets().get();
-  if (targets.length == 0) return list;
-  const target = targets[0].target;
   const board = factory.ctx.board();
-  if (target.entity == null) return list;
-  if (target.entity.type == EntityType.WALL_POINT) {
-    list.push(factory.wall(target.entity.id));
-  } else if (target.entity.isWall()) {
-    const w1 = nextwall(board, target.entity.id);
-    list.push(factory.wallSegment([target.entity.clone(), Entity.of(w1, target.entity.type)], [target.entity.clone()]));
-  } else if (target.entity.isSector()) {
-    list.push(factory.sector(target.entity.clone()));
-  } else if (target.entity.isSprite()) {
-    list.push(factory.sprite(target.entity.id));
+  for (const snapTarget of targets) {
+    const target = snapTarget.target;
+    if (target.entity == null) continue;
+    if (target.entity.type == EntityType.WALL_POINT) {
+      list.push(factory.wall(target.entity.id));
+    } else if (target.entity.isWall()) {
+      const w1 = nextwall(board, target.entity.id);
+      list.push(factory.wallSegment([target.entity.clone(), Entity.of(w1, target.entity.type)], [target.entity.clone()]));
+    } else if (target.entity.isSector()) {
+      list.push(factory.sector(target.entity.clone()));
+    } else if (target.entity.isSprite()) {
+      list.push(factory.sprite(target.entity.id));
+    }
   }
 
   // const fullLoop = factory.ctx.state.get<boolean>(FULL_LOOP_STATE)

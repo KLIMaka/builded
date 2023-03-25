@@ -20,9 +20,10 @@ export function createContext(w: number, h: number, opts = {}): WebGLRenderingCo
 
 export function resize(gl: WebGLRenderingContext) {
   const canvas = <HTMLCanvasElement>gl.canvas;
+  const parent = canvas.parentElement.parentElement;
 
-  const displayWidth = canvas.clientWidth;
-  const displayHeight = canvas.clientHeight;
+  const displayWidth = parent.clientWidth - 2;
+  const displayHeight = parent.clientHeight - 35;
 
   if (canvas.width != displayWidth || canvas.height != displayHeight) {
 

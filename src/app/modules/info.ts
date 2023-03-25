@@ -1,6 +1,5 @@
 import { art } from "build/artraster";
 import { ArtInfoProvider } from "build/formats/art";
-import h from "stage0";
 import { createEmptyCanvas, clearCanvas, drawToCanvas } from "utils/imgutils";
 import { fit, palRasterizer, Rasterizer, transform } from "utils/pixelprovider";
 import { div, Element, tag, span } from "utils/ui/ui";
@@ -10,7 +9,9 @@ import { create, lifecycle, Module, plugin } from "../../utils/injector";
 import { ART, ArtProvider, BOARD, BoardProvider, View, VIEW } from "../apis/app";
 import { BUS, busDisconnector, MessageHandlerReflective } from "../apis/handler";
 import { BoardInvalidate, Frame } from "../edit/messages";
-import { Palette, RAW_PAL, RAW_PLUs } from "../modules/artselector"
+import { Palette, RAW_PAL, RAW_PLUs } from "../modules/artselector";
+import $ from "jquery";
+import "jqueryui";
 
 type ArtRenderer = { canvas: HTMLCanvasElement, renderer: (picnum: number, pal: number) => void };
 function artRenderer(arts: ArtInfoProvider, rasterizer: Rasterizer<number>, pals: Palette[]): ArtRenderer {

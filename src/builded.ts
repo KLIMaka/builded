@@ -14,6 +14,8 @@ import { createContextFromCanvas } from './utils/gl/gl';
 import { App, create, instance, plugin, provider } from './utils/injector';
 import { PROFILER } from './utils/profiler';
 import { DefaultLifecycleListener } from './app/modules/default/lifecycle-listener';
+import $ from "jquery";
+import "jqueryui";
 
 function createLogger() {
   return (level: LogLevel, ...msg: any[]) => {
@@ -47,5 +49,8 @@ app.install(PainterModule);
 app.bind(plugin('MainLoop'), provider(async injector => {
   await create(injector, MainLoop, GL, VIEW, BUS, PROFILER, FRAME_GENERATOR);
 }));
+
+$("#viewport").resizable({ containment: 'body' }).draggable({ containment: 'body' })
+
 
 app.start();

@@ -2,7 +2,7 @@ import { cloneBoard, cloneSector, cloneSprite, cloneWall, newBoard, newSector, n
 import { ArtFile, ArtFiles } from "../../../build/formats/art";
 import { createPalette, GrpFile, loadPlus, loadShadeTables } from "../../../build/formats/grp";
 import { createTexture } from "../../../utils/gl/textures";
-import { Dependency, getInstances, Injector, instance, Module, plugin, provider } from "../../../utils/injector";
+import { Dependency, getInstances, Injector, instance, Module, Plugin, plugin, provider } from "../../../utils/injector";
 import { BUS, BusPlugin } from "../../apis/handler";
 import { LoadBoard, namedMessageHandler } from "../../edit/messages";
 import { Palette, PIC_TAGS, RAW_PAL, RAW_PLUs } from "../artselector";
@@ -105,8 +105,7 @@ const PicTags = provider(async (injector: Injector) => {
 });
 
 const Resources = provider(async (injector: Injector) => {
-  const fs = await injector.getInstance(FS);
-  const grp = await injector.getInstance(GRP);
+  const [fs, grp] = await getInstances(injector, FS, GRP);
   return {
     get: async name => {
       const file = await fs.get(name);
@@ -114,11 +113,11 @@ const Resources = provider(async (injector: Injector) => {
       return grp.getArrayBuffer(name);
     },
     list: async () => {
-      const files = new Set<string>(Object.keys(grp.files));
+      const files = new Set<string>(grp.infos.keys());
       (await fs.list()).forEach(f => files.add(f));
       return [...files];
     }
-  }
+  } as BuildResources;
 });
 
 async function mapLoader(module: Module) {

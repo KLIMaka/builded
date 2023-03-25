@@ -16,10 +16,10 @@ export async function StatusBarModule(module: Module) {
 }
 
 const positionBoxTemplate = h`
-  <span class="title padded-horizontally-less">Position:
+  <div class="hitem">Position:
     <span style="width: 45px; display: inline-block; text-align: right;">#posx</span>,
     <span style="width: 45px; display: inline-block; text-align: left;">#posy</span>
-  </span>
+  </div>
 `
 function PositionBox(): [Node, (x: number, y: number) => void] {
   const root = positionBoxTemplate;
@@ -40,7 +40,7 @@ function PositionBox(): [Node, (x: number, y: number) => void] {
   return [root, update];
 }
 
-const valueBoxTemplate = h`<span class="title padded-horizontally-less">#nameNode<span style="display: inline-block;">#valueNode</span></span>`;
+const valueBoxTemplate = h`<div class="hitem">#nameNode<span style="display: inline-block;">#valueNode</span></div>`;
 function ValueBox(name: String, size: number): [Node, (value: any) => void] {
   const root = valueBoxTemplate.cloneNode(true);
   const { nameNode, valueNode } = valueBoxTemplate.collect(root);
@@ -56,7 +56,7 @@ function ValueBox(name: String, size: number): [Node, (value: any) => void] {
   return [root, update];
 }
 
-const statusBarTemplate = h`<span class="pull-right" #statusbar></span>`;
+const statusBarTemplate = h`<div class="item-bar" #statusbar></div>`;
 function StatusBar() {
   const root = statusBarTemplate;
   const { statusbar } = statusBarTemplate.collect(root);

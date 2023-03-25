@@ -116,7 +116,8 @@ li.selected:hover {
 }
 
 .btn.selected,
-.btn.selected:hover {
+.btn.selected:hover,
+.btn:active {
   background-color: var(--selected);
 }
 
@@ -174,7 +175,6 @@ li.selected:hover {
 }
 
 .window {
-  width: 600px;
   display: flex;
   flex-direction: column;
 }
@@ -197,7 +197,7 @@ li.selected:hover {
   box-shadow: var(--window-border-shadow), inset 0px 7px 4px -6px var(--shadow-color);
 }
 
-.window-body {
+.window-content {
   background-color: var(--bg);
   border-left: var(--window-border);
   border-right: var(--window-border);
@@ -213,6 +213,12 @@ li.selected:hover {
   border-right: var(--window-border);
   border-bottom: var(--window-border);
   box-shadow: var(--window-border-shadow);
+}
+
+.window-footer.global {
+  border-top: solid 1px var(--border);
+  border-bottom-left-radius: 0px;
+  border-bottom-right-radius: 0px;
 }
 
 .nav-content {
@@ -416,6 +422,21 @@ li.selected:hover {
   border-radius: 3px;
 }
 
+.item-bar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.hitem {
+  border-right: solid 1px var(--border);
+  margin: 5px 0px;
+  padding: 0px 5px;
+}
+
+.hitem:last-child {
+  border-right: none;
+  /* margin-right: 10px; */
+}
 
 input[type=text] {
   background-color: var(--fg-gray);
@@ -424,7 +445,8 @@ input[type=text] {
   box-shadow: var(--shadow);
   padding: 2px 5px;
   text-align: center;
-  width: 100%;
+  cursor: text;
+  user-select: auto;
 }
 
 input[type=text].top {
@@ -456,8 +478,21 @@ input[type=text]:focus-visible {
   text-shadow: var(--text-shadow);
   font-size: 12px;
   font-family: sans-serif;
+  cursor: default;
+  user-select: none;
 }
 
 body {
   background-color: #505050;
+  margin: 0px;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  overflow: hidden;
+}
+
+.hidden {
+  display: none;
 }

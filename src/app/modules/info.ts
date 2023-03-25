@@ -3,6 +3,7 @@ import { ArtInfoProvider } from "build/formats/art";
 import h from "stage0";
 import { createEmptyCanvas, clearCanvas, drawToCanvas } from "utils/imgutils";
 import { fit, palRasterizer, Rasterizer, transform } from "utils/pixelprovider";
+import { div, Element, tag, span } from "utils/ui/ui";
 import { Sector, Sprite, Wall } from "../../build/board/structs";
 import { Entity, EntityType } from "../../build/hitscan";
 import { create, lifecycle, Module, plugin } from "../../utils/injector";
@@ -36,50 +37,61 @@ export async function InfoModule(module: Module) {
   }));
 }
 
-const rowTemplate = h`<tr><td style="text-align: right">#nameNode</td><td>#valueNode</td></tr>`;
-function createRow(name: string): [Node, (v: any) => void] {
-  const root = rowTemplate.cloneNode(true);
-  const { nameNode, valueNode } = rowTemplate.collect(root);
-  nameNode.nodeValue = name;
-  const update = (v: any) => valueNode.nodeValue = v;
-  return [root, update];
+function section(name: string) {
+  const props = div('props');
+  const root = div('section');
+  const content = div('section-content');
+  content.append(props);
+  root.append(content);
+  props
+    .append(div('prop-label').text('Type'))
+    .append(div('select').text(name))
+    .append(div('prop-spacer'));
+  return { root, props };
 }
 
-const rowsTemplate = h`<div><table class="table-striped"><thead><tr><th style="width:50px">Type</th><th>#type</th></tr></thead><tbody #table></tbody></table><div #pic style="padding:10px; position:absolute; bottom:0;"></div></div>`;
-function createSprite(artRenderer: ArtRenderer): [HTMLElement, (id: number, sprite: Sprite) => void] {
-  const root = <HTMLElement>rowsTemplate.cloneNode(true);
-  const { type, table, pic } = rowsTemplate.collect(root);
-  type.nodeValue = 'Sprite';
-  const [id, idUpdater] = createRow("Id");
-  const [pos, posUpdater] = createRow("Position");
-  const [picnum, picnumUpdater] = createRow("Picnum");
-  const [shade, shadeUpdater] = createRow("Shade");
-  const [pal, palUpdater] = createRow("Palette");
-  const [offset, offsetUpdater] = createRow("Offset");
-  const [repeat, repeatUpdater] = createRow("Repeat");
-  const [lotag, lotagUpdater] = createRow("Lo-Tag");
-  const [hitag, hitagUpdater] = createRow("Hi-Tag");
-  const [clipdist, clipdistUpdater] = createRow("Clip Dist");
-  const [angle, angleUpdater] = createRow("Angle");
-  const [realCenter, realCenterUpdater] = createRow("Real Center");
-  const [xflip, xflipUpdater] = createRow("X Flip");
-  const [yflip, yflipUpdater] = createRow("Y Flip");
+type Widget = { elem: Element, updater: (v: any) => void };
 
-  table.appendChild(id);
-  table.appendChild(pos);
-  table.appendChild(picnum);
-  table.appendChild(shade);
-  table.appendChild(pal);
-  table.appendChild(offset);
-  table.appendChild(repeat);
-  table.appendChild(lotag);
-  table.appendChild(hitag);
-  table.appendChild(clipdist);
-  table.appendChild(angle);
-  table.appendChild(realCenter);
-  table.appendChild(xflip);
-  table.appendChild(yflip);
-  pic.appendChild(artRenderer.canvas);
+function createRow(name: string, props: Element, widget: Widget, spacer = true): (v: any) => void {
+  if (name != null) props.append(div('prop-label').text(name))
+  else props.append(div(''));
+  props.append(widget.elem);
+  if (spacer) props.append(div('prop-spacer'));
+  return widget.updater;
+}
+
+function check(name: string): Widget {
+  const input = tag('input').attr('type', 'checkbox');
+  const updater = (v: any) => (<HTMLInputElement>input.elem()).checked = (v == 1);
+  const elem = tag('label').className('check').text(name).append(input).append(span().className('mark'));
+  return { elem, updater };
+}
+
+function text(): Widget {
+  const elem = tag('input').attr('type', 'text');
+  const updater = (v: any) => (<HTMLInputElement>elem.elem()).value = v;
+  return { elem, updater };
+}
+
+
+function createSprite(artRenderer: ArtRenderer): [Element, (id: number, sprite: Sprite) => void] {
+  const { root, props } = section('Sprite');
+
+  const idUpdater = createRow('Id', props, text())
+  const posUpdater = createRow('Position', props, text());
+  const picnumUpdater = createRow('Picnum', props, text());
+  const shadeUpdater = createRow('Shade', props, text());
+  const palUpdater = createRow('Palette', props, text());
+  const offsetUpdater = createRow('Offset', props, text());
+  const repeatUpdater = createRow('Repeat', props, text());
+  const lotagUpdater = createRow('Lo-Tag', props, text());
+  const hitagUpdater = createRow('Hi-Tag', props, text());
+  const clipdistUpdater = createRow('Clip Dist', props, text());
+  const angleUpdater = createRow('Angle', props, text());
+  const realCenterUpdater = createRow(null, props, check('Real Center'));
+  const xflipUpdater = createRow(null, props, check('X Flip'));
+  const yflipUpdater = createRow(null, props, check('Y Flip'));
+
   return [root,
     (id: number, s: Sprite) => {
       idUpdater(id);
@@ -96,132 +108,131 @@ function createSprite(artRenderer: ArtRenderer): [HTMLElement, (id: number, spri
       realCenterUpdater(s.cstat.realCenter);
       xflipUpdater(s.cstat.xflip);
       yflipUpdater(s.cstat.yflip);
-      artRenderer.renderer(s.picnum, s.pal);
     }];
 }
 
-function createWall(artRenderer: ArtRenderer): [HTMLElement, (id: number, wall: Wall, type: EntityType) => void] {
-  const root = <HTMLElement>rowsTemplate.cloneNode(true);
-  const { type, table, pic } = rowsTemplate.collect(root);
-  type.nodeValue = 'Wall';
-  const [id, idUpdater] = createRow("Id");
-  const [pos, posUpdater] = createRow("Position");
-  const [picnum, picnumUpdater] = createRow("Picnum");
-  const [shade, shadeUpdater] = createRow("Shade");
-  const [pal, palUpdater] = createRow("Palette");
-  const [offset, offsetUpdater] = createRow("Offset");
-  const [repeat, repeatUpdater] = createRow("Repeat");
-  const [lotag, lotagUpdater] = createRow("Lo-Tag");
-  const [hitag, hitagUpdater] = createRow("Hi-Tag");
-  const [blocking, blockingUpdater] = createRow("Blocking");
-  const [swapBottoms, swapBottomsUpdater] = createRow("Swap Bottoms");
-  const [alignBottom, alignBottomUpdater] = createRow("Align Bottom");
-  const [xflip, xflipUpdater] = createRow("X Flip");
-  const [masking, maskingUpdater] = createRow("Masking");
-  const [oneWay, oneWayUpdater] = createRow("One Way");
-  const [blocking2, blocking2Updater] = createRow("Hit Scan");
-  const [translucent, translucentUpdater] = createRow("Translucent");
-  const [yflip, yflipUpdater] = createRow("Y Flip");
-  const [translucentReversed, translucentReversedUpdater] = createRow("Translucent 2");
-  table.appendChild(id);
-  table.appendChild(pos);
-  table.appendChild(picnum);
-  table.appendChild(shade);
-  table.appendChild(pal);
-  table.appendChild(offset);
-  table.appendChild(repeat);
-  table.appendChild(lotag);
-  table.appendChild(hitag);
-  table.appendChild(blocking);
-  table.appendChild(swapBottoms);
-  table.appendChild(alignBottom);
-  table.appendChild(xflip);
-  table.appendChild(masking);
-  table.appendChild(oneWay);
-  table.appendChild(blocking2);
-  table.appendChild(translucent);
-  table.appendChild(yflip);
-  table.appendChild(translucentReversed);
-  pic.appendChild(artRenderer.canvas);
-  return [root,
-    (id: number, w: Wall, type: EntityType) => {
-      idUpdater(id);
-      posUpdater(`${w.x}, ${w.y}`);
-      picnumUpdater(w.picnum);
-      shadeUpdater(w.shade);
-      palUpdater(w.pal);
-      offsetUpdater(`${w.xpanning}, ${w.ypanning}`);
-      repeatUpdater(`${w.xrepeat}, ${w.yrepeat}`);
-      lotagUpdater(w.lotag);
-      hitagUpdater(w.hitag);
-      blockingUpdater(w.cstat.blocking);
-      swapBottomsUpdater(w.cstat.swapBottoms);
-      alignBottomUpdater(w.cstat.alignBottom);
-      xflipUpdater(w.cstat.xflip);
-      maskingUpdater(w.cstat.masking);
-      oneWayUpdater(w.cstat.oneWay);
-      blocking2Updater(w.cstat.blocking2);
-      translucentUpdater(w.cstat.translucent);
-      yflipUpdater(w.cstat.yflip);
-      translucentReversedUpdater(w.cstat.translucentReversed);
-      if (type == EntityType.MID_WALL && w.nextwall != -1) artRenderer.renderer(w.overpicnum, w.pal);
-      else artRenderer.renderer(w.picnum, w.pal)
-    }];
-}
+// function createWall(artRenderer: ArtRenderer): [HTMLElement, (id: number, wall: Wall, type: EntityType) => void] {
+//   const root = <HTMLElement>rowsTemplate.cloneNode(true);
+//   const { type, table, pic } = rowsTemplate.collect(root);
+//   type.nodeValue = 'Wall';
+//   const [id, idUpdater] = createRow("Id");
+//   const [pos, posUpdater] = createRow("Position");
+//   const [picnum, picnumUpdater] = createRow("Picnum");
+//   const [shade, shadeUpdater] = createRow("Shade");
+//   const [pal, palUpdater] = createRow("Palette");
+//   const [offset, offsetUpdater] = createRow("Offset");
+//   const [repeat, repeatUpdater] = createRow("Repeat");
+//   const [lotag, lotagUpdater] = createRow("Lo-Tag");
+//   const [hitag, hitagUpdater] = createRow("Hi-Tag");
+//   const [blocking, blockingUpdater] = createRow("Blocking");
+//   const [swapBottoms, swapBottomsUpdater] = createRow("Swap Bottoms");
+//   const [alignBottom, alignBottomUpdater] = createRow("Align Bottom");
+//   const [xflip, xflipUpdater] = createRow("X Flip");
+//   const [masking, maskingUpdater] = createRow("Masking");
+//   const [oneWay, oneWayUpdater] = createRow("One Way");
+//   const [blocking2, blocking2Updater] = createRow("Hit Scan");
+//   const [translucent, translucentUpdater] = createRow("Translucent");
+//   const [yflip, yflipUpdater] = createRow("Y Flip");
+//   const [translucentReversed, translucentReversedUpdater] = createRow("Translucent 2");
+//   table.appendChild(id);
+//   table.appendChild(pos);
+//   table.appendChild(picnum);
+//   table.appendChild(shade);
+//   table.appendChild(pal);
+//   table.appendChild(offset);
+//   table.appendChild(repeat);
+//   table.appendChild(lotag);
+//   table.appendChild(hitag);
+//   table.appendChild(blocking);
+//   table.appendChild(swapBottoms);
+//   table.appendChild(alignBottom);
+//   table.appendChild(xflip);
+//   table.appendChild(masking);
+//   table.appendChild(oneWay);
+//   table.appendChild(blocking2);
+//   table.appendChild(translucent);
+//   table.appendChild(yflip);
+//   table.appendChild(translucentReversed);
+//   pic.appendChild(artRenderer.canvas);
+//   return [root,
+//     (id: number, w: Wall, type: EntityType) => {
+//       idUpdater(id);
+//       posUpdater(`${w.x}, ${w.y}`);
+//       picnumUpdater(w.picnum);
+//       shadeUpdater(w.shade);
+//       palUpdater(w.pal);
+//       offsetUpdater(`${w.xpanning}, ${w.ypanning}`);
+//       repeatUpdater(`${w.xrepeat}, ${w.yrepeat}`);
+//       lotagUpdater(w.lotag);
+//       hitagUpdater(w.hitag);
+//       blockingUpdater(w.cstat.blocking);
+//       swapBottomsUpdater(w.cstat.swapBottoms);
+//       alignBottomUpdater(w.cstat.alignBottom);
+//       xflipUpdater(w.cstat.xflip);
+//       maskingUpdater(w.cstat.masking);
+//       oneWayUpdater(w.cstat.oneWay);
+//       blocking2Updater(w.cstat.blocking2);
+//       translucentUpdater(w.cstat.translucent);
+//       yflipUpdater(w.cstat.yflip);
+//       translucentReversedUpdater(w.cstat.translucentReversed);
+//       if (type == EntityType.MID_WALL && w.nextwall != -1) artRenderer.renderer(w.overpicnum, w.pal);
+//       else artRenderer.renderer(w.picnum, w.pal)
+//     }];
+// }
 
-function createSector(artRenderer: ArtRenderer): [HTMLElement, (id: number, sector: Sector, type: EntityType) => void] {
-  const root = <HTMLElement>rowsTemplate.cloneNode(true);
-  const { type, table, pic } = rowsTemplate.collect(root);
-  type.nodeValue = 'Sector';
-  const [id, idUpdater] = createRow("Id");
-  const [picnum, picnumUpdater] = createRow("Picnum");
-  const [shade, shadeUpdater] = createRow("Shade");
-  const [pal, palUpdater] = createRow("Palette");
-  const [offset, offsetUpdater] = createRow("Offset");
-  const [z, zUpdater] = createRow("Z");
-  const [heinum, heinumUpdater] = createRow("Heinum");
-  const [lotag, lotagUpdater] = createRow("Lo-Tag");
-  const [hitag, hitagUpdater] = createRow("Hi-Tag");
-  const [dubleRes, dubleResUpdater] = createRow("Double Res");
-  const [swapXY, swapXYUpdater] = createRow("Swap XY");
-  const [xflip, xflipUpdater] = createRow("X Flip");
-  const [yflip, yflipUpdater] = createRow("Y Flip");
-  const [aligned, alignedUpdater] = createRow("Aligned");
-  table.appendChild(id);
-  table.appendChild(picnum);
-  table.appendChild(shade);
-  table.appendChild(pal);
-  table.appendChild(offset);
-  table.appendChild(z);
-  table.appendChild(heinum);
-  table.appendChild(lotag);
-  table.appendChild(hitag);
-  table.appendChild(dubleRes);
-  table.appendChild(swapXY);
-  table.appendChild(xflip);
-  table.appendChild(yflip);
-  table.appendChild(aligned);
-  pic.appendChild(artRenderer.canvas);
-  return [root,
-    (id: number, s: Sector, type: EntityType) => {
-      const ceiling = type == EntityType.CEILING;
-      idUpdater(id);
-      picnumUpdater(ceiling ? s.ceilingpicnum : s.floorpicnum);
-      shadeUpdater(ceiling ? s.ceilingshade : s.floorshade);
-      palUpdater(ceiling ? s.ceilingpal : s.floorpal);
-      offsetUpdater(ceiling ? `${s.ceilingxpanning}, ${s.ceilingypanning}` : `${s.floorxpanning}, ${s.floorypanning}`);
-      zUpdater(ceiling ? s.ceilingz : s.floorz)
-      heinumUpdater(ceiling ? s.ceilingheinum : s.floorheinum)
-      lotagUpdater(s.lotag);
-      hitagUpdater(s.hitag);
-      dubleResUpdater((ceiling ? s.ceilingstat : s.floorstat).doubleSmooshiness);
-      swapXYUpdater((ceiling ? s.ceilingstat : s.floorstat).swapXY);
-      xflipUpdater((ceiling ? s.ceilingstat : s.floorstat).xflip);
-      yflipUpdater((ceiling ? s.ceilingstat : s.floorstat).yflip);
-      alignedUpdater((ceiling ? s.ceilingstat : s.floorstat).alignToFirstWall);
-      artRenderer.renderer(ceiling ? s.ceilingpicnum : s.floorpicnum, ceiling ? s.ceilingpal : s.floorpal);
-    }];
-}
+// function createSector(artRenderer: ArtRenderer): [HTMLElement, (id: number, sector: Sector, type: EntityType) => void] {
+//   const root = <HTMLElement>rowsTemplate.cloneNode(true);
+//   const { type, table, pic } = rowsTemplate.collect(root);
+//   type.nodeValue = 'Sector';
+//   const [id, idUpdater] = createRow("Id");
+//   const [picnum, picnumUpdater] = createRow("Picnum");
+//   const [shade, shadeUpdater] = createRow("Shade");
+//   const [pal, palUpdater] = createRow("Palette");
+//   const [offset, offsetUpdater] = createRow("Offset");
+//   const [z, zUpdater] = createRow("Z");
+//   const [heinum, heinumUpdater] = createRow("Heinum");
+//   const [lotag, lotagUpdater] = createRow("Lo-Tag");
+//   const [hitag, hitagUpdater] = createRow("Hi-Tag");
+//   const [dubleRes, dubleResUpdater] = createRow("Double Res");
+//   const [swapXY, swapXYUpdater] = createRow("Swap XY");
+//   const [xflip, xflipUpdater] = createRow("X Flip");
+//   const [yflip, yflipUpdater] = createRow("Y Flip");
+//   const [aligned, alignedUpdater] = createRow("Aligned");
+//   table.appendChild(id);
+//   table.appendChild(picnum);
+//   table.appendChild(shade);
+//   table.appendChild(pal);
+//   table.appendChild(offset);
+//   table.appendChild(z);
+//   table.appendChild(heinum);
+//   table.appendChild(lotag);
+//   table.appendChild(hitag);
+//   table.appendChild(dubleRes);
+//   table.appendChild(swapXY);
+//   table.appendChild(xflip);
+//   table.appendChild(yflip);
+//   table.appendChild(aligned);
+//   pic.appendChild(artRenderer.canvas);
+//   return [root,
+//     (id: number, s: Sector, type: EntityType) => {
+//       const ceiling = type == EntityType.CEILING;
+//       idUpdater(id);
+//       picnumUpdater(ceiling ? s.ceilingpicnum : s.floorpicnum);
+//       shadeUpdater(ceiling ? s.ceilingshade : s.floorshade);
+//       palUpdater(ceiling ? s.ceilingpal : s.floorpal);
+//       offsetUpdater(ceiling ? `${s.ceilingxpanning}, ${s.ceilingypanning}` : `${s.floorxpanning}, ${s.floorypanning}`);
+//       zUpdater(ceiling ? s.ceilingz : s.floorz)
+//       heinumUpdater(ceiling ? s.ceilingheinum : s.floorheinum)
+//       lotagUpdater(s.lotag);
+//       hitagUpdater(s.hitag);
+//       dubleResUpdater((ceiling ? s.ceilingstat : s.floorstat).doubleSmooshiness);
+//       swapXYUpdater((ceiling ? s.ceilingstat : s.floorstat).swapXY);
+//       xflipUpdater((ceiling ? s.ceilingstat : s.floorstat).xflip);
+//       yflipUpdater((ceiling ? s.ceilingstat : s.floorstat).yflip);
+//       alignedUpdater((ceiling ? s.ceilingstat : s.floorstat).alignToFirstWall);
+//       artRenderer.renderer(ceiling ? s.ceilingpicnum : s.floorpicnum, ceiling ? s.ceilingpal : s.floorpal);
+//     }];
+// }
 
 
 const NULL_ENT = Entity.of(-1, EntityType.SPRITE);
@@ -229,7 +240,7 @@ const NULL_ENT = Entity.of(-1, EntityType.SPRITE);
 export class Info extends MessageHandlerReflective {
   private sector: HTMLElement;
   private wall: HTMLElement;
-  private sprite: HTMLElement;
+  private sprite: Element;
   private sectorUpdate: (id: number, sector: Sector, type: EntityType) => void;
   private wallUpdate: (id: number, wall: Wall, type: EntityType) => void;
   private spriteUpdate: (id: number, sprite: Sprite) => void;
@@ -246,13 +257,13 @@ export class Info extends MessageHandlerReflective {
   ) {
     super();
     const rasterizer = palRasterizer(pal);
-    [this.sector, this.sectorUpdate] = createSector(artRenderer(arts, rasterizer, pals));
-    [this.wall, this.wallUpdate] = createWall(artRenderer(arts, rasterizer, pals));
+    // [this.sector, this.sectorUpdate] = createSector(artRenderer(arts, rasterizer, pals));
+    // [this.wall, this.wallUpdate] = createWall(artRenderer(arts, rasterizer, pals));
     [this.sprite, this.spriteUpdate] = createSprite(artRenderer(arts, rasterizer, pals));
     const panel = document.getElementById('info_panel');
-    panel.appendChild(this.sector);
-    panel.appendChild(this.wall);
-    panel.appendChild(this.sprite);
+    // panel.appendChild(this.sector);
+    // panel.appendChild(this.wall);
+    panel.appendChild(this.sprite.elem());
   }
 
   public Frame(msg: Frame) {
@@ -261,24 +272,24 @@ export class Info extends MessageHandlerReflective {
     if (this.lastEnt.equals(ent)) return;
     this.lastEnt = ent == null ? NULL_ENT : ent;
     if (ent == null) {
-      this.sector.classList.add('hidden');
-      this.wall.classList.add('hidden');
-      this.sprite.classList.add('hidden');
+      // this.sector.classList.add('hidden');
+      // this.wall.classList.add('hidden');
+      this.sprite.elem().classList.add('hidden');
     } else if (ent.isSector()) {
-      this.wall.classList.add('hidden');
-      this.sprite.classList.add('hidden');
-      this.sectorUpdate(ent.id, board.sectors[ent.id], ent.type);
-      this.sector.classList.remove('hidden');
+      // this.wall.classList.add('hidden');
+      this.sprite.elem().classList.add('hidden');
+      // this.sectorUpdate(ent.id, board.sectors[ent.id], ent.type);
+      // this.sector.classList.remove('hidden');
     } else if (ent.isSprite()) {
-      this.wall.classList.add('hidden');
-      this.sector.classList.add('hidden');
+      // this.wall.classList.add('hidden');
+      // this.sector.classList.add('hidden');
       this.spriteUpdate(ent.id, board.sprites[ent.id]);
-      this.sprite.classList.remove('hidden');
+      this.sprite.elem().classList.remove('hidden');
     } else if (ent.isWall()) {
-      this.sector.classList.add('hidden');
-      this.sprite.classList.add('hidden');
-      this.wallUpdate(ent.id, board.walls[ent.id], ent.type);
-      this.wall.classList.remove('hidden');
+      // this.sector.classList.add('hidden');
+      this.sprite.elem().classList.add('hidden');
+      // this.wallUpdate(ent.id, board.walls[ent.id], ent.type);
+      // this.wall.classList.remove('hidden');
     }
   }
 

@@ -79,15 +79,15 @@ function fillBuffersForSectorNormal(ceil: boolean, board: Board, sectorId: numbe
 }
 
 function compress(triangles: point2d[]): [point2d[], number[]] {
-  const vtxidx: string[] = [];
+  const vtxidx = new Map<string, number>();
   const vtxset: [number, number][] = [];
   const indexes: number[] = [];
   iter(triangles).forEach(([x0, y0]) => {
     const vtx0 = `${x0},${y0}`;
-    let idx = vtxidx.indexOf(vtx0);
-    if (idx == -1) {
+    let idx = vtxidx.get(vtx0);
+    if (idx == undefined) {
       idx = vtxset.length;
-      vtxidx.push(vtx0);
+      vtxidx.set(vtx0, idx);
       vtxset.push([x0, y0]);
     }
     indexes.push(idx);

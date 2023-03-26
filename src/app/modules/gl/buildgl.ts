@@ -77,13 +77,13 @@ export class BuildGl {
     renderable.drawCall(dc => this.state.run(this.gl, dc));
   }
 
-  public newFrame() {
+  public newFrame(canvas: HTMLElement) {
     this.updateProfile(this.state.profile);
     this.gl.clearColor(0.2, 0.2, 0.2, 1.0);
     this.gl.clearStencil(0);
     this.gl.clearDepth(1);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT | this.gl.STENCIL_BUFFER_BIT);
-    this.state.setUniform('sys', [performance.now(), this.gl.drawingBufferWidth, this.gl.drawingBufferHeight, (<BloodBoard>this.board()).visibility]);
+    this.state.setUniform('sys', [performance.now(), canvas.clientWidth, canvas.clientHeight, (<BloodBoard>this.board()).visibility]);
     this.modulation(1, 1, 1, 1);
   }
 

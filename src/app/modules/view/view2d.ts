@@ -1,32 +1,22 @@
 import { vec3 } from "gl-matrix";
-import { closestSpriteInSectorDist, closestWallInSectorDist, closestWallPointDist, closestWallSegmentDist, closestWallSegmentInSector, closestWallSegmentInSectorDist } from "../../../build/board/distances";
+import { closestSpriteInSectorDist, closestWallInSectorDist, closestWallPointDist, closestWallSegmentDist, closestWallSegmentInSectorDist } from "../../../build/board/distances";
 import { findSector, inSector, snapWall } from "../../../build/board/query";
 import { Board } from "../../../build/board/structs";
 import { Entity, Hitscan, Ray, Target, hitscan } from "../../../build/hitscan";
 import { ZSCALE, build2gl, getPlayerStart } from "../../../build/utils";
 import { CachedValue } from "../../../utils/cachedvalue";
 import { Controller2D } from "../../../utils/camera/controller2d";
-import { getInstances, lifecycle } from "../../../utils/injector";
 import { NumberInterpolator } from "../../../utils/interpolator";
 import { clamp, int, len2d } from "../../../utils/mathutils";
 import { DelayedValue } from "../../../utils/timed";
-import { ART, ArtProvider, BOARD, BOARD_UTILS, BoardProvider, BoardUtils, GRID, GridController, STATE, SnapTarget, SnapTargets, SnapType, State, View } from "../../apis/app";
+import { ArtProvider, BoardProvider, BoardUtils, GridController, SnapTarget, SnapTargets, SnapType, State, View } from "../../apis/app";
 import { Message, MessageHandlerReflective } from "../../apis/handler";
 import { Renderable } from "../../apis/renderable";
 import { BoardInvalidate, LoadBoard, Mouse } from "../../edit/messages";
-import { BUILD_GL, BuildGl } from "../gl/buildgl";
-import { BoardRenderer2D, Renderer2D } from "./boardrenderer2d";
+import { BuildGl } from "../gl/buildgl";
+import { BoardRenderer2D } from "./boardrenderer2d";
 import { SnapTargetsImpl, TargetImpl, ViewPosition } from "./view";
 
-
-export const View2dConstructor = lifecycle(async (injector, lifecycle) => {
-  const [grid, bgl, board, boardUtils, art, state] = await getInstances(injector, GRID, BUILD_GL, BOARD, BOARD_UTILS, ART, STATE);
-  const renderer = await Renderer2D(injector);
-  lifecycle(state.register('zoom+', false), async s => state.unregister(s))
-  lifecycle(state.register('zoom-', false), async s => state.unregister(s))
-  const view = new View2d(renderer, grid, bgl, board, boardUtils, art, state);
-  return view;
-});
 
 export class View2d extends MessageHandlerReflective implements View {
   private position: ViewPosition;
@@ -38,6 +28,7 @@ export class View2d extends MessageHandlerReflective implements View {
   private upp = new DelayedValue(100, 1, NumberInterpolator);
 
   constructor(
+    private canvas: HTMLCanvasElement,
     private renderer: BoardRenderer2D,
     private gridController: GridController,
     private buildgl: BuildGl,
@@ -73,8 +64,8 @@ export class View2d extends MessageHandlerReflective implements View {
 
   Mouse(msg: Mouse) {
     this.control.track(msg.x, msg.y, 1024 * ZSCALE, this.state.get('lookaim'));
-    const x = (msg.x / this.buildgl.gl.drawingBufferWidth) * 2 - 1;
-    const y = (msg.y / this.buildgl.gl.drawingBufferHeight) * 2 - 1;
+    const x = (msg.x / this.canvas.clientWidth) * 2 - 1;
+    const y = (msg.y / this.canvas.clientHeight) * 2 - 1;
     const p = this.control.getPointerPosition(this.pointer, x, y);
 
     this.position.x = int(p[0]);
@@ -86,11 +77,11 @@ export class View2d extends MessageHandlerReflective implements View {
 
   Frame(msg: Message) {
     this.invalidateTarget();
-    this.control.setSize(this.buildgl.gl.drawingBufferWidth, this.buildgl.gl.drawingBufferHeight);
+    this.control.setSize(this.canvas.clientWidth, this.canvas.clientHeight);
     const max = this.control.getPointerPosition(this.pointer, 1, 1);
     const campos = this.control.getPosition();
     const dist = len2d(max[0] - campos[0], max[2] - campos[2]);
-    this.buildgl.newFrame();
+    this.buildgl.newFrame(this.canvas);
     this.renderer.draw(this, campos, dist, this.control);
     const cursor = build2gl(vec3.create(), this.snapTargetsValue.get().closest().target.coords);
     this.buildgl.setCursorPosiotion(cursor[0], cursor[1], cursor[2]);
@@ -134,10 +125,6 @@ export class View2d extends MessageHandlerReflective implements View {
     return hit;
   }
 
-  hitscan(hit: Hitscan): Hitscan {
-    return this.updateHitscan(hit);
-  }
-
   private gridTarget = new TargetImpl();
   private gridSnapTraget: SnapTarget = { target: this.gridTarget, type: SnapType.GRID };
   private wallTarget = new TargetImpl();
@@ -166,24 +153,10 @@ export class View2d extends MessageHandlerReflective implements View {
       : closestWallSegmentInSectorDist(board, sectorId, x, y);
     if (wallId != -1) {
       const [sx, sy] = snapWall(board, wallId, x, y, this.gridController);
-      // const wall = board.walls[wallId];
-      // const wall2 = board.walls[wall.point2];
-      // if (sx == wall.x && sy == wall.y) {
-      //   this.pointOnWallTarget.entity_ = Entity.wallPoint(wallId);
-      //   vec3.set(this.pointOnWallTarget.coords_, wall.x, wall.y, 0);
-      //   this.pointOnWallSnapTarget.type = SnapType.WALL;
-      //   targets.add(this.pointOnWallSnapTarget, len2d(x - wall.x, y - wall.y));
-      // } else if (sx == wall2.x && sy == wall2.y) {
-      //   this.pointOnWallTarget.entity_ = Entity.wallPoint(wall.point2);
-      //   vec3.set(this.pointOnWallTarget.coords_, wall2.x, wall2.y, 0);
-      //   this.pointOnWallSnapTarget.type = SnapType.WALL;
-      //   targets.add(this.pointOnWallSnapTarget, len2d(x - wall2.x, y - wall2.y));
-      // } else {
       this.pointOnWallTarget.entity_ = Entity.midWall(wallId);
       vec3.set(this.pointOnWallTarget.coords_, sx, sy, 0);
       this.pointOnWallSnapTarget.type = SnapType.POINT_ON_WALL;
       targets.add(this.pointOnWallSnapTarget, len2d(x - sx, y - sy));
-      // }
     }
 
     const [wallPointId, wallDist] = sectorId == -1

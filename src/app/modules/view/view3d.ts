@@ -5,30 +5,16 @@ import { Entity, Hitscan, Ray, Target, hitscan } from "../../../build/hitscan";
 import { ZSCALE, build2gl, getPlayerStart, gl2build } from "../../../build/utils";
 import { CachedValue } from "../../../utils/cachedvalue";
 import { Controller3D } from "../../../utils/camera/controller3d";
-import { getInstances, lifecycle } from "../../../utils/injector";
 import { NumberInterpolator } from "../../../utils/interpolator";
 import { int, len2d, len3d } from "../../../utils/mathutils";
 import { DelayedValue } from "../../../utils/timed";
-import { ART, ArtProvider, BOARD, BOARD_UTILS, BoardProvider, BoardUtils, GRID, GridController, STATE, SnapTarget, SnapTargets, SnapType, State, View } from "../../apis/app";
+import { ArtProvider, BoardProvider, BoardUtils, GridController, SnapTarget, SnapTargets, SnapType, State, View } from "../../apis/app";
 import { MessageHandlerReflective } from "../../apis/handler";
 import { Renderable } from "../../apis/renderable";
 import { BoardInvalidate, Frame, LoadBoard, Mouse, NamedMessage } from "../../edit/messages";
-import { BUILD_GL, BuildGl } from "../gl/buildgl";
-import { Boardrenderer3D, Renderer3D } from "./boardrenderer3d";
+import { BuildGl } from "../gl/buildgl";
+import { Boardrenderer3D } from "./boardrenderer3d";
 import { SnapTargetsImpl, TargetImpl, ViewPosition } from "./view";
-
-export const View3dConstructor = lifecycle(async (injector, lifecycle) => {
-  const [buildgl, board, boardUtils, state, grid, art] = await getInstances(injector, BUILD_GL, BOARD, BOARD_UTILS, STATE, GRID, ART);
-  const renderer = await Renderer3D(injector);
-  const view = new View3d(renderer, buildgl, board, boardUtils, state, grid, art);
-  const stateCleaner = async (s: string) => state.unregister(s);
-  lifecycle(state.register('forward', false), stateCleaner);
-  lifecycle(state.register('backward', false), stateCleaner);
-  lifecycle(state.register('strafe_left', false), stateCleaner);
-  lifecycle(state.register('strafe_right', false), stateCleaner);
-  lifecycle(state.register('camera_speed', 8000), stateCleaner);
-  return view;
-});
 
 export class View3d extends MessageHandlerReflective implements View {
   private position: ViewPosition;
@@ -44,6 +30,7 @@ export class View3d extends MessageHandlerReflective implements View {
   private sideDamper = new DelayedValue(100, 0, NumberInterpolator);
 
   constructor(
+    private canvas: HTMLCanvasElement,
     private renderer: Boardrenderer3D,
     private buildgl: BuildGl,
     private board: BoardProvider,
@@ -54,9 +41,8 @@ export class View3d extends MessageHandlerReflective implements View {
   ) {
     super();
 
-    this.aspect = this.buildgl.gl.drawingBufferWidth / this.buildgl.gl.drawingBufferHeight;
+    this.updateAspectRatio();
     this.control.setFov(90);
-
     this.loadBoard(board());
   }
 
@@ -76,6 +62,7 @@ export class View3d extends MessageHandlerReflective implements View {
   dir(): Ray { return this.direction.get() }
   getViewPosition() { return this.position }
 
+
   activate(pos: ViewPosition) {
     this.position = pos;
     this.control.setPosition(this.position.x, this.position.z / ZSCALE + 1024, this.position.y);
@@ -84,17 +71,22 @@ export class View3d extends MessageHandlerReflective implements View {
   Mouse(msg: Mouse) {
     this.mouseX = msg.x;
     this.mouseY = msg.y;
+    // console.log(this.state.get('lookaim'));
     this.control.track(msg.x, msg.y, this.state.get('lookaim'));
   }
 
   Frame(msg: Frame) {
+    this.updateAspectRatio();
     this.invalidateTarget();
     build2gl(this.cursor, this.snapTargetsValue.get().closest().target.coords);
-    this.aspect = this.buildgl.gl.drawingBufferWidth / this.buildgl.gl.drawingBufferHeight;
     this.buildgl.setCursorPosiotion(this.cursor[0], this.cursor[1], this.cursor[2]);
-    this.buildgl.newFrame();
+    this.buildgl.newFrame(this.canvas);
     this.renderer.draw(this);
     this.move(msg.dt / 1000);
+  }
+
+  private updateAspectRatio() {
+    this.aspect = this.canvas.clientWidth / this.canvas.clientHeight;
   }
 
   private move(dt: number) {
@@ -153,10 +145,6 @@ export class View3d extends MessageHandlerReflective implements View {
     return hit;
   }
 
-  hitscan(hit: Hitscan): Hitscan {
-    return this.updateHitscan(hit);
-  }
-
   private gridTarget = new TargetImpl();
   private gridSnapTraget: SnapTarget = { target: this.gridTarget, type: SnapType.GRID };
   private wallTarget = new TargetImpl();
@@ -213,8 +201,8 @@ export class View3d extends MessageHandlerReflective implements View {
 
   private updateDir(r: Ray): Ray {
     vec3.set(r.start, this.x, this.y, this.z);
-    const x = (this.mouseX / this.buildgl.gl.drawingBufferWidth) * 2 - 1;
-    const y = (this.mouseY / this.buildgl.gl.drawingBufferHeight) * 2 - 1;
+    const x = (this.mouseX / this.canvas.clientWidth) * 2 - 1;
+    const y = (this.mouseY / this.canvas.clientHeight) * 2 - 1;
     gl2build(r.dir, this.control.getForwardUnprojected(this.aspect, x, y));
     return r;
   }

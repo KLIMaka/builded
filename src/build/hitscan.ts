@@ -39,6 +39,7 @@ export interface Target {
   readonly coords: vec3;
   readonly entity: Entity;
 }
+export const EMPTY_TARGET: Target = { coords: vec3.create(), entity: null };
 
 export function isSector(type: EntityType) {
   switch (type) {

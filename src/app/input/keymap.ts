@@ -77,7 +77,7 @@ function parseKey(key: string): string {
   return key;
 }
 
-export function loadBinds(binds: string, messageParser: EventParser, logger: Logger) {
+export function loadBinds(binds: string, messageParser: EventParser, logger: Logger): InputConsumer {
   const consumer = new InputConsumer();
   const lines = binds.split(/\r?\n/);
   for (const line of lines) {

@@ -2,26 +2,27 @@ import { SelectorConstructor } from '../../app/modules/artselector';
 import { Board } from '../../build/board/structs';
 import { Deck } from '../../utils/collections';
 import { resize } from '../../utils/gl/gl';
-import { IndexedImgLibJsConstructor, INDEXED_IMG_LIB } from '../../utils/imglib';
-import { getInstances, instance, lifecycle, Module, plugin } from '../../utils/injector';
-import { DefaultProfilerConstructor, Profiler, PROFILER } from '../../utils/profiler';
+import { INDEXED_IMG_LIB, IndexedImgLibJsConstructor } from '../../utils/imglib';
+import { Module, getInstances, instance, lifecycle, plugin } from '../../utils/injector';
+import { DefaultProfilerConstructor, PROFILER, Profiler } from '../../utils/profiler';
 import { ART, BOARD, BOARD_UTILS, ENGINE_API, GRID, LIGHTMAPS, REFERENCE_TRACKER, SCHEDULER, STATE, STORAGES, View } from '../apis/app';
-import { BUS, busDisconnector, DefaultMessageBusConstructor, MessageBus, MessageHandlerReflective } from '../apis/handler';
+import { BUS, DefaultMessageBusConstructor, MessageBus, MessageHandlerReflective, busDisconnector } from '../apis/handler';
 import { Renderable } from '../apis/renderable';
 import { DefaultScheduler } from '../apis/scheduler';
-import { EntityFactoryConstructor, ENTITY_FACTORY } from '../edit/context';
-import { Commit, LoadBoard, namedMessageHandler, PostFrame, PreFrame, Render } from '../edit/messages';
+import { ENTITY_FACTORY, EntityFactoryConstructor } from '../edit/context';
+import { Commit, LoadBoard, PostFrame, PreFrame, Render, namedMessageHandler } from '../edit/messages';
 import { ClipboardModule } from '../edit/tools/clipboard';
 import { DrawSectorModule } from '../edit/tools/drawsector';
 import { DrawWallModule } from '../edit/tools/drawwall';
 import { JoinSectorsModule } from '../edit/tools/joinsectors';
 import { PushWallModule } from '../edit/tools/pushwall';
 import { PICNUM_SELECTOR, SelectionModule } from '../edit/tools/selection';
-import { ToolsBusConstructor, TOOLS_BUS } from '../edit/tools/toolsbus';
+import { SplitWallModule } from "../edit/tools/splitwall";
+import { TOOLS_BUS, ToolsBusConstructor } from '../edit/tools/toolsbus';
 import { TransformModule } from '../edit/tools/transform';
 import { UtilsModule } from '../edit/tools/utils';
 import { DefaultBoardUtilsConstructor } from '../modules/default/board-utils';
-import { DefaultFrameGenerator, FrameGenerator, FRAME_GENERATOR } from "../modules/default/framegenerator";
+import { FramegeneratorModule } from "../modules/default/framegenerator";
 import { DefaultLightmapsConstructor } from '../modules/default/lightmap';
 import { StatusBarModule } from '../modules/statusbar';
 import { TaskManagerModule } from '../modules/taskmanager';
@@ -34,10 +35,9 @@ import { DefaultAdditionalTextures } from './default/utiltex';
 import { RenderablesCacheModule } from './geometry/cache';
 import { BUILDERS_FACTORY, DefaultBuildersFactory } from './geometry/common';
 import { BUFFER_FACTORY, DefaultBufferFactory } from './gl/buffers';
-import { BuildGlConstructor, BUILD_GL } from './gl/buildgl';
+import { BUILD_GL, BuildGlConstructor } from './gl/buildgl';
 import { InfoModule } from './info';
 import { SwappableViewModule } from './view/view';
-import { SplitWallModule } from "../edit/tools/splitwall";
 
 function mapBackupService(module: Module) {
   module.bind(plugin('MapBackupService'), lifecycle(async (injector, lifecycle) => {
@@ -88,7 +88,6 @@ export function DefaultSetupModule(module: Module) {
   module.bind(SCHEDULER, DefaultScheduler);
   module.bind(LIGHTMAPS, DefaultLightmapsConstructor)
   module.bind(PROFILER, DefaultProfilerConstructor);
-  module.bind(FRAME_GENERATOR, DefaultFrameGenerator);
 
   module.install(SwappableViewModule);
   module.install(JoinSectorsModule);
@@ -104,6 +103,7 @@ export function DefaultSetupModule(module: Module) {
   module.install(StatusBarModule);
   module.install(UtilsModule);
   module.install(TaskManagerModule);
+  module.install(FramegeneratorModule);
 
   module.install(newMap);
   module.install(mapBackupService);
@@ -127,11 +127,9 @@ export class MainLoop extends MessageHandlerReflective {
     private view: View,
     private bus: MessageBus,
     private profiler: Profiler,
-    private frameGenerator: FrameGenerator
   ) {
     super();
     bus.connect(this);
-    frameGenerator.start();
   }
 
   PreFrame(msg: PreFrame) {

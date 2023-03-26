@@ -3,7 +3,7 @@ import { AllBoardVisitorResult, VisResult } from '../../../build/boardvisitor';
 import { mat4, vec3 } from 'gl-matrix';
 import { Controller2D } from '../../../utils/camera/controller2d';
 import { Deck } from '../../../utils/collections';
-import { Injector } from '../../../utils/injector';
+import { Injector, getInstances } from '../../../utils/injector';
 import { BOARD, BoardProvider } from '../../apis/app';
 import { BuildRenderableProvider, HELPER_GRID, SPRITE_LABEL, Renderable, SortingRenderable } from '../../apis/renderable';
 import { GRID_SECTOR_MATRIX } from '../geometry/builders/common';
@@ -15,12 +15,7 @@ import { View2d } from './view2d';
 const visible = new AllBoardVisitorResult();
 
 export async function Renderer2D(injector: Injector) {
-  const [bgl, builders, renderables, board] = await Promise.all([
-    injector.getInstance(BUILD_GL),
-    injector.getInstance(BUILDERS_FACTORY),
-    injector.getInstance(RENDRABLES_CACHE),
-    injector.getInstance(BOARD),
-  ]);
+  const [bgl, builders, renderables, board] = await getInstances(injector, BUILD_GL, BUILDERS_FACTORY, RENDRABLES_CACHE, BOARD);
   return new BoardRenderer2D(bgl, builders, renderables.topdown, board);
 }
 

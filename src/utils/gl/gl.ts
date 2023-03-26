@@ -5,19 +5,6 @@ export function createContextFromCanvas(id: string, opts = {}): WebGLRenderingCo
   return gl;
 }
 
-export function createContext(w: number, h: number, opts = {}): WebGLRenderingContext {
-  const canvas: HTMLCanvasElement = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
-  canvas.id = 'gl';
-  const gl = <WebGLRenderingContext>canvas.getContext('webgl2', opts);
-
-  document.body.appendChild(canvas);
-  document.body.style.overflow = 'hidden';
-  canvas.style.position = 'absolute';
-  return gl;
-}
-
 export function resize(gl: WebGLRenderingContext) {
   const canvas = <HTMLCanvasElement>gl.canvas;
   const parent = canvas.parentElement.parentElement;
@@ -34,23 +21,18 @@ export function resize(gl: WebGLRenderingContext) {
   }
 }
 
-export function animate(gl: WebGLRenderingContext, callback: (gl: WebGLRenderingContext, time: number) => void) {
-  let time = performance.now();
+export function switchContext(gl: WebGL2RenderingContext, elem: HTMLElement) {
+  const canvas = <HTMLCanvasElement>gl.canvas;
+  const rect = elem.getBoundingClientRect();
+  if (rect.bottom < 0 || rect.top > canvas.clientHeight ||
+    rect.right < 0 || rect.left > canvas.clientWidth)
+    return;
 
-  function update() {
-    resize(gl);
-    const now = performance.now();
-    callback(gl, (now - time) / 1000);
-    requestAnimationFrame(update);
-    time = now;
-  }
+  const width = rect.right - rect.left;
+  const height = rect.bottom - rect.top;
+  const left = rect.left;
+  const bottom = canvas.clientHeight - rect.bottom;
 
-  update();
+  gl.viewport(left, bottom, width, height);
+  gl.scissor(left, bottom, width, height);
 }
-
-const pixel = new Uint8Array(4);
-export function readId(gl: WebGLRenderingContext, x: number, y: number): number {
-  gl.readPixels(x, gl.drawingBufferHeight - y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
-  return pixel[0] | pixel[1] << 8 | pixel[2] << 16 /*| pixel[3]<<24*/;
-}
-

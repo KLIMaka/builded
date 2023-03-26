@@ -1,8 +1,8 @@
-import { mat2d, mat4 } from "gl-matrix";
+import { mat2d, mat4, vec3 } from "gl-matrix";
 import { EngineApi } from "../../build/board/mutations/api";
 import { Board } from "../../build/board/structs";
 import { ArtInfoProvider } from "../../build/formats/art";
-import { Ray, Target } from "../../build/hitscan";
+import { EMPTY_TARGET, Ray, Target } from "../../build/hitscan";
 import { MoveStruct } from "../../build/utils";
 import { Texture } from "../../utils/gl/drawstruct";
 import { Dependency } from "../../utils/injector";
@@ -39,11 +39,18 @@ export enum SnapType {
 }
 
 export type SnapTarget = { target: Target, type: SnapType };
+export const EMPTY_SNAP_TARGET: SnapTarget = { target: EMPTY_TARGET, type: SnapType.GRID };
 export interface SnapTargets {
   get(): SnapTarget[];
   getByType(...types: SnapType[]): SnapTarget[];
   closest(): SnapTarget;
 }
+
+export const EMPLY_SNAP_TARGETS: SnapTargets = {
+  get: () => [],
+  getByType: (...types) => [],
+  closest: () => EMPTY_SNAP_TARGET
+};
 
 export interface View extends MoveStruct, MessageHandler {
   drawTools(renderables: Iterable<Renderable>): void;

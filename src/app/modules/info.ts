@@ -10,8 +10,6 @@ import { ART, ArtProvider, BOARD, BoardProvider, View, VIEW } from "../apis/app"
 import { BUS, busDisconnector, MessageHandlerReflective } from "../apis/handler";
 import { BoardInvalidate, Frame } from "../edit/messages";
 import { Palette, RAW_PAL, RAW_PLUs } from "../modules/artselector";
-import $ from "jquery";
-import "jqueryui";
 
 type ArtRenderer = { canvas: HTMLCanvasElement, renderer: (picnum: number, pal: number) => void };
 function artRenderer(arts: ArtInfoProvider, rasterizer: Rasterizer<number>, pals: Palette[]): ArtRenderer {

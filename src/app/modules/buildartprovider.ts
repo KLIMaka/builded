@@ -7,7 +7,8 @@ import { create, Dependency, lifecycle } from "../../utils/injector";
 import { int } from "../../utils/mathutils";
 import { ArtProvider, Logger, LOGGER } from "../apis/app";
 
-export const GL = new Dependency<WebGLRenderingContext>('GL');
+export const GL = new Dependency<WebGL2RenderingContext>('GL');
+export const OFFSCREEN = new Dependency<OffscreenCanvas>('Offscreen');
 export const ART_FILES = new Dependency<ArtFiles>('ArtFiles');
 export type TextureProvider = (id: number) => Texture;
 export const TEXTURES_OVERRIDE = new Dependency<TextureProvider>('Textures Override');

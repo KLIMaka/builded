@@ -3,6 +3,8 @@ import tippy from "tippy.js";
 import { instance, Module } from "../../utils/injector";
 import { center, div, dragElement } from "../../utils/ui/ui";
 import { MenuBuilder, ToolbarBuilder, UI, UiBuilder, Window, WindowBuilder } from "../apis/ui";
+import $ from "jquery";
+import "jqueryui";
 
 const dialogTemplate = h`
 <div class="window-frame hidden" #window>
@@ -51,17 +53,10 @@ export class PhotonDialog implements Window {
 }
 
 const windowTemplate = h`
-<div class="window-frame hidden" #window>
-  <header class="toolbar toolbar-header">
-    <h1 class="title" #title>#caption
-      <span class="icon icon-record pull-right padded-horizontally red hidden" #close></span>
-    </h1>
-    <div class="toolbar-actions hidden" #toolbar></div>
-  </header>
+<div class="window" #window>
+  <div class="window-head" #head></div>
   <div class="window-content" #content></div>
-  <footer class="toolbar toolbar-footer">
-      <div class="toolbar-actions hidden" #footer></div>
-  </footer>
+  <div class="window-footer" #footer></div>
 </div>
 `;
 
@@ -70,42 +65,30 @@ class PhotonWindow implements Window {
   public onclose: () => void;
   readonly contentElement: HTMLElement;
   readonly winElement: HTMLElement;
-  readonly toolbar: HTMLElement;
-  readonly footerToolbar: HTMLElement;
+  readonly headerElement: HTMLElement;
+  readonly footerElement: HTMLElement;
 
-  constructor(c: string, private w: number, private h: number, private centered = true, closeable = true) {
+  constructor(caption: string, private w: number, private h: number, private centered = true, closeable = true) {
     const root = <HTMLElement>windowTemplate.cloneNode(true);
-    const { window, title, caption, close, toolbar, footer, content } = windowTemplate.collect(root);
+    const { window, head, content, footer } = windowTemplate.collect(root);
 
-    caption.nodeValue = c;
-    if (closeable) {
-      (<HTMLElement>close).classList.remove('hidden');
-      (<HTMLElement>close).onclick = e => this.close();
-    }
-
+    head.innerText = caption;
     this.winElement = window;
     this.contentElement = content;
-    this.contentElement.style.width = w + 'px';
-    this.contentElement.style.height = h + 'px';
-    this.toolbar = toolbar;
-    this.footerToolbar = footer;
+    this.headerElement = head;
+    this.footerElement = footer;
 
-    dragElement(title, this.winElement);
     document.body.appendChild(root);
+    const jqw = $(window);
+    jqw.draggable({ handle: head, containment: document.body });
+    jqw.resizable({ containment: document.body });
+    jqw.hide();
   }
 
   public addToolbarWidget(currentGroup: HTMLElement, isToolbar: boolean, widget: HTMLElement) {
-    const toolbar = isToolbar ? this.toolbar : this.footerToolbar;
-    const container = currentGroup == null ? toolbar : currentGroup;
-    container.appendChild(widget);
-    toolbar.classList.remove('hidden');
   }
 
   public startButtonGroup(isToolbar: boolean) {
-    const toolbar = isToolbar ? this.toolbar : this.footerToolbar;
-    const group = div('btn-group').elem();
-    toolbar.append(group);
-    return group;
   }
 
   public close() {
@@ -113,12 +96,12 @@ class PhotonWindow implements Window {
     if (this.onclose) this.onclose();
   }
 
-  hide() { this.winElement.classList.add('hidden') }
+  hide() { $(this.winElement).hide() }
   destroy() { document.body.removeChild(this.winElement) }
 
   show() {
     if (this.centered) this.setPosition((document.body.clientWidth - this.w) / 2, (document.body.clientHeight - this.h) / 2);
-    this.winElement.classList.remove('hidden')
+    $(this.winElement).show();
   }
 
   setPosition(x: string | number, y: string | number): void {
@@ -126,6 +109,8 @@ class PhotonWindow implements Window {
     const actualY = typeof y == 'number' ? y + 'px' : y;
     this.winElement.style.left = actualX;
     this.winElement.style.top = actualY;
+    this.winElement.style.width = `${this.w}px`;
+    this.winElement.style.height = `${this.h}px`;
   }
 }
 

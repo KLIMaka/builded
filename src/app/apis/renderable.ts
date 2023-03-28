@@ -10,7 +10,7 @@ export const NULL_RENDERABLE: Renderable = { drawCall: (consumer: DrawCallConsum
 export const SPRITE_LABEL = 1 << 0;
 export const HELPER_GRID = 1 << 1;
 
-const sorter = (l: DrawCall, r: DrawCall): number => l.hint - r.hint;
+const SORTER = (l: DrawCall, r: DrawCall): number => l.hint - r.hint;
 export class SortingRenderable implements Renderable {
   private drawList: DrawCall[] = [];
 
@@ -24,7 +24,7 @@ export class SortingRenderable implements Renderable {
     for (const r of this.renderables) r.drawCall(dc => {
       if (this.filter(dc.kind)) this.drawList.push(dc);
     });
-    const sorted = this.drawList.sort(sorter);
+    const sorted = this.drawList.sort(SORTER);
     for (const dc of sorted) consumer(dc);
   }
 }

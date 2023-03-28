@@ -1,14 +1,14 @@
 import { vec3 } from "gl-matrix";
-import { Deck, EMPTY_COLLECTION, EMPTY_ITERATOR, filter, forEach } from "utils/collections";
+import { Deck, EMPTY_COLLECTION, filter, forEach } from "utils/collections";
 import { Comparator, SortedHeap } from "utils/list";
 import { EMPTY_TARGET, Entity, Ray, Target } from "../../../build/hitscan";
-import { Dependency, Module, Plugin, create, getInstances, lifecycle, provider } from "../../../utils/injector";
-import { ART, ArtProvider, BOARD, BOARD_UTILS, BoardProvider, BoardUtils, EMPLY_SNAP_TARGETS as EMPTY_SNAP_TARGETS, GRID, GridController, STATE, SnapTarget, SnapTargets, SnapType, State, VIEW, View } from "../../apis/app";
-import { BUS, Message, MessageBus, MessageHandler, MessageHandlerReflective, busDisconnector } from "../../apis/handler";
+import { Dependency, getInstances, lifecycle, Module, Plugin, provider } from "../../../utils/injector";
+import { ART, ArtProvider, BOARD, BoardProvider, BoardUtils, BOARD_UTILS, EMPLY_SNAP_TARGETS as EMPTY_SNAP_TARGETS, GRID, GridController, SnapTarget, SnapTargets, SnapType, STATE, State, VIEW, View } from "../../apis/app";
+import { BUS, busDisconnector, Message, MessageBus, MessageHandler, MessageHandlerReflective } from "../../apis/handler";
 import { Renderable } from "../../apis/renderable";
 import { Frame, Key, LoadBoard, Mouse, NamedMessage, PreFrame, Render } from "../../edit/messages";
 import { OFFSCREEN } from "../buildartprovider";
-import { BUILD_GL, BuildGl } from "../gl/buildgl";
+import { BuildGl, BUILD_GL } from "../gl/buildgl";
 import { BoardRenderer2D, Renderer2D } from "./boardrenderer2d";
 import { Boardrenderer3D, Renderer3D } from "./boardrenderer3d";
 import { View2d } from "./view2d";
@@ -252,12 +252,17 @@ class ViewControllerImpl extends MessageHandlerReflective implements ViewControl
   Frame(msg: Frame) {
     const gl = this.buildgl.gl;
     this.views.forEach(([v, c]) => {
-      // this.offscren.width = c.clientWidth;
-      // this.offscren.height = c.clientHeight;
-      // gl.viewport(0, 0, c.clientWidth, c.clientHeight);
-      gl.viewport(0, 0, 128, 128);
+      const parent = c.parentElement.parentElement;
+      const w = parent.clientWidth - 2;
+      const h = parent.clientHeight - 35;
+      c.width = w;
+      c.height = h;
+      this.offscren.width = w;
+      this.offscren.height = h;
+      gl.viewport(0, 0, w, h);
       v.handle(msg);
-      c.getContext('bitmaprenderer').transferFromImageBitmap(this.offscren.transferToImageBitmap());
+      c.getContext('bitmaprenderer')
+        .transferFromImageBitmap(this.offscren.transferToImageBitmap());
     });
   }
 

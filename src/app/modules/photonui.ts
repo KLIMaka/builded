@@ -62,7 +62,7 @@ const windowTemplate = h`
 </div>
 `;
 
-type WindowSettings = {
+type WindowState = {
   x: number,
   y: number,
   width: number,
@@ -77,7 +77,7 @@ class BuildedWindow implements Window {
   readonly headerElement: HTMLElement;
   readonly footerElement: HTMLElement;
 
-  private settings: WindowSettings;
+  private state: Promise<WindowState>;
   private neetToSave = false;
 
   constructor(private id: string, private storage: Storage) {
@@ -89,35 +89,39 @@ class BuildedWindow implements Window {
     this.headerElement = head;
     this.footerElement = footer;
 
-    document.body.appendChild(root);
     const jqw = $(root);
     jqw.draggable({
-      handle: head, containment: document.body, drag: (e, ui) => {
-        this.settings.x = ui.position.left;
-        this.settings.y = ui.position.top;
+      handle: head, containment: document.body, drag: async (e, ui) => {
+        const state = await this.state;
+        state.x = ui.position.left;
+        state.y = ui.position.top;
         this.neetToSave = true;
       }
     });
     jqw.resizable({
-      containment: document.body, resize: (e, ui) => {
-        this.settings.width = ui.size.width;
-        this.settings.height = ui.size.height;
+      containment: document.body, resize: async (e, ui) => {
+        const state = await this.state;
+        state.width = ui.size.width;
+        state.height = ui.size.height;
         this.neetToSave = true;
       }
     });
     jqw.hide();
-    setInterval(() => this.saveState(), 10000);
+    document.body.appendChild(root);
+    setInterval(() => this.saveState(), 1000);
     this.restoreState();
   }
 
   private async restoreState() {
-    const settings = await this.storage.get(this.id) as WindowSettings;
-    if (settings != null) this.settings = settings;
+    this.state = this.storage.get(this.id, {} as WindowState);
+    const state = await this.state;
+    this.setSize(state.width, state.height);
+    this.setPosition(state.x, state.y);
   }
 
   private saveState() {
     if (!this.neetToSave) return;
-    this.storage.set(this.id, this.settings);
+    this.storage.set(this.id, this.state);
     this.neetToSave = false;
   }
 
@@ -127,21 +131,23 @@ class BuildedWindow implements Window {
   }
 
   hide() { $(this.winElement).hide() }
-  show() { $(this.winElement).show() }
+  async show() { await this.state; $(this.winElement).show() }
 
-  setSize(w: number, h: number) {
+  async setSize(w: number, h: number) {
     this.winElement.style.width = `${w}px`;
     this.winElement.style.height = `${h}px`;
-    this.settings.height = h;
-    this.settings.width = w;
+    const state = await this.state;
+    state.height = h;
+    state.width = w;
     this.saveState();
   }
 
-  setPosition(x: number, y: number) {
+  async setPosition(x: number, y: number) {
     this.winElement.style.left = `${x}px`;
     this.winElement.style.top = `${y}px`;
-    this.settings.x = x;
-    this.settings.y = y;
+    const state = await this.state;
+    state.x = x;
+    state.y = y;
     this.saveState();
   }
 
@@ -295,7 +301,7 @@ class BuildedUi implements Ui {
   ) { }
 
   createWindow(id: string): Window {
-    const window = new BuildedWindow(this.uiStorage);
+    const window = new BuildedWindow(id, this.uiStorage);
     return window;
   }
 }

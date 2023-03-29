@@ -1,7 +1,6 @@
 import { UI } from "app/apis/ui";
 import { ViewType, VIEW_CONTROLLER } from "app/modules/view/view";
-import $ from "jquery";
-import "jqueryui";
+import { div } from "utils/ui/ui";
 import { LOGGER, LogLevel, TIMER } from './app/apis/app';
 import { ArtEditorModule } from './app/modules/arteditor';
 import { BloodModule } from './app/modules/blood/module';
@@ -51,12 +50,9 @@ app.bind(plugin('MainLoop'), provider(async injector => {
   const [viewctl, ui] = await getInstances(injector, VIEW_CONTROLLER, UI);
   const canvas = document.createElement('canvas');
   viewctl.add(canvas, ViewType.VIEW_3D);
-  const window = ui.builder.window()
-    .title('Viewport')
-    .draggable(true)
-    .size(600, 600)
-    .content(canvas)
-    .build();
+  const window = ui.createWindow('viewport');
+  window.contentElement.appendChild(canvas);
+  window.headerElement.innerText = 'Caption';
   window.show();
 }));
 

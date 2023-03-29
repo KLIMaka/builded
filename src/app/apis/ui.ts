@@ -2,11 +2,11 @@ import { Dependency } from "../../utils/injector";
 
 export interface Window {
   readonly contentElement: HTMLElement;
+  readonly headerElement: HTMLElement;
   readonly winElement: HTMLElement;
   onclose: () => void;
   show(): void;
   hide(): void;
-  setPosition(x: number | string, y: string | number): void;
   destroy(): void;
 }
 

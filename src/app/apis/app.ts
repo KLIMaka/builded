@@ -18,8 +18,8 @@ export type Timer = () => number;
 export const TIMER = new Dependency<Timer>('Timer');
 
 export interface Storage {
-  get(key: string): Promise<any>;
-  set(key: string, value: any): Promise<any>;
+  get<T>(key: string, def?: T): Promise<T>;
+  set<T>(key: string, value: T): Promise<any>;
   delete(key: string): Promise<void>;
   clear(): Promise<void>;
   keys(): Promise<string[]>;

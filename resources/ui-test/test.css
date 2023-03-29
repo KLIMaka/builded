@@ -202,6 +202,7 @@ li.selected:hover {
   border-left: var(--window-border);
   border-right: var(--window-border);
   box-shadow: var(--window-border-shadow), inset 0px 7px 4px -6px var(--shadow-color);
+  height: 100%;
 }
 
 .window-footer {

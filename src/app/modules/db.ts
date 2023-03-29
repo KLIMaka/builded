@@ -27,15 +27,15 @@ class Db implements Storage {
     return transaction.objectStore(this.name);
   }
 
-  get(key: string) {
-    return new Promise(async (ok, error) => {
+  get<T>(key: string, def: T = null) {
+    return new Promise<T>(async (ok, error) => {
       const request = (await this.request('readonly')).get(key.toUpperCase());
-      request.onsuccess = () => ok(request.result ? request.result.data : null);
+      request.onsuccess = () => ok(request.result ? <T>request.result.data : def);
       request.onerror = (e) => error(e);
     })
   }
 
-  set(key: string, value: any) {
+  set<T>(key: string, value: T) {
     return new Promise(async (ok, error) => {
       const request = (await this.request('readwrite')).put({ key: key.toUpperCase(), name: key, data: value });
       request.onsuccess = () => ok(null);

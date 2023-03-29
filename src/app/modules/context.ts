@@ -108,39 +108,3 @@ export function DefaultSetupModule(module: Module) {
   module.install(newMap);
   module.install(mapBackupService);
 }
-
-function createTools() {
-  const list = new Deck<Renderable>();
-  return {
-    consumer: (r: Renderable) => list.push(r),
-    clear: () => list.clear(),
-    provider: list,
-  }
-}
-
-const tools = createTools();
-const RENDER = new Render(tools.consumer);
-
-export class MainLoop extends MessageHandlerReflective {
-  constructor(
-    private gl: WebGL2RenderingContext,
-    private view: View,
-    private bus: MessageBus,
-    private profiler: Profiler,
-  ) {
-    super();
-    bus.connect(this);
-  }
-
-  PreFrame(msg: PreFrame) {
-    resize(this.gl);
-    this.profiler.frameStart();
-    this.profiler.frame().timer('Frame').start();
-  }
-
-  PostFrame(msg: PostFrame) {
-    tools.clear();
-    this.bus.handle(RENDER);
-    this.view.drawTools(tools.provider);
-  }
-}

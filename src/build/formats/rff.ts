@@ -16,13 +16,13 @@ class FatRecord {
   public filename: string;
 }
 
-let headerStruct = struct(Header)
+const headerStruct = struct(Header)
   .field('sign', string(4))
   .field('version', uint)
   .field('offFat', uint)
   .field('numFiles', uint);
 
-let fatRecord = struct(FatRecord)
+const fatRecord = struct(FatRecord)
   .field('unk', array(byte, 16))
   .field('offset', uint)
   .field('size', uint)
@@ -35,14 +35,14 @@ let fatRecord = struct(FatRecord)
 export class RffFile {
   private data: Stream;
   private header: Header;
+  private namesTable = new Map<string, number>();
   public fat: FatRecord[];
-  private namesTable: { [index: string]: number } = {};
 
   constructor(buf: ArrayBuffer) {
     this.data = new Stream(buf);
     this.header = headerStruct.read(this.data);
     this.data.setOffset(this.header.offFat);
-    const len = this.header.numFiles * 48;
+    const len = this.header.numFiles * fatRecord.size;
     const fat = atomic_array(ubyte, len).read(this.data);
     this.decodeFat(fat);
     const fatBuffer = new Stream(fat.buffer);
@@ -55,7 +55,7 @@ export class RffFile {
     for (let i = 0; i < this.fat.length; i++) {
       const r = this.fat[i];
       r.filename = this.convertFname(r.filename).toLowerCase();
-      this.namesTable[r.filename] = i;
+      this.namesTable.set(r.filename, i);
     }
   }
 
@@ -71,11 +71,11 @@ export class RffFile {
   }
 
   private convertFname(name: string): string {
-    return name.substr(3) + '.' + name.substr(0, 3);
+    return name.substring(3) + '.' + name.substring(0, 3);
   }
 
   public get(fname: string): Uint8Array {
-    const idx = this.namesTable[fname.toLowerCase()];
+    const idx = this.namesTable.get(fname.toLowerCase());
     if (idx == undefined) return null;
     const record = this.fat[idx];
     this.data.setOffset(record.offset);

@@ -1,3 +1,4 @@
+import { Element } from "utils/ui/ui";
 import { Dependency } from "../../utils/injector";
 
 export interface Window {
@@ -11,7 +12,9 @@ export interface Window {
 }
 
 export interface Ui {
-  createWindow(id: string): Window;
+  createWindow(id: string, defw: number, defh: number): Window;
+
+  footer: Element;
 }
 
 export const UI = new Dependency<Ui>('UI');

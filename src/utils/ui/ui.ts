@@ -82,42 +82,30 @@ function create(tag: string) {
 }
 
 export class Table extends Element {
-  private tbody: Element;
-  private thead: Element;
-
-  constructor() {
-    super(create('table'));
-    this.thead = new Element(create('thead'));
-    this.tbody = new Element(create('tbody'));
-    this.append(this.thead);
-    this.append(this.tbody);
+  constructor(private template: string) {
+    super(div('table').elem());
   }
 
-  public head(cols: Element[]): Table {
-    let tr = new Element(create('tr'));
-    for (let i = 0; i < cols.length; i++) {
-      let c = cols[i];
-      let td = new Element(create('th')).append(c);
-      tr.append(td);
-    }
-    this.thead.append(tr);
+
+
+  public head(...cols: Element[]): Table {
+    const head = div('table-head');
+    const row = div('table-row-content');
+    head.append(row);
+    row.css('grid-template-columns', this.template);
+    for (const col of cols) row.append(col);
+    this.append(head);
     return this;
   }
 
-  public row(cols: Element[]): Element {
-    let tr = new Element(create('tr'));
-    for (let i = 0; i < cols.length; i++) {
-      let c = cols[i];
-      let td = new Element(create('td')).append(c);
-      tr.append(td);
-    }
-    this.tbody.append(tr);
-    return tr;
-  }
-
-  public removeRow(row: number): Table {
-    (<HTMLTableElement>this.tbody.elem()).deleteRow(row);
-    return this;
+  public row(...cols: Element[]): Element {
+    const row = div('table-row');
+    const content = div('table-row-content');
+    row.append(content);
+    content.css('grid-template-columns', this.template);
+    for (const col of cols) content.append(col);
+    this.append(row);
+    return row;
   }
 }
 

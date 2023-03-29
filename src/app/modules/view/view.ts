@@ -252,11 +252,12 @@ class ViewControllerImpl extends MessageHandlerReflective implements ViewControl
   Frame(msg: Frame) {
     const gl = this.buildgl.gl;
     this.views.forEach(([v, c]) => {
-      const parent = c.parentElement;
-      const w = parent.clientWidth;
-      const h = parent.clientHeight - 10;
-      c.width = w;
-      c.height = h;
+      // const parent = c.parentElement;
+      // const w = parent.clientWidth;
+      // const h = parent.clientHeight - 3;
+      // if (w <= 0 || h <= 0) return;
+      const w = c.clientWidth;
+      const h = c.clientHeight;
       this.offscren.width = w;
       this.offscren.height = h;
       gl.viewport(0, 0, w, h);

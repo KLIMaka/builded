@@ -7,6 +7,8 @@ import { center, div, dragElement } from "../../utils/ui/ui";
 import { Ui, UI, Window } from "../apis/ui";
 import { Storages, STORAGES } from "app/apis/app";
 import { Storage } from "app/apis/app";
+import { WallStats } from "build/board/structs";
+import { Element } from "../../utils/ui/ui";
 
 const dialogTemplate = h`
 <div class="window-frame hidden" #window>
@@ -80,7 +82,7 @@ class BuildedWindow implements Window {
   private state: Promise<WindowState>;
   private neetToSave = false;
 
-  constructor(private id: string, private storage: Storage) {
+  constructor(private id: string, private storage: Storage, private defState: WindowState, private desktop: HTMLElement) {
     const root = <HTMLElement>windowTemplate.cloneNode(true);
     const { window, head, content, footer } = windowTemplate.collect(root);
 
@@ -89,9 +91,10 @@ class BuildedWindow implements Window {
     this.headerElement = head;
     this.footerElement = footer;
 
+    desktop.appendChild(root);
     const jqw = $(root);
     jqw.draggable({
-      handle: head, containment: document.body, drag: async (e, ui) => {
+      handle: head, containment: desktop, snap: true, drag: async (e, ui) => {
         const state = await this.state;
         state.x = ui.position.left;
         state.y = ui.position.top;
@@ -99,7 +102,7 @@ class BuildedWindow implements Window {
       }
     });
     jqw.resizable({
-      containment: document.body, resize: async (e, ui) => {
+      containment: desktop, resize: async (e, ui) => {
         const state = await this.state;
         state.width = ui.size.width;
         state.height = ui.size.height;
@@ -107,21 +110,20 @@ class BuildedWindow implements Window {
       }
     });
     jqw.hide();
-    document.body.appendChild(root);
     setInterval(() => this.saveState(), 1000);
     this.restoreState();
   }
 
   private async restoreState() {
-    this.state = this.storage.get(this.id, {} as WindowState);
+    this.state = this.storage.get(this.id, this.defState);
     const state = await this.state;
     this.setSize(state.width, state.height);
     this.setPosition(state.x, state.y);
   }
 
-  private saveState() {
+  private async saveState() {
     if (!this.neetToSave) return;
-    this.storage.set(this.id, this.state);
+    this.storage.set(this.id, await this.state);
     this.neetToSave = false;
   }
 
@@ -139,7 +141,7 @@ class BuildedWindow implements Window {
     const state = await this.state;
     state.height = h;
     state.width = w;
-    this.saveState();
+    this.neetToSave = true;
   }
 
   async setPosition(x: number, y: number) {
@@ -148,10 +150,10 @@ class BuildedWindow implements Window {
     const state = await this.state;
     state.x = x;
     state.y = y;
-    this.saveState();
+    this.neetToSave = true;
   }
 
-  destroy() { document.body.removeChild(this.winElement) }
+  destroy() { this.desktop.removeChild(this.winElement) }
 }
 
 class PhotonWindowBuilder implements WindowBuilder {
@@ -296,13 +298,37 @@ class PhotonMenuBuilder implements MenuBuilder {
 }
 
 class BuildedUi implements Ui {
+  public head: Element;
+  public content: Element;
+  public footer: Element;
+  public win: Element;
+
   constructor(
     private uiStorage: Storage
-  ) { }
+  ) {
+    this.createDesktop();
+  }
 
-  createWindow(id: string): Window {
-    const window = new BuildedWindow(id, this.uiStorage);
+  createWindow(id: string, defw: number, defh: number): Window {
+    const window = new BuildedWindow(id, this.uiStorage, this.createDefaultState(defw, defh), this.content.elem());
     return window;
+  }
+
+  private createDefaultState(width: number, height: number): WindowState {
+    const maxw = document.body.clientWidth;
+    const maxh = document.body.clientHeight;
+    return { width, height, x: (maxw - width) / 2, y: (maxh - height) / 2 };
+  }
+
+  private createDesktop() {
+    this.head = div('desktop-header');
+    this.content = div('desktop-content');
+    this.footer = div('desktop-footer');
+    this.win = div('desktop')
+      .append(this.head)
+      .append(this.content)
+      .append(this.footer);
+    document.body.appendChild(this.win.elem());
   }
 }
 

@@ -4,12 +4,14 @@ import { Profiler, PROFILER } from "../../utils/profiler";
 import { View, VIEW } from "../apis/app";
 import { BUS, busDisconnector, MessageHandlerReflective } from "../apis/handler";
 import { PostFrame } from "../edit/messages";
+import { Ui } from "app/apis/ui";
+import { UI } from "app/apis/ui";
 
 
 export async function StatusBarModule(module: Module) {
   module.bind(plugin('StatusBar'), lifecycle(async (injector, lifecycle) => {
     const bus = await injector.getInstance(BUS);
-    const statusbar = await create(injector, Statusbar, VIEW, PROFILER);
+    const statusbar = await create(injector, Statusbar, VIEW, PROFILER, UI);
     lifecycle(bus.connect(statusbar), busDisconnector(bus));
     lifecycle(statusbar, async s => s.stop());
   }));
@@ -84,16 +86,20 @@ export class Statusbar extends MessageHandlerReflective {
   private root: hElement;
   private lastUpdate = 0;
 
-  constructor(private view: View, private profiler: Profiler) {
+  constructor(
+    private view: View,
+    private profiler: Profiler,
+    private ui: Ui
+  ) {
     super();
     const { root, updaters } = StatusBar();
     this.root = root;
-    document.getElementById('footer').appendChild(root);
+    this.ui.footer.appendHtml(root);
     this.updaters = updaters;
   }
 
   public stop() {
-    document.getElementById('footer').removeChild(this.root);
+    this.ui.footer.elem().removeChild(this.root);
   }
 
   public PostFrame(msg: PostFrame) {

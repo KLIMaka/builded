@@ -202,7 +202,8 @@ li.selected:hover {
   border-left: var(--window-border);
   border-right: var(--window-border);
   box-shadow: var(--window-border-shadow), inset 0px 7px 4px -6px var(--shadow-color);
-  height: 100%;
+  flex-grow: 1;
+  height: calc(100% - 100vh);
 }
 
 .window-footer {
@@ -372,7 +373,6 @@ li.selected:hover {
   box-shadow: var(--shadow);
   border: solid 1px var(--fg-gray);
   overflow: auto;
-  padding-bottom: 5px;
   height: 100%;
 }
 
@@ -418,6 +418,14 @@ li.selected:hover {
   background-color: var(--table-even-color);
 }
 
+.table-row:first-child {
+  padding-top: 2px;
+}
+
+.table-row:last-child {
+  padding-bottom: 2px;
+}
+
 .table-row>.table-row-content:hover {
   background-color: var(--table-hover-color);
   border-radius: 3px;
@@ -437,6 +445,21 @@ li.selected:hover {
 .hitem:last-child {
   border-right: none;
   /* margin-right: 10px; */
+}
+
+.desktop {
+  height: 100%;
+  width: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+}
+
+.desktop-head {}
+
+.desktop-content {}
+
+.desktop-footer {
+  background-color: var(--bg);
 }
 
 input[type=text] {

@@ -1,6 +1,5 @@
 import { UI } from "app/apis/ui";
 import { ViewType, VIEW_CONTROLLER } from "app/modules/view/view";
-import { div } from "utils/ui/ui";
 import { LOGGER, LogLevel, TIMER } from './app/apis/app';
 import { ArtEditorModule } from './app/modules/arteditor';
 import { BloodModule } from './app/modules/blood/module';
@@ -43,14 +42,16 @@ app.install(BloodModule);
 // module.install(DukeModule);
 app.install(PhotonUiModule);
 app.install(FileBrowserModule);
-app.install(ArtEditorModule);
-app.install(PainterModule);
+// app.install(ArtEditorModule);
+// app.install(PainterModule);
 
 app.bind(plugin('MainLoop'), provider(async injector => {
   const [viewctl, ui] = await getInstances(injector, VIEW_CONTROLLER, UI);
   const canvas = document.createElement('canvas');
+  canvas.style.height = '100%';
+  canvas.style.width = '100%';
   viewctl.add(canvas, ViewType.VIEW_3D);
-  const window = ui.createWindow('viewport');
+  const window = ui.createWindow('viewport', 400, 400);
   window.contentElement.appendChild(canvas);
   window.headerElement.innerText = 'Caption';
   window.show();

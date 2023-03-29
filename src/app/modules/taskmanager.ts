@@ -50,13 +50,8 @@ class TaskManager implements ScheddulerHandler, GridModel {
     ui: Ui,
     currentTasks: Iterable<TaskHandle>
   ) {
-    this.window = ui.builder.window()
-      .title('Tasks')
-      .draggable(true)
-      .closeable(true)
-      .centered(true)
-      .size(600, 600)
-      .build();
+    this.window = ui.createWindow('task-manager', 600, 600);
+    this.window.headerElement.innerHTML = 'Tasks';
     this.window.onclose = () => this.active = false;
     for (const task of currentTasks) this.onTaskAdd(task);
   }

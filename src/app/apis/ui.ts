@@ -10,40 +10,8 @@ export interface Window {
   destroy(): void;
 }
 
-export interface WindowBuilder {
-  title(title: string): WindowBuilder;
-  draggable(draggable: boolean): WindowBuilder;
-  centered(centered: boolean): WindowBuilder;
-  closeable(closeable: boolean): WindowBuilder;
-  size(width: number, height: number): WindowBuilder;
-  onclose(h: () => void): WindowBuilder;
-  toolbar(builder: ToolbarBuilder): WindowBuilder;
-  content(content: HTMLElement): WindowBuilder;
-  build(): Window;
-}
-
-export interface ToolbarBuilder {
-  footer(): ToolbarBuilder,
-  startGroup(): ToolbarBuilder;
-  endGroup(): ToolbarBuilder;
-  button(caption: string, click: () => void): ToolbarBuilder;
-  iconButton(icon: string, click: () => void): ToolbarBuilder;
-  widget(widget: HTMLElement): ToolbarBuilder;
-}
-
-export interface MenuBuilder {
-  item(text: string, click: () => void): MenuBuilder
-  build(elem: HTMLElement): void;
-}
-
-export interface UiBuilder {
-  window(): WindowBuilder;
-  toolbar(): ToolbarBuilder;
-  menu(): MenuBuilder;
-}
-
-
 export interface Ui {
-  readonly builder: UiBuilder;
+  createWindow(id: string): Window;
 }
+
 export const UI = new Dependency<Ui>('UI');

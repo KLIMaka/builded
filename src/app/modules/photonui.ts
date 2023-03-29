@@ -1,10 +1,12 @@
+import $, { ui } from "jquery";
+import "jqueryui";
 import h from "stage0";
 import tippy from "tippy.js";
-import { instance, Module } from "../../utils/injector";
+import { create, getInstances, instance, Module, Plugin, provider } from "../../utils/injector";
 import { center, div, dragElement } from "../../utils/ui/ui";
-import { MenuBuilder, ToolbarBuilder, UI, UiBuilder, Window, WindowBuilder } from "../apis/ui";
-import $ from "jquery";
-import "jqueryui";
+import { Ui, UI, Window } from "../apis/ui";
+import { Storages, STORAGES } from "app/apis/app";
+import { Storage } from "app/apis/app";
 
 const dialogTemplate = h`
 <div class="window-frame hidden" #window>
@@ -53,42 +55,70 @@ export class PhotonDialog implements Window {
 }
 
 const windowTemplate = h`
-<div class="window" #window>
+<div class="window" style="position:absolute;" #window>
   <div class="window-head" #head></div>
   <div class="window-content" #content></div>
   <div class="window-footer" #footer></div>
 </div>
 `;
 
+type WindowSettings = {
+  x: number,
+  y: number,
+  width: number,
+  height: number
+}
 
-class PhotonWindow implements Window {
+
+class BuildedWindow implements Window {
   public onclose: () => void;
   readonly contentElement: HTMLElement;
   readonly winElement: HTMLElement;
   readonly headerElement: HTMLElement;
   readonly footerElement: HTMLElement;
 
-  constructor(caption: string, private w: number, private h: number, private centered = true, closeable = true) {
+  private settings: WindowSettings;
+  private neetToSave = false;
+
+  constructor(private id: string, private storage: Storage) {
     const root = <HTMLElement>windowTemplate.cloneNode(true);
     const { window, head, content, footer } = windowTemplate.collect(root);
 
-    head.innerText = caption;
     this.winElement = window;
     this.contentElement = content;
     this.headerElement = head;
     this.footerElement = footer;
 
     document.body.appendChild(root);
-    const jqw = $(window);
-    jqw.draggable({ handle: head, containment: document.body });
-    jqw.resizable({ containment: document.body });
+    const jqw = $(root);
+    jqw.draggable({
+      handle: head, containment: document.body, drag: (e, ui) => {
+        this.settings.x = ui.position.left;
+        this.settings.y = ui.position.top;
+        this.neetToSave = true;
+      }
+    });
+    jqw.resizable({
+      containment: document.body, resize: (e, ui) => {
+        this.settings.width = ui.size.width;
+        this.settings.height = ui.size.height;
+        this.neetToSave = true;
+      }
+    });
     jqw.hide();
+    setInterval(() => this.saveState(), 10000);
+    this.restoreState();
   }
 
-  public addToolbarWidget(currentGroup: HTMLElement, isToolbar: boolean, widget: HTMLElement) {
+  private async restoreState() {
+    const settings = await this.storage.get(this.id) as WindowSettings;
+    if (settings != null) this.settings = settings;
   }
 
-  public startButtonGroup(isToolbar: boolean) {
+  private saveState() {
+    if (!this.neetToSave) return;
+    this.storage.set(this.id, this.settings);
+    this.neetToSave = false;
   }
 
   public close() {
@@ -97,21 +127,25 @@ class PhotonWindow implements Window {
   }
 
   hide() { $(this.winElement).hide() }
+  show() { $(this.winElement).show() }
+
+  setSize(w: number, h: number) {
+    this.winElement.style.width = `${w}px`;
+    this.winElement.style.height = `${h}px`;
+    this.settings.height = h;
+    this.settings.width = w;
+    this.saveState();
+  }
+
+  setPosition(x: number, y: number) {
+    this.winElement.style.left = `${x}px`;
+    this.winElement.style.top = `${y}px`;
+    this.settings.x = x;
+    this.settings.y = y;
+    this.saveState();
+  }
+
   destroy() { document.body.removeChild(this.winElement) }
-
-  show() {
-    if (this.centered) this.setPosition((document.body.clientWidth - this.w) / 2, (document.body.clientHeight - this.h) / 2);
-    $(this.winElement).show();
-  }
-
-  setPosition(x: string | number, y: string | number): void {
-    const actualX = typeof x == 'number' ? x + 'px' : x;
-    const actualY = typeof y == 'number' ? y + 'px' : y;
-    this.winElement.style.left = actualX;
-    this.winElement.style.top = actualY;
-    this.winElement.style.width = `${this.w}px`;
-    this.winElement.style.height = `${this.h}px`;
-  }
 }
 
 class PhotonWindowBuilder implements WindowBuilder {
@@ -135,7 +169,7 @@ class PhotonWindowBuilder implements WindowBuilder {
   public content(content: HTMLElement) { this._content = content; return this; }
 
   public build() {
-    const win = new PhotonWindow(this._title, this._w, this._h, this._centered, this._closeable);
+    const win = new BuildedWindow(this._title, this._w, this._h, this._centered, this._closeable);
     win.onclose = this._onclose;
     if (this._toolbar) this._toolbar.build(win);
     if (this._content) win.contentElement.appendChild(this._content);
@@ -146,7 +180,7 @@ class PhotonWindowBuilder implements WindowBuilder {
 const buttonTemplate = h`<button class="btn btn-default" #button></button>`;
 const iconButtonTemplate = h`<button class="btn btn-default" #button><span class="icon" #icon></span></button>`;
 
-interface ToolbarItemBuilder { build(window: PhotonWindow, group: HTMLElement): void }
+interface ToolbarItemBuilder { build(window: BuildedWindow, group: HTMLElement): void }
 
 class ToolbarGroupBuilder implements ToolbarItemBuilder {
   items: ToolbarItemBuilder[] = [];
@@ -157,7 +191,7 @@ class ToolbarGroupBuilder implements ToolbarItemBuilder {
     this.items.push(item);
   }
 
-  build(window: PhotonWindow): void {
+  build(window: BuildedWindow): void {
     const group = window.startButtonGroup(this.isToolbar);
     for (const i of this.items) i.build(window, group);
   }
@@ -190,7 +224,7 @@ class PhotonToolbarBuilder implements ToolbarBuilder {
   button(caption: string, click: () => void): ToolbarBuilder {
     const isToolbar = this.isToolbar;
     const item = {
-      build(window: PhotonWindow, group: HTMLElement) {
+      build(window: BuildedWindow, group: HTMLElement) {
         const root = <HTMLElement>buttonTemplate.cloneNode(true);
         const { button } = buttonTemplate.collect(root);
         button.onclick = click;
@@ -205,7 +239,7 @@ class PhotonToolbarBuilder implements ToolbarBuilder {
   iconButton(i: string, click: () => void): ToolbarBuilder {
     const isToolbar = this.isToolbar;
     const item = {
-      build(window: PhotonWindow, group: HTMLElement) {
+      build(window: BuildedWindow, group: HTMLElement) {
         const root = <HTMLElement>iconButtonTemplate.cloneNode(true);
         const { button, icon } = iconButtonTemplate.collect(root);
         button.onclick = click;
@@ -219,12 +253,12 @@ class PhotonToolbarBuilder implements ToolbarBuilder {
 
   widget(widget: HTMLElement): ToolbarBuilder {
     const isToolbar = this.isToolbar;
-    const item = { build(window: PhotonWindow, group: HTMLElement) { window.addToolbarWidget(group, isToolbar, widget) } };
+    const item = { build(window: BuildedWindow, group: HTMLElement) { window.addToolbarWidget(group, isToolbar, widget) } };
     this.addItem(item);
     return this;
   }
 
-  build(window: PhotonWindow) {
+  build(window: BuildedWindow) {
     for (const group of this.groups) group.build(window, null);
   }
 }
@@ -255,13 +289,24 @@ class PhotonMenuBuilder implements MenuBuilder {
   }
 }
 
-class Builder implements UiBuilder {
-  window() { return new PhotonWindowBuilder() }
-  toolbar() { return new PhotonToolbarBuilder() }
-  menu() { return new PhotonMenuBuilder() }
+class BuildedUi implements Ui {
+  constructor(
+    private uiStorage: Storage
+  ) { }
+
+  createWindow(id: string): Window {
+    const window = new BuildedWindow(this.uiStorage);
+    return window;
+  }
 }
+
+const BuildedUiConstructor: Plugin<Ui> = provider(async injector => {
+  const [storages] = await getInstances(injector, STORAGES);
+  const uiStorage = await storages('UI');
+  return new BuildedUi(uiStorage);
+});
 
 export function PhotonUiModule(module: Module) {
   document.body.oncontextmenu = () => false;
-  module.bind(UI, instance({ builder: new Builder() }));
+  module.bind(UI, BuildedUiConstructor);
 }

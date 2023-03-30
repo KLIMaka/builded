@@ -9,6 +9,7 @@ import { Storages, STORAGES } from "app/apis/app";
 import { Storage } from "app/apis/app";
 import { WallStats } from "build/board/structs";
 import { Element } from "../../utils/ui/ui";
+import { enumerate, forEach } from "utils/collections";
 
 const dialogTemplate = h`
 <div class="window-frame hidden" #window>
@@ -82,7 +83,7 @@ class BuildedWindow implements Window {
   private state: Promise<WindowState>;
   private neetToSave = false;
 
-  constructor(private id: string, private storage: Storage, private defState: WindowState, private desktop: HTMLElement) {
+  constructor(private ui: BuildedUi, private id: string, defw: number, defh: number) {
     const root = <HTMLElement>windowTemplate.cloneNode(true);
     const { window, head, content, footer } = windowTemplate.collect(root);
 
@@ -91,10 +92,10 @@ class BuildedWindow implements Window {
     this.headerElement = head;
     this.footerElement = footer;
 
-    desktop.appendChild(root);
+    this.ui.desktop.appendHtml(root);
     const jqw = $(root);
     jqw.draggable({
-      handle: head, containment: desktop, snap: true, drag: async (e, ui) => {
+      handle: head, containment: this.ui.content.elem(), snap: true, drag: async (e, ui) => {
         const state = await this.state;
         state.x = ui.position.left;
         state.y = ui.position.top;
@@ -102,7 +103,7 @@ class BuildedWindow implements Window {
       }
     });
     jqw.resizable({
-      containment: desktop, resize: async (e, ui) => {
+      containment: this.ui.content.elem(), resize: async (e, ui) => {
         const state = await this.state;
         state.width = ui.size.width;
         state.height = ui.size.height;
@@ -111,11 +112,12 @@ class BuildedWindow implements Window {
     });
     jqw.hide();
     setInterval(() => this.saveState(), 1000);
-    this.restoreState();
+    this.winElement.addEventListener('mousedown', e => this.ui.bringToFront(this));
+    this.restoreState(defw, defh);
   }
 
-  private async restoreState() {
-    this.state = this.storage.get(this.id, this.defState);
+  private async restoreState(w: number, h: number) {
+    this.state = this.ui.storage.get(this.id, this.ui.createDefaultState(w, h));
     const state = await this.state;
     this.setSize(state.width, state.height);
     this.setPosition(state.x, state.y);
@@ -123,7 +125,7 @@ class BuildedWindow implements Window {
 
   private async saveState() {
     if (!this.neetToSave) return;
-    this.storage.set(this.id, await this.state);
+    this.ui.storage.set(this.id, await this.state);
     this.neetToSave = false;
   }
 
@@ -133,7 +135,9 @@ class BuildedWindow implements Window {
   }
 
   hide() { $(this.winElement).hide() }
-  async show() { await this.state; $(this.winElement).show() }
+  async show() { await this.state; $(this.winElement).show(); this.ui.bringToFront(this); }
+  async setZ(z: number) { this.winElement.style.zIndex = `${z}` }
+  getZ() { return this.winElement.style.zIndex }
 
   async setSize(w: number, h: number) {
     this.winElement.style.width = `${w}px`;
@@ -153,7 +157,7 @@ class BuildedWindow implements Window {
     this.neetToSave = true;
   }
 
-  destroy() { this.desktop.removeChild(this.winElement) }
+  destroy() { this.ui.desktop.elem().removeChild(this.winElement) }
 }
 
 class PhotonWindowBuilder implements WindowBuilder {
@@ -297,39 +301,53 @@ class PhotonMenuBuilder implements MenuBuilder {
   }
 }
 
+type WinzTuple = [BuildedWindow, number];
+function zSorter(topWin: BuildedWindow) {
+  return (lh: WinzTuple, rh: WinzTuple) => { return lh[0] == topWin ? 1 : rh[0] == topWin ? -1 : lh[1] - rh[1] }
+}
+
 class BuildedUi implements Ui {
   public head: Element;
   public content: Element;
   public footer: Element;
-  public win: Element;
+  public desktop: Element;
+
+  private windows: BuildedWindow[] = [];
 
   constructor(
-    private uiStorage: Storage
+    public storage: Storage
   ) {
     this.createDesktop();
   }
 
   createWindow(id: string, defw: number, defh: number): Window {
-    const window = new BuildedWindow(id, this.uiStorage, this.createDefaultState(defw, defh), this.content.elem());
+    const window = new BuildedWindow(this, id, defw, defh);
+    this.windows.push(window);
     return window;
   }
 
-  private createDefaultState(width: number, height: number): WindowState {
-    const maxw = document.body.clientWidth;
-    const maxh = document.body.clientHeight;
+  createDefaultState(width: number, height: number): WindowState {
+    const maxw = this.content.elem().clientWidth;
+    const maxh = this.content.elem().clientHeight;
     return { width, height, x: (maxw - width) / 2, y: (maxh - height) / 2 };
+  }
+
+  bringToFront(win: BuildedWindow) {
+    forEach(enumerate(this.windows.map(w => [w, parseInt(w.getZ())] as WinzTuple).sort(zSorter(win))), ([[w,], i]) => w.setZ(i));
   }
 
   private createDesktop() {
     this.head = div('desktop-header');
     this.content = div('desktop-content');
     this.footer = div('desktop-footer');
-    this.win = div('desktop')
+    this.desktop = div('desktop')
       .append(this.head)
       .append(this.content)
       .append(this.footer);
-    document.body.appendChild(this.win.elem());
+    document.body.appendChild(this.desktop.elem());
   }
+
+
 }
 
 const BuildedUiConstructor: Plugin<Ui> = provider(async injector => {

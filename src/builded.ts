@@ -1,7 +1,6 @@
 import { UI } from "app/apis/ui";
 import { ViewType, VIEW_CONTROLLER } from "app/modules/view/view";
 import { LOGGER, LogLevel, TIMER } from './app/apis/app';
-import { ArtEditorModule } from './app/modules/arteditor';
 import { BloodModule } from './app/modules/blood/module';
 import { GL, OFFSCREEN } from './app/modules/buildartprovider';
 import { DefaultSetupModule } from './app/modules/context';
@@ -9,7 +8,6 @@ import { InputModule } from './app/modules/default/input';
 import { DefaultLifecycleListener } from './app/modules/default/lifecycle-listener';
 import { DbFsModule } from './app/modules/fs/db';
 import { FileBrowserModule } from './app/modules/fs/manager';
-import { PainterModule } from './app/modules/painter/painter';
 import { PhotonUiModule } from './app/modules/photonui';
 import { App, getInstances, instance, plugin, provider } from './utils/injector';
 

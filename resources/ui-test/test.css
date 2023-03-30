@@ -454,9 +454,13 @@ li.selected:hover {
   grid-template-rows: auto 1fr auto;
 }
 
-.desktop-head {}
+.desktop-head {
+  background-color: var(--bg);
+}
 
-.desktop-content {}
+.desktop-content {
+  background-color: #505050;
+}
 
 .desktop-footer {
   background-color: var(--bg);
@@ -497,6 +501,16 @@ input[type=text]:focus-visible {
   text-align: left;
 }
 
+canvas {
+  border: solid 1px var(--border);
+}
+
+canvas:focus,
+canvas:focus-visible {
+  outline: none;
+  border: solid 1px var(--fg-highlight);
+}
+
 * {
   color: var(--font-color);
   text-shadow: var(--text-shadow);
@@ -507,7 +521,6 @@ input[type=text]:focus-visible {
 }
 
 body {
-  background-color: #505050;
   margin: 0px;
   position: absolute;
   top: 0;

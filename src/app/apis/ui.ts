@@ -1,5 +1,6 @@
 import { Element } from "utils/ui/ui";
 import { Dependency } from "../../utils/injector";
+import { MessageHandler } from "./handler";
 
 export interface Window {
   readonly contentElement: HTMLElement;
@@ -11,10 +12,9 @@ export interface Window {
   destroy(): void;
 }
 
-export interface Ui {
+export interface Ui extends MessageHandler {
   createWindow(id: string, defw: number, defh: number): Window;
-
-  footer: Element;
+  getFooter(): Element;
 }
 
 export const UI = new Dependency<Ui>('UI');

@@ -13,6 +13,7 @@ import { BoardRenderer2D, Renderer2D } from "./boardrenderer2d";
 import { Boardrenderer3D, Renderer3D } from "./boardrenderer3d";
 import { View2d } from "./view2d";
 import { View3d } from "./view3d";
+import { INPUT, Input } from "../default/input";
 
 export class TargetImpl implements Target {
   public coords_ = vec3.create();
@@ -43,7 +44,7 @@ export enum ViewType {
 }
 
 export interface ViewController {
-  add(canvas: HTMLCanvasElement, type: ViewType): void;
+  create(type: ViewType): HTMLCanvasElement;
   currentView(): View;
 }
 
@@ -62,10 +63,10 @@ export function SwappableViewModule(module: Module) {
 // });
 
 const ViewControllerConstructor: Plugin<ViewController> = lifecycle(async (injector, lifecycle) => {
-  const [bus, offscreen, buildgl, board, boardUtils, state, grid, art] = await getInstances(injector, BUS, OFFSCREEN, BUILD_GL, BOARD, BOARD_UTILS, STATE, GRID, ART);
+  const [bus, offscreen, buildgl, board, boardUtils, state, grid, art, input] = await getInstances(injector, BUS, OFFSCREEN, BUILD_GL, BOARD, BOARD_UTILS, STATE, GRID, ART, INPUT);
   const renderer2d = await Renderer2D(injector);
   const renderer3d = await Renderer3D(injector);
-  const ctl = new ViewControllerImpl(bus, offscreen, buildgl, board, boardUtils, state, grid, art, renderer2d, renderer3d);
+  const ctl = new ViewControllerImpl(bus, input, offscreen, buildgl, board, boardUtils, state, grid, art, renderer2d, renderer3d);
   const stateCleaner = async (s: string) => state.unregister(s);
   lifecycle(state.register('lookaim', false), stateCleaner);
   lifecycle(state.register('forward', false), stateCleaner);
@@ -176,6 +177,7 @@ class ViewControllerImpl extends MessageHandlerReflective implements ViewControl
 
   constructor(
     private bus: MessageBus,
+    private input: Input,
     private offscren: OffscreenCanvas,
     private buildgl: BuildGl,
     private board: BoardProvider,
@@ -187,9 +189,14 @@ class ViewControllerImpl extends MessageHandlerReflective implements ViewControl
     private renderer3d: Boardrenderer3D,
   ) { super(); }
 
-  add(canvas: HTMLCanvasElement, type: ViewType): void {
+  create(type: ViewType): HTMLCanvasElement {
+    const canvas = document.createElement('canvas');
+    canvas.style.height = 'calc(100% - 2px)';
+    canvas.style.width = 'calc(100% - 2px)';
+    canvas.tabIndex = 1;
     if (type == ViewType.VIEW_3D) this.createView3d(canvas);
     if (type == ViewType.VIEW_2D) this.createView2d(canvas);
+    return canvas;
   }
 
   currentView(): View {
@@ -207,17 +214,30 @@ class ViewControllerImpl extends MessageHandlerReflective implements ViewControl
       queue.push(new Key(key, true));
       queue.push(new Key(key, false));
     }
+    const kbe = (handler: (key: string) => void) => (e: KeyboardEvent) => {
+      handler(e.key.toLowerCase());
+      e.preventDefault();
+      return false;
+    }
+    const keyup = kbe(key => queue.push(new Key(key, false)));
+    const keydown = kbe(key => queue.push(new Key(key, true)));
+    canvas.addEventListener('keyup', keyup);
+    canvas.addEventListener('keydown', keydown);
+    canvas.addEventListener('wheel', e => { if (e.ctrlKey) e.preventDefault(); return false; }, { passive: false });
     canvas.addEventListener('mousemove', musemove);
     canvas.addEventListener('mouseup', mousesp);
     canvas.addEventListener('mousedown', mousedown);
     canvas.addEventListener('wheel', wheel);
+    const consumer = this.input.get('view3d');
 
     return () => {
       if (mouseMoved) {
         handler.handle(MOUSE);
         mouseMoved = false;
       }
-      forEach(queue, k => handler.handle(k));
+      forEach(queue,
+        k => forEach(consumer.consume(k, this.state),
+          e => handler.handle(e)));
       queue.clear();
     }
   }

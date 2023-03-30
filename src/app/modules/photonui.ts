@@ -2,14 +2,17 @@ import $, { ui } from "jquery";
 import "jqueryui";
 import h from "stage0";
 import tippy from "tippy.js";
-import { create, getInstances, instance, Module, Plugin, provider } from "../../utils/injector";
+import { create, getInstances, instance, lifecycle, Module, Plugin, provider } from "../../utils/injector";
 import { center, div, dragElement } from "../../utils/ui/ui";
 import { Ui, UI, Window } from "../apis/ui";
-import { Storages, STORAGES } from "app/apis/app";
+import { State, STATE, Storages, STORAGES } from "app/apis/app";
 import { Storage } from "app/apis/app";
 import { WallStats } from "build/board/structs";
 import { Element } from "../../utils/ui/ui";
 import { enumerate, forEach } from "utils/collections";
+import { BUS, Message, MessageBus } from "app/apis/handler";
+import { INPUT, Input } from "./default/input";
+import { Key } from "app/edit/messages";
 
 const dialogTemplate = h`
 <div class="window-frame hidden" #window>
@@ -307,23 +310,33 @@ function zSorter(topWin: BuildedWindow) {
 }
 
 class BuildedUi implements Ui {
-  public head: Element;
-  public content: Element;
-  public footer: Element;
-  public desktop: Element;
-
+  private head: Element;
+  private content: Element;
+  private footer: Element;
+  private desktop: Element;
   private windows: BuildedWindow[] = [];
 
   constructor(
-    public storage: Storage
+    public storage: Storage,
+    private bus: MessageBus,
+    private input: Input,
+    private state: State,
   ) {
     this.createDesktop();
+    this.addEventListeners();
+  }
+
+  handle(message: Message): void {
   }
 
   createWindow(id: string, defw: number, defh: number): Window {
     const window = new BuildedWindow(this, id, defw, defh);
     this.windows.push(window);
     return window;
+  }
+
+  getFooter(): Element {
+    return this.footer;
   }
 
   createDefaultState(width: number, height: number): WindowState {
@@ -333,7 +346,8 @@ class BuildedUi implements Ui {
   }
 
   bringToFront(win: BuildedWindow) {
-    forEach(enumerate(this.windows.map(w => [w, parseInt(w.getZ())] as WinzTuple).sort(zSorter(win))), ([[w,], i]) => w.setZ(i));
+    const winzs = this.windows.map(w => [w, parseInt(w.getZ())] as WinzTuple).sort(zSorter(win));
+    forEach(enumerate(winzs), ([[w,], i]) => w.setZ(i));
   }
 
   private createDesktop() {
@@ -347,16 +361,29 @@ class BuildedUi implements Ui {
     document.body.appendChild(this.desktop.elem());
   }
 
-
+  private addEventListeners() {
+    const consumer = this.input.get('desktop');
+    const kbe = (handler: (key: string) => void) => (e: KeyboardEvent) => {
+      handler(e.key.toLowerCase());
+      e.preventDefault();
+      return false;
+    }
+    const keyup = kbe(key => forEach(consumer.consume(new Key(key, false), this.state), e => this.bus.handle(e)));
+    const keydown = kbe(key => forEach(consumer.consume(new Key(key, true), this.state), e => this.bus.handle(e)));
+    document.body.addEventListener('contextmenu', e => e.preventDefault());
+    document.body.addEventListener('keydown', keydown);
+    document.body.addEventListener('keyup', keyup);
+  }
 }
 
-const BuildedUiConstructor: Plugin<Ui> = provider(async injector => {
-  const [storages] = await getInstances(injector, STORAGES);
+const BuildedUiConstructor: Plugin<Ui> = lifecycle(async (injector, lifecycle) => {
+  const [storages, bus, input, state] = await getInstances(injector, STORAGES, BUS, INPUT, STATE);
   const uiStorage = await storages('UI');
-  return new BuildedUi(uiStorage);
+  const ui = new BuildedUi(uiStorage, bus, input, state);
+  lifecycle(bus.connect(ui), async h => bus.disconnect(h));
+  return ui;
 });
 
 export function PhotonUiModule(module: Module) {
-  document.body.oncontextmenu = () => false;
   module.bind(UI, BuildedUiConstructor);
 }

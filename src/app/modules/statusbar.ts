@@ -1,4 +1,3 @@
-import h, { hElement } from "stage0";
 import { create, lifecycle, Module, plugin } from "../../utils/injector";
 import { Profiler, PROFILER } from "../../utils/profiler";
 import { View, VIEW } from "../apis/app";
@@ -6,6 +5,7 @@ import { BUS, busDisconnector, MessageHandlerReflective } from "../apis/handler"
 import { PostFrame } from "../edit/messages";
 import { Ui } from "app/apis/ui";
 import { UI } from "app/apis/ui";
+import { div, Element, span } from "utils/ui/ui";
 
 
 export async function StatusBarModule(module: Module) {
@@ -17,62 +17,55 @@ export async function StatusBarModule(module: Module) {
   }));
 }
 
-const positionBoxTemplate = h`
-  <div class="hitem">Position:
-    <span style="width: 45px; display: inline-block; text-align: right;">#posx</span>,
-    <span style="width: 45px; display: inline-block; text-align: left;">#posy</span>
-  </div>
-`
-function PositionBox(): [Node, (x: number, y: number) => void] {
-  const root = positionBoxTemplate;
-  const { posx, posy } = positionBoxTemplate.collect(root);
+function PositionBox(): [Element, (x: number, y: number) => void] {
+  const item = div('hitem').text('Position');
+  const posx = span().css('width', '45px').css('display', 'inline-block').css('text=align', 'right');
+  const posy = span().css('width', '45px').css('display', 'inline-block').css('text=align', 'left');
+  item.append(posx).appendText(',').append(posy);
+
   let cachedPosX = 0;
   let cachedPosY = 0;
   const update = (x: number, y: number) => {
     if (x != cachedPosX) {
       cachedPosX = x;
-      posx.nodeValue = `[${x}`;
+      posx.text(`[${x}`);
     }
     if (y != cachedPosY) {
       cachedPosY = y;
-      posy.nodeValue = `${y}]`;
+      posy.text(`${y}]`);
     }
   }
 
-  return [root, update];
+  return [item, update];
 }
 
-const valueBoxTemplate = h`<div class="hitem">#nameNode<span style="display: inline-block;">#valueNode</span></div>`;
-function ValueBox(name: String, size: number): [Node, (value: any) => void] {
-  const root = valueBoxTemplate.cloneNode(true);
-  const { nameNode, valueNode } = valueBoxTemplate.collect(root);
-  nameNode.nodeValue = `${name}: `;
-  valueNode.parentElement.style.width = `${size}px`;
+function ValueBox(name: string, size: number): [Element, (value: any) => void] {
+  const item = div('hitem').appendText(name + ' ');
+  const label = span().css('display', 'inline-block').css('width', `${size}px`);
+  item.append(label);
   let cachedValue = null;
   const update = (value: any) => {
     if (value != cachedValue) {
-      valueNode.nodeValue = value;
+      label.text(value);
       cachedValue = value;
     }
   }
-  return [root, update];
+  return [item, update];
 }
 
-const statusBarTemplate = h`<div class="item-bar" #statusbar></div>`;
 function StatusBar() {
-  const root = statusBarTemplate;
-  const { statusbar } = statusBarTemplate.collect(root);
+  const statusbar = div('item-bar');
   const [posBox, posUpdate] = PositionBox();
   const [sectorBox, sectorUpdate] = ValueBox('Sector', 25);
   const [drawsBox, drawsUpdate] = ValueBox('Draws', 85);
   const [bufferBox, bufferUpdate] = ValueBox('Buffer', 35);
   const [fpsBox, fpsUpdate] = ValueBox('FPS', 35);
-  statusbar.appendChild(posBox);
-  statusbar.appendChild(sectorBox);
-  statusbar.appendChild(drawsBox);
-  statusbar.appendChild(bufferBox);
-  statusbar.appendChild(fpsBox);
-  return { root, updaters: { posUpdate, sectorUpdate, drawsUpdate, bufferUpdate, fpsUpdate } };
+  statusbar.append(posBox);
+  statusbar.append(sectorBox);
+  statusbar.append(drawsBox);
+  statusbar.append(bufferBox);
+  statusbar.append(fpsBox);
+  return { root: statusbar, updaters: { posUpdate, sectorUpdate, drawsUpdate, bufferUpdate, fpsUpdate } };
 }
 
 export class Statusbar extends MessageHandlerReflective {
@@ -83,8 +76,9 @@ export class Statusbar extends MessageHandlerReflective {
     fpsUpdate: (value: any) => void;
     bufferUpdate: (value: any) => void;
   };
-  private root: hElement;
+
   private lastUpdate = 0;
+  private root: Element;
 
   constructor(
     private view: View,
@@ -94,12 +88,12 @@ export class Statusbar extends MessageHandlerReflective {
     super();
     const { root, updaters } = StatusBar();
     this.root = root;
-    this.ui.footer.appendHtml(root);
+    this.ui.getFooter().append(root);
     this.updaters = updaters;
   }
 
   public stop() {
-    this.ui.footer.elem().removeChild(this.root);
+    this.ui.getFooter().elem().removeChild(this.root.elem());
   }
 
   public PostFrame(msg: PostFrame) {

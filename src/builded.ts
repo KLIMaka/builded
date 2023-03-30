@@ -33,7 +33,6 @@ app.bind(LOGGER, instance(logger));
 app.bind(TIMER, instance(timer));
 app.bind(GL, instance(gl));
 app.bind(OFFSCREEN, instance(offscreenCanvas));
-app.install(InputModule);
 app.install(DbFsModule('resources/engines/blood/'));
 app.install(DefaultSetupModule);
 app.install(BloodModule);
@@ -43,12 +42,9 @@ app.install(FileBrowserModule);
 // app.install(ArtEditorModule);
 // app.install(PainterModule);
 
-app.bind(plugin('MainLoop'), provider(async injector => {
+app.bind(plugin('Main'), provider(async injector => {
   const [viewctl, ui] = await getInstances(injector, VIEW_CONTROLLER, UI);
-  const canvas = document.createElement('canvas');
-  canvas.style.height = '100%';
-  canvas.style.width = '100%';
-  viewctl.add(canvas, ViewType.VIEW_3D);
+  const canvas = viewctl.create(ViewType.VIEW_3D);
   const window = ui.createWindow('viewport', 400, 400);
   window.contentElement.appendChild(canvas);
   window.headerElement.innerText = 'Caption';

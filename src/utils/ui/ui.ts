@@ -27,6 +27,10 @@ export class Element {
     this.element.appendChild(element.element);
     return this;
   }
+  public appendText(text: string): Element {
+    this.element.appendChild(document.createTextNode(text));
+    return this;
+  }
 
   public pos(x: string, y: string): Element {
     this.element.style.left = x;
@@ -152,10 +156,6 @@ export function div(className: string): Element {
 
 export function span(): Element {
   return new Element(create('span'))
-}
-
-export function table(): Table {
-  return new Table();
 }
 
 export function props(): Properties {

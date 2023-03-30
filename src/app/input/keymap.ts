@@ -1,16 +1,7 @@
-import { Collection, EMPTY_COLLECTION } from "../../utils/collections";
+import { Collection, EMPTY_COLLECTION, getOrCreate } from "../../utils/collections";
 import { Logger, State } from "../apis/app";
 import { Message } from "../apis/handler";
 import { Key } from "../edit/messages";
-
-function ensure<K, T>(container: Map<K, T>, key: K, factory: () => T) {
-  let value = container.get(key);
-  if (value == undefined) {
-    value = factory();
-    container.set(key, value);
-  }
-  return value;
-}
 
 export class InputConsumer {
   private pressed = new Map<string, boolean>();
@@ -38,19 +29,19 @@ export class InputConsumer {
 
   public reset(state: State) {
     this.pressed.clear();
-    for (const [_, states] of this.states)
-      for (const [name, _, off] of states)
+    for (const [, states] of this.states)
+      for (const [name, , off] of states)
         if (state.has(name)) state.set(name, off);
   }
 
 
   public addBind(messages: Collection<Message>, key: string, ...mods: string[]) {
     const modState = this.modState(mods.includes('shift'), mods.includes('control'), mods.includes('alt'));
-    ensure(this.actions.get(modState), key, () => []).push(...messages);
+    getOrCreate(this.actions.get(modState), key, () => []).push(...messages);
   }
 
   public addStateBind(name: string, enabled: any, disabled: any, key: string) {
-    ensure(this.states, key, () => []).push([name, enabled, disabled]);
+    getOrCreate(this.states, key, () => []).push([name, enabled, disabled]);
   }
 
   private keydown(key: string) { this.pressed.set(key, true) }
@@ -65,10 +56,6 @@ export class InputConsumer {
   }
 }
 
-type ContextMatcher = (context: string) => boolean;
-function parseContextMatcher(str: string): ContextMatcher {
-  return s => s == str;
-}
 export type EventParser = (str: string, logger: Logger) => Collection<Message>;
 
 function parseKey(key: string): string {
@@ -77,15 +64,16 @@ function parseKey(key: string): string {
   return key;
 }
 
-export function loadBinds(binds: string, messageParser: EventParser, logger: Logger): InputConsumer {
-  const consumer = new InputConsumer();
+export function loadBinds(binds: string, messageParser: EventParser, logger: Logger): Map<string, InputConsumer> {
+  const result = new Map<string, InputConsumer>();
   const lines = binds.split(/\r?\n/);
   for (const line of lines) {
     const trline = line.trim();
     if (trline.length == 0) continue;
     const parts = trline.split('|');
     if (parts.length != 3) { logger('WARN', `Skipping bind line: ${trline}`); continue; }
-    const context = parseContextMatcher(parts[0].trim());
+    const context = parts[0].trim();
+    const consumer = getOrCreate(result, context, _ => new InputConsumer());
     const keys = parts[1].trim().toLowerCase().split('+').map(parseKey);
     const command = parts[2].trim();
     if (keys[0] == '') {
@@ -99,5 +87,5 @@ export function loadBinds(binds: string, messageParser: EventParser, logger: Log
       consumer.addBind(messages, keys.pop(), ...keys);
     }
   }
-  return consumer;
+  return result;
 }

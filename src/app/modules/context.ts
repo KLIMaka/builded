@@ -1,16 +1,13 @@
 import { SelectorConstructor } from '../../app/modules/artselector';
 import { Board } from '../../build/board/structs';
-import { Deck } from '../../utils/collections';
-import { resize } from '../../utils/gl/gl';
 import { INDEXED_IMG_LIB, IndexedImgLibJsConstructor } from '../../utils/imglib';
 import { Module, getInstances, instance, lifecycle, plugin } from '../../utils/injector';
-import { DefaultProfilerConstructor, PROFILER, Profiler } from '../../utils/profiler';
-import { ART, BOARD, BOARD_UTILS, ENGINE_API, GRID, LIGHTMAPS, REFERENCE_TRACKER, SCHEDULER, STATE, STORAGES, View } from '../apis/app';
-import { BUS, DefaultMessageBusConstructor, MessageBus, MessageHandlerReflective, busDisconnector } from '../apis/handler';
-import { Renderable } from '../apis/renderable';
+import { DefaultProfilerConstructor, PROFILER } from '../../utils/profiler';
+import { ART, BOARD, BOARD_UTILS, ENGINE_API, GRID, LIGHTMAPS, REFERENCE_TRACKER, SCHEDULER, STATE, STORAGES } from '../apis/app';
+import { BUS, DefaultMessageBusConstructor, MessageHandlerReflective, busDisconnector } from '../apis/handler';
 import { DefaultScheduler } from '../apis/scheduler';
 import { ENTITY_FACTORY, EntityFactoryConstructor } from '../edit/context';
-import { Commit, LoadBoard, PostFrame, PreFrame, Render, namedMessageHandler } from '../edit/messages';
+import { Commit, LoadBoard, namedMessageHandler } from '../edit/messages';
 import { ClipboardModule } from '../edit/tools/clipboard';
 import { DrawSectorModule } from '../edit/tools/drawsector';
 import { DrawWallModule } from '../edit/tools/drawwall';
@@ -29,6 +26,7 @@ import { TaskManagerModule } from '../modules/taskmanager';
 import { BuildArtProviderConstructor, TEXTURES_OVERRIDE } from './buildartprovider';
 import { DefaultGridController } from './default/grid';
 import { DefaultBoardProviderConstructor } from './default/history';
+import { DefaultInputConstructor, INPUT } from './default/input';
 import { BuildReferenceTrackerImpl } from './default/reftracker';
 import { StateImpl } from './default/state';
 import { DefaultAdditionalTextures } from './default/utiltex';
@@ -88,6 +86,7 @@ export function DefaultSetupModule(module: Module) {
   module.bind(SCHEDULER, DefaultScheduler);
   module.bind(LIGHTMAPS, DefaultLightmapsConstructor)
   module.bind(PROFILER, DefaultProfilerConstructor);
+  module.bind(INPUT, DefaultInputConstructor);
 
   module.install(SwappableViewModule);
   module.install(JoinSectorsModule);

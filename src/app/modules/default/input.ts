@@ -1,12 +1,19 @@
+import { Key } from "app/edit/messages"
 import { loadString } from "../../../utils/getter"
 import { Dependency, Plugin, getInstances, provider } from "../../../utils/injector"
-import { LOGGER } from "../../apis/app"
+import { LOGGER, State } from "../../apis/app"
 import { InputConsumer, loadBinds } from "../../input/keymap"
 import { messageParser } from "../../input/messageparser"
+import { Message } from "app/apis/handler"
+import { EMPTY_COLLECTION, EMPTY_ITERATOR } from "utils/collections"
 
+export interface InputTransformer {
+  transform(key: Key, state: State): Iterable<Message>;
+}
+const EMPTY_TRANSFORMER: InputTransformer = { transform: (key, state) => EMPTY_COLLECTION };
 
 export interface Input {
-  get(ctx: string): InputConsumer;
+  get(ctx: string): InputTransformer;
 }
 export const INPUT = new Dependency<Input>('Input');
 

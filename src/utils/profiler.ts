@@ -42,10 +42,12 @@ export class DefaultTimer implements Timer {
   constructor(private timer: Timer_) { };
 
   get() { return this.startTime != -1 ? this.timer() - this.startTime : this.time }
+
   start() {
     if (this.startTime == -1) this.startTime = this.timer();
     return this;
   }
+
   stop() {
     if (this.startTime != -1) {
       this.time = this.timer() - this.startTime;
@@ -53,6 +55,7 @@ export class DefaultTimer implements Timer {
     }
     return this;
   }
+
   print() {
     const t = this.get();
     if (t <= 500) return t.toFixed(2) + 'ms';
@@ -88,10 +91,13 @@ export class DefaultProfile implements Profile {
 }
 
 export class DefaultProfiler implements Profiler {
-  private globalProfile = new DefaultProfile(this.t);
-  private frameProfile = new DefaultProfile(this.t);
+  private globalProfile: Profile;;
+  private frameProfile: Profile;
 
-  constructor(private t: Timer_) { }
+  constructor(private t: Timer_) {
+    this.globalProfile = new DefaultProfile(t);
+    this.frameProfile = new DefaultProfile(t);
+  }
 
   global() { return this.globalProfile }
   frame() { return this.frameProfile }

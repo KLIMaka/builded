@@ -16,13 +16,6 @@ export class Camera {
   }
 
   public setPosition(x: number, y: number, z: number): void {
-    this.position[0] = x;
-    this.position[1] = y;
-    this.position[2] = z;
-    this.needUpdate = true;
-  }
-
-  public setPositionXYZ(x: number, y: number, z: number): void {
     vec3.set(this.position, x, y, z);
     this.needUpdate = true;
   }
@@ -32,12 +25,12 @@ export class Camera {
   }
 
   public forward(): vec3 {
-    var mat4 = this.getTransformMatrix()
+    const mat4 = this.getTransformMatrix()
     return vec3.fromValues(-mat4[2], -mat4[6], -mat4[10]);
   }
 
   public side(): vec3 {
-    var mat4 = this.getTransformMatrix()
+    const mat4 = this.getTransformMatrix()
     return vec3.fromValues(mat4[0], mat4[4], mat4[8]);
   }
 
@@ -55,7 +48,7 @@ export class Camera {
   }
 
   public getTransformMatrix(): mat4 {
-    var mat = this.transform;
+    const mat = this.transform;
     if (this.needUpdate) {
       var pos = this.position;
       mat4.identity(mat);

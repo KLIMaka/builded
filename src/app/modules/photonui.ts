@@ -7,12 +7,12 @@ import { center, div, dragElement } from "../../utils/ui/ui";
 import { Ui, UI, Window } from "../apis/ui";
 import { State, STATE, Storages, STORAGES } from "app/apis/app";
 import { Storage } from "app/apis/app";
-import { WallStats } from "build/board/structs";
 import { Element } from "../../utils/ui/ui";
 import { enumerate, forEach } from "utils/collections";
-import { BUS, Message, MessageBus } from "app/apis/handler";
-import { INPUT, Input } from "./default/input";
+import { BUS, Message, MessageBus, MessageHandler, MessageHandlerReflective } from "app/apis/handler";
+import { INPUT } from "./default/input";
 import { Key } from "app/edit/messages";
+import { Input } from "app/input/keymap";
 
 const dialogTemplate = h`
 <div class="window-frame hidden" #window>
@@ -82,9 +82,9 @@ class BuildedWindow implements Window {
   readonly winElement: HTMLElement;
   readonly headerElement: HTMLElement;
   readonly footerElement: HTMLElement;
-
   private state: Promise<WindowState>;
   private neetToSave = false;
+  private handlers: MessageHandler[] = [];
 
   constructor(private ui: BuildedUi, private id: string, defw: number, defh: number) {
     const root = <HTMLElement>windowTemplate.cloneNode(true);
@@ -95,10 +95,10 @@ class BuildedWindow implements Window {
     this.headerElement = head;
     this.footerElement = footer;
 
-    this.ui.desktop.appendHtml(root);
+    this.ui.getDesktop().appendHtml(root);
     const jqw = $(root);
     jqw.draggable({
-      handle: head, containment: this.ui.content.elem(), snap: true, drag: async (e, ui) => {
+      handle: head, containment: this.ui.getContent().elem(), snap: true, drag: async (e, ui) => {
         const state = await this.state;
         state.x = ui.position.left;
         state.y = ui.position.top;
@@ -106,7 +106,7 @@ class BuildedWindow implements Window {
       }
     });
     jqw.resizable({
-      containment: this.ui.content.elem(), resize: async (e, ui) => {
+      containment: this.ui.getContent().elem(), resize: async (e, ui) => {
         const state = await this.state;
         state.width = ui.size.width;
         state.height = ui.size.height;
@@ -160,7 +160,15 @@ class BuildedWindow implements Window {
     this.neetToSave = true;
   }
 
-  destroy() { this.ui.desktop.elem().removeChild(this.winElement) }
+  destroy() { this.ui.getDesktop().elem().removeChild(this.winElement) }
+
+  public handle(msg: Message): void {
+    this.handlers.forEach(h => h.handle(msg));
+  }
+
+  addHandler(handler: MessageHandler): void {
+    this.handlers.push(handler);
+  }
 }
 
 class PhotonWindowBuilder implements WindowBuilder {
@@ -315,6 +323,7 @@ class BuildedUi implements Ui {
   private footer: Element;
   private desktop: Element;
   private windows: BuildedWindow[] = [];
+  private currentWindow: BuildedWindow;
 
   constructor(
     public storage: Storage,
@@ -326,7 +335,8 @@ class BuildedUi implements Ui {
     this.addEventListeners();
   }
 
-  handle(message: Message): void {
+  handle(msg: Message): void {
+    
   }
 
   createWindow(id: string, defw: number, defh: number): Window {
@@ -339,6 +349,14 @@ class BuildedUi implements Ui {
     return this.footer;
   }
 
+  getDesktop(): Element {
+    return this.desktop;
+  }
+
+  getContent(): Element {
+    return this.content;
+  }
+
   createDefaultState(width: number, height: number): WindowState {
     const maxw = this.content.elem().clientWidth;
     const maxh = this.content.elem().clientHeight;
@@ -348,6 +366,7 @@ class BuildedUi implements Ui {
   bringToFront(win: BuildedWindow) {
     const winzs = this.windows.map(w => [w, parseInt(w.getZ())] as WinzTuple).sort(zSorter(win));
     forEach(enumerate(winzs), ([[w,], i]) => w.setZ(i));
+    this.currentWindow = win;
   }
 
   private createDesktop() {
@@ -362,17 +381,19 @@ class BuildedUi implements Ui {
   }
 
   private addEventListeners() {
-    const consumer = this.input.get('desktop');
-    const kbe = (handler: (key: string) => void) => (e: KeyboardEvent) => {
-      handler(e.key.toLowerCase());
-      e.preventDefault();
-      return false;
-    }
-    const keyup = kbe(key => forEach(consumer.consume(new Key(key, false), this.state), e => this.bus.handle(e)));
-    const keydown = kbe(key => forEach(consumer.consume(new Key(key, true), this.state), e => this.bus.handle(e)));
+    // const consumer = this.input.get('desktop');
+    // const kbe = (handler: (key: string) => void) => (e: KeyboardEvent) => {
+    //   handler(e.key.toLowerCase());
+    //   e.preventDefault();
+    //   return false;
+    // }
+    // const keyup = kbe(key => forEach(consumer.transform(new Key(key, false), this.state), e => this.bus.handle(e)));
+    // const keydown = kbe(key => forEach(consumer.transform(new Key(key, true), this.state), e => this.bus.handle(e)));
+    // document.body.addEventListener('keydown', keydown);
+    // document.body.addEventListener('keyup', keyup);
+
     document.body.addEventListener('contextmenu', e => e.preventDefault());
-    document.body.addEventListener('keydown', keydown);
-    document.body.addEventListener('keyup', keyup);
+    this.input.connect('desktop', ms => ms.forEach(m => this.currentWindow.handle(m)));
   }
 }
 

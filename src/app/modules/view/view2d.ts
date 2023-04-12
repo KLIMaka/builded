@@ -9,16 +9,16 @@ import { Controller2D } from "../../../utils/camera/controller2d";
 import { NumberInterpolator } from "../../../utils/interpolator";
 import { clamp, int, len2d } from "../../../utils/mathutils";
 import { DelayedValue } from "../../../utils/timed";
-import { ArtProvider, BoardProvider, BoardUtils, GridController, SnapTarget, SnapTargets, SnapType, State, View } from "../../apis/app";
-import { Message, MessageHandlerReflective } from "../../apis/handler";
+import { ArtProvider, BoardProvider, BoardUtils, GridController, SnapTarget, SnapTargets, SnapType, State } from "../../apis/app";
 import { Renderable } from "../../apis/renderable";
-import { BoardInvalidate, LoadBoard, Mouse } from "../../edit/messages";
+import { BoardInvalidate, LoadBoard } from "../../edit/messages";
 import { BuildGl } from "../gl/buildgl";
 import { BoardRenderer2D } from "./boardrenderer2d";
 import { SnapTargetsImpl, TargetImpl, ViewPosition } from "./view";
+import { ViewBase } from "./common";
 
 
-export class View2d extends MessageHandlerReflective implements View {
+export class View2d extends ViewBase {
   private position: ViewPosition;
   private control = new Controller2D();
   private pointer = vec3.create();
@@ -28,7 +28,9 @@ export class View2d extends MessageHandlerReflective implements View {
   private upp = new DelayedValue(100, 1, NumberInterpolator);
 
   constructor(
-    private canvas: HTMLCanvasElement,
+    gl: WebGL2RenderingContext,
+    offscreen: OffscreenCanvas,
+    canvas: HTMLCanvasElement,
     private renderer: BoardRenderer2D,
     private gridController: GridController,
     private buildgl: BuildGl,
@@ -37,7 +39,7 @@ export class View2d extends MessageHandlerReflective implements View {
     private art: ArtProvider,
     private state: State
   ) {
-    super();
+    super(gl, offscreen, canvas);
     this.loadBoard(board());
   }
 
@@ -54,7 +56,6 @@ export class View2d extends MessageHandlerReflective implements View {
   targets(): Iterable<Target> { return this.hit.get().targets() }
   snapTargets(): SnapTargets { return this.snapTargetsValue.get() }
   dir(): Ray { return this.direction.get() }
-  isWireframe() { return true }
   getViewPosition() { return this.position }
 
   activate(pos: ViewPosition) {
@@ -62,11 +63,9 @@ export class View2d extends MessageHandlerReflective implements View {
     this.control.setPosition(this.position.x, this.position.y, this.position.z);
   }
 
-  Mouse(msg: Mouse) {
-    this.control.track(msg.x, msg.y, 1024 * ZSCALE, this.state.get('lookaim'));
-    const x = (msg.x / this.canvas.clientWidth) * 2 - 1;
-    const y = (msg.y / this.canvas.clientHeight) * 2 - 1;
-    const p = this.control.getPointerPosition(this.pointer, x, y);
+  mouse(mx: number, my: number) {
+    this.control.track(mx, my, 1024 * ZSCALE, this.state.get('lookaim'));
+    const p = this.control.getPointerPosition(this.pointer);
 
     this.position.x = int(p[0]);
     this.position.y = int(p[2]);
@@ -75,13 +74,12 @@ export class View2d extends MessageHandlerReflective implements View {
       this.position.sec = findSector(board, this.position.x, this.position.y, this.position.sec);
   }
 
-  Frame(msg: Message) {
+  protected draw(dt: number) {
+    this.control.setSize(this.getCanvas().clientWidth, this.getCanvas().clientHeight);
     this.invalidateTarget();
-    this.control.setSize(this.canvas.clientWidth, this.canvas.clientHeight);
-    const max = this.control.getPointerPosition(this.pointer, 1, 1);
     const campos = this.control.getPosition();
-    const dist = len2d(max[0] - campos[0], max[2] - campos[2]);
-    this.buildgl.newFrame(this.canvas);
+    const dist = this.control.getMaxDist();
+    this.buildgl.newFrame(this.getCanvas());
     this.renderer.draw(this, campos, dist, this.control);
     const cursor = build2gl(vec3.create(), this.snapTargetsValue.get().closest().target.coords);
     this.buildgl.setCursorPosiotion(cursor[0], cursor[1], cursor[2]);
@@ -96,7 +94,6 @@ export class View2d extends MessageHandlerReflective implements View {
 
     this.control.setUnitsPerPixel(upp);
   }
-
 
   private invalidateTarget() {
     this.direction.invalidate();

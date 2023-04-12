@@ -333,7 +333,9 @@ export function* interpolate<T>(ii: Iterable<T>, f: (lh: T, rh: T, t: number) =>
   }
 }
 
-export function* flatten<T>(i: Iterable<Iterable<T>>): Generator<T> {
+export type Deiterable<T> = T extends Iterable<infer T1> ? T1 : never;
+
+export function* flatten<T>(i: Iterable<T>): Generator<Deiterable<T>> {
   const ii = i[Symbol.iterator]();
   let item = ii.next();
   while (!item.done) {

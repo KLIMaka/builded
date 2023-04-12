@@ -1,5 +1,4 @@
-import { filter, map, reduce, forEach, all, enumerate, take, findFirst, chain, butLast, skip, any, iterIsEmpty, skipWhile } from "./collections";
-
+import { filter, map, reduce, forEach, all, enumerate, take, findFirst, chain, butLast, skip, any, iterIsEmpty, skipWhile, flatten, Deiterable } from "./collections";
 
 export class Iter<T> implements Iterable<T>{
   public static of<T>(iter: Iterable<T>) { return new Iter(iter) }
@@ -21,6 +20,7 @@ export class Iter<T> implements Iterable<T>{
   first(f: (t: T) => boolean, def: T): T { return findFirst(this.iter, f, def) }
   chain(i: Iterable<T>): Iter<T> { return new Iter(chain(this.iter, i)) }
   butLast(): Iter<T> { return new Iter(butLast(this.iter)) }
+  flatten(): Iter<Deiterable<T>> { return new Iter(flatten(this.iter)) }
   collect(): T[] { return [...this.iter] }
   set(): Set<T> { return new Set(this.iter) }
 }

@@ -2,8 +2,8 @@ import { Deck } from '../../utils/collections';
 import { Injector } from '../../utils/injector';
 import { iter } from '../../utils/iter';
 import { PostFrame } from '../edit/messages';
-import { ScheddulerHandler, Scheduler, SchedulerTask, TaskHandle } from './app';
-import { BUS, Handle, MessageHandlerReflective } from './handler';
+import { ScheddulerHandler, Scheduler, SchedulerTask, TaskHandle } from '../apis/app';
+import { BUS, Handle, MessageHandlerReflective } from '../apis/handler';
 
 export const DefaultScheduler = (() => {
   let handle: Handle;

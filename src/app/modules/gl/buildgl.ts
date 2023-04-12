@@ -44,7 +44,7 @@ const clipPlane = vec4.create();
 export class BuildGl {
   constructor(
     readonly state: State,
-    readonly gl: WebGLRenderingContext,
+    readonly gl: WebGL2RenderingContext,
     private profiler: Profiler,
     private logger: Logger,
     private board: BoardProvider) {

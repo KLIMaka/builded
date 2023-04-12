@@ -5,7 +5,7 @@ import { Module, getInstances, instance, lifecycle, plugin } from '../../utils/i
 import { DefaultProfilerConstructor, PROFILER } from '../../utils/profiler';
 import { ART, BOARD, BOARD_UTILS, ENGINE_API, GRID, LIGHTMAPS, REFERENCE_TRACKER, SCHEDULER, STATE, STORAGES } from '../apis/app';
 import { BUS, DefaultMessageBusConstructor, MessageHandlerReflective, busDisconnector } from '../apis/handler';
-import { DefaultScheduler } from '../apis/scheduler';
+import { DefaultScheduler } from './scheduler';
 import { ENTITY_FACTORY, EntityFactoryConstructor } from '../edit/context';
 import { Commit, LoadBoard, namedMessageHandler } from '../edit/messages';
 import { ClipboardModule } from '../edit/tools/clipboard';

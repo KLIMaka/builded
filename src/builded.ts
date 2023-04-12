@@ -1,15 +1,15 @@
 import { UI } from "app/apis/ui";
-import { ViewType, VIEW_CONTROLLER } from "app/modules/view/view";
+import { VIEW_FACTORY as VIEW_FACTORY, ViewType } from "app/modules/view/view";
 import { LOGGER, LogLevel, TIMER } from './app/apis/app';
 import { BloodModule } from './app/modules/blood/module';
 import { GL, OFFSCREEN } from './app/modules/buildartprovider';
 import { DefaultSetupModule } from './app/modules/context';
-import { InputModule } from './app/modules/default/input';
 import { DefaultLifecycleListener } from './app/modules/default/lifecycle-listener';
 import { DbFsModule } from './app/modules/fs/db';
 import { FileBrowserModule } from './app/modules/fs/manager';
 import { PhotonUiModule } from './app/modules/photonui';
 import { App, getInstances, instance, plugin, provider } from './utils/injector';
+import { BUS } from "app/apis/handler";
 
 function createLogger() {
   return (level: LogLevel, ...msg: any[]) => {
@@ -43,12 +43,14 @@ app.install(FileBrowserModule);
 // app.install(PainterModule);
 
 app.bind(plugin('Main'), provider(async injector => {
-  const [viewctl, ui] = await getInstances(injector, VIEW_CONTROLLER, UI);
-  const canvas = viewctl.create(ViewType.VIEW_3D);
+  const [viewFactory, ui, bus] = await getInstances(injector, VIEW_FACTORY, UI, BUS);
+  const view = viewFactory.create3d();
   const window = ui.createWindow('viewport', 400, 400);
-  window.contentElement.appendChild(canvas);
+  window.contentElement.appendChild(view.getCanvas());
   window.headerElement.innerText = 'Caption';
+  window.addHandler(view);
   window.show();
+  bus.connect(view);
 }));
 
 app.start();

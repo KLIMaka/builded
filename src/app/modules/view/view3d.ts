@@ -8,20 +8,17 @@ import { Controller3D } from "../../../utils/camera/controller3d";
 import { NumberInterpolator } from "../../../utils/interpolator";
 import { int, len2d, len3d } from "../../../utils/mathutils";
 import { DelayedValue } from "../../../utils/timed";
-import { ArtProvider, BoardProvider, BoardUtils, GridController, SnapTarget, SnapTargets, SnapType, State, View } from "../../apis/app";
-import { MessageHandlerReflective } from "../../apis/handler";
+import { ArtProvider, BoardProvider, BoardUtils, GridController, SnapTarget, SnapTargets, SnapType, State } from "../../apis/app";
 import { Renderable } from "../../apis/renderable";
-import { BoardInvalidate, Frame, LoadBoard, Mouse, NamedMessage } from "../../edit/messages";
+import { BoardInvalidate, LoadBoard, NamedMessage } from "../../edit/messages";
 import { BuildGl } from "../gl/buildgl";
 import { Boardrenderer3D } from "./boardrenderer3d";
+import { ViewBase } from "./common";
 import { SnapTargetsImpl, TargetImpl, ViewPosition } from "./view";
 
-export class View3d extends MessageHandlerReflective implements View {
+export class View3d extends ViewBase {
   private position: ViewPosition;
-  private aspect: number;
   private control = new Controller3D();
-  private mouseX = 0;
-  private mouseY = 0;
   private hit = new CachedValue((h: Hitscan) => this.updateHitscan(h), new Hitscan());
   private snapTargetsValue = new CachedValue(t => this.updateSnapTargets(t), new SnapTargetsImpl());
   private direction = new CachedValue((r: Ray) => this.updateDir(r), new Ray());
@@ -30,7 +27,9 @@ export class View3d extends MessageHandlerReflective implements View {
   private sideDamper = new DelayedValue(100, 0, NumberInterpolator);
 
   constructor(
-    private canvas: HTMLCanvasElement,
+    gl: WebGL2RenderingContext,
+    offscreen: OffscreenCanvas,
+    canvas: HTMLCanvasElement,
     private renderer: Boardrenderer3D,
     private buildgl: BuildGl,
     private board: BoardProvider,
@@ -39,9 +38,7 @@ export class View3d extends MessageHandlerReflective implements View {
     private gridController: GridController,
     private art: ArtProvider
   ) {
-    super();
-
-    this.updateAspectRatio();
+    super(gl, offscreen, canvas);
     this.control.setFov(90);
     this.loadBoard(board());
   }
@@ -51,7 +48,7 @@ export class View3d extends MessageHandlerReflective implements View {
   get y() { return this.position.y }
   get z() { return this.position.z }
 
-  getProjectionMatrix() { return this.control.getProjectionMatrix(this.aspect) }
+  getProjectionMatrix() { return this.control.getProjectionMatrix() }
   getTransformMatrix() { return this.control.getTransformMatrix() }
   getPosition() { return this.control.getPosition() }
   getForward() { return this.control.getForward() }
@@ -68,26 +65,20 @@ export class View3d extends MessageHandlerReflective implements View {
     this.control.setPosition(this.position.x, this.position.z / ZSCALE + 1024, this.position.y);
   }
 
-  Mouse(msg: Mouse) {
-    this.mouseX = msg.x;
-    this.mouseY = msg.y;
-    // console.log(this.state.get('lookaim'));
-    this.control.track(msg.x, msg.y, this.state.get('lookaim'));
+  protected mouse(mx: number, my: number) {
+    this.control.track(mx, my, this.state.get('lookaim'));
   }
 
-  Frame(msg: Frame) {
-    this.updateAspectRatio();
+  protected draw(dt: number) {
+    this.control.setSize(this.getCanvas().clientWidth, this.getCanvas().clientHeight);
     this.invalidateTarget();
     build2gl(this.cursor, this.snapTargetsValue.get().closest().target.coords);
     this.buildgl.setCursorPosiotion(this.cursor[0], this.cursor[1], this.cursor[2]);
-    this.buildgl.newFrame(this.canvas);
+    this.buildgl.newFrame(this.getCanvas());
     this.renderer.draw(this);
-    this.move(msg.dt / 1000);
+    this.move(dt / 1000);
   }
 
-  private updateAspectRatio() {
-    this.aspect = this.canvas.clientWidth / this.canvas.clientHeight;
-  }
 
   private move(dt: number) {
     const state = this.state;
@@ -201,9 +192,7 @@ export class View3d extends MessageHandlerReflective implements View {
 
   private updateDir(r: Ray): Ray {
     vec3.set(r.start, this.x, this.y, this.z);
-    const x = (this.mouseX / this.canvas.clientWidth) * 2 - 1;
-    const y = (this.mouseY / this.canvas.clientHeight) * 2 - 1;
-    gl2build(r.dir, this.control.getForwardUnprojected(this.aspect, x, y));
+    gl2build(r.dir, this.control.getForwardUnprojected());
     return r;
   }
 }

@@ -1,19 +1,21 @@
+import { Input } from "app/input/keymap";
 import { vec3 } from "gl-matrix";
-import { Deck, EMPTY_COLLECTION, filter, forEach } from "utils/collections";
+import { EMPTY_COLLECTION, filter } from "utils/collections";
 import { Comparator, SortedHeap } from "utils/list";
 import { EMPTY_TARGET, Entity, Ray, Target } from "../../../build/hitscan";
-import { Dependency, getInstances, lifecycle, Module, Plugin, provider } from "../../../utils/injector";
-import { ART, ArtProvider, BOARD, BoardProvider, BoardUtils, BOARD_UTILS, EMPLY_SNAP_TARGETS as EMPTY_SNAP_TARGETS, GRID, GridController, SnapTarget, SnapTargets, SnapType, STATE, State, VIEW, View } from "../../apis/app";
-import { BUS, busDisconnector, Message, MessageBus, MessageHandler, MessageHandlerReflective } from "../../apis/handler";
+import { Dependency, Module, Plugin, getInstances, lifecycle, provider } from "../../../utils/injector";
+import { ART, ArtProvider, BOARD, BOARD_UTILS, BoardProvider, BoardUtils, EMPLY_SNAP_TARGETS as EMPTY_SNAP_TARGETS, GRID, GridController, STATE, SnapTarget, SnapTargets, SnapType, State, VIEW, View } from "../../apis/app";
+import { BUS, Message, MessageBus, MessageHandler, MessageHandlerReflective, busDisconnector } from "../../apis/handler";
 import { Renderable } from "../../apis/renderable";
-import { Frame, Key, LoadBoard, Mouse, NamedMessage, PreFrame, Render } from "../../edit/messages";
+import { LoadBoard, NamedMessage } from "../../edit/messages";
 import { OFFSCREEN } from "../buildartprovider";
-import { BuildGl, BUILD_GL } from "../gl/buildgl";
+import { INPUT } from "../default/input";
+import { BUILD_GL, BuildGl } from "../gl/buildgl";
 import { BoardRenderer2D, Renderer2D } from "./boardrenderer2d";
 import { Boardrenderer3D, Renderer3D } from "./boardrenderer3d";
+import { ViewCanvas } from "./common";
 import { View2d } from "./view2d";
 import { View3d } from "./view3d";
-import { INPUT, Input } from "../default/input";
 
 export class TargetImpl implements Target {
   public coords_ = vec3.create();
@@ -43,15 +45,15 @@ export enum ViewType {
   VIEW_2D, VIEW_3D
 }
 
-export interface ViewController {
-  create(type: ViewType): HTMLCanvasElement;
-  currentView(): View;
+export interface ViewFactory {
+  create2d(): ViewCanvas;
+  create3d(): ViewCanvas;
 }
 
-export const VIEW_CONTROLLER = new Dependency<ViewController>('View Controller');
+export const VIEW_FACTORY = new Dependency<ViewFactory>('View Controller');
 
 export function SwappableViewModule(module: Module) {
-  module.bind(VIEW_CONTROLLER, ViewControllerConstructor);
+  module.bind(VIEW_FACTORY, ViewFactoryConstructor);
   module.bind(VIEW, ViewConstructor);
 }
 
@@ -62,11 +64,11 @@ export function SwappableViewModule(module: Module) {
 //   return view;
 // });
 
-const ViewControllerConstructor: Plugin<ViewController> = lifecycle(async (injector, lifecycle) => {
+const ViewFactoryConstructor: Plugin<ViewFactory> = lifecycle(async (injector, lifecycle) => {
   const [bus, offscreen, buildgl, board, boardUtils, state, grid, art, input] = await getInstances(injector, BUS, OFFSCREEN, BUILD_GL, BOARD, BOARD_UTILS, STATE, GRID, ART, INPUT);
   const renderer2d = await Renderer2D(injector);
   const renderer3d = await Renderer3D(injector);
-  const ctl = new ViewControllerImpl(bus, input, offscreen, buildgl, board, boardUtils, state, grid, art, renderer2d, renderer3d);
+  const ctl = new ViewFactoryImpl(bus, input, offscreen, buildgl, board, boardUtils, state, grid, art, renderer2d, renderer3d);
   const stateCleaner = async (s: string) => state.unregister(s);
   lifecycle(state.register('lookaim', false), stateCleaner);
   lifecycle(state.register('forward', false), stateCleaner);
@@ -88,9 +90,7 @@ class ViewImpl implements View {
   }
 
   private or<T>(value: () => T, def: T) {
-    return this.ctl.currentView() == null
-      ? def
-      : value();
+    return def;
   }
 
   get sec() { return this.or(() => this.ctl.currentView().sec, -1) }
@@ -108,7 +108,7 @@ class ViewImpl implements View {
 }
 
 const ViewConstructor: Plugin<View> = provider(async injector => {
-  const [ctl] = await getInstances(injector, VIEW_CONTROLLER);
+  const [ctl] = await getInstances(injector, VIEW_FACTORY);
   return new ViewImpl(ctl);
 });
 
@@ -157,22 +157,9 @@ class SwappableView implements View, MessageHandler {
   }
 }
 
-function createTools() {
-  const list = new Deck<Renderable>();
-  return {
-    consumer: (r: Renderable) => list.push(r),
-    clear: () => list.clear(),
-    provider: list,
-  }
-}
 
-const tools = createTools();
-const RENDER = new Render(tools.consumer);
 
-const MOUSE = new Mouse(0, 0);
-class ViewControllerImpl extends MessageHandlerReflective implements ViewController {
-  private updaters: (() => void)[] = [];
-  private views: [View, HTMLCanvasElement][] = [];
+class ViewFactoryImpl extends MessageHandlerReflective implements ViewFactory {
   public view: View;
 
   constructor(
@@ -189,102 +176,20 @@ class ViewControllerImpl extends MessageHandlerReflective implements ViewControl
     private renderer3d: Boardrenderer3D,
   ) { super(); }
 
-  create(type: ViewType): HTMLCanvasElement {
+  private createCanvas() {
     const canvas = document.createElement('canvas');
     canvas.style.height = 'calc(100% - 2px)';
     canvas.style.width = 'calc(100% - 2px)';
     canvas.tabIndex = 1;
-    if (type == ViewType.VIEW_3D) this.createView3d(canvas);
-    if (type == ViewType.VIEW_2D) this.createView2d(canvas);
     return canvas;
   }
-
-  currentView(): View {
-    return null;
+  create3d(): ViewCanvas {
+    const canvas = this.createCanvas();
+    return new View3d(this.buildgl.gl, this.offscren, canvas, this.renderer3d, this.buildgl, this.board, this.boardUtils, this.state, this.grid, this.art);
   }
 
-  private createInputUpdater(canvas: HTMLCanvasElement, handler: MessageHandler) {
-    const queue = new Deck<Key>();
-    let mouseMoved = false;
-    const mousedown = (e: MouseEvent) => queue.push(new Key(`mouse${e.button}`, true));
-    const mousesp = (e: MouseEvent) => queue.push(new Key(`mouse${e.button}`, false));
-    const musemove = (e: MouseEvent) => { MOUSE.x = e.offsetX; MOUSE.y = e.offsetY; mouseMoved = true; }
-    const wheel = (e: WheelEvent) => {
-      const key = e.deltaY > 0 ? "wheelup" : "wheeldown";
-      queue.push(new Key(key, true));
-      queue.push(new Key(key, false));
-    }
-    const kbe = (handler: (key: string) => void) => (e: KeyboardEvent) => {
-      handler(e.key.toLowerCase());
-      e.preventDefault();
-      return false;
-    }
-    const keyup = kbe(key => queue.push(new Key(key, false)));
-    const keydown = kbe(key => queue.push(new Key(key, true)));
-    canvas.addEventListener('keyup', keyup);
-    canvas.addEventListener('keydown', keydown);
-    canvas.addEventListener('wheel', e => { if (e.ctrlKey) e.preventDefault(); return false; }, { passive: false });
-    canvas.addEventListener('mousemove', musemove);
-    canvas.addEventListener('mouseup', mousesp);
-    canvas.addEventListener('mousedown', mousedown);
-    canvas.addEventListener('wheel', wheel);
-    const consumer = this.input.get('view3d');
-
-    return () => {
-      if (mouseMoved) {
-        handler.handle(MOUSE);
-        mouseMoved = false;
-      }
-      forEach(queue,
-        k => forEach(consumer.consume(k, this.state),
-          e => handler.handle(e)));
-      queue.clear();
-    }
+  create2d(): ViewCanvas {
+    const canvas = this.createCanvas();
+    return new View2d(this.buildgl.gl, this.offscren, canvas, this.renderer2d, this.grid, this.buildgl, this.board, this.boardUtils, this.art, this.state);
   }
-
-  private createView3d(canvas: HTMLCanvasElement) {
-    const view = new View3d(canvas, this.renderer3d, this.buildgl, this.board, this.boardUtils, this.state, this.grid, this.art);
-    const updater = this.createInputUpdater(canvas, view);
-    this.updaters.push(updater);
-    this.views.push([view, canvas]);
-  }
-
-  private createView2d(canvas: HTMLCanvasElement) {
-    const view = new View2d(canvas, this.renderer2d, this.grid, this.buildgl, this.board, this.boardUtils, this.art, this.state,);
-    const updater = this.createInputUpdater(canvas, view);
-    this.updaters.push(updater);
-    this.views.push([view, canvas]);
-  }
-
-  PreFrame(msg: PreFrame) {
-    this.updaters.forEach(u => u());
-  }
-
-  // PostFrame(msg: PostFrame) {
-  //   tools.clear();
-  //   this.bus.handle(RENDER);
-  //   this.views.forEach(v => {
-  //     v.drawTools(tools.provider);
-
-  //   });
-  // }
-
-  Frame(msg: Frame) {
-    const gl = this.buildgl.gl;
-    this.views.forEach(([v, c]) => {
-      // const parent = c.parentElement;
-      // const w = parent.clientWidth;
-      // const h = parent.clientHeight - 3;
-      // if (w <= 0 || h <= 0) return;
-      const w = c.clientWidth;
-      const h = c.clientHeight;
-      this.offscren.width = w;
-      this.offscren.height = h;
-      gl.viewport(0, 0, w, h);
-      v.handle(msg);
-      c.getContext('bitmaprenderer')
-        .transferFromImageBitmap(this.offscren.transferToImageBitmap());
-    });
-  }
-
 }

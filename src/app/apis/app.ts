@@ -1,4 +1,4 @@
-import { mat2d, mat4, vec3 } from "gl-matrix";
+import { mat2d, mat4 } from "gl-matrix";
 import { EngineApi } from "../../build/board/mutations/api";
 import { Board } from "../../build/board/structs";
 import { ArtInfoProvider } from "../../build/formats/art";

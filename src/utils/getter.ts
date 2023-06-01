@@ -3,6 +3,5 @@ export async function loadBin(fname: string): Promise<ArrayBuffer> {
 }
 
 export async function loadString(fname: string): Promise<string> {
-  const r = await fetch(fname);
-  return r.ok ? r.text() : null;
+  return await fetch(fname).then(r => r.ok ? r.text() : null).catch(r => null);
 }

@@ -1,5 +1,5 @@
 import { UI } from "app/apis/ui";
-import { VIEW_FACTORY as VIEW_FACTORY, ViewType } from "app/modules/view/view";
+import { VIEW_FACTORY as VIEW_FACTORY } from "app/modules/view/view";
 import { LOGGER, LogLevel, TIMER } from './app/apis/app';
 import { BloodModule } from './app/modules/blood/module';
 import { GL, OFFSCREEN } from './app/modules/buildartprovider';

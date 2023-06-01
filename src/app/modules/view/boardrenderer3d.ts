@@ -118,9 +118,10 @@ export class Boardrenderer3D {
 
   private drawGeometry(view: View3d) {
     const board = this.board();
-    let result = view.sec == -1
+    const viewPos = view.getViewPosition();
+    const result = viewPos.sec == -1
       ? all.visit(board)
-      : visible.visit(board, this.boardUtils, view, view.getForward());
+      : visible.visit(board, this.boardUtils, viewPos, view.getForward());
 
     this.bgl.setProjectionMatrix(view.getProjectionMatrix());
     this.drawMirrors(result, view);
@@ -191,13 +192,14 @@ export class Boardrenderer3D {
   private mirrorWallsCollector = createWallCollector((board: Board, wallId: number, sectorId: number) => this.impl.isMirrorPic(board.walls[wallId].picnum));
   private drawMirrors(result: VisResult, view: View3d) {
     const board = this.board();
+    const viewPos = view.getViewPosition();
     result.forWall(board, this.mirrorWallsCollector.visit());
     if (this.mirrorWallsCollector.walls.length() == 0) return;
 
     this.bgl.gl.enable(WebGLRenderingContext.STENCIL_TEST);
     for (let i = 0; i < this.mirrorWallsCollector.walls.length(); i++) {
       const w = unpackWallId(this.mirrorWallsCollector.walls.get(i));
-      if (!wallVisible(board, w, view)) continue;
+      if (!wallVisible(board, w, viewPos)) continue;
 
       // draw mirror surface into stencil
       const r = this.renderables.wall(w);
@@ -220,7 +222,7 @@ export class Boardrenderer3D {
       this.bgl.gl.cullFace(WebGLRenderingContext.FRONT);
       vec3.copy(mpos, view.getPosition());
       reflectPoint3d(mpos, mirrorNormal, mirrorrD, mpos);
-      mstmp.sec = view.sec; mstmp.x = mpos[0]; mstmp.y = mpos[2]; mstmp.z = mpos[1];
+      mstmp.sec = viewPos.sec; mstmp.x = mpos[0]; mstmp.y = mpos[2]; mstmp.z = mpos[1];
       this.writeStenciledOnly(i + 127);
       this.drawRooms(mirrorVis.visit(board, this.boardUtils, mstmp, view.getForward()));
       this.bgl.gl.cullFace(WebGLRenderingContext.BACK);

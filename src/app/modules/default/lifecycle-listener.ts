@@ -1,5 +1,5 @@
 import { map, range } from "../../../utils/collections";
-import { Dependency, LifecycleListener } from "../../../utils/injector";
+import { Dependency, DependencyError, LifecycleListener } from "../../../utils/injector";
 import { iter } from "../../../utils/iter";
 import { int } from "../../../utils/mathutils";
 import { Logger, Timer } from "../../apis/app";
@@ -31,7 +31,7 @@ export class DefaultLifecycleListener implements LifecycleListener {
       this.stats.set(dep, { start, end });
       return result;
     } catch (e) {
-      this.logger('ERROR', `${dep.name} failed to start. Error: ${e.message}`)
+      this.logger('ERROR', `${dep.name} failed to start. ${(<DependencyError>e).cause.stack}`)
       throw e;
     }
   }

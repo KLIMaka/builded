@@ -33,7 +33,7 @@ function addEventListeners(target: HTMLElement, input: Input) {
 }
 
 export const DefaultInputConstructor: Plugin<Input> = lifecycle(async (injector, lifecycle) => {
-  const [logger, bus, state] = await getInstances(injector, LOGGER, BUS, STATE);
+  const [logger, state] = await getInstances(injector, LOGGER, STATE);
   const keybinds = await loadString('builded_binds.txt');
   const input = loadBinds(keybinds, messageParser, logger, state);
   addEventListeners(document.body, input);

@@ -23,8 +23,8 @@ export class View3d extends ViewBase {
   private snapTargetsValue = new CachedValue(t => this.updateSnapTargets(t), new SnapTargetsImpl());
   private direction = new CachedValue((r: Ray) => this.updateDir(r), new Ray());
   private cursor = vec3.create();
-  private forwardDamper = new DelayedValue(100, 0, NumberInterpolator);
-  private sideDamper = new DelayedValue(100, 0, NumberInterpolator);
+  private forwardDamper = new DelayedValue(300, 0, NumberInterpolator);
+  private sideDamper = new DelayedValue(300, 0, NumberInterpolator);
 
   constructor(
     gl: WebGL2RenderingContext,
@@ -42,11 +42,6 @@ export class View3d extends ViewBase {
     this.control.setFov(90);
     this.loadBoard(board());
   }
-
-  get sec() { return this.position.sec }
-  get x() { return this.position.x }
-  get y() { return this.position.y }
-  get z() { return this.position.z }
 
   getProjectionMatrix() { return this.control.getProjectionMatrix() }
   getTransformMatrix() { return this.control.getTransformMatrix() }
@@ -132,7 +127,7 @@ export class View3d extends ViewBase {
     const { start, dir } = this.dir();
     const fwd = gl2build(vec3.create(), this.getForward());
     hit.reset(start[0], start[1], start[2], dir[0], dir[1], dir[2], fwd[0], fwd[1], fwd[2]);
-    hitscan(this.board(), this.boardUtils, this.art, this.sec, hit, 0);
+    hitscan(this.board(), this.boardUtils, this.art, this.position.sec, hit, 0);
     return hit;
   }
 
@@ -191,7 +186,7 @@ export class View3d extends ViewBase {
   }
 
   private updateDir(r: Ray): Ray {
-    vec3.set(r.start, this.x, this.y, this.z);
+    vec3.set(r.start, this.position.x, this.position.y, this.position.z);
     gl2build(r.dir, this.control.getForwardUnprojected());
     return r;
   }

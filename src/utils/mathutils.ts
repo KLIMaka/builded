@@ -327,13 +327,13 @@ const SCALE = 27644437;
 export const Vec2Hash: (v: [number, number]) => number = ([x, y]) => (x * 9834497) ^ (y * 8503057);
 export const Vec2Eq: (v1: [number, number], v2: [number, number]) => boolean = ([x1, y1], [x2, y2]) => x1 == x2 && y1 == y2;
 
-function slope(f: (number) => number, x: number, d = 0.01): number {
+function slope(f: (x: number) => number, x: number, d = 0.01): number {
   const y1 = f(x - d);
   const y2 = f(x + d);
   return (y2 - y1) / (2 * d);
 }
 
-export function optimize(f: (number) => number, count = 2, eps = 0.001): number {
+export function optimize(f: (x: number) => number, count = 2, eps = 0.001): number {
   const x0 = f(0.5);
   let xp = x0;
   let xn = x0 - f(x0) / slope(f, x0);

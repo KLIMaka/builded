@@ -41,10 +41,6 @@ export interface ViewPosition {
   sec: number;
 }
 
-export enum ViewType {
-  VIEW_2D, VIEW_3D
-}
-
 export interface ViewFactory {
   create2d(): ViewCanvas;
   create3d(): ViewCanvas;
@@ -65,10 +61,10 @@ export function SwappableViewModule(module: Module) {
 // });
 
 const ViewFactoryConstructor: Plugin<ViewFactory> = lifecycle(async (injector, lifecycle) => {
-  const [bus, offscreen, buildgl, board, boardUtils, state, grid, art, input] = await getInstances(injector, BUS, OFFSCREEN, BUILD_GL, BOARD, BOARD_UTILS, STATE, GRID, ART, INPUT);
+  const [offscreen, buildgl, board, boardUtils, state, grid, art] = await getInstances(injector, OFFSCREEN, BUILD_GL, BOARD, BOARD_UTILS, STATE, GRID, ART);
   const renderer2d = await Renderer2D(injector);
   const renderer3d = await Renderer3D(injector);
-  const ctl = new ViewFactoryImpl(bus, input, offscreen, buildgl, board, boardUtils, state, grid, art, renderer2d, renderer3d);
+  const factory = new ViewFactoryImpl(offscreen, buildgl, board, boardUtils, state, grid, art, renderer2d, renderer3d);
   const stateCleaner = async (s: string) => state.unregister(s);
   lifecycle(state.register('lookaim', false), stateCleaner);
   lifecycle(state.register('forward', false), stateCleaner);
@@ -78,8 +74,7 @@ const ViewFactoryConstructor: Plugin<ViewFactory> = lifecycle(async (injector, l
   lifecycle(state.register('camera_speed', 8000), stateCleaner);
   lifecycle(state.register('zoom+', false), stateCleaner);
   lifecycle(state.register('zoom-', false), stateCleaner);
-  lifecycle(bus.connect(ctl), busDisconnector(bus));
-  return ctl;
+  return factory;
 });
 
 const VOID_RAY = new Ray();
@@ -127,11 +122,6 @@ class SwappableView implements View, MessageHandler {
     this.view = view2d;
   }
 
-  get sec() { return this.view.sec }
-  get x() { return this.view.x }
-  get y() { return this.view.y }
-  get z() { return this.view.z }
-
   target() { return this.view.target() }
   targets() { return this.view.targets() }
   snapTargets() { return this.view.snapTargets() }
@@ -163,8 +153,6 @@ class ViewFactoryImpl extends MessageHandlerReflective implements ViewFactory {
   public view: View;
 
   constructor(
-    private bus: MessageBus,
-    private input: Input,
     private offscren: OffscreenCanvas,
     private buildgl: BuildGl,
     private board: BoardProvider,

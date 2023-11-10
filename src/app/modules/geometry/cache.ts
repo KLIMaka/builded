@@ -228,28 +228,28 @@ export class RenderablesCacheImpl extends MessageHandlerReflective implements Re
   }
 
   private * prebuild(): SchedulerTask {
-    let handle = yield;
+    let handle = yield false;
     handle.setDescription('Prebuild...');
     const board = this.ctx.board();
     for (let i = 0; i < board.sectors.length; i++) {
       this.geometry.sector(i);
       this.topdown.sector(i);
       handle.setDescription(`Prebuild. Sector ${i}`);
-      handle = yield;
+      handle = yield true;
     }
     handle.setProgress(33);
     for (let i = 0; i < board.walls.length; i++) {
       this.geometry.wall(i);
       this.helpers.wall(i);
       handle.setDescription(`Prebuild. Wall ${i}`);
-      handle = yield;
+      handle = yield true;
     }
     handle.setProgress(66);
     for (let i = 0; i < board.sprites.length; i++) {
       this.geometry.sprite(i);
       this.topdown.sprite(i);
       handle.setDescription(`Prebuild. Sprite ${i}`);
-      handle = yield;
+      handle = yield true;
     }
   }
 

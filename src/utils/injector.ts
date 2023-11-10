@@ -173,6 +173,7 @@ class RootInjector implements ParentInjector, Runtime {
 }
 
 type Dependencyfy<T> = { [P in keyof T]: Dependency<T[P]> };
+
 export async function create<U, T extends any[]>(injector: Injector, ctr: { new(...args: T): U }, ...args: Dependencyfy<T>): Promise<U> {
   return new ctr(...<T>await getInstances(injector, ...args));
 }

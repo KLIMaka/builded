@@ -1,8 +1,11 @@
 import { List, Node } from "./list";
 
 export class Place {
+  static of(offset: number, size: number): Place { return new Place(offset, size); }
+
   constructor(public offset: number, public size: number, public data: any = null) { }
 }
+
 
 export class Bag {
   private holes: List<Place>;
@@ -30,7 +33,7 @@ export class Bag {
   public put(offset: number, size: number): void {
     let hole = this.holes.first();
     if (hole == this.holes.terminator()) {
-      this.holes.insertAfter(new Place(offset, size));
+      this.holes.insertAfter(Place.of(offset, size));
       return;
     }
     while (hole.next != this.holes.terminator()) {
@@ -40,13 +43,13 @@ export class Bag {
     }
     const end = hole.obj.offset + hole.obj.size;
     if (hole.obj.offset > offset) {
-      const newHole = this.holes.insertBefore(new Place(offset, size), hole);
+      const newHole = this.holes.insertBefore(Place.of(offset, size), hole);
       this.tryMerge(newHole);
     } else if (end == offset) {
       hole.obj.size += size;
       this.tryMerge(hole);
     } else {
-      const newHole = this.holes.insertAfter(new Place(offset, size), hole);
+      const newHole = this.holes.insertAfter(Place.of(offset, size), hole);
       this.tryMerge(newHole);
     }
   }
@@ -68,8 +71,8 @@ export class Bag {
   }
 
   public reset() {
-    this.holes = new List<Place>();
-    this.holes.insertAfter(new Place(0, this.size));
+    this.holes.clear();
+    this.holes.insertAfter(Place.of(0, this.size));
   }
 
   public getHoles() { return [...this.holes] }
@@ -109,7 +112,7 @@ export class BagController {
     //   offset = this.bag.get(size);
     // }
     if (offset == null) return null;
-    const result = new Place(offset, size);
+    const result = Place.of(offset, size);
     this.places[offset] = result;
     return result;
   }

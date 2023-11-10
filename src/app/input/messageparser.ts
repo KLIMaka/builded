@@ -11,9 +11,9 @@ class MessageParser {
     this.lexer.addRule(new LexerRule(/^[ \t\r\v\n]+/, 'WS'));
     this.lexer.addRule(new LexerRule(/^[a-zA-Z_][a-zA-Z0-9_]+/, 'ID'));
     this.lexer.addRule(new LexerRule(/^,/, 'COMA'));
-    this.lexer.addRule(new LexerRule(/^(false|true)/, 'BOOLEAN', 0, (s) => s == 'true'));
-    this.lexer.addRule(new LexerRule(/^\-?[0-9]*(\.[0-9]+)?([eE][\+\-][0-9]+)?/, 'FLOAT', 0, (s) => parseFloat(s)));
-    this.lexer.addRule(new LexerRule(/^\-?[0-9]+/, 'INT', 0, (s) => parseInt(s)));
+    this.lexer.addRule(new LexerRule(/^(false|true)/, 'BOOLEAN', 0, s => s == 'true'));
+    this.lexer.addRule(new LexerRule(/^\-?[0-9]*(\.[0-9]+)?([eE][\+\-][0-9]+)?/, 'FLOAT', 0, parseFloat));
+    this.lexer.addRule(new LexerRule(/^\-?[0-9]+/, 'INT', 0, parseInt));
     this.lexer.addRule(new LexerRule(/^"([^"]*)"/, 'STRING', 1));
     this.lexer.addRule(new LexerRule(/^\{([^\}]*)\}/, 'MACRO', 1));
   }
@@ -34,8 +34,8 @@ class MessageParser {
 const PARSER = new MessageParser();
 
 const NOOP_MESSAGE: Message = {};
-function createMessage(logger: Logger, constr: Function, ...types: string[]) {
-  const args = [...types].map(t => PARSER.get(t));
+function createMessage(logger: Logger, constr: Function, ...types: string[]) { 
+const args = [...types].map(t => PARSER.get(t));
   try {
     return Reflect.construct(constr, args);
   } catch (e) {

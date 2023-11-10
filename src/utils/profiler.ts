@@ -1,5 +1,6 @@
 import { TIMER, Timer as Timer_ } from "../app/apis/app";
 import { Dependency, Injector, Plugin, provider } from "utils/injector";
+import { getOrCreate } from "./collections";
 
 export const DefaultProfilerConstructor: Plugin<Profiler> = provider(async (injector: Injector) => {
   const timer = await injector.getInstance(TIMER);
@@ -71,27 +72,18 @@ export class DefaultCounter implements Counter {
   get(): number { return this.count }
 }
 
-function ensure<T>(map: Map<string, T>, key: string, ctor: () => T) {
-  let value = map.get(key);
-  if (value == undefined) {
-    value = ctor();
-    map.set(key, value);
-  }
-  return value;
-}
-
 export class DefaultProfile implements Profile {
   private timers = new Map<string, Timer>();
   private counters = new Map<string, Counter>();
 
   constructor(private t: Timer_) { }
 
-  timer(name: string): Timer { return ensure(this.timers, name, () => new DefaultTimer(this.t)) }
-  counter(name: string): Counter { return ensure(this.counters, name, () => new DefaultCounter()) }
+  timer(name: string): Timer { return getOrCreate(this.timers, name, _ => new DefaultTimer(this.t)) }
+  counter(name: string): Counter { return getOrCreate(this.counters, name, _ => new DefaultCounter()) }
 }
 
 export class DefaultProfiler implements Profiler {
-  private globalProfile: Profile;;
+  private globalProfile: Profile;
   private frameProfile: Profile;
 
   constructor(private t: Timer_) {

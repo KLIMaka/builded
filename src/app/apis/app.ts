@@ -128,7 +128,7 @@ export interface GridController {
 export const GRID = new Dependency<GridController>('GridController');
 
 
-export type SchedulerTask = Generator<void, void, TaskHandle>;
+export type SchedulerTask = Generator<boolean, void, TaskHandle>;
 
 export interface TaskHandle {
   stop(): void;

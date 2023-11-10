@@ -32,9 +32,8 @@ export const DefaultBoardProviderConstructor = (() => {
               return;
             case 'redo':
               if (forward.length() == 0) return;
-              activeBoard = forward.top();
+              activeBoard = forward.pop();
               history.push(api.cloneBoard(activeBoard));
-              forward.pop();
               lastTag = '';
               bus.handle(INVALIDATE_ALL);
               return;

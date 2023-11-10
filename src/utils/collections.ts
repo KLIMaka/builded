@@ -1,4 +1,3 @@
-import { Iter } from "./iter";
 import { cyclic } from "./mathutils";
 
 export interface Collection<T> extends Iterable<T> {
@@ -37,8 +36,8 @@ export class ArrayWrapper<T> implements MutableCollection<T> {
 export function wrap<T>(array: T[]) { return new ArrayWrapper(array) }
 
 export class Deck<T> implements MutableCollection<T>{
-  public array: T[] = [];
-  public size = 0;
+  private array: T[] = [];
+  private size = 0;
 
   public get(i: number) { return this.array[i] }
 
@@ -53,13 +52,12 @@ export class Deck<T> implements MutableCollection<T>{
   }
 
   public pushAll(values: Iterable<T>): Deck<T> {
-    for (let val of values) this.push(val);
+    for (const val of values) this.push(val);
     return this;
   }
 
-  public pop(): Deck<T> {
-    this.size--;
-    return this;
+  public pop(): T {
+    return this.array[--this.size];
   }
 
   public top(): T {
@@ -76,7 +74,7 @@ export class Deck<T> implements MutableCollection<T>{
   }
 
   public clone() {
-    let copy = new Deck<T>();
+    const copy = new Deck<T>();
     copy.array = [...take(this.array, this.size)];
     copy.size = this.size;
     return copy;
@@ -96,7 +94,7 @@ export class IndexedDeck<T> extends Deck<T>{
   public push(value: T): IndexedDeck<T> {
     if (this.index.has(value)) return this;
     super.push(value);
-    this.index.set(value, this.size - 1);
+    this.index.set(value, this.length() - 1);
     return this;
   }
 
@@ -114,8 +112,7 @@ export class IndexedDeck<T> extends Deck<T>{
   }
 
   public indexOf(value: T) {
-    let idx = this.index.get(value);
-    return idx == undefined ? -1 : idx;
+    return getOrDefault(this.index, value, -1);
   }
 
   public hasAny(i: Iterable<T>): boolean {
@@ -351,6 +348,11 @@ export function getOrCreate<K, V>(map: Map<K, V>, key: K, value: (k: K) => V) {
     map.set(key, v);
   }
   return v;
+}
+
+export function getOrDefault<K, V>(map: Map<K, V>, key: K, def: V) {
+  const v = map.get(key);
+  return v == undefined ? def : v;
 }
 
 export function or<T>(lh: T, rh: T): T {

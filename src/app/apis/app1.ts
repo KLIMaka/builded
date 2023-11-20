@@ -38,6 +38,8 @@ export interface TaskHandle {
 
 export type SchedulerTask = AsyncGenerator<boolean, boolean, TaskHandle>;
 
+export type SchedulerTaskFactory = (handle: TaskHandle) => SchedulerTask;
+
 export interface ScheddulerHandler {
   onTaskAdd(task: TaskHandle): void;
   onTaskStop(task: TaskHandle): void;
@@ -45,7 +47,7 @@ export interface ScheddulerHandler {
 }
 
 export interface Scheduler {
-  addTask(task: SchedulerTask): TaskHandle;
+  spawn(factory: SchedulerTaskFactory): TaskHandle;
   addHandler(handler: ScheddulerHandler): Handle;
   currentTasks(): Iterable<TaskHandle>;
 }

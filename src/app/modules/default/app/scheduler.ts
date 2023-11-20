@@ -1,89 +1,109 @@
-import { TaskHandle, Scheduler, ScheddulerHandler, SchedulerTask, Handle, Timer } from "app/apis/app1";
-import { Deck } from "utils/collections";
-import { iter } from "utils/iter";
-import { StopWatch, measure } from "utils/time";
+export type Callback<T> = (arg: T) => void;
+export type EventLoop = (cb: Callback<void>) => void;
 
-class TaskHandleImpl implements TaskHandle {
-  constructor(
-    private stopped = false,
-    public description = "",
-    public progress = -1,
-  ) { }
-
-
-  stop(): void { this.stopped = true }
-  isStopped() { return this.stopped }
-  getDescription(): string { return this.description }
-  getProgress(): number { return this.progress }
-  setDescription(s: string): void { this.description = s }
-  setProgress(p: number): void { this.progress = p }
+export interface TaskHandle {
+  wait(): Promise<void>;
+  waitFor<T>(promise: Promise<T>): Promise<T>;
 }
 
-class TaskInfo {
-  name: string;
-  description: string;
-  progress: number;
-  lastTime: number;
+export interface TaskController {
+  pause(): void;
+  unpause(): void;
+  stop(): void,
 }
 
+export type Task = (handle: TaskHandle) => Promise<void>;
 
+export interface Scheduler {
+  exec(task: Task): TaskController;
+}
 
-type Task = { handle: TaskHandleImpl, task: SchedulerTask };
-type TaskStats = { time: number, task: TaskHandle };
-type RunStats = { taskStats: TaskStats, lastRunTime: number };
+class TaskInerruptedError extends Error {
+  constructor() {
+    super('Task Interrupted');
+  }
+};
 
+class Barrier {
+  private promise: Promise<void>;
+  private ok: Callback<void> | undefined;
+  private err: Callback<Error> | undefined;
 
-class SchedulerImpl implements Scheduler {
-  private tasks = new Deck<Task>();
-  private nextTasks = new Deck<Task>();
-  private handlers: Set<ScheddulerHandler> = new Set();
-  private lastRun = 0;
-
-  constructor(private timer: Timer) {
-    requestAnimationFrame(() => this.run());
+  constructor(private blocked = true) {
+    this.promise = this.updatePromise();
   }
 
-  addTask(task: SchedulerTask): TaskHandle {
-    const handle = new TaskHandleImpl();
-    this.tasks.push({ handle, task });
-    this.handleAdd(handle);
-    return handle;
+  private updatePromise() {
+    return this.blocked
+      ? new Promise<void>((ok, err) => [this.ok, this.err] = [ok, err])
+      : Promise.resolve();
   }
 
-  addHandler(handler: ScheddulerHandler): Handle {
-    this.handlers.add(handler);
-    const remove = () => this.handlers.delete(handler);
-    return { remove };
+  wait(): Promise<void> { return this.promise }
+  block() { if (this.blocked) return; this.blocked = true; this.promise = this.updatePromise(); }
+  unblock() { if (!this.blocked) return; this.blocked = false; this.ok?.(); this.promise = this.updatePromise(); }
+  error(err: Error) { if (!this.blocked) return; this.err?.(err) }
+  isBlocking() { return this.blocked }
+}
+
+class TaskDescriptor implements TaskController, TaskHandle {
+  private paused = false;
+  private stopped = false;
+  private pauseBarrier = new Barrier(false);
+
+  constructor(private scheduler: SchedulerImpl) { }
+
+  async wait(): Promise<void> {
+    if (this.stopped) throw new TaskInerruptedError();
+    await this.scheduler.wait();
+    await this.pauseBarrier.wait()
   }
 
-  currentTasks(): Iterable<TaskHandle> {
-    return iter(this.tasks).map(t => t.handle);
+  async waitFor<T>(promise: Promise<T>): Promise<T> {
+    if (this.stopped) throw new TaskInerruptedError();
+    const result = await promise;
+    await this.scheduler.wait();
+    await this.pauseBarrier.wait();
+    return result;
   }
 
-  private handleAdd(task: TaskHandleImpl) { for (const h of this.handlers) h.onTaskAdd(task) }
-  private handleStop(task: TaskHandleImpl) { for (const h of this.handlers) h.onTaskStop(task) }
-  private handleUpdate(task: TaskHandleImpl) { for (const h of this.handlers) h.onTaskUpdate(task) }
+  pause() { this.pauseBarrier.block() }
+  unpause() { this.pauseBarrier.unblock() }
 
-
-  private run() {
-    const sinceLastRun = this.timer() - this.lastRun;
-    this.nextTasks.clear();
-    for (const ent of this.tasks) {
-      const { handle, task } = ent;
-      if (!handle.isStopped()) {
-        const [result, taskTime] = measure(() => task.next(handle), this.timer);
-        if (result.value) this.handleUpdate(handle);
-        if (result.done) handle.stop();
-      }
-      if (handle.isStopped()) this.handleStop(handle);
-      else this.nextTasks.push(ent);
-    }
-    this.tasks = this.nextTasks;
-
-    requestAnimationFrame(() => this.run());
+  stop() {
+    this.stopped = true;
+    if (this.paused) this.pauseBarrier.error(new TaskInerruptedError());
   }
 }
 
-export function DefaultScheduler(timer: Timer) {
-  return new SchedulerImpl(timer);
+export class SchedulerImpl implements Scheduler {
+  private nextTick: Promise<void>;
+
+  constructor(private eventloop: EventLoop) {
+    this.nextTick = this.createNextTick();
+  }
+
+  private createNextTick() {
+    return new Promise<void>(ok => this.eventloop(() => this.run(ok)));
+  }
+
+  private run(cb: Callback<void>) {
+    cb();
+    this.nextTick = this.createNextTick();
+  }
+
+  exec(task: Task): TaskController {
+    const descriptor = new TaskDescriptor(this);
+    task(descriptor)
+      .then(() => console.log('end'))
+      .catch(e => console.error(e))
+      .finally(() => console.log('finished'));
+    return descriptor;
+  }
+
+  wait(): Promise<void> { return this.nextTick }
+}
+
+export function DefaultScheduler(eventloop: EventLoop): Scheduler {
+  return new SchedulerImpl(eventloop);
 }

@@ -1,4 +1,4 @@
-import { List, Node } from "./list";
+import { FastList, List, Node } from "./list";
 
 export class Place {
   static of(offset: number, size: number): Place { return new Place(offset, size); }
@@ -8,7 +8,7 @@ export class Place {
 
 
 export class Bag {
-  private holes: List<Place>;
+  private holes = new List<Place>();
 
   constructor(readonly size: number) {
     this.reset();
@@ -97,7 +97,7 @@ export class Bag {
 
 export class BagController {
   private bag: Bag;
-  private places = {};
+  private places = new Map<number, Place>();
   private updater: (place: Place, noffset: number) => void;
 
   constructor(size: number, updater: (place: Place, noffset: number) => void) {
@@ -113,24 +113,21 @@ export class BagController {
     // }
     if (offset == null) return null;
     const result = Place.of(offset, size);
-    this.places[offset] = result;
+    this.places.set(offset, result);
     return result;
   }
 
   public put(place: Place): void {
     this.bag.put(place.offset, place.size);
-    delete this.places[place.offset];
+    this.places.delete(place.offset);
   }
 
   public optimize() {
     const places = this.places;
-    const keys = Object.keys(places);
-    this.places = {};
+    this.places = new Map();
     this.bag.reset();
     let offset = 0;
-    for (let i = 0; i < keys.length; i++) {
-      const key = keys[i];
-      const place = places[key];
+    for (const [_, place] of places) {
       this.places[offset] = place;
       if (place.offset != offset) {
         this.updater(place, offset);

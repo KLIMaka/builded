@@ -39,14 +39,18 @@ test('bag controller', () => {
     return true;
   }
 
+  // function toChar(x: number) { return x < 0.25 ? '.' : x < 0.5 ? '-' : x < 0.75 ? '+' : '#' };
   const places: Place[] = [];
-  for (let p = get(randInt(64, 128)); p != null; p = get(randInt(64, 128))) places.push(p);
+  for (let p = get(randInt(8, 16)); p != null; p = get(randInt(8, 16))) places.push(p);
+  // console.log(controller.freeSpace(80).map(toChar).join(''));
   const validPlaces: Place[] = [];
   for (const p of places) {
     if (coin()) controller.put(p);
     else validPlaces.push(p);
   }
+  // console.log(controller.freeSpace(80).map(toChar).join(''));
 
   controller.optimize();
+  // console.log(controller.freeSpace(80).map(toChar).join(''));
   for (const p of validPlaces) expect(check(p)).toBe(true);
 })

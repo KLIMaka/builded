@@ -8,6 +8,6 @@ export function DefaultApp(appName: string): App {
   const logger = DefaultLogger();
   const timer = () => performance.now();
   const storages = DefaultStorages(appName);
-  const scheduler = DefaultScheduler(timer);
+  const scheduler = DefaultScheduler(requestAnimationFrame);
   return { logger, timer, storages, scheduler };
 }

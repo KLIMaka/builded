@@ -1,23 +1,4 @@
-export type Callback<T> = (arg: T) => void;
-export type EventLoop = (cb: Callback<void>) => void;
-
-export interface TaskHandle {
-  wait(): Promise<void>;
-  waitFor<T>(promise: Promise<T>): Promise<T>;
-}
-
-export interface TaskController {
-  pause(): void;
-  unpause(): void;
-  stop(): void,
-}
-
-export type Task = (handle: TaskHandle) => Promise<void>;
-
-export interface Scheduler {
-  exec(task: Task): TaskController;
-}
-
+import { Callback, EventLoop, Scheduler, Task, TaskController, TaskHandle } from "../../../apis/app1";
 class TaskInerruptedError extends Error {
   constructor() {
     super('Task Interrupted');

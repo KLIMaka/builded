@@ -2,7 +2,7 @@ import { map, range } from "../../../utils/collections";
 import { Dependency, DependencyError, LifecycleListener } from "../../../utils/injector";
 import { iter } from "../../../utils/iter";
 import { int } from "../../../utils/mathutils";
-import { Logger, Timer } from "../../apis/app";
+import { Logger, Timer } from "../../apis/app1";
 
 type TimeStats = { start: number, end: number };
 
@@ -31,7 +31,7 @@ export class DefaultLifecycleListener implements LifecycleListener {
       this.stats.set(dep, { start, end });
       return result;
     } catch (e) {
-      this.logger('ERROR', `${dep.name} failed to start. ${(<DependencyError>e).cause.stack}`)
+      this.logger.log('ERROR', `${dep.name} failed to start. ${(<DependencyError>e).cause.stack}`)
       throw e;
     }
   }
@@ -43,7 +43,7 @@ export class DefaultLifecycleListener implements LifecycleListener {
     const maxw = 80;
     const timeline = maxw - labelMax - 1;
     for (const [d, s] of this.stats) {
-      this.logger('INFO', `${d.name}${repeat(labelMax - d.name.length, ' ')} ${printTimeline(timeline, s, minStart, maxEnd)}`);
+      this.logger.log('INFO', `${d.name}${repeat(labelMax - d.name.length, ' ')} ${printTimeline(timeline, s, minStart, maxEnd)}`);
     }
   }
 
@@ -51,7 +51,7 @@ export class DefaultLifecycleListener implements LifecycleListener {
     try {
       await promise;
     } catch (e) {
-      this.logger('ERROR', `${dep.name} failed to stop. Error: ${e.message}`)
+      this.logger.log('ERROR', `${dep.name} failed to stop. Error: ${e.message}`)
       throw e;
     }
   }

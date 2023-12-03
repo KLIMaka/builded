@@ -1,5 +1,6 @@
 import Optional from "optional-js";
-import { FileSystem, FileSystemHandler, FileSystems, WritableFileSystem, Storage, Handle } from "../../../apis/app1";
+import { FileSystem, FileSystemHandler, FileSystems, WritableFileSystem } from "../../../apis/fs";
+import { Storage, Handle } from "../../../apis/app1";
 
 class FileSystemsImpl implements FileSystems {
   private mounts: Map<string, FileSystem> = new Map();

@@ -1,9 +1,10 @@
-import { Callback, DefaultScheduler } from "../src/app/modules/default/app/scheduler";
+import { Callback } from "../src/app/apis/app1";
+import { DefaultScheduler } from "../src/app/modules/default/app/scheduler";
 import { getOrCreate } from "../src/utils/collections";
 
 
-async function run(cb: Callback<void>): Promise<void> {
-  cb();
+async function run(cb: Callback<number>): Promise<void> {
+  cb(0);
   return new Promise<void>(ok => setTimeout(ok));
 }
 
@@ -21,8 +22,55 @@ function count(c: number) {
   for (const cb of cbs) cb();
 }
 
+test('Scheduler1', async () => {
+  let cb: Callback<number> = () => { };
+  const s = DefaultScheduler(c => cb = c);
+  const nextLoop = () => run(cb);
+  let barrier: Callback<void> | undefined;
+  let x = 0;
+  let r = 0;
+
+  s.exec(async h => {
+    async function a() {
+      await h.wait();
+      x = 1;
+      await h.wait();
+      r = await h.waitFor(b());
+      x = 4;
+    }
+    async function b() {
+      x = 2;
+      await h.waitFor(new Promise<void>(ok => barrier = ok));
+      x = 3;
+      return 42;
+    }
+    await h.waitFor(a());
+    x = 5;
+  });
+
+  expect(x).toBe(0);
+  await nextLoop();
+  expect(x).toBe(1);
+  await nextLoop();
+  expect(x).toBe(2);
+  await nextLoop();
+  await nextLoop();
+  expect(x).toBe(2);
+  barrier?.();
+  expect(x).toBe(2);
+  await nextLoop();
+  await nextLoop();
+  expect(x).toBe(3);
+  expect(r).toBe(0);
+  await nextLoop();
+  expect(x).toBe(4);
+  expect(r).toBe(42);
+  await nextLoop();
+  expect(x).toBe(5);
+});
+
 test('Scheduler', async () => {
-  let cb: Callback<void> = () => { };
+  let cb: Callback<number> = () => { };
   const s = DefaultScheduler(c => cb = c);
   const nextLoop = () => run(cb);
   let counter = 0;

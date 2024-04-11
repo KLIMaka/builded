@@ -21,7 +21,6 @@ export function rgb2hsl(r: number, g: number, b: number): [number, number, numbe
   }
   return [int(h), int(s * 255), int(l * 255)];
 }
-
 export function hsl2rgb(h: number, s: number, l: number): [number, number, number] {
   if (s == 0) return [l, l, l];
 

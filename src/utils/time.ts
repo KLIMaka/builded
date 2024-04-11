@@ -1,17 +1,19 @@
 import { Timer } from "../app/apis/app1";
+import { int } from "./mathutils";
+import { Supplier } from "./types";
 
 const MS_IN_SEC = 1000;
 const MS_IN_MIN = MS_IN_SEC * 60;
 
 export function printTime(t: number) {
   if (t <= MS_IN_SEC * 0.5) return t.toFixed(2) + 'ms';
-  if (t <= MS_IN_MIN * 0.5) return (t / MS_IN_SEC).toFixed(2) + 'sec'
-  return (t / MS_IN_MIN).toFixed(2) + 'min';
+  if (t <= MS_IN_MIN) return (t / MS_IN_SEC).toFixed(2) + 's'
+  return int(t / MS_IN_MIN) + 'min ' + ((t - int(t / MS_IN_MIN) * MS_IN_MIN) / MS_IN_SEC).toFixed(2) + 's';
 }
 
-export function measure<T>(f: () => T, timer: Timer): [T, number] {
+export async function measure<T>(f: Supplier<Promise<T>>, timer: Timer): Promise<[T, number]> {
   const start = timer();
-  const result = f();
+  const result = await f();
   return [result, timer() - start];
 }
 
@@ -45,7 +47,7 @@ export class StopWatch {
     return this;
   }
 
-  print() {
+  print(): string {
     return printTime(this.get());
   }
 }

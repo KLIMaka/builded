@@ -1,14 +1,13 @@
-import { perlinOctaves } from "wasm_rust";
 import { transformed, tuple, value } from "../../../../utils/callbacks";
 import { octaves2d, perlin2d } from "../../../../utils/mathutils";
 import { INT_MODEL, NumberModelBuilder } from "../../../../utils/ui/controls/numberbox";
 import { VecStack } from "../../../../utils/vecstack";
-import { Context, Image } from "../api";
+import { Context, Image, propSection } from "../api";
 import { param, paramModel } from "./common";
 
 export function perlin(ctx: Context): Image {
-  const scale = param('Scale', 256);
-  const octaves = paramModel('Octaves', 1,
+  const scale = param(ctx.ui(), 'Scale', 256);
+  const octaves = paramModel(ctx.ui(), 'Octaves', 1,
     new NumberModelBuilder(INT_MODEL).validation(x => x > 0 && x < 8).build());
 
   const renderer = transformed(tuple(scale.value, octaves.value), ([s, o]) => {
@@ -21,5 +20,5 @@ export function perlin(ctx: Context): Image {
     }
   });
 
-  return { renderer, settings: value([scale.prop, octaves.prop]), dependsOn: _ => false }
+  return { renderer, settings: value(propSection('Perlin', scale.prop, octaves.prop)), dependsOn: _ => false }
 }

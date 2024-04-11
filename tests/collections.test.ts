@@ -1,5 +1,6 @@
 import { Deck, IndexedDeck, first, last, map, reduce, sub, wrap, reversed, enumerate, range, cyclicRange, cyclicPairs, rect, all, take, isEmpty, flatten } from "../src/utils/collections";
-import { SortedHeap } from "../src/utils/list";
+import { SortedList } from "../src/utils/list";
+import { rand0 } from "../src/utils/random";
 
 
 test('Deck', () => {
@@ -107,55 +108,31 @@ test('Utils', () => {
   expect([...flatten([[1, 2, 3], [4], [], [5, [6, 7]]])]).toStrictEqual([1, 2, 3, 4, 5, [6, 7]]);
 });
 
-test('SortedHeap', () => {
-  const heap = new SortedHeap<string>();
-  heap.add('nil', Number.MAX_VALUE);
-  expect([...heap.get()]).toStrictEqual(['nil']);
-  heap.add('first', 10);
-  expect([...heap.get()]).toStrictEqual(['first', 'nil']);
-  heap.add('second', 100);
-  expect([...heap.get()]).toStrictEqual(['first', 'second', 'nil']);
-  heap.add('third', -10);
-  expect([...heap.get()]).toStrictEqual(['third', 'first', 'second', 'nil']);
-  heap.add('fourth', 15);
-  expect([...heap.get()]).toStrictEqual(['third', 'first', 'fourth', 'second', 'nil']);
-})
+test('Sorted List', () => {
+  type T = { i: number, n: number }
+  const list = new SortedList<T>();
+  const items: T[] = [];
+  for (let i = 0; i < 200; i++) {
+    const t: T = { i, n: rand0(1) };
+    items.push(t);
+    list.add(t, t.n);
+  }
+  items.sort((l, r) => l.n - r.n);
+  expect([...list.get()]).toStrictEqual(items);
 
-test('SortedHeapEqOrder', () => {
-  const heap = new SortedHeap<string>((lh, rh) => lh < rh ? 1 : lh == rh ? 0 : -1);
-  heap.add("c", 10);
-  heap.add("a", 10);
-  heap.add("b", 10);
-  expect([...heap.get()]).toStrictEqual(['a', 'b', 'c']);
+  const list1 = new SortedList<string>();
+  list1.add('a', 1);
+  list1.add('b', 1);
+  list1.add('c', 1);
+  list1.add('d', 1);
+  expect([...list1.get()]).toStrictEqual(['a', 'b', 'c', 'd']);
 
-  heap.clear();
-  heap.add("c", 10);
-  heap.add("b", 10);
-  heap.add("a", 10);
-  expect([...heap.get()]).toStrictEqual(['a', 'b', 'c']);
-
-  heap.clear();
-  heap.add("a", 10);
-  heap.add("b", 10);
-  heap.add("c", 10);
-  expect([...heap.get()]).toStrictEqual(['a', 'b', 'c']);
-
-
-  heap.clear();
-  heap.add("a", 10);
-  heap.add("c", 10);
-  heap.add("b", 10);
-  expect([...heap.get()]).toStrictEqual(['a', 'b', 'c']);
-
-  heap.clear();
-  heap.add("b", 10);
-  heap.add("c", 10);
-  heap.add("a", 10);
-  expect([...heap.get()]).toStrictEqual(['a', 'b', 'c']);
-
-  heap.clear();
-  heap.add("b", 10);
-  heap.add("a", 10);
-  heap.add("c", 10);
-  expect([...heap.get()]).toStrictEqual(['a', 'b', 'c']);
-})
+  list1.clear();
+  list1.add('a', 1);
+  list1.add('b', 0.5);
+  list1.add('c', 0.5);
+  list1.add('d', 0.5);
+  list1.add('e', 0.5);
+  list1.add('f', 0.5);
+  expect([...list1.get()]).toStrictEqual(['b', 'c', 'd', 'e', 'f', 'a']);
+});

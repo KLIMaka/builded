@@ -1,15 +1,15 @@
 import { handle, value } from "../../../../utils/callbacks";
 import { VecStack } from "../../../../utils/vecstack";
-import { Context, Image } from "../api";
+import { Context, Image, propSection } from "../api";
 import { ImageBuilder, param, transformedParam, VOID_RENDERER } from "./common";
 
 export function displace(ctx: Context): Image {
   const builder = new ImageBuilder();
-  const oracle = ctx.oracle(builder.object());
-  const src = transformedParam('Source', ctx.imageProvider(), oracle, ctx.currentImageName());
-  const displace = transformedParam('Displace', ctx.imageProvider(), oracle);
-  const scale = param('Scale', 1);
-  const props = [src.prop, displace.prop, scale.prop];
+  const oracle = ctx.images(builder.object());
+  const src = transformedParam(ctx.ui(), 'Source', ctx.imageProvider(), oracle, ctx.currentImageName());
+  const displace = transformedParam(ctx.ui(), 'Displace', ctx.imageProvider(), oracle);
+  const scale = param(ctx.ui(), 'Scale', 1);
+  const props = propSection('Displace', src.prop, displace.prop, scale.prop);
 
   const renderer = value(VOID_RENDERER);
   const settings = value(props);

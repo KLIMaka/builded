@@ -1,9 +1,4 @@
-import { Callback, EventLoop, Scheduler, Task, TaskController, TaskHandle } from "../../../apis/app1";
-class TaskInerruptedError extends Error {
-  constructor() {
-    super('Task Interrupted');
-  }
-};
+import { Callback, EventLoop, Scheduler, Task, TaskController, TaskHandle, TaskInerruptedError } from "../../../apis/app1";
 
 class Barrier {
   private promise: Promise<void>;
@@ -31,8 +26,10 @@ class TaskDescriptor implements TaskController, TaskHandle {
   private paused = false;
   private stopped = false;
   private pauseBarrier = new Barrier(false);
+  private task: Promise<void>;
 
   constructor(private scheduler: SchedulerImpl) { }
+
 
   async wait(): Promise<void> {
     if (this.stopped) throw new TaskInerruptedError();
@@ -50,10 +47,13 @@ class TaskDescriptor implements TaskController, TaskHandle {
 
   pause() { this.pauseBarrier.block() }
   unpause() { this.pauseBarrier.unblock() }
+  setTask(task: Promise<void>) { this.task = task }
+  end() { return this.task }
 
-  stop() {
+  stop(): Promise<void> {
     this.stopped = true;
     if (this.paused) this.pauseBarrier.error(new TaskInerruptedError());
+    return this.task;
   }
 }
 
@@ -65,7 +65,10 @@ export class SchedulerImpl implements Scheduler {
   }
 
   private createNextTick() {
-    return new Promise<void>(ok => this.eventloop(() => this.run(ok)));
+    return new Promise<void>(ok => {
+      const eventloop = this.eventloop;
+      eventloop(() => this.run(ok));
+    });
   }
 
   private run(cb: Callback<void>) {
@@ -75,10 +78,7 @@ export class SchedulerImpl implements Scheduler {
 
   exec(task: Task): TaskController {
     const descriptor = new TaskDescriptor(this);
-    task(descriptor)
-      .then(() => console.log('end'))
-      .catch(e => console.error(e))
-      .finally(() => console.log('finished'));
+    descriptor.setTask(task(descriptor));
     return descriptor;
   }
 

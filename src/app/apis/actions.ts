@@ -1,37 +1,24 @@
+import { Dependency } from "@utils/injector";
+import { Consumer, Supplier } from "@utils/types";
+import { Bind } from "app/input/keymap";
+import Optional from "optional-js";
 
-export interface Action {
-  readonly id: string;
-  readonly description: string;
+export interface ActionDescriptor {
+  label(): Optional<string>;
+  icon(): Optional<string>;
+  descr(): Optional<string>;
+  bind(): Optional<Bind>;
 }
 
-
-export class ActionRegistry {
-  private actions = new Map<string, Action>();
-
-  register(action: Action): void {
-    if (this.actions.has(action.id)) throw new Error(`Action ${action.id} already registered`);
-    this.actions.set(action.id, action);
-  }
+export interface ActionDescriptors {
+  get(id: string): ActionDescriptor;
+  sub(id: string): ActionDescriptors;
+  bind(id: string, handler: ActionHandler): Action;
+  bindSync(id: string, handler: Consumer<void>): Action;
 }
 
-export interface Action {
+export type ActionHandler = Supplier<Promise<void>>;
+export type Action = { descriptor: ActionDescriptor, handler: ActionHandler }
+export type ActionsProvider = { actions: Supplier<Iterable<Action>> }
 
-}
-
-export class Action1 {
-  private actions = new Map<string, Action>();
-
-  registerAction(id: string, handler: Action) {
-    if (this.actions.has(id)) throw new Error(`Action ${id} already registered`);
-    this.actions.set(id, handler);
-  }
-
-  handle(id: string, arg: any) {
-    const handler = this.actions.get(id);
-    handler.
-  }
-}
-
-export interface ActionFactory {
-  create(params: string): Action;
-}
+export const ACTION_DESCRIPTORS = new Dependency<ActionDescriptors>('ActionDescriptors');

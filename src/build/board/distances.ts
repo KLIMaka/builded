@@ -16,6 +16,12 @@ export function distanceToWallPoint(board: Board, wallId: number, x: number, y: 
   return len2d(x - wall.x, y - wall.y);
 }
 
+export function distanceToSprite(board: Board, spriteId: number, x: number, y: number): number {
+  const sprite = board.sprites[spriteId];
+  return len2d(x - sprite.x, y - sprite.y);
+}
+
+
 function distance(ids: Iterable<number>, distf: (ent: number) => number): [number, number] {
   let id = -1;
   let mindist = Number.MAX_VALUE;
@@ -43,7 +49,7 @@ export function closestWallSegmentInSectorDist(board: Board, sectorId: number, x
 
 export function closestSpriteInSectorDist(board: Board, secId: number, x: number, y: number): [number, number] {
   const sprites = board.sprites;
-  return distance(iter(range(0, board.numsprites)).filter(s => sprites[s].sectnum == secId), s => len2d(sprites[s].x - x, sprites[s].y - y));
+  return distance(iter(range(0, board.numsprites)).filter(s => sprites[s].sectnum == secId), s => distanceToSprite(board, s, x, y));
 }
 
 export function closestWallSegmentDist(board: Board, x: number, y: number): [number, number] {

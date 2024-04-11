@@ -1,6 +1,6 @@
 import { Dependency, lifecycle } from "../../../utils/injector";
 import { tag } from '../../../utils/ui/ui';
-import { PhotonDialog } from "../photonui";
+import { PhotonDialog } from "../ui/photonui";
 
 export const MAP_NAME = new Dependency<(name: string) => Promise<string>>('MapName');
 

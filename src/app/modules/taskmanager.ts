@@ -51,7 +51,7 @@ class TaskManager implements ScheddulerHandler, GridModel {
     currentTasks: Iterable<TaskHandle>
   ) {
     this.window = ui.createWindow('task-manager', 600, 600);
-    this.window.headerElement.innerHTML = 'Tasks';
+    this.window.header.innerHTML = 'Tasks';
     this.window.onclose = () => this.active = false;
     for (const task of currentTasks) this.onTaskAdd(task);
   }
@@ -85,7 +85,7 @@ class TaskManager implements ScheddulerHandler, GridModel {
 
   private async refreshGrid() {
     if (!this.active) return;
-    replaceContent(this.window.contentElement, (await renderGrid(this)).elem());
+    replaceContent(this.window.content, (await renderGrid(this)).elem());
   }
 
   public async show() {

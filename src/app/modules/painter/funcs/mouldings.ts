@@ -1,7 +1,7 @@
 import { handle, value } from "../../../../utils/callbacks";
 import { int } from "../../../../utils/mathutils";
 import { VecStack } from "../../../../utils/vecstack";
-import { Context, Image } from "../api";
+import { Context, Image, propSection } from "../api";
 import { param, VOID_RENDERER } from "./common";
 
 type Moulding = (x: number) => number;
@@ -14,8 +14,8 @@ const CYMA_RECTA: Moulding = x => x < 0.5 ? 2 * x * x : 1 - 2 * (1 - x) * (1 - x
 const CYMA_REVERSA: Moulding = x => x < 0.5 ? 0.5 * Math.sqrt(2 * x) : 1 - 0.5 * Math.sqrt(2 - 2 * x);
 
 export function mouldings(ctx: Context): Image {
-  const size = param('Size', 4);
-  const props = [size.prop];
+  const size = param(ctx.ui(), 'Size', 4);
+  const props = propSection('Mouldings', size.prop);
 
   const renderer = value(VOID_RENDERER);
   const settings = value(props);

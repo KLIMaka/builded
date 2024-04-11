@@ -1,4 +1,4 @@
-import { clamp, int } from './mathutils';
+import { clamp, cyclic, int } from './mathutils';
 
 export interface Raster<P> {
   readonly width: number;
@@ -92,7 +92,7 @@ export class RectRaster<P> implements Raster<P> {
     private sy: number,
     ex: number,
     ey: number,
-    private padd: P,
+    private padd: (x: number, y: number, r: Raster<P>) => P,
   ) {
     this.width = ex - sx;
     this.height = ey - sy;
@@ -101,7 +101,7 @@ export class RectRaster<P> implements Raster<P> {
   pixel(x: number, y: number): P {
     const nx = this.sx + x;
     const ny = this.sy + y;
-    if (nx < 0 || ny < 0 || nx >= this.src.width || ny >= this.src.height) return this.padd;
+    if (nx < 0 || ny < 0 || nx >= this.src.width || ny >= this.src.height) return this.padd(cyclic(nx, this.src.width), cyclic(ny, this.src.height), this.src);
     return this.src.pixel(nx, ny);
   }
 }
@@ -137,6 +137,8 @@ function dithOffset(x: number, y: number) {
 export class SuperResizeRaster<P> implements Raster<P> {
   private readonly dx: number;
   private readonly dy: number;
+  private readonly hdx: number;
+  private readonly hdy: number;
   private readonly maxw: number;
   private readonly maxh: number;
 
@@ -149,13 +151,15 @@ export class SuperResizeRaster<P> implements Raster<P> {
   ) {
     this.dx = src.width / this.width;
     this.dy = src.height / this.height;
+    this.hdx = this.dx / 2;
+    this.hdy = this.dy / 2;
     this.maxw = src.width - 1;
     this.maxh = src.height - 1;
   }
 
   pixel(x: number, y: number): P {
-    const nx = x * this.dx + this.dx / 2;
-    const ny = y * this.dy + this.dy / 2;
+    const nx = x * this.dx + this.hdx;
+    const ny = y * this.dy + this.hdy;
     const inx = int(nx);
     const iny = int(ny);
     const doff = dithOffset(x, y);
@@ -163,8 +167,8 @@ export class SuperResizeRaster<P> implements Raster<P> {
     const fracy = ny - iny;
     const dx = fracx <= 0.5 ? -1 : +1;
     const dy = fracy <= 0.5 ? -1 : +1;
-    const addSample1 = this.src.pixel(clamp(inx + dx, 0, this.maxw), iny);
-    const addSample2 = this.src.pixel(inx, clamp(iny + dy, 0, this.maxh));
+    const addSample1 = this.src.pixel(clamp(inx + dx, 0, this.maxw), clamp(iny, 0, this.maxh));
+    const addSample2 = this.src.pixel(clamp(inx, 0, this.maxw), clamp(iny + dy, 0, this.maxh));
     const newSample = this.op1(addSample1, addSample2, doff);
     const origSample = this.src.pixel(inx, iny);
     return newSample == null ? origSample : this.op2(origSample, newSample, doff);
@@ -190,7 +194,12 @@ export function axisSwap<P>(src: Raster<P>) {
 
 export function rect<P>(src: Raster<P>, sx: number, sy: number, ex: number, ey: number, padd: P) {
   if (sx == 0 && sy == 0 && src.height == ey && src.width == ex) return src;
-  return new RectRaster(src, sx, sy, ex, ey, padd);
+  return new RectRaster(src, sx, sy, ex, ey, (x, y, r) => padd);
+}
+
+export function rectRepeat<P>(src: Raster<P>, sx: number, sy: number, ex: number, ey: number) {
+  if (sx == 0 && sy == 0 && src.height == ey && src.width == ex) return src;
+  return new RectRaster(src, sx, sy, ex, ey, (x, y, r) => r.pixel(x, y));
 }
 
 export function center<P>(src: Raster<P>, w: number, h: number, padd: P) {

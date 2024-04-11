@@ -16,13 +16,20 @@
     "allowJs": true,
     "baseUrl": "./src",
     "paths": {
-      "utils": [
-        "utils"
+      "@utils/*": [
+        "utils/*"
       ]
     },
     "allowSyntheticDefaultImports": true,
   },
   "files": [
-    "src/builded.ts"
+    "src/builded.ts",
+  ],
+  "include": [
+    "src"
+  ],
+  "exclude": [
+    "node_modules",
+    "**/node_modules/*"
   ]
 }

@@ -1,6 +1,6 @@
 import { handle, value } from "../../../../utils/callbacks";
 import { VecStack } from "../../../../utils/vecstack";
-import { Context, Image } from "../api";
+import { Context, Image, propSection } from "../api";
 import { ImageBuilder, param, transformedParam, VOID_RENDERER } from "./common";
 
 const FUNCS = {
@@ -14,12 +14,12 @@ const FUNCS_KEYS = Object.keys(FUNCS);
 
 export function blend(ctx: Context): Image {
   const builder = new ImageBuilder();
-  const oracle = ctx.oracle(builder.object());
-  const src1 = transformedParam('Source 1', ctx.imageProvider(), oracle, ctx.currentImageName());
-  const src2 = transformedParam('Source 2', ctx.imageProvider(), oracle);
-  const func = transformedParam('Function', f => FUNCS[f], _ => FUNCS_KEYS, 'Blend');
-  const t = param('Delta', 0.5);
-  const props = [src1.prop, src2.prop, func.prop, t.prop];
+  const oracle = ctx.images(builder.object());
+  const src1 = transformedParam(ctx.ui(), 'Source 1', ctx.imageProvider(), oracle, ctx.currentImageName());
+  const src2 = transformedParam(ctx.ui(), 'Source 2', ctx.imageProvider(), oracle);
+  const func = transformedParam(ctx.ui(), 'Function', f => FUNCS[f], _ => FUNCS_KEYS, 'Blend');
+  const t = param(ctx.ui(), 'Delta', 0.5);
+  const props = propSection('Blend', src1.prop, src2.prop, func.prop, t.prop);
 
   const renderer = value(VOID_RENDERER);
   const settings = value(props);

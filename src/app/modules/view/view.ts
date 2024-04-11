@@ -1,7 +1,7 @@
 import { Input } from "app/input/keymap";
 import { vec3 } from "gl-matrix";
 import { EMPTY_COLLECTION, filter } from "utils/collections";
-import { Comparator, SortedHeap } from "utils/list";
+import { Comparator, SortedList } from "utils/list";
 import { EMPTY_TARGET, Entity, Ray, Target } from "../../../build/hitscan";
 import { Dependency, Module, Plugin, getInstances, lifecycle, provider } from "../../../utils/injector";
 import { ART, ArtProvider, BOARD, BOARD_UTILS, BoardProvider, BoardUtils, EMPLY_SNAP_TARGETS as EMPTY_SNAP_TARGETS, GRID, GridController, STATE, SnapTarget, SnapTargets, SnapType, State, VIEW, View } from "../../apis/app";
@@ -26,7 +26,7 @@ export class TargetImpl implements Target {
 
 const SNAP_TARGET_ORDER: Comparator<SnapTarget> = (lh, rh) => lh.type - rh.type;
 export class SnapTargetsImpl implements SnapTargets {
-  private targets = new SortedHeap<SnapTarget>(SNAP_TARGET_ORDER);
+  private targets = new SortedList<SnapTarget>(SNAP_TARGET_ORDER);
   get(): SnapTarget[] { return [... this.targets.get()] }
   getByType(...types: SnapType[]): SnapTarget[] { return [...filter(this.targets.get(), t => types.includes(t.type))] }
   closest(): SnapTarget { return this.targets.first() }

@@ -28,7 +28,7 @@ class LocalFsManager {
       const roots = await this.localFsStorage.keys();
       await Promise.all(iter(roots).map(r => this.localFsStorage.get(r).then(h => this.roots.set(r, h))).collect());
       const table = await renderGrid(this.gridModel(resolve));
-      replaceContent(this.window.contentElement, table.elem());
+      replaceContent(this.window.content, table.elem());
       this.window.show();
     });
   }

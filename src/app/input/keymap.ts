@@ -1,78 +1,23 @@
-import { iter } from "utils/iter";
-import { Collection, all, getOrCreate } from "../../utils/collections";
+import { Collection, all } from "../../utils/collections";
 import { Logger, State } from "../apis/app";
-import { Message, MessageHandlerReflective } from "../apis/handler";
-import { Key } from "../edit/messages";
+import { Message } from "../apis/handler";
 
 export class Bind {
   constructor(readonly keys: string[]) { };
+  print() { return this.keys.map(k => this.p(k)).join('+') }
+  p(k: string) { return k }
+  length() { return this.keys.length }
 }
 
 export class InputController {
   private pressed = new Set<string>();
-  update(input: Key) { if (input.down) this.pressed.add(input.key); else this.pressed.delete(input.key); }
+  update(key: string, pressed: boolean) { if (pressed) this.pressed.add(key); else this.pressed.delete(key); }
   reset() { this.pressed.clear() }
   isPressed(bind: Bind): boolean { return all(bind.keys, k => this.pressed.has(k)) }
 }
 
-export class Keymap {
-  private binds: [Bind, Message[]][] = [];
-
-  getMessages(ctl: InputController): Iterable<Message> {
-    return iter(this.binds)
-      .filter(([s,]) => ctl.isPressed(s))
-      .map(([, m]) => m)
-      .flatten()
-  }
-
-  addBind(bind: Bind, messages: Message[]) { this.binds.push([bind, messages]) }
-}
-
 export type MessagesHandler = (messages: Message[]) => void;
 
-export class Input extends MessageHandlerReflective {
-  private ctl = new InputController();
-  private states = new Map<string, [string, any, any]>();
-  private keymaps = new Map<string, Keymap>();
-  private channels = new Map<string, MessagesHandler[]>();
-
-  constructor(private state: State) { super() };
-
-  Key(msg: Key) {
-    this.ctl.update(msg);
-    this.updateState(msg);
-    if (!msg.down) return;
-    for (const [channel, handlers] of this.channels) {
-      const keymap = this.keymaps.get(channel);
-      if (keymap == undefined) continue;
-      const messages = [...keymap.getMessages(this.ctl)];
-      handlers.forEach(h => h(messages));
-    }
-  }
-
-  private updateState(msg: Key) {
-    const stateChange = this.states.get(msg.key);
-    if (stateChange != undefined) {
-      for (const [sname, on, off] of stateChange) {
-        if (this.state.has(sname)) this.state.set(sname, msg.down ? on : off);
-      }
-    }
-  }
-
-  connect(ctx: string, handler: MessagesHandler) {
-    const list = getOrCreate(this.channels, ctx, () => []);
-    list.push(handler);
-  }
-
-  addBind(ctx: string, bind: Bind, msgs: Message[]) {
-    const keymap = getOrCreate(this.keymaps, ctx, () => new Keymap());
-    keymap.addBind(bind, msgs);
-  }
-
-  public addStateBind(name: string, enabled: any, disabled: any, key: string) {
-    getOrCreate(this.states, key, () => []).push([name, enabled, disabled]);
-  }
-}
 
 
 // export class InputConsumer implements InputTransformer {

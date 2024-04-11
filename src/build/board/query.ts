@@ -69,7 +69,8 @@ export function findSectorsAtPoint(board: Board, x: number, y: number): Set<numb
 export function findContainingSector(board: Board, points: Iterable<[number, number]>) {
   return iter(points)
     .map(p => findSectorsAtPoint(board, p[0], p[1]))
-    .reduce((lh, rh) => { return lh == null ? rh : intersect(lh, rh) }, null)
+    .reduceFirst(intersect)
+    .get()
 }
 
 function pointInterpolator(lh: [number, number], rh: [number, number], t: number) {

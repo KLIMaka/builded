@@ -22,13 +22,6 @@ function createDrawPanel(arts: ArtInfoProvider, pal: Uint8Array, canvas: HTMLCan
 }
 
 
-export interface PicTags {
-  allTags(): Iterable<string>;
-  tags(picnum: number): Iterable<string>;
-}
-
-export type Palette = { readonly name: string, readonly plu: Uint8Array }
-
 export const RAW_PAL = new Dependency<Uint8Array>('RawPal');
 export const RAW_PLUs = new Dependency<Palette[]>('Raw PLUs');
 export const PIC_TAGS = new Dependency<PicTags>('Tags');

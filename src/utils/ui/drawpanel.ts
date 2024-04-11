@@ -1,3 +1,4 @@
+import { Block } from "app/apis/ui";
 import { Deck, isEmpty, map } from "../collections";
 import { drawToCanvas } from "../imgutils";
 import { iter } from "../iter";
@@ -17,7 +18,7 @@ export class DrawPanel<P> {
   private selected = new Set<number>();
 
   constructor(
-    readonly canvas: HTMLCanvasElement,
+    readonly canvas: Block,
     private idsProvider: () => Iterable<number>,
     private rasters: (id: number) => Raster<P>,
     private rasterizer: Rasterizer<P>,
@@ -26,11 +27,11 @@ export class DrawPanel<P> {
     private cellW = 64,
     private cellH = 64,
   ) {
-    canvas.onclick = (e: MouseEvent) => {
+    canvas.event('click', e => {
       const idx = this.calcIdx(e.offsetX, e.offsetY);
       if (idx != -1) this.selectCallback(idx);
-    }
-    canvas.onwheel = (e: WheelEvent) => {
+    });
+    canvas.event('wheel', e => {
       if (e.altKey) {
         const d = e.deltaY > 0 ? -4 : 4;
         this.cellH += d;
@@ -38,7 +39,7 @@ export class DrawPanel<P> {
         this.draw();
       } else if (e.deltaY > 0) this.scroll(1, e.shiftKey ? ScrollType.PAGE : ScrollType.ROW);
       else if (e.deltaY < 0) this.scroll(-1, e.shiftKey ? ScrollType.PAGE : ScrollType.ROW);
-    }
+    });
   }
 
   public setSource(src: (id: number) => Raster<P>) {
@@ -64,8 +65,8 @@ export class DrawPanel<P> {
     return idx < this.pageIds.length() ? this.pageIds.get(idx) : -1;
   }
 
-  private horizontalCells() { return int(this.canvas.clientWidth / this.cellW) }
-  private verticalCells() { return int(this.canvas.clientHeight / this.cellH) }
+  private horizontalCells() { return int(this.canvas.cast().clientWidth / this.cellW) }
+  private verticalCells() { return int(this.canvas.cast().clientHeight / this.cellH) }
   private cellsOnPage() { return this.horizontalCells() * this.verticalCells() }
 
   private getDelta(type: ScrollType): number {
@@ -133,6 +134,6 @@ export class DrawPanel<P> {
 
   public draw(): void {
     this.prepareIds();
-    drawGrid(this.canvas, map(this.pageIds, i => this.render(i)), this.cellW, this.cellH);
+    drawGrid(this.canvas.cast(), map(this.pageIds, i => this.render(i)), this.cellW, this.cellH);
   }
 }

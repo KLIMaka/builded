@@ -1,15 +1,15 @@
 import { handle, value } from "../../../../utils/callbacks";
 import { VecStack } from "../../../../utils/vecstack";
-import { Context, Image } from "../api";
+import { Context, Image, propSection, propSectionGroups } from "../api";
 import { ImageBuilder, param, transformedParam, VOID_RENDERER } from "./common";
 
 export function transform(ctx: Context): Image {
   const builder = new ImageBuilder();
-  const src = transformedParam('Source', ctx.imageProvider(), ctx.oracle(builder.object()), ctx.currentImageName());
-  const scale = param('Scale', 1);
-  const offx = param('X Offset', 0);
-  const offy = param('Y Offset', 0);
-  const props = [src.prop, scale.prop, offx.prop, offy.prop];
+  const src = transformedParam(ctx.ui(), 'Source', ctx.imageProvider(), ctx.images(builder.object()), ctx.currentImageName());
+  const scale = param(ctx.ui(), 'Scale', 1);
+  const offx = param(ctx.ui(), 'Offset X', 0);
+  const offy = param(ctx.ui(), 'Y', 0);
+  const props = propSectionGroups('Transform', [src.prop], [scale.prop], [offx.prop, offy.prop]);
 
   const renderer = value(VOID_RENDERER);
   const settings = value(props);

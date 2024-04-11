@@ -1,15 +1,15 @@
 import { handle, value } from "../../../../utils/callbacks";
 import { clamp, smothstep } from "../../../../utils/mathutils";
 import { VecStack } from "../../../../utils/vecstack";
-import { Context, Image } from "../api";
+import { Context, Image, propSection } from "../api";
 import { ImageBuilder, param, transformedParam, VOID_RENDERER } from "./common";
 
 export function profile(ctx: Context): Image {
   const builder = new ImageBuilder();
-  const src = transformedParam('Profile', ctx.imageProvider(), ctx.oracle(builder.object()), ctx.currentImageName());
-  const y = param('Y', 0.5);
+  const src = transformedParam(ctx.ui(), 'Profile', ctx.imageProvider(), ctx.images(builder.object()), ctx.currentImageName());
+  const y = param(ctx.ui(), 'Y', 0.5);
 
-  const props = [src.prop, y.prop];
+  const props = propSection('Profile', src.prop, y.prop);
 
   const renderer = value(VOID_RENDERER);
   const settings = value(props);

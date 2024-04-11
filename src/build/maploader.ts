@@ -1,9 +1,9 @@
-import { struct, bits, ushort, int, short, byte, ubyte, uint, Stream, array } from '../utils/stream';
+import { struct, bits, ushort, int, short, byte, ubyte, uint, Stream, array, bit } from '../utils/stream';
 import { SectorStats, Sector, WallStats, Wall, SpriteStats, Sprite, Board, FACE_SPRITE } from './board/structs';
 import { ZSCALE } from './utils';
 
 const sectorStats = struct(SectorStats)
-  .field('parallaxing', bits(1))
+  .field('parallaxing', bit())
   .field('slopped', bits(1))
   .field('swapXY', bits(1))
   .field('doubleSmooshiness', bits(1))
@@ -135,8 +135,9 @@ export function saveBuildMap(board: Board): ArrayBuffer {
   const buffer = new ArrayBuffer(size);
   const stream = new Stream(buffer);
   boardStruct.write(stream, board);
+  fixSectorSlopes(board);
   ushort.write(stream, board.numsectors);
-  array(sectorStruct, board.numsectors).write(stream, fixSectorSlopes(board.sectors));
+  array(sectorStruct, board.numsectors).write(stream, board.sectors);
   ushort.write(stream, board.numwalls);
   array(wallStruct, board.numwalls).write(stream, board.walls);
   ushort.write(stream, board.numsprites);
@@ -144,12 +145,12 @@ export function saveBuildMap(board: Board): ArrayBuffer {
   return buffer;
 }
 
-function fixSectorSlopes(sectors: Sector[]) {
-  for (const sec of sectors) {
+export function fixSectorSlopes(board: Board) {
+  for (var i = 0; i < board.numsectors; i++) {
+    const sec = board.sectors[i];
     sec.ceilingstat.slopped = 1;
     sec.floorstat.slopped = 1;
   }
-  return sectors;
 }
 
 export function initWallStats(stat: WallStats) {
@@ -195,7 +196,7 @@ export function newWall() {
 export function initSectorStats(stat: SectorStats) {
   stat.alignToFirstWall = 0;
   stat.doubleSmooshiness = 0;
-  stat.parallaxing = 0;
+  stat.parallaxing = false;
   stat.slopped = 0;
   stat.swapXY = 0;
   stat.xflip = 0;

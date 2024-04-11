@@ -8,10 +8,10 @@ export type ValueProvider<T> = () => T;
 export type Changer<T, C> = (value: T, change: C) => T;
 
 export function and<T>(v1: Validator<T>, v2: Validator<T>): Validator<T> { return (v: T) => v1(v) && v2(v) }
-export const IntParseValidator: ParseValidator = (str: string) => !isNaN(Number.parseInt(str));
-export const FloatParseValidator: ParseValidator = (str: string) => !isNaN(Number.parseFloat(str));
 export const IntParser: Parser<number> = Number.parseInt;
 export const FloatParser: Parser<number> = Number.parseFloat;
+export const IntParseValidator: ParseValidator = (str: string) => !isNaN(IntParser(str));
+export const FloatParseValidator: ParseValidator = (str: string) => !isNaN(FloatParser(str));
 
 export const numberRangeValidator = (min: number, max: number): Validator<number> => (v: number) => v <= max && v >= min;
 export const intNumberValidator: Validator<number> = (v: number) => int(v) == v;

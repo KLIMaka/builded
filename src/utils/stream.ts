@@ -183,6 +183,10 @@ export class Stream {
     if (this.aligned) this.writeUByte(this.currentByte);
   }
 
+  public readBitsSigned(bits: number): number {
+    return this.readBits(-bits);
+  }
+
   public readBits(bits: number): number {
     let value = 0;
     const signed = bits < 0;
@@ -247,6 +251,8 @@ export const uint = atomicReader(s => s.readUInt(), (s, v) => s.writeUInt(v), 4,
 export const float = atomicReader(s => s.readFloat(), (s, v) => s.writeFloat(v), 4, Float32Array);
 export const string = (len: number) => accessor(s => s.readByteString(len), (s, v) => s.writeByteString(len, v), len);
 export const bits = (len: number) => accessor(s => s.readBits(len), (s, v) => s.writeBits(len, v), Math.abs(len) / 8);
+export const bits_signed = (len: number) => accessor(s => s.readBitsSigned(len), (s, v) => s.writeBits(len, v), Math.abs(len) / 8);
+export const bit = () => accessor(s => s.readBits(1) == 1, (s, v) => s.writeBits(1, v ? 1 : 0), 1 / 8);
 export const array = <T>(type: Accessor<T>, len: number) => accessor(s => readArray(s, type, len), (s, v) => writeArray(s, type, len, v), type.size * len);
 export const atomic_array = <T>(type: AtomicReader<any, T>, len: number) => accessor(s => readAtomicArray(s, type, len), (s, v) => writeAtomicArray(s, type, len, v), type.size * len);
 export const struct = <T>(type: Constructor<T>) => new StructBuilder(type);
@@ -273,14 +279,14 @@ const writeAtomicArray = <T>(s: Stream, type: AtomicReader<any, T>, len: number,
 }
 
 type Constructor<T> = { new(): T };
-type Field<T> = [T, Accessor<any>];
+type Field<T> = [keyof T, Accessor<T[keyof T]>];
 
-class StructBuilder<T, K extends keyof T> implements Accessor<T> {
-  private fields: Field<K>[] = [];
+class StructBuilder<T> implements Accessor<T> {
+  private fields: Field<T>[] = [];
   public size = 0;
   constructor(private ctr: Constructor<T>) { }
 
-  field(f: K, r: Accessor<any>) {
+  field<V extends keyof T>(f: V, r: Accessor<T[V]>) {
     this.fields.push([f, r]);
     this.size += r.size;
     return this;

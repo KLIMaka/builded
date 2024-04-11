@@ -1,4 +1,5 @@
 import { chain, filter, flatten, getOrCreate, map, pairs, reduce } from './collections';
+import { iter } from './iter';
 import { memoize } from './mathutils';
 
 export type Links<T> = { to: Set<T>, from: Set<T> };
@@ -72,12 +73,12 @@ export class DirecredGraph<T> {
   public subgraphs(): T[][] {
     const visited = new Set();
     const nodes = this.nodes;
-    const collect = function (node: T) {
+    const collect: (node: T) => T[] = node => {
       if (visited.has(node)) return [];
       const links = nodes.get(node);
       visited.add(node);
-      return [node, ...flatten(map(chain(links.to, links.from), collect))];
+      return [node, ...iter(chain(links.to, links.from)).map(collect).flatten()];
     }
-    return [...map(filter(this.nodes.keys(), n => !visited.has(n)), collect)];
+    return iter(nodes.keys()).filter(n => !visited.has(n)).map(collect).collect();
   }
 }

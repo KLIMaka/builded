@@ -1,7 +1,7 @@
 import { BoardUtils } from "app/apis/app";
 import { vec3 } from "gl-matrix";
 import { range } from "../utils/collections";
-import { SortedHeap } from "../utils/list";
+import { SortedList as SortedList } from "../utils/list";
 import { cross2d, int, len2d, ortonorm2d, sign } from "../utils/mathutils";
 import { inSector, isValidSectorId } from "./board/query";
 import { Board, FACE_SPRITE, FLOOR_SPRITE, Sector, WALL_SPRITE } from "./board/structs";
@@ -83,7 +83,7 @@ const EMPTY: Target = { entity: null, coords: [0, 0, 0] };
 
 export class Hitscan {
   constructor(
-    private targetsList = new SortedHeap<Target>(),
+    private targetsList = new SortedList<Target>(),
     public ray = new Ray(),
     public forward = vec3.create()
   ) { }

@@ -50,12 +50,12 @@ export class VecStack {
   setz(ptr: number, v: number): VecStack { this.stack[ptr + 2] = v; return this }
   setw(ptr: number, v: number): VecStack { this.stack[ptr + 3] = v; return this }
 
-  copy(lh: number, rh: number): number {
-    this.stack[lh] = this.stack[rh];
-    this.stack[lh + 1] = this.stack[rh + 1];
-    this.stack[lh + 2] = this.stack[rh + 2];
-    this.stack[lh + 3] = this.stack[rh + 3];
-    return lh;
+  copy(dst: number, src: number): number {
+    this.stack[dst] = this.stack[src];
+    this.stack[dst + 1] = this.stack[src + 1];
+    this.stack[dst + 2] = this.stack[src + 2];
+    this.stack[dst + 3] = this.stack[src + 3];
+    return dst;
   }
 
   set(id: number, x: number, y: number, z: number, w: number): number {

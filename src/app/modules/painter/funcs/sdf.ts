@@ -1,19 +1,19 @@
 import { handle, value } from "../../../../utils/callbacks";
 import { VecStack } from "../../../../utils/vecstack";
-import { Context, Image } from "../api";
+import { Context, Image, propSection } from "../api";
 import { ImageBuilder, transformedParam, VOID_RENDERER } from "./common";
 
 export function sdf(ctx: Context): Image {
   const builder = new ImageBuilder();
-  const distance = transformedParam('SDF',
+  const distance = transformedParam(ctx.ui(), 'SDF',
     ctx.imageProvider(),
-    ctx.oracle(builder.object()),
+    ctx.images(builder.object()),
     ctx.currentImageName());
-  const profile = transformedParam('Profile',
+  const profile = transformedParam(ctx.ui(), 'Profile',
     ctx.imageProvider(),
-    ctx.oracle(builder.object()));
+    ctx.images(builder.object()));
 
-  const props = [distance.prop, profile.prop];
+  const props = propSection('SDF', distance.prop, profile.prop);
 
   const renderer = value(VOID_RENDERER);
   const settings = value(props);

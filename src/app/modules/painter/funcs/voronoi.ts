@@ -2,16 +2,16 @@ import { handle, value } from "../../../../utils/callbacks";
 import { map } from "../../../../utils/collections";
 import { fract, Vec2Hash } from "../../../../utils/mathutils";
 import { VecStack } from "../../../../utils/vecstack";
-import { Context, Image } from "../api";
+import { Context, Image, propSection } from "../api";
 import { ImageBuilder, param, transformedParam, VOID_RENDERER } from "./common";
 
 const CORE: [number, number][] = [[-1, -1], [0, -1], [1, -1], [-1, 0], [0, 0], [1, 0], [-1, 1], [0, 1], [1, 1]]
 
 export function voronoi(ctx: Context): Image {
   const builder = new ImageBuilder();
-  const src = transformedParam('Source', ctx.imageProvider(), ctx.oracle(builder.object()), ctx.currentImageName());
-  const scale = param('Scale', 4);
-  const props = [src.prop, scale.prop];
+  const src = transformedParam(ctx.ui(), 'Source', ctx.imageProvider(), ctx.images(builder.object()), ctx.currentImageName());
+  const scale = param(ctx.ui(), 'Scale', 4);
+  const props = propSection('Voronoi', src.prop, scale.prop);
 
   const core = [...map(CORE, c => ctx.stack().pushGlobal(c[0], c[1], 0, 0))];
 

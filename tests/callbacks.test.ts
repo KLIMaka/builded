@@ -1,9 +1,9 @@
-import { Value, handle, value, transformed, delay, tuple } from "../src/utils/callbacks";
+import { handle, transformed, tuple, value } from "../src/utils/callbacks";
 
 test('value', () => {
   const a = value(1);
   const log: number[] = [];
-  a.add(() => log.push(a.get()));
+  a.add(a => log.push(a));
 
   a.set(1);
   a.set(1);
@@ -58,7 +58,7 @@ test('transformed', () => {
   expect(tsrc.get()).toBe('42');
 
   const log: string[] = [];
-  tsrc.add(() => log.push(tsrc.get()));
+  tsrc.add(a => log.push(a));
 
   src.set(0);
   src.set(12);
@@ -68,52 +68,6 @@ test('transformed', () => {
   expect(tsrc1.get()).toBe(12 * 12 + 1);
 });
 
-test('delay', done => {
-  const src = value(42);
-  const tsrc = transformed(src, v => v.toString());
-
-  const log: string[] = [];
-  const dsrc = delay(tsrc, setTimeout);
-  dsrc.add(() => log.push(dsrc.get()));
-
-  src.set(1);
-  expect(src.get()).toBe(1);
-  src.set(2);
-  expect(src.get()).toBe(2);
-  src.set(3);
-  expect(src.get()).toBe(3);
-  expect(log).toStrictEqual([]);
-
-  setTimeout(() => {
-    expect(log).toStrictEqual(['3']);
-    done();
-  });
-});
-
-test('tuple', done => {
-  const a = value(1);
-  const b = value(2);
-  const t = tuple(a, b);
-  const d = delay(t, setTimeout);
-
-  const log1: [number, number][] = [];
-  const log2: [number, number][] = [];
-  t.add(() => log1.push(t.get()));
-  d.add(() => log2.push(d.get()));
-
-  a.set(42);
-  b.set(42);
-  expect(t.get()).toStrictEqual([42, 42]);
-  expect(d.get()).toStrictEqual([42, 42]);
-  expect(log1).toStrictEqual([[42, 2], [42, 42]]);
-  expect(log2).toStrictEqual([]);
-
-  setTimeout(() => {
-    expect(log2).toStrictEqual([[42, 42]]);
-    done();
-  });
-});
-
 test('tuple1', () => {
   const a = value(1);
   const tr = transformed(a, x => x + 1);
@@ -121,8 +75,8 @@ test('tuple1', () => {
   const tr1 = transformed(tuple(a, t), x => x.toString());
 
   const log: string[] = [];
-  tr1.add(() => log.push(tr1.get()));
+  tr1.add(a => log.push(a));
 
   a.set(42);
-  expect(log).toStrictEqual(["42,42,43", "42,42,43", "42,42,43"]);
+  expect(log).toStrictEqual(["42,42,43"]);
 });

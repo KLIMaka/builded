@@ -73,6 +73,20 @@ class StorageImpl implements Storage {
       request.onerror = e => error(e);
     })
   }
+
+  getAll<T>(): Promise<T[]> {
+    return new Promise(async (ok, error) => {
+      const request = (await this.request('readonly')).openCursor();
+      const values: T[] = [];
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (!cursor) return ok(values);
+        values.push(cursor.value);
+        cursor.continue();
+      }
+      request.onerror = e => error(e);
+    })
+  }
 }
 
 export function DefaultStorages(appName: string): Storages {

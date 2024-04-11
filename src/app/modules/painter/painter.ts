@@ -1,89 +1,64 @@
-import h from "stage0";
-import { CallbackChannelImpl, CallbackHandlerImpl, Handle, handle, transformed, value } from "../../../utils/callbacks";
-import { getOrCreate } from "../../../utils/collections";
-import { create, lifecycle, Module, plugin } from "../../../utils/injector";
+import { cyclicToggler } from "@utils/objects";
+import { Consumer, Supplier, nil } from "@utils/types";
+import { Action, ActionDescriptors } from "app/apis/actions";
+import { Scheduler, TaskController, TaskHandle } from "app/apis/app1";
+import { CallbackChannelImpl, CallbackHandlerImpl, transformed, value } from "../../../utils/callbacks";
+import { chain, getOrCreate, mapBuilder } from "../../../utils/collections";
 import { Range, Vec3Interpolator } from "../../../utils/interpolator";
 import { iter } from "../../../utils/iter";
 import { int, normalize, vec42int } from "../../../utils/mathutils";
-import { f32array, Mapper } from "../../../utils/pixelprovider";
-import { Oracle } from "../../../utils/ui/controls/api";
-import { listBox } from "../../../utils/ui/controls/listbox";
-import { menuButton, NavItem1, navTree, NavTreeModel, properties } from "../../../utils/ui/renderers";
-import { replaceContent } from "../../../utils/ui/ui";
+import { Mapper, f32array } from "../../../utils/pixelprovider";
+import { propSections } from "../../../utils/ui/renderers";
 import { VecStack } from "../../../utils/vecstack";
-import { Scheduler, SCHEDULER, TaskHandle } from "../../apis/app";
-import { BUS, busDisconnector } from "../../apis/handler";
-import { Ui, UI, Window } from "../../apis/ui";
-import { namedMessageHandler } from "../../edit/messages";
-import { Context, Image, Renderer, Value } from "./api";
-import { apply, blend, box, circle, circular, displace, displacedGrid, gradient, grid, mouldings, perlin, pointDistance, profile, profiles, render, repeat, sdf, select, transform, voronoi } from './funcs/catalog';
-import { rasterWorkplaneRenderer, renderGrid, Workplane, WorkplaneRendererBuilder } from "./workplane";
-
-export async function PainterModule(module: Module) {
-  module.bind(plugin('Painter'), lifecycle(async (injector, lifecycle) => {
-    const bus = await injector.getInstance(BUS);
-    const editor = await create(injector, Painter, UI, SCHEDULER);
-    lifecycle(bus.connect(namedMessageHandler('show_painter', () => editor.show())), busDisconnector(bus));
-    lifecycle(editor, async e => e.stop());
-  }));
-}
-
-class Model1Item implements NavItem1 {
-  private selectCallback: ((select: boolean) => void)[] = [];
-
-  constructor(public title: string) { }
-
-  setSelect(cb: (select: boolean) => void) { this.selectCallback.push(cb) }
-  select(selected: boolean) { this.selectCallback.forEach(cb => cb(selected)) }
-}
-
-class ShapesModel implements NavTreeModel {
-  items: NavItem1[] = [];
-  title = "Shapes";
-  private changeCallback: () => void;
-  private selected: Model1Item = null;
-
-  setOnCnange(cb: () => void) { this.changeCallback = cb }
-
-  select(item: Model1Item) {
-    if (this.selected == item) return;
-    if (this.selected != null) this.selected.select(false);
-    item.select(true);
-    this.selected = item;
-  }
-
-  add(title: string) {
-    const item = new Model1Item(title);
-    this.items.push(item);
-    this.changeCallback();
-    return item;
-  }
-}
-
+import { Block, TableModel, Ui, Widget, Window, WindowBuilder, blockActions, clazz, style } from "../../apis/ui";
+import { column, listBuilder, singleActionWidget, suggestionBox, table } from "../ui/builders";
+import { Context, Image, PropertySection, Renderer, Value } from "./api";
+import catalog from './funcs/catalog';
+import { Workplane, WorkplaneRendererBuilder, rasterWorkplaneRenderer, renderGrid } from "./workplane";
+import { printTime } from "@utils/time";
 
 const GREEN_RED = new Range([0, 255, 0], [255, 0, 0], Vec3Interpolator);
 type Limiter = (r: number, g: number, b: number, a: number) => number;
 
-class Image2dRenderer extends CallbackChannelImpl<[]> {
-  private scheduleHandle: TaskHandle;
+type ProgressHandler = {
+  progress: Consumer<number>,
+  onEnd: Consumer<void>,
+  onStart: Consumer<TaskController>
+}
+
+class Image2dRenderer extends CallbackChannelImpl<void> {
+  private scheduleHandle: TaskController;
   private position: number;
-  private handler: Handle;
+  private handler = new CallbackHandlerImpl<Renderer>(r => this.scheduleRedraw(r));
   public mins = [0, 0, 0, 0];
   public maxs = [0, 0, 0, 0];
 
-  constructor(private scheduler: Scheduler, private stack: VecStack, private buff: Float32Array, private size: number) {
+  constructor(
+    private scheduler: Scheduler,
+    private stack: VecStack,
+    private buff: Float32Array,
+    private size: number,
+    private progressHandler: ProgressHandler
+  ) {
     super();
     this.position = this.stack.pushGlobal(0, 0, 0, 0);
   }
 
   public set(renderer: Value<Renderer>) {
-    if (this.handler != null) this.handler.stop();
-    this.handler = handle(null, (p, renderer) => this.scheduleRedraw(renderer), renderer);
+    this.handler.connect(renderer);
   }
 
   private scheduleRedraw(renderer: Renderer) {
-    if (this.scheduleHandle != null) this.scheduleHandle.stop();
-    this.scheduleHandle = this.scheduler.addTask(this.redraw(renderer));
+    if (this.scheduleHandle != null) {
+      this.scheduleHandle.stop().finally(() => {
+        this.progressHandler.onEnd();
+        this.scheduleHandle = null;
+        this.scheduleRedraw(renderer)
+      });
+      return;
+    }
+    this.scheduleHandle = this.scheduler.exec(handle => this.redrawImpl(handle, renderer));
+    this.progressHandler.onStart(this.scheduleHandle);
   }
 
   private updateStats(r: number, g: number, b: number, a: number) {
@@ -102,10 +77,17 @@ class Image2dRenderer extends CallbackChannelImpl<[]> {
     this.maxs = [0, 0, 0, 0];
   }
 
-  private * redraw(renderer: Renderer) {
+  private async redrawImpl(handle: TaskHandle, renderer: Renderer) {
+    return this.redraw(handle, renderer).catch(nil()).finally(() => {
+      this.progressHandler.onEnd();
+      this.scheduleHandle = null;
+    });
+  }
+
+  private async redraw(handle: TaskHandle, renderer: Renderer) {
     let t = window.performance.now();
-    const start = t;
     this.resetStats();
+    this.buff.fill(0);
     const size = this.size;
     const ds = 0.5 / size;
     const max = size * size;
@@ -131,24 +113,21 @@ class Image2dRenderer extends CallbackChannelImpl<[]> {
 
       if (i % 512 == 0) {
         const dt = window.performance.now() - t;
-        if (dt > 100) {
+        if (dt > 50) {
           t = window.performance.now();
+          this.progressHandler.progress(i / max);
           this.notify();
-          yield;
+          await handle.wait();
         }
       }
     }
     this.notify();
-    console.log(window.performance.now() - start);
   }
 }
 
-
-
-class Painter implements Context {
+export class Painter implements Context {
   private window: Window;
-  private sidebarRight: HTMLElement;
-  private sidebarLeft: HTMLElement;
+  private sidebarRight: Block;
 
   private buffer: Float32Array;
   private bufferSize = 512;
@@ -161,115 +140,193 @@ class Painter implements Context {
   private readonly PLUS_MINUS_ONE_R = this.createPlusMinusOneR();
   private readonly VECTOR = this.createVector();
 
-  private images: Image[] = [];
-  private imagesModel = new ShapesModel();
+  private imagesList: Image[] = [];
+  private imagesTable: TableModel<[number, string, Image]>;
   private imageMap = new Map<string, Image>();
   private limiters = new Map<Image, Limiter>();
-  private currentImage = value(<Image>null);
+  private currentImage = value<Image>(null);
   private _currentImageName = '';
-  private settingsHandle = new CallbackHandlerImpl(() => replaceContent(this.sidebarRight, properties(this.currentImage.get().settings.get())));
+  private settingsHandler = new CallbackHandlerImpl<PropertySection[]>(props => this.sidebarRight.replace(propSections(this._ui, props)));
   private limiter = value(this.GRAY_R);
   private mapper: Mapper = (r, g, b, a) => this.limiter.get()(r, g, b, a);
   private shapesLib = this.initShapes();
 
-  private gridSizeName = value("128");
+  private gridSizeName = value("0");
   private gridSize = transformed(this.gridSizeName, Number.parseInt);
 
-  constructor(private ui: Ui, scheduler: Scheduler) {
-    this.recreateBuffer();
-    this.renderer = new Image2dRenderer(scheduler, this._stack, this.buffer, this.bufferSize);
-    this.renderer.add(() => this.redraw());
-    this.currentImage.add(() => this.renderer.set(this.currentImage.get().renderer))
-    this.limiter.add(() => { this.limiters.set(this.currentImage.get(), this.limiter.get()); this.workplane.redraw() });
+  private actionsContext: ActionDescriptors;
+  private actions: Action[] = [];
 
-    const view = this.createView();
-    this.window = ui.builder.window()
-      .title('Painter')
-      .draggable(true)
-      .closeable(true)
-      .centered(true)
-      .size(1081, 640)
-      .content(view)
-      .toolbar(ui.builder.toolbar()
-        .startGroup()
-        .widget(this.createPPMenu())
-        .widget(this.createPopup())
-        .iconButton('icon-resize-small', () => this.workplane.update(64, 64, 1))
-        .endGroup()
-        .widget(this.createGridSizeControl()))
-      .build();
+  private progressLabel: Block;
+  private progressStartPauseButton: Block;
+  private progressStopButton: Block;
+  private progressLastStart = 0;
+  private progressPaused = false;
+  private progressTaskController: TaskController;
+
+  constructor(private _ui: Ui, actions: ActionDescriptors, scheduler: Scheduler) {
+    this.actionsContext = actions.sub('painter');
+    this.buffer = this.createBuffer();
+    this.renderer = new Image2dRenderer(scheduler, this._stack, this.buffer, this.bufferSize, this.createProgressHandler());
+    this.renderer.add(_ => this.redraw());
+    this.currentImage.add(img => this.renderer.set(img.renderer))
+    this.limiter.add(lmt => { this.limiters.set(this.currentImage.get(), lmt); this.redraw() });
+
+    const builder = new WindowBuilder()
+      .title(_ui.block().text('Painter'))
+      .size(1100, 600)
+      .actionsProvider(() => this.actionsImpl())
+      .content(_ui.column()
+        .widget(_ui.row(['window-toolbar'])
+          .insert(this.createImageControl())
+          .insert(this.modeControl())
+          .insert(this.gridControl()))
+        .widget(this.createView(), '1')
+        .asWidget())
+      .footer(_ui.row()
+        .insert(this.createProgressBar())
+        .asWidget());
+    this.window = _ui.createWindow(builder);
   }
 
-  private createPPMenu() {
-    const menu = this.ui.builder.menu();
-    menu.item('Normal', () => this.limiter.set(this.NORMAL));
-    menu.item('Gray R', () => this.limiter.set(this.GRAY_R));
-    menu.item('+/-1 R', () => this.limiter.set(this.PLUS_MINUS_ONE_R));
-    menu.item('Vector', () => this.limiter.set(this.VECTOR));
-    return menuButton('icon-adjust', menu);
+  ui(): Ui { return this._ui }
+
+  private actionsImpl(): Iterable<Action> {
+    return chain(this.imagesTable.actions(), this.actions)
+  }
+
+  private modeControl(): Block {
+    const modes = mapBuilder<Limiter, string>()
+      .add(this.NORMAL, 'Normal')
+      .add(this.GRAY_R, 'Gray R')
+      .add(this.PLUS_MINUS_ONE_R, '+1/-1 R')
+      .add(this.VECTOR, 'Vector')
+      .build();
+    const modesToggler = cyclicToggler([...modes.keys()], this.limiter.get());
+    this.limiter.add(l => modesToggler.set(l));
+    const box = listBuilder(this._ui, this.limiter)
+      .items([...modes.keys()])
+      .labelMod(style.width('90px'))
+      .renderer(l => modes.get(l))
+      .labelPrefix('Mode :')
+      .build();
+    this.actions.push(this.actionsContext.bind('toggle-mode', async () => this.limiter.set(modesToggler.toggleNext())))
+    return box;
   }
 
   private initShapes(): Map<string, () => void> {
     const map = new Map<string, () => void>();
     let counter = 0;
-    map.set('Profiles', () => this.addImage(`Profiles ${counter++}`, profiles(this)));
-    map.set('Point', () => this.addImage(`Point ${counter++}`, pointDistance(this)));
-    map.set('SDF', () => this.addImage(`SDF ${counter++}`, sdf(this)));
-    map.set('Profile', () => this.addImage(`Profile ${counter++}`, profile(this)));
-    map.set('Circle', () => this.addImage(`Circle ${counter++}`, circle(this)));
-    map.set('Box', () => this.addImage(`Box ${counter++}`, box(this)));
-    map.set('Perlin', () => this.addImage(`Perlin ${counter++}`, perlin(this)));
-    map.set('Select', () => this.addImage(`Select ${counter++}`, select(this)));
-    map.set('Displace', () => this.addImage(`Displace ${counter++}`, displace(this)));
-    map.set('Repeat', () => this.addImage(`Repeat ${counter++}`, repeat(this)));
-    map.set('Circular', () => this.addImage(`Circular ${counter++}`, circular(this)));
-    map.set('Transform', () => this.addImage(`Transform ${counter++}`, transform(this)));
-    map.set('Grid', () => this.addImage(`Grid ${counter++}`, grid(this)));
-    map.set('Displaced', () => this.addImage(`Displaced ${counter++}`, displacedGrid(this)));
-    map.set('Apply', () => this.addImage(`Apply ${counter++}`, apply(this)));
-    map.set('Gradient', () => this.addImage(`Gradient ${counter++}`, gradient(this)));
-    map.set('Blend', () => this.addImage(`Blend ${counter++}`, blend(this)));
-    map.set('Renderer', () => this.addImage(`Renderer ${counter++}`, render(this)));
-    map.set('Voronoi', () => this.addImage(`Voronoi ${counter++}`, voronoi(this)));
-    map.set('Mouldings', () => this.addImage(`Mouldings ${counter++}`, mouldings(this)));
+    map.set('Profiles', () => this.addImage(`Profiles ${counter++}`, catalog.profiles(this)));
+    map.set('Point', () => this.addImage(`Point ${counter++}`, catalog.pointDistance(this)));
+    map.set('SDF', () => this.addImage(`SDF ${counter++}`, catalog.sdf(this)));
+    map.set('Profile', () => this.addImage(`Profile ${counter++}`, catalog.profile(this)));
+    map.set('Circle', () => this.addImage(`Circle ${counter++}`, catalog.circle(this)));
+    map.set('Box', () => this.addImage(`Box ${counter++}`, catalog.box(this)));
+    map.set('Perlin', () => this.addImage(`Perlin ${counter++}`, catalog.perlin(this)));
+    map.set('Select', () => this.addImage(`Select ${counter++}`, catalog.select(this)));
+    map.set('Displace', () => this.addImage(`Displace ${counter++}`, catalog.displace(this)));
+    map.set('Repeat', () => this.addImage(`Repeat ${counter++}`, catalog.repeat(this)));
+    map.set('Circular', () => this.addImage(`Circular ${counter++}`, catalog.circular(this)));
+    map.set('Transform', () => this.addImage(`Transform ${counter++}`, catalog.transform(this)));
+    map.set('Grid', () => this.addImage(`Grid ${counter++}`, catalog.grid(this)));
+    map.set('Displaced', () => this.addImage(`Displaced ${counter++}`, catalog.displacedGrid(this)));
+    map.set('Apply', () => this.addImage(`Apply ${counter++}`, catalog.apply(this)));
+    map.set('Gradient', () => this.addImage(`Gradient ${counter++}`, catalog.gradient(this)));
+    map.set('Blend', () => this.addImage(`Blend ${counter++}`, catalog.blend(this)));
+    map.set('Renderer', () => this.addImage(`Renderer ${counter++}`, catalog.render(this)));
+    map.set('Voronoi', () => this.addImage(`Voronoi ${counter++}`, catalog.voronoi(this)));
+    map.set('Mouldings', () => this.addImage(`Mouldings ${counter++}`, catalog.mouldings(this)));
     return map;
   }
 
-  private createAddMenu() {
-    const menu = this.ui.builder.menu();
-    for (const [name, action] of this.shapesLib) menu.item(name, action);
-    return menuButton('icon-plus', menu);
-  }
-
-  private recreateBuffer() {
-    this.buffer = new Float32Array(this.bufferSize * this.bufferSize * 4);
+  private createBuffer() {
+    return new Float32Array(this.bufferSize * this.bufferSize * 4);
   }
 
   private addImage(name: string, img: Image) {
-    const id = this.images.length;
-    this.images.push(img);
-    const item = this.imagesModel.add(name);
-    item.setSelect(s => { if (s) this.selectImage(id, name) });
+    const id = this.imagesList.length;
+    this.imagesList.push(img);
+    this.imagesTable.addRow([id, name, img]);
     this.imageMap.set(name, img);
-    this.imagesModel.select(item);
+    this.selectImage(id, name);
   }
 
   private selectImage(id: number, name: string) {
-    const img = this.images[id];
+    const img = this.imagesList[id];
     if (img == undefined) return;
     this._currentImageName = name;
     this.currentImage.set(img);
     this.limiter.set(getOrCreate(this.limiters, img, _ => this.GRAY_R))
-    this.settingsHandle.connect(img.settings);
-    replaceContent(this.sidebarRight, properties(img.settings.get()));
+    this.settingsHandler.connect(img.settings);
+    this.imagesTable.selectRow(id);
   }
 
-  private createPopup() {
-    const oracle = (s: string) => iter(this.shapesLib.keys()).filter(i => i.toLowerCase().startsWith(s.toLowerCase()));
-    const name = value('');
-    const handle = transformed(name, v => this.shapesLib.get(v));
-    handle.add(() => { const a = handle.get(); if (a) { a(); name.set("") } });
-    return listBox("Shape", "icon-plus", oracle, name, true);
+  private createImageControl() {
+    const label = this._ui.block().text('Add Node...').mod(style.width('80px'));
+    const widgets = iter(this.shapesLib.entries()).toMap(
+      ([n, _]) => n.toLowerCase(),
+      ([n, a]) => singleActionWidget(this._ui.block().text(n), async () => a()));
+    const oracle = (s: string) => iter(widgets.entries()).filter(([n, _]) => n.startsWith(s.toLowerCase())).map(([_, w]) => w);
+    const box = suggestionBox(this._ui, label, oracle);
+    this.actions.push(this.actionsContext.bind('add-shape', async () => { box.mod(e => e.click()) }));
+    return box;
+  }
+
+  private createProgressHandler(): ProgressHandler {
+    return {
+      progress: p => this.setProgress(p),
+      onStart: ctl => this.startRendering(ctl),
+      onEnd: () => this.finishRendering(),
+    }
+  }
+
+  private createProgressBar(): Block {
+    this.progressLabel = this._ui.block().text('');
+    this.progressStartPauseButton = this._ui.block('icon', 'icon-pause', 'hidden')
+      .event('click', () => {
+        if (this.progressPaused) {
+          this.progressStartPauseButton
+            .mod(clazz.toggle('icon-pause'))
+            .mod(clazz.toggle('icon-play'))
+          this.progressPaused = false;
+          this.progressTaskController.unpause();
+        } else {
+          this.progressStartPauseButton
+            .mod(clazz.toggle('icon-pause'))
+            .mod(clazz.toggle('icon-play'))
+          this.progressPaused = true;
+          this.progressTaskController.pause();
+        }
+      });
+    this.progressStopButton = this._ui.block('icon', 'icon-stop', 'hidden')
+      .event('click', () => { this.progressTaskController?.stop(); this.finishRendering() });
+    return this._ui.row(['baseline-aligned', 'padded-5'])
+      .insert(this.progressLabel)
+      .insert(this.progressStartPauseButton)
+      .insert(this.progressStopButton)
+      .asWidget();
+  }
+
+  finishRendering(): void {
+    this.progressLabel.text(`Finished in :${printTime(window.performance.now() - this.progressLastStart)}`)
+    this.progressStartPauseButton.mod(clazz.add('hidden'));
+    this.progressStopButton.mod(clazz.add('hidden'));
+  }
+
+  startRendering(controller: TaskController): void {
+    this.progressLastStart = window.performance.now();
+    this.progressStartPauseButton.mod(clazz.remove('hidden'));
+    this.progressStopButton.mod(clazz.remove('hidden'));
+    this.progressPaused = false;
+    this.progressStartPauseButton
+      .mod(clazz.remove('icon-play'))
+      .mod(clazz.add('icon-pause'));
+    this.progressTaskController = controller;
+  }
+
+  setProgress(n: number): void {
+    this.progressLabel.text(`Progress ${int(n * 100)}%`);
   }
 
   private redraw() {
@@ -311,40 +368,43 @@ class Painter implements Context {
     };
   }
 
-  private createView(): HTMLElement {
-    const template = h` 
-    <div class='pane-group'>
-      <div class='pane pane-sm sidebar' #sidebarleft></div>
-      <div class='pane' style="position: relative;" #holder></div>
-      <div class='pane pane-sm sidebar' #sidebarright></div>
-    </div>`;
-    const widget = <HTMLElement>template.cloneNode(true);
-    const { holder, sidebarleft, sidebarright } = template.collect(widget);
-    this.sidebarLeft = sidebarleft;
-    this.sidebarRight = sidebarright;
-    this.workplane = new Workplane(640, 640, [
-      rasterWorkplaneRenderer(f32array(this.buffer, this.bufferSize, this.bufferSize, this.mapper)),
-      this.createGridRenderer()
-    ]);
-    this.workplane.update(64, 64, 1);
-    holder.appendChild(this.workplane.getWidget());
+  private createView(): Widget {
+    const array = f32array(this.buffer, this.bufferSize, this.bufferSize, this.mapper);
+    const raster = rasterWorkplaneRenderer(() => array);
+    this.workplane = new Workplane(this._ui, raster, this.createGridRenderer());
+    this.workplane.centerRect(this.bufferSize, this.bufferSize);
+    this.actions.push(this.actionsContext.bind('reset-workplane', async () => this.workplane.centerRect(this.bufferSize, this.bufferSize)));
+    this.imagesTable = table<[number, string, Image]>(this._ui, [], [column('Name', async r => r[1], (b, v) => b.block().text(v))]);
+    this.imagesTable.addSelectionHandler(([id, name, _]) => this.selectImage(id, name));
+    this.sidebarRight = this._ui.block('stack-container');
 
-    navTree(sidebarleft, this.imagesModel);
-    return widget;
+    return this._ui.row(['padded-5', 'gap-5'])
+      .widget(this.imagesTable, '200px')
+      .widget(this.workplane, '1')
+      .resizable(this.sidebarRight, 300, 100, 500)
   }
 
   private createGridRenderer(): WorkplaneRendererBuilder {
     return (canvas, ctx) => {
-      const renderer = () => renderGrid(canvas, ctx, this.gridSize.get());
-      this.gridSize.add(() => renderer());
+      const renderer = () => renderGrid(canvas, ctx, this.gridSize.get(), this.bufferSize);
+      this.gridSize.add(_ => renderer());
       return renderer;
     }
   }
 
-  private createGridSizeControl() {
-    const sizes = ["0", "64", "128", "170", "256"];
-    const oracle = (s: string) => sizes;
-    return listBox("", "icon-plus", oracle, this.gridSizeName);
+  private gridControl() {
+    const sizes = ["0", "1", "2", "3", "4", "5", "6", "12"];
+    const sizesToggler = cyclicToggler(sizes, this.gridSizeName.get());
+    this.gridSizeName.add(value => sizesToggler.set(value));
+    const box = listBuilder(this._ui, this.gridSizeName)
+      .items(sizes)
+      .labelPrefix('Grid: ')
+      .labelMod(style.width('55px'))
+      .build();
+    this.actions.push(this.actionsContext.bindSync('grid', blockActions.click(box)));
+    this.actions.push(this.actionsContext.bindSync('grid-inc', () => this.gridSizeName.set(sizesToggler.toggleNext())));
+    this.actions.push(this.actionsContext.bindSync('grid-dec', () => this.gridSizeName.set(sizesToggler.togglePrev())));
+    return box;
   }
 
 
@@ -352,13 +412,12 @@ class Painter implements Context {
   public currentImageName(): string { return this._currentImageName }
   public imageProvider(): (name: string) => Image { return s => this.imageMap.get(s) }
 
-  public oracle(img: Image): Oracle<string> {
-    return s =>
-      iter(this.imageMap.entries())
-        .filter(ent => ent[0].startsWith(s) && !ent[1].dependsOn(img))
-        .map(e => e[0])
+  public images(img: Image): Supplier<Iterable<string>> {
+    return () => iter(this.imageMap.entries())
+      .filter(([_, i]) => !i.dependsOn(img))
+      .map(([name, _]) => name)
   }
 
   public stop() { this.window.destroy() }
-  public show() { this.window.show(); this.redraw() }
+  public show() { this._ui.showWindow(this.window); this.redraw() }
 }

@@ -1,6 +1,6 @@
 import { transformed, tuple, value } from "../../../../utils/callbacks";
 import { VecStack } from "../../../../utils/vecstack";
-import { Context, Image } from "../api";
+import { Context, Image, propSection, propSectionGroups } from "../api";
 import { param, transformedParam } from "./common";
 
 const PROFILES = {
@@ -14,16 +14,16 @@ const PROFILES = {
 const PROFILE_KEYS = Object.keys(PROFILES);
 
 export function profiles(ctx: Context): Image {
-  const profile = transformedParam('Profile', s => PROFILES[s], _ => PROFILE_KEYS, 'Identity');
-  const xoff = param('X Offset', 0);
-  const yoff = param('Y Offset', 0);
-  const xscale = param('X Scale', 1);
-  const yscale = param('Y Scale', 1);
+  const profile = transformedParam(ctx.ui(), 'Profile', s => PROFILES[s], _ => PROFILE_KEYS, 'Identity');
+  const xoff = param(ctx.ui(), 'Offset X', 0);
+  const yoff = param(ctx.ui(), 'Y', 0);
+  const xscale = param(ctx.ui(), 'Scale X', 1);
+  const yscale = param(ctx.ui(), 'Y', 1);
 
   const renderer = transformed(tuple(profile.value, xoff.value, yoff.value, xscale.value, yscale.value), ([profile, xoff, yoff, xscale, yscale]) => (stack: VecStack, pos: number) => {
     const x = stack.x(stack.add(stack.scale(pos, xscale), stack.push(xoff, 0, 0, 0)));
     return stack.push(yoff + profile(x) * yscale, 0, 0, 1);
   });
 
-  return { renderer, settings: value([profile.prop, xoff.prop, yoff.prop, xscale.prop, yscale.prop]), dependsOn: _ => false };
+  return { renderer, settings: value(propSectionGroups('Profiles', [profile.prop], [xoff.prop, yoff.prop], [xscale.prop, yscale.prop])), dependsOn: _ => false };
 }

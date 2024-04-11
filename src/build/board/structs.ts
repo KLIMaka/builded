@@ -21,7 +21,7 @@
 //  lotag, hitag, extra - These variables used by the game programmer only
 
 export class SectorStats {
-  public parallaxing: number;
+  public parallaxing: boolean;
   public slopped: number;
   public swapXY: number;
   public doubleSmooshiness: number;

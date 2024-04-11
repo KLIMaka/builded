@@ -1,7 +1,6 @@
 import { BuildReferenceTracker } from "../../../app/apis/app";
-import { Collection, forEach, range, reverse } from "../../../utils/collections";
-import { iter } from "../../../utils/iter";
-import { clockwise } from "../../utils";
+import { forEach, range } from "@utils/collections";
+import { iter } from "@utils/iter";
 import { sectorWalls } from "../loops";
 import { isValidSectorId, isValidSpriteId } from "../query";
 import { Board, Sector, Sprite } from "../structs";
@@ -69,7 +68,7 @@ function deleteSectorImpl(board: Board, sectorId: number, refs: BuildReferenceTr
   for (let s = sectorId; s < board.numsectors - 1; s++) {
     board.sectors[s] = board.sectors[s + 1];
   }
-  refs.sectors.update((s) => s == sectorId ? -1 : s > sectorId ? s - 1 : s);
+  refs.sectors.update(s => s == sectorId ? -1 : s > sectorId ? s - 1 : s);
   board.sectors[board.numsectors - 1] = null;
   board.numsectors--;
 }

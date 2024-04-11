@@ -1,5 +1,6 @@
 import Optional from "optional-js";
-import { Dependency } from "utils/injector";
+import { Dependency } from "@utils/injector";
+import { Disconnector } from "./app1";
 
 export interface WritableFileSystem {
   delete(name: string): Promise<void>;
@@ -7,10 +8,11 @@ export interface WritableFileSystem {
 }
 
 export interface FileSystem {
-  get(name: string): Promise<Optional<ArrayBuffer>>
+  get(name: string): Promise<Optional<ArrayBuffer>>;
+  getSize(name: string): Promise<Optional<number>>;
   list(): Promise<string[]>;
-  write(): Optional<WritableFileSystem>;
-  addHandler(handler: FileSystemHandler): Handle;
+  write(): Promise<Optional<WritableFileSystem>>;
+  addHandler(handler: FileSystemHandler): Disconnector;
 }
 
 export interface FileSystems {
@@ -19,9 +21,7 @@ export interface FileSystems {
   get(name: string): Optional<FileSystem>;
 }
 
-export interface FileSystemHandler {
-  onFileChanged(fs: FileSystem, name: string): Promise<void>;
-  onFileDeleted(fs: FileSystem, name: String): Promise<void>;
-}
+export type FileSystemHandler = (name: string, deleted: boolean) => void;
+
 
 export const FS = new Dependency<FileSystems>("Filesystems");

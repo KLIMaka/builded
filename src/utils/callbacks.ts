@@ -1,112 +1,123 @@
-import { FastList } from "../utils/list"
+import Optional from "optional-js";
+import { Consumer, Function, Supplier, nil } from "./types";
 
-export type Callback<Args extends any[]> = (...args: Args) => void;
-export type CallbackHandle = { disconnect: () => void }
+export type ChangeCallback<T> = Consumer<T>;
+export type Disconnector = Consumer<void>
 
-export interface CallbackChannel<Args extends any[]> {
-  add(cb: Callback<Args>): CallbackHandle;
+export interface CallbackChannel<T> {
+  add(cb: ChangeCallback<T>): Disconnector;
 }
 
-export interface CallbackHandler<Args extends any[]> {
-  connect(channel: CallbackChannel<Args>): void;
+export interface CallbackHandler<T> {
+  connect(channel: CallbackChannel<T>): void;
 }
 
-export class CallbackHandlerImpl<Args extends any[]> implements CallbackHandler<Args>{
-  private handle: CallbackHandle = null;
+export class CallbackHandlerImpl<T> implements CallbackHandler<T> {
+  private disconnector: Disconnector = null;
 
-  constructor(private callback: Callback<Args>) { }
+  constructor(private callback: ChangeCallback<T>) { }
 
-  connect(channel: CallbackChannel<Args>): void {
-    if (this.handle != null) this.handle.disconnect();
-    this.handle = channel.add(this.callback);
+  connect(src: Source<T>): void {
+    this.disconnector?.();
+    this.disconnector = src.add(this.callback);
+    this.callback(src.get());
   }
 }
 
-export interface Source<T> { get(): T }
+export interface Source<T> extends CallbackChannel<T> { get(): T }
 export interface Destenation<T> { set(value: T): void }
-export type CallbackSource<T> = Source<T> & CallbackChannel<[]>;
 
 
-export class CallbackChannelImpl<Args extends any[]> implements CallbackChannel<Args> {
-  private handlers = new FastList<Callback<Args>>();
+export class CallbackChannelImpl<T> implements CallbackChannel<T> {
+  private handlers = new Set<ChangeCallback<T>>();
 
-  add(cb: Callback<Args>): CallbackHandle {
-    const handle = this.handlers.push(cb);
-    return { disconnect: () => this.handlers.remove(handle) };
+  add(cb: ChangeCallback<T>): Disconnector {
+    this.handlers.add(cb);
+    return () => this.handlers.delete(cb);
   }
 
-  notify(...args: Args): void { for (const h of this.handlers) h(...args) }
+  notify(value: T): void { for (const h of this.handlers) h(value) }
 }
 
-export class CallbackChannelStub<Args extends any[]> implements CallbackChannel<Args> {
-  readonly handle: CallbackHandle = { disconnect: () => { } };
-  add(cb: Callback<Args>): CallbackHandle { return this.handle }
+export class CallbackChannelStub<T> implements CallbackChannel<T> {
+  add(_: ChangeCallback<T>): Disconnector { return nil() }
 }
 
-export interface SourceCallbacklChannel<T> extends Source<T>, CallbackChannel<[]> { };
-
-export class Value<T> extends CallbackChannelImpl<[]> implements Destenation<T>, Source<T> {
+export class Value<T> extends CallbackChannelImpl<T> implements Destenation<T>, Source<T> {
   constructor(private value: T) { super() }
   get(): T { return this.value }
-  set(newValue: T) { if (this.value != newValue) { this.value = newValue; this.notify() } }
+  set(newValue: T) { if (this.value != newValue) { this.value = newValue; this.notify(newValue) } }
 }
 
 export function value<T>(value: T): Value<T> {
   return new Value<T>(value);
 }
 
-export class Reference<T> extends CallbackChannelImpl<[]> implements Source<T>  {
+export class Reference<T> extends CallbackChannelImpl<T> implements Source<T> {
   constructor(private value: T) { super() }
   get(): T { return this.value }
-  modify(): void { this.notify() }
+  nodify(): void { this.notify(this.value) }
 }
 
 export function reference<T>(ref: T): Reference<T> {
   return new Reference<T>(ref);
 }
 
-export class TransformValue<T, U> extends CallbackChannelImpl<[]> implements Source<T> {
-  private needToUpdate = true;
-  private value: T;
+export class TransformValue<S, D> extends CallbackChannelImpl<D> implements Source<D> {
+  private value: D;
+  private initialized: boolean;
 
-  constructor(private source: SourceCallbacklChannel<U>, private transformer: (value: U) => T) {
+  constructor(private source: Source<S>, private transformer: Function<S, D>) {
     super();
-    source.add(() => { this.needToUpdate = true; this.notify() });
+    source.add(v => {
+      this.initialized = true;
+      const nvalue = this.transformer(v);
+      if (nvalue != this.value) {
+        this.value = nvalue;
+        this.notify(this.value)
+      }
+    });
   }
-
-  private update() { if (this.needToUpdate) { this.value = this.transformer(this.source.get()); this.needToUpdate = false } }
-  get(): T { this.update(); return this.value }
+  get(): D { if (!this.initialized) { this.value = this.transformer(this.source.get()); this.initialized = true } return this.value }
+}
+export function transformed<S, D>(source: Source<S>, transformer: Function<S, D>): TransformValue<S, D> {
+  return new TransformValue<S, D>(source, transformer);
 }
 
-export function transformed<T, U>(source: SourceCallbacklChannel<U>, transformer: (value: U) => T): TransformValue<T, U> {
-  return new TransformValue<T, U>(source, transformer);
-}
-
-export type Executor = (executable: () => void, delay: number) => number;
-
-export class Delay<T> extends CallbackChannelImpl<[]> implements Source<T> {
-  private handle = -1;
-  constructor(private source: SourceCallbacklChannel<T>, private executor: Executor, delay = 0) {
+export class TransformValueAsync<S, D> extends CallbackChannelImpl<D> implements Source<D> {
+  constructor(
+    private source: Source<S>,
+    private transformer: Function<S, Promise<D>>,
+    private value: D
+  ) {
     super();
-    source.add(() => {
-      if (this.handle != -1) return;
-      this.handle = this.executor(() => { this.handle = -1; this.notify() }, delay);
+    source.add(async v => {
+      const nvalue = await this.transformer(v)
+      if (nvalue != this.value) {
+        this.value = nvalue;
+        this.notify(this.value)
+      }
     });
   }
 
-  get(): T { return this.source.get() }
+  get(): D { return this.value }
 }
 
-export function delay<T>(source: SourceCallbacklChannel<T>, executor: Executor, delay = 0) {
-  return new Delay<T>(source, executor, delay);
+export async function transformedAsync<S, D>(source: Source<S>, init: Promise<D>, transformer: Function<S, Promise<D>>): Promise<TransformValueAsync<S, D>> {
+  return new TransformValueAsync<S, D>(source, transformer, await init);
 }
 
-export class Tuple<Args extends any[]> extends CallbackChannelImpl<[]> implements Source<Args> {
+export function transformedAsyncImmediate<S, D>(source: Source<S>, init: D, transformer: Function<S, Promise<D>>): TransformValueAsync<S, D> {
+  return new TransformValueAsync<S, D>(source, transformer, init);
+}
+
+type SourceCallbacklChannelfy<T> = { [P in keyof T]: Source<T[P]> };
+export class Tuple<Args extends any[]> extends CallbackChannelImpl<Args> implements Source<Args> {
   sources: SourceCallbacklChannelfy<Args>[number][];
   constructor(...sources: SourceCallbacklChannelfy<Args>) {
     super();
     this.sources = [...sources];
-    this.sources.forEach(s => { s.add(() => this.notify()) });
+    this.sources.forEach(s => s.add(_ => this.notify(this.get())));
   }
 
   get(): Args { return <Args>this.sources.map(v => v.get()) }
@@ -116,19 +127,18 @@ export function tuple<Args extends any[]>(...sources: SourceCallbacklChannelfy<A
   return new Tuple<Args>(...sources);
 }
 
-export type Handler<Args extends any[]> = (parent: CallbackChannel<[]>, ...args: Args) => void;
-type SourceCallbacklChannelfy<T> = { [P in keyof T]: SourceCallbacklChannel<T[P]> };
-
+export type Handler<Args extends any[]> = (parent: CallbackChannel<void>, ...args: Args) => void;
 export type Handle = { update: () => void, stop: () => void };
-export function handle<Args extends any[]>(parent: CallbackChannel<[]>, handler: Handler<Args>, ...values: SourceCallbacklChannelfy<Args>): Handle {
-  const channel = new CallbackChannelImpl<[]>();
+
+export function handle<Args extends any[]>(parent: CallbackChannel<void> | null, handler: Handler<Args>, ...values: SourceCallbacklChannelfy<Args>): Handle {
+  const channel = reference<void>(null);
   const update = () => {
-    const vs = values.map(v => v.get());
+    const vs = <Args>values.map(v => v.get());
     channel.notify();
-    handler(channel, ...<Args>vs);
+    handler(channel, ...vs);
   }
   const handles = values.map(v => v.add(update));
-  const stop = () => handles.forEach(h => h.disconnect());
+  const stop = () => handles.forEach(h => h());
   if (parent != null) parent.add(stop);
   update();
   return { update, stop }

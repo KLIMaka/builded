@@ -1,4 +1,6 @@
+import Optional from "optional-js";
 import { cyclic } from "./mathutils";
+import { BiFunction, Function } from "./types";
 
 export interface Collection<T> extends Iterable<T> {
   get(i: number): T;
@@ -20,6 +22,21 @@ export const EMPTY_COLLECTION: Collection<any> = {
   get: (i: number) => undefined,
   length: () => 0,
   [Symbol.iterator]: () => EMPTY_ITERATOR
+}
+
+export function singletonIterable<T>(value: T): Iterator<T> {
+  let done = false;
+  return {
+    next: () => {
+      const result = iteratorResult(done, value);
+      done = true;
+      return result;
+    }
+  }
+}
+
+export function singleton<T>(value: T): Iterable<T> {
+  return { [Symbol.iterator]: () => singletonIterable(value) }
 }
 
 export function iteratorResult<T>(isDone: boolean, val: T): IteratorResult<T> {
@@ -145,6 +162,18 @@ export function* map<T, V>(i: Iterable<T>, f: (t: T) => V): Generator<V> {
   for (const v of i) yield f(v);
 }
 
+export function* zip<T1, T2>(i1: Iterable<T1>, i2: Iterable<T2>): Generator<[T1, T2]> {
+  const iter1 = i1[Symbol.iterator]();
+  const iter2 = i2[Symbol.iterator]();
+  let v1 = iter1.next();
+  let v2 = iter2.next();
+  while (!v1.done && !v2.done) {
+    yield [v1.value, v2.value];
+    v1 = iter1.next();
+    v2 = iter2.next();
+  }
+}
+
 export function forEach<T>(i: Iterable<T>, f: (t: T) => void): void {
   for (const v of i) f(v);
 }
@@ -152,6 +181,17 @@ export function forEach<T>(i: Iterable<T>, f: (t: T) => void): void {
 export function reduce<T>(i: Iterable<T>, f: (lh: T, rh: T) => T, start: T): T {
   for (const v of i) start = f(start, v);
   return start;
+}
+
+export function reduceFirst<T>(i: Iterable<T>, f: BiFunction<T, T, T>): Optional<T> {
+  const ii = i[Symbol.iterator]();
+  const first = ii.next();
+  if (first.done) return Optional.empty();
+  let start = first.value;
+  for (let v = ii.next(); !v.done; v = ii.next()) {
+    start = f(start, v.value);
+  }
+  return Optional.of(start);
 }
 
 export function* sub<T>(c: Collection<T>, start: number, length: number): Generator<T> {
@@ -179,18 +219,8 @@ export function findFirst<T>(i: Iterable<T>, f: (t: T) => boolean, def: T): T {
 }
 
 export function* chain<T>(i1: Iterable<T>, i2: Iterable<T>): Generator<T> {
-  const iter1 = i1[Symbol.iterator]();
-  let v = iter1.next();
-  while (!v.done) {
-    yield v.value;
-    v = iter1.next();
-  }
-  const iter2 = i2[Symbol.iterator]();
-  v = iter2.next();
-  while (!v.done) {
-    yield v.value;
-    v = iter2.next();
-  }
+  for (const i of i1) yield i;
+  for (const i of i2) yield i;
 }
 
 export function* butLast<T>(i: Iterable<T>): Generator<T> {
@@ -256,6 +286,17 @@ export function* pairs<T>(i: Iterable<T>): Generator<[T, T]> {
   }
 }
 
+export function* join<T>(i: Iterable<T>, delim: T): Generator<T> {
+  const iter = i[Symbol.iterator]();
+  let item = iter.next();
+  for (; ;) {
+    yield item.value;
+    item = iter.next();
+    if (item.done) return
+    yield delim;
+  }
+}
+
 export function* take<T>(c: Iterable<T>, count: number): Generator<T> {
   if (count < 0) return;
   const iter = c[Symbol.iterator]();
@@ -273,13 +314,7 @@ export function takeFirst<T>(i: Iterable<T>): T {
   return item.done ? null : item.value;
 }
 
-export function skip<T>(i: Iterable<T>, count: number): Iterable<T> {
-  const iter = i[Symbol.iterator]();
-  while (count > 0) {
-    const v = iter.next();
-    if (v.done) break;
-    count--;
-  }
+export function toIterable<T>(iter: Iterator<T>): Iterable<T> {
   return {
     [Symbol.iterator]: () => {
       return {
@@ -289,19 +324,23 @@ export function skip<T>(i: Iterable<T>, count: number): Iterable<T> {
   }
 }
 
+export function skip<T>(i: Iterable<T>, count: number): Iterable<T> {
+  const iter = i[Symbol.iterator]();
+  while (count > 0) {
+    const v = iter.next();
+    if (v.done) break;
+    count--;
+  }
+  return toIterable(iter);
+}
+
 export function skipWhile<T>(i: Iterable<T>, f: (t: T) => boolean): Iterable<T> {
   const iter = i[Symbol.iterator]();
   for (; ;) {
     const v = iter.next();
     if (v.done || !f(v.value)) break;
   }
-  return {
-    [Symbol.iterator]: () => {
-      return {
-        next: () => { return iter.next() }
-      }
-    }
-  }
+  return toIterable(iter);
 }
 
 export function* rect(w: number, h: number): Generator<[number, number]> {
@@ -341,6 +380,12 @@ export function* flatten<T>(i: Iterable<T>): Generator<Deiterable<T>> {
   }
 }
 
+export function toMap<T, K, V>(i: Iterable<T>, keyMapper: Function<T, K>, valueMapper: Function<T, V>): Map<K, V> {
+  const map = new Map<K, V>();
+  for (const item of i) { map.set(keyMapper(item), valueMapper(item)) }
+  return map;
+}
+
 export function getOrCreate<K, V>(map: Map<K, V>, key: K, value: (k: K) => V) {
   let v = map.get(key);
   if (v == undefined) {
@@ -355,6 +400,16 @@ export function getOrDefault<K, V>(map: Map<K, V>, key: K, def: V) {
   return v == undefined ? def : v;
 }
 
-export function or<T>(lh: T, rh: T): T {
-  return lh ? lh : rh;
+export interface MapBuilder<K, V> {
+  add(k: K, v: V): this;
+  build(): Map<K, V>;
+}
+
+export function mapBuilder<K, V>(): MapBuilder<K, V> {
+  const map = new Map<K, V>();
+  const builder: MapBuilder<K, V> = {
+    add: (k, v) => { map.set(k, v); return builder },
+    build: () => map
+  }
+  return builder;
 }

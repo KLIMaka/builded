@@ -1,5 +1,6 @@
 import { Bag, BagController, Place } from "../src/utils/bag";
-import { coin, randInt, randInt0 } from "../src/utils/random";
+import { SortedList } from "../src/utils/list";
+import { coin, rand, rand0, randInt, randInt0 } from "../src/utils/random";
 
 test('bag', () => {
   const bag = new Bag(1024);

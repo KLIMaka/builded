@@ -1,3 +1,4 @@
+import { iter } from "@utils/iter";
 import { BuildReferenceTracker } from "../../../app/apis/app";
 import { track } from "../../../app/apis/referencetracker";
 import { forEach, map } from "../../../utils/collections";
@@ -13,7 +14,7 @@ export class SectorBuilder {
   addWalls(walls: Iterable<Wall>): SectorBuilder { forEach(walls, w => this.currentLoop.push(w)); return this }
   addLoop(walls: Iterable<Wall>): SectorBuilder { return this.addWalls(walls).loop() }
   *getWalls() { for (const ws of this.walls) for (const w of ws) yield w; }
-  wallsLength() { let sum = 0; forEach(this.walls, ws => sum += ws.length); return sum; }
+  wallsLength() { return iter(this.walls).map(w => w.length).reduceFirst((l, r) => l + r).orElse(0) }
 
   loop(): SectorBuilder {
     if (this.currentLoop.length == 0) return this;

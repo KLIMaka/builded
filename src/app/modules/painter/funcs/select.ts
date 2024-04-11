@@ -1,17 +1,17 @@
 import { handle, value } from "../../../../utils/callbacks";
 import { smothstep } from "../../../../utils/mathutils";
 import { VecStack } from "../../../../utils/vecstack";
-import { Context, Image } from "../api";
+import { Context, Image, propSection, propSectionGroups } from "../api";
 import { ImageBuilder, param, transformedParam, VOID_RENDERER } from "./common";
 
 export function select(ctx: Context): Image {
   const builder = new ImageBuilder();
-  const src = transformedParam('Source', ctx.imageProvider(), ctx.oracle(builder.object()), ctx.currentImageName());
-  const from = param('From', 0);
-  const to = param('To', 0);
-  const smoth = param('Smoth', 0);
+  const src = transformedParam(ctx.ui(), 'Source', ctx.imageProvider(), ctx.images(builder.object()), ctx.currentImageName());
+  const from = param(ctx.ui(), 'From', 0);
+  const to = param(ctx.ui(), 'To', 0);
+  const smoth = param(ctx.ui(), 'Smoth', 0);
 
-  const props = [src.prop, from.prop, to.prop, smoth.prop];
+  const props = propSectionGroups('Select', [src.prop], [from.prop, to.prop], [smoth.prop]);
 
   const renderer = value(VOID_RENDERER);
   const settings = value(props);

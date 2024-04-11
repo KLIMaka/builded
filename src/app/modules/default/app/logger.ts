@@ -1,4 +1,4 @@
-import { Handle, LogHandler, LogLevel, Logger } from "../../../apis/app1";
+import { Disconnector, LogHandler, LogLevel, Logger } from "../../../apis/app1";
 
 class LoggerImpl implements Logger {
   private handlers: Set<LogHandler> = new Set();
@@ -7,7 +7,7 @@ class LoggerImpl implements Logger {
     this.handlers.forEach(h => h(level, msg));
   }
 
-  addHandler(handler: LogHandler): Handle {
+  addHandler(handler: LogHandler): Disconnector {
     this.handlers.add(handler);
     const remove = () => this.handlers.delete(handler);
     return { remove };

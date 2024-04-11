@@ -1,3 +1,4 @@
+import { Consumer } from "@utils/types";
 
 
 export class Element {
@@ -27,6 +28,12 @@ export class Element {
     this.element.appendChild(element.element);
     return this;
   }
+
+  public before(element: Element): Element {
+    this.element.before(element.element);
+    return this;
+  }
+
   public appendText(text: string): Element {
     this.element.appendChild(document.createTextNode(text));
     return this;
@@ -68,9 +75,51 @@ export class Element {
     return this;
   }
 
+  public styles(): CSSStyleDeclaration {
+    return this.element.style;
+  }
+
+  public classList(): DOMTokenList {
+    return this.element.classList;
+  }
+
+  public addEvent<K extends keyof HTMLElementEventMap>(type: K, listener: (this: HTMLElement, ev: HTMLElementEventMap[K]) => any): Element {
+    this.element.addEventListener(type, listener);
+    return this;
+  }
+
   public click(e: () => void): Element {
     this.element.onclick = e;
     return this;
+  }
+
+  public next(nth = 0): Element {
+    let next = this.element.nextElementSibling;
+    for (; next != null && nth > 0; next = next.nextElementSibling, nth--);
+    return next == null ? null : new Element(<HTMLElement>next);
+  }
+
+  public nextValid(nth = 0): Element {
+    let next: globalThis.Element = this.element;
+    for (; next != null && nth >= 0 && next.nextElementSibling != null; next = next.nextElementSibling, nth--);
+    return next == this.element ? this : new Element(<HTMLElement>next);
+  }
+
+  public prev(nth = 0): Element {
+    let prev = this.element.previousElementSibling;
+    for (; prev != null && nth > 0; prev = prev.previousElementSibling, nth--);
+    return prev == null ? null : new Element(<HTMLElement>prev);
+  }
+
+  public prevValid(nth = 0): Element {
+    let prev: globalThis.Element = this.element;
+    for (; prev != null && nth >= 0 && prev.previousElementSibling != null; prev = prev.previousElementSibling, nth--);
+    return prev == this.element ? this : new Element(<HTMLElement>prev);
+  }
+
+  public child(): Element {
+    const child = this.element.firstElementChild;
+    return child == null ? null : new Element(<HTMLElement>child);
   }
 
   public change(cb: (s: string) => void): Element {
@@ -79,71 +128,14 @@ export class Element {
     };
     return this;
   }
+
+  public clearChildren() {
+    this.element.replaceChildren();
+  }
 }
 
 function create(tag: string) {
   return document.createElement(tag);
-}
-
-export class Table extends Element {
-  constructor(private template: string) {
-    super(div('table').elem());
-  }
-
-
-
-  public head(...cols: Element[]): Table {
-    const head = div('table-head');
-    const row = div('table-row-content');
-    head.append(row);
-    row.css('grid-template-columns', this.template);
-    for (const col of cols) row.append(col);
-    this.append(head);
-    return this;
-  }
-
-  public row(...cols: Element[]): Element {
-    const row = div('table-row');
-    const content = div('table-row-content');
-    row.append(content);
-    content.css('grid-template-columns', this.template);
-    for (const col of cols) content.append(col);
-    this.append(row);
-    return row;
-  }
-}
-
-export declare module Object {
-  export function keys(obj: any): any;
-}
-
-export class Properties extends Table {
-  private labels: any = {};
-
-  constructor() {
-    super();
-    this.className('props');
-  }
-
-  public prop(name: string, el: Element): Properties {
-    this.row([div('property_name').text(name), el]);
-    return this;
-  }
-
-  public refresh(props: any): Properties {
-    let fields = Object.keys(props);
-    for (let i = 0; i < fields.length; i++) {
-      let field = fields[i];
-      let l = this.labels[field];
-      if (l == undefined) {
-        l = label('');
-        this.labels[field] = l;
-        this.prop(field, l);
-      }
-      l.text(props[field] + '');
-    }
-    return this;
-  }
 }
 
 export function tag(tag: string): Element {
@@ -158,10 +150,6 @@ export function span(): Element {
   return new Element(create('span'))
 }
 
-export function props(): Properties {
-  return new Properties();
-}
-
 export function label(text: string): Element {
   return div('label').text(text);
 }
@@ -170,86 +158,45 @@ export function button(caption: string): Element {
   return div('contour').append(div('button').text(caption));
 }
 
-export function panel(title: string): Element {
-  return div('frame')
-    .append(div('header').text(title))
-    .append(div('hline'))
-    .append(div('content'));
-}
-
-export class Progress extends Element {
-  private title: Element;
-  private progress: Element;
-
-  constructor(title: string, max: number = 100) {
-    super(create('div'));
-    this.title = div('title').text(title);
-    this.progress = new Element(create('progress')).attr('max', max);
-    this.append(this.title).append(this.progress);
-  }
-
-  public max(max: number): Progress {
-    this.progress.attr('max', max);
-    return this;
-  }
-
-  public setValue(val: number): Progress {
-    this.progress.attr('value', val);
-    return this;
-  }
-}
-
-export function progress(title: string, max: number = 100) {
-  return new Progress(title, max);
-}
-
-export class VerticalPanel extends Element {
-  private rows = 0;
-  constructor(className: string) {
-    super(create('div'));
-    this.className(className);
-  }
-
-  public add(elem: Element): number {
-    this.append(elem);
-    return this.rows++;
-  }
-}
-
-export function verticalPanel(className: string): VerticalPanel {
-  return new VerticalPanel(className);
-}
-
-export function dragElement(header: HTMLElement, elment: HTMLElement) {
+export type DragConsumer = (dx: number, dy: number) => void;
+export function dragElement(elem: HTMLElement, cursor: string, dragConsumer: DragConsumer, startDragConsumer: Consumer<void>, endDragConsumer: Consumer<void>, clickConsumer: Consumer<void>) {
+  let started = false;
   let startx = 0;
   let starty = 0;
   let onmouseup = null;
   let onmousemove = null;
-  header.onmousedown = dragMouseDown;
+  elem.onmousedown = startDrag;
 
-  function dragMouseDown(e: MouseEvent) {
+  function startDrag(e: MouseEvent) {
     e.preventDefault();
     startx = e.clientX;
     starty = e.clientY;
+    started = false;
     onmouseup = document.onmouseup;
     onmousemove = document.onmousemove;
-    document.onmouseup = closeDragElement;
-    document.onmousemove = elementDrag;
+    document.onmouseup = endDrag;
+    document.onmousemove = drag;
+    document.body.style.setProperty('cursor', cursor, 'important');
   }
 
-  function elementDrag(e: MouseEvent) {
+  function drag(e: MouseEvent) {
     e.preventDefault();
-    let x = startx - e.clientX;
-    let y = starty - e.clientY;
-    startx = e.clientX;
-    starty = e.clientY;
-    elment.style.top = (elment.offsetTop - y) + "px";
-    elment.style.left = (elment.offsetLeft - x) + "px";
+    const dx = startx - e.clientX;
+    const dy = starty - e.clientY;
+    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+      started = true;
+      startDragConsumer();
+    }
+    if (started) dragConsumer(dx, dy);
   }
 
-  function closeDragElement() {
+  function endDrag(e: MouseEvent) {
+    e.preventDefault();
     document.onmouseup = onmouseup;
     document.onmousemove = onmousemove;
+    document.body.style.cursor = 'default';
+    endDragConsumer();
+    if (!started) clickConsumer();
   }
 }
 
@@ -305,4 +252,29 @@ export function center(parent: HTMLElement, child: HTMLElement, width: number, h
   const winW = parent.clientWidth;
   child.style.top = (winH - height) / 2 + 'px';
   child.style.left = (winW - width) / 2 + 'px';
+}
+
+export class AutoScroller {
+  private observer: IntersectionObserver;
+  private needToScroll = false;
+  private lastElemet: HTMLElement;
+
+  constructor(root: HTMLElement) {
+    this.observer = new IntersectionObserver((e, o) => this.observerCallback(e, o), { root: root });
+  }
+
+  private observerCallback(entries: IntersectionObserverEntry[], _: IntersectionObserver) {
+    if (!this.needToScroll) return;
+    const e = entries[0];
+    if (e.intersectionRect.height >= e.boundingClientRect.height) return;
+    e.target.scrollIntoView(e.boundingClientRect.top < e.rootBounds.top);
+    this.needToScroll = false;
+  }
+
+  show(elem: HTMLElement) {
+    if (this.lastElemet) this.observer.unobserve(this.lastElemet);
+    this.needToScroll = true;
+    this.observer.observe(elem);
+    this.lastElemet = elem;
+  }
 }

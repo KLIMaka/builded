@@ -1,4 +1,4 @@
-import { struct, string, uint, array, byte, ubyte, Stream, atomic_array } from "../../utils/stream";
+import { struct, string, uint, array, byte, ubyte, Stream, atomic_array } from "@utils/stream";
 
 class Header {
   public sign: string;
@@ -35,7 +35,7 @@ const fatRecord = struct(FatRecord)
 export class RffFile {
   private data: Stream;
   private header: Header;
-  private namesTable = new Map<string, number>();
+  private namesTable = new Map<string, FatRecord>();
   public fat: FatRecord[];
 
   constructor(buf: ArrayBuffer) {
@@ -52,11 +52,10 @@ export class RffFile {
 
   private loadFat(stream: Stream, numFiles: number): void {
     this.fat = array(fatRecord, numFiles).read(stream);
-    for (let i = 0; i < this.fat.length; i++) {
-      const r = this.fat[i];
-      r.filename = this.convertFname(r.filename).toLowerCase();
-      this.namesTable.set(r.filename, i);
-    }
+    this.fat.forEach(r => {
+      r.filename = this.convertFname(r.filename);
+      this.namesTable.set(r.filename.toLocaleLowerCase(), r);
+    });
   }
 
   private decodeFat(fat: Uint8Array) {
@@ -75,15 +74,17 @@ export class RffFile {
   }
 
   public get(fname: string): Uint8Array {
-    const idx = this.namesTable.get(fname.toLowerCase());
-    if (idx == undefined) return null;
-    const record = this.fat[idx];
+    const record = this.getRecord(fname);
     this.data.setOffset(record.offset);
     const arr = atomic_array(ubyte, record.size).read(this.data);
     if (record.flags & 0x10)
       for (let i = 0; i < 256; i++)
         arr[i] ^= (i >> 1);
     return arr;
+  }
+
+  public getRecord(fname: string): FatRecord {
+    return this.namesTable.get(fname.toLowerCase());
   }
 }
 

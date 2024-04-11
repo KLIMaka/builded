@@ -1,15 +1,15 @@
 import { handle, value } from "../../../../utils/callbacks";
 import { fract } from "../../../../utils/mathutils";
 import { VecStack } from "../../../../utils/vecstack";
-import { Context, Image } from "../api";
+import { Context, Image, propSection, propSectionGroups } from "../api";
 import { ImageBuilder, param, transformedParam, VOID_RENDERER } from "./common";
 
 export function repeat(ctx: Context): Image {
   const builder = new ImageBuilder();
-  const src = transformedParam('Source', ctx.imageProvider(), ctx.oracle(builder.object()), ctx.currentImageName());
-  const scalex = param('Scale X', 3);
-  const scaley = param('Scale Y', 3);
-  const props = [src.prop, scalex.prop, scaley.prop];
+  const src = transformedParam(ctx.ui(), 'Source', ctx.imageProvider(), ctx.images(builder.object()), ctx.currentImageName());
+  const scalex = param(ctx.ui(), 'Scale X', 3);
+  const scaley = param(ctx.ui(), 'Y', 3);
+  const props = propSectionGroups('Repeat', [src.prop], [scalex.prop, scaley.prop]);
 
   const renderer = value(VOID_RENDERER);
   const settings = value(props);

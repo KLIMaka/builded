@@ -1,18 +1,22 @@
-export { sdf } from "./sdf";
-export { apply } from "./apply";
-export { box, circle, pointDistance } from "./basic";
-export { blend } from "./blend";
-export { circular } from "./circular";
-export { displace } from "./displace";
-export { displacedGrid } from "./displaced-grid";
-export { gradient } from "./gradient";
-export { grid } from "./grid";
-export { mouldings } from "./mouldings";
-export { perlin } from "./perlin";
-export { profile } from "./profile";
-export { profiles } from "./profiles";
-export { render } from "./render";
-export { repeat } from "./repeat";
-export { select } from "./select";
-export { transform } from "./transform";
-export { voronoi } from "./voronoi";
+import { sdf } from "./sdf";
+import { apply } from "./apply";
+import { box, circle, pointDistance } from "./basic";
+import { blend } from "./blend";
+import { circular } from "./circular";
+import { displace } from "./displace";
+import { displacedGrid } from "./displaced-grid";
+import { gradient } from "./gradient";
+import { grid } from "./grid";
+import { mouldings } from "./mouldings";
+import { perlin } from "./perlin";
+import { profile } from "./profile";
+import { profiles } from "./profiles";
+import { render } from "./render";
+import { repeat } from "./repeat";
+import { select } from "./select";
+import { transform } from "./transform";
+import { voronoi } from "./voronoi";
+
+export default {
+  sdf, apply, box, circle, pointDistance, blend, circular, displace, displacedGrid, gradient, grid, mouldings, perlin, profile, profiles, render, repeat, select, transform, voronoi
+}

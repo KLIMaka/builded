@@ -1,5 +1,4 @@
-import { TERMINAL_ITERATOR_RESULT, EMPTY_ITERATOR, Deck, ITERATOR_RESULT } from "./collections";
-import { eq } from "./mathutils";
+import { Deck, EMPTY_ITERATOR, ITERATOR_RESULT, TERMINAL_ITERATOR_RESULT, map } from "./collections";
 
 export class Node<T> {
   constructor(
@@ -36,6 +35,10 @@ export class List<T> implements Iterable<T>{
 
   public push(value: T): Node<T> {
     return this.insertAfter(value);
+  }
+
+  public pushForward(value: T): Node<T> {
+    return this.insertBefore(value);
   }
 
   public pushAll(values: T[]): Node<T>[] {
@@ -188,52 +191,41 @@ function length(list: FastList<any>, from: number, to: number) {
   return length;
 }
 
-function binaryIndexOf(list: FastList<number>, searchElement: number) {
-  let min = list.first();
-  let max = list.last(0);
-  if (searchElement < list.get(min)) return 0;
-  if (searchElement >= list.get(max)) return max;
-  let current = min;
-  let currentElement: number = null;
-  let size = length(list, min, max);
-  while (size > 0) {
-    size -= size / 2 | 0;
-    current = advance(min, list, size);
-    currentElement = list.get(current);
-    if (currentElement < searchElement) min = list.next(current);
-    else if (currentElement > searchElement) max = list.last(current);
-    else break;
-    size--;
-  }
-  return min == max ? max : current;
-}
+export class SortedList<T> {
+  private values = new FastList<[T, number]>();
 
-export type Comparator<T> = (lh: T, rh: T) => number;
-
-export class SortedHeap<T> {
-  private values = new FastList<T>();
-  private sortValues = new FastList<number>();
-  private eqOrder: Comparator<T>;
-
-  constructor(eqOrder: Comparator<T> = (lh, rh) => 0) {
-    this.eqOrder = eqOrder;
+  constructor() {
   }
 
-  public add(value: T, sortValue: number) {
-    const ptr = binaryIndexOf(this.sortValues, sortValue);
-    let nptr = ptr;
-    while (nptr != 0 && this.sortValues.get(nptr) == sortValue && this.eqOrder(value, this.values.get(nptr)) > 0)
-      nptr = this.sortValues.last(nptr);
-    this.values.insertAfter(value, nptr);
-    this.sortValues.insertAfter(sortValue, nptr);
+  add(value: T, sortValue: number) {
+    const ptr = this.binaryIndexOf(sortValue);
+    this.values.insertAfter([value, sortValue], ptr);
   }
 
-  public clear() {
+  clear() {
     this.values.clear();
-    this.sortValues.clear();
   }
 
-  public get(): Iterable<T> { return this.values }
-  public isEmpty(): boolean { return this.values.isEmpty() }
-  public first(): T { return this.values.get(this.values.first()) }
+  get(): Iterable<T> { return map(this.values, v => v[0]) }
+  isEmpty(): boolean { return this.values.isEmpty() }
+  first(): T { return this.values.get(this.values.first())[0] }
+
+  private binaryIndexOf(searchElement: number) {
+    const values = this.values;
+    if (values.isEmpty()) return 0;
+    let min = values.first();
+    let max = values.last(0);
+    if (searchElement < values.get(min)[1]) return 0;
+    if (searchElement >= values.get(max)[1]) return max;
+    let size = length(values, min, max);
+    while (min != max) {
+      const ds = Math.ceil(size / 2);
+      size -= ds;
+      const current = advance(min, values, ds);
+      const currentElement = values.get(current)[1];
+      if (currentElement <= searchElement) min = current;
+      else max = values.last(current);
+    }
+    return min;
+  }
 }

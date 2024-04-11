@@ -1,14 +1,14 @@
 import { handle, value } from "../../../../utils/callbacks";
 import { VecStack } from "../../../../utils/vecstack";
 import { displacedPointGrid } from "../sdf/sdf";
-import { Context, Image } from "../api";
+import { Context, Image, propSection } from "../api";
 import { ImageBuilder, param, transformedParam, VOID_RENDERER } from "./common";
 
 export function displacedGrid(ctx: Context): Image {
   const builder = new ImageBuilder();
-  const src = transformedParam('Source', ctx.imageProvider(), ctx.oracle(builder.object()), ctx.currentImageName());
-  const scale = param('Scale', 1);
-  const props = [src.prop, scale.prop];
+  const src = transformedParam(ctx.ui(), 'Source', ctx.imageProvider(), ctx.images(builder.object()), ctx.currentImageName());
+  const scale = param(ctx.ui(), 'Scale', 1);
+  const props = propSection('Displaced Grid', src.prop, scale.prop);
 
   const s = ctx.stack().pushGlobal(1, 1, 1, 1);
 

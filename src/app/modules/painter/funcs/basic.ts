@@ -1,18 +1,18 @@
 import { handle, transformed, tuple, value } from "../../../../utils/callbacks";
 import { clamp } from "../../../../utils/mathutils";
 import { VecStack } from "../../../../utils/vecstack";
-import { Context, Image } from "../api";
+import { Context, Image, propSection, propSectionGroups } from "../api";
 import { ImageBuilder, param, transformedParam, VOID_RENDERER } from "./common";
 
 export function box(ctx: Context): Image {
   const builder = new ImageBuilder();
-  const w = param('Width', 0.5);
-  const h = param('Height', 0.5);
-  const r = param('Radius', 0.1);
-  const max = param('Max', 1);
-  const profile = transformedParam('Profile', ctx.imageProvider(), ctx.oracle(builder.object()), ctx.currentImageName());
+  const w = param(ctx.ui(), 'Width', 0.5);
+  const h = param(ctx.ui(), 'Height', 0.5);
+  const r = param(ctx.ui(), 'Radius', 0.1);
+  const max = param(ctx.ui(), 'Max', 1);
+  const profile = transformedParam(ctx.ui(), 'Profile', ctx.imageProvider(), ctx.images(builder.object()), ctx.currentImageName());
 
-  const props = [w.prop, h.prop, r.prop, max.prop, profile.prop];
+  const props = propSectionGroups('Box', [w.prop, h.prop], [r.prop], [max.prop], [profile.prop]);
 
   const renderer = value(VOID_RENDERER);
   const settings = value(props);
@@ -48,8 +48,8 @@ export function box(ctx: Context): Image {
 }
 
 export function circle(ctx: Context): Image {
-  const radius = param('Radius', 0.5);
-  const pow = param('Power', 0);
+  const radius = param(ctx.ui(), 'Radius', 0.5);
+  const pow = param(ctx.ui(), 'Power', 0);
 
   const renderer = transformed(tuple(radius.value, pow.value), ([radius, pow]) => (stack: VecStack, pos: number) => {
     const l = stack.distance(stack.push(stack.x(pos), stack.y(pos), 0, 0), stack.push(0.5, 0.5, 0, 0));
@@ -59,7 +59,7 @@ export function circle(ctx: Context): Image {
     const k = Math.pow(v / radius, pp) * radius;
     return stack.push(k, 0, 0, 1);
   });
-  return { renderer, settings: value([radius.prop, pow.prop]), dependsOn: _ => false }
+  return { renderer, settings: value(propSection('Circle', radius.prop, pow.prop)), dependsOn: _ => false }
 }
 
 export function pointDistance(ctx: Context): Image {

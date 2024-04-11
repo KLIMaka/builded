@@ -1,30 +1,28 @@
 import { handle, value } from "../../../../utils/callbacks";
 import { clamp, fract, smothstep } from "../../../../utils/mathutils";
 import { VecStack } from "../../../../utils/vecstack";
-import { Context, Image } from "../api";
+import { Context, Image, propSection } from "../api";
 import { ImageBuilder, param, transformedParam, VOID_RENDERER } from "./common";
 
-const FUNCS = {
-  "Fract": fract,
-  "Sin": Math.sin,
-  "Ident": (x: number) => x,
-  "Sin1": (x: number) => (1 - smothstep(x, 0, Math.PI * 2)) * Math.sin(x),
-  "Clamp": (x: number) => clamp(x, 0, 1),
-  "Max 0.5": (x: number) => Math.max(x, 0.5)
-}
-const FUNCS_KEYS = Object.keys(FUNCS);
+const FUNCS = new Map<string, (x: number) => number>();
+FUNCS.set("Fract", fract);
+FUNCS.set("Sin", Math.sin);
+FUNCS.set("Ident", x => x);
+FUNCS.set("Sin1", x => (1 - smothstep(x, 0, Math.PI * 2)) * Math.sin(x));
+FUNCS.set("Clamp", x => clamp(x, 0, 1));
+FUNCS.set("Max 0.5", x => Math.max(x, 0.5));
 
 export function apply(ctx: Context): Image {
   const builder = new ImageBuilder();
-  const src = transformedParam('Source', ctx.imageProvider(), ctx.oracle(builder.object()), ctx.currentImageName());
-  const func = transformedParam('Function', f => FUNCS[f], _ => FUNCS_KEYS, 'Ident');
-  const scale = param('Scale', 1);
-  const offset = param('Offset', 0);
+  const src = transformedParam(ctx.ui(), 'Source', ctx.imageProvider(), ctx.images(builder.object()), ctx.currentImageName());
+  const func = transformedParam(ctx.ui(), 'Function', f => FUNCS.get(f), () => FUNCS.keys(), 'Ident');
+  const scale = param(ctx.ui(), 'Scale', 1);
+  const offset = param(ctx.ui(), 'Offset', 0);
 
   const off = ctx.stack().pushGlobal(0, 0, 0, 0);
   const s = ctx.stack().pushGlobal(1, 1, 1, 1);
 
-  const props = [src.prop, func.prop, scale.prop, offset.prop];
+  const props = propSection('Apply', src.prop, func.prop, scale.prop, offset.prop);
 
   const renderer = value(VOID_RENDERER);
   const settings = value(props);

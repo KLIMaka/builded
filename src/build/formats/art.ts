@@ -5,15 +5,16 @@ export class ArtInfo {
 }
 
 
-export const NO_ANIMATION = 0;
-export const ANIMATE_FORWARD = 2;
-export const OSCILLATING_ANIMATION = 1;
-export const ANIMATE_BACKWARD = 3;
-
+export enum AnimationType {
+  NO_ANIMATION = 0,
+  OSCILLATING_ANIMATION = 1,
+  ANIMATE_FORWARD = 2,
+  ANIMATE_BACKWARD = 3,
+}
 
 export class Attributes {
   public frames = 0;
-  public type = NO_ANIMATION;
+  public type = AnimationType.NO_ANIMATION;
   public xoff = 0;
   public yoff = 0;
   public speed = 0;
@@ -24,12 +25,12 @@ export const EMPTY_INFO = new ArtInfo(0, 0, new Attributes(), new Uint8Array(0))
 
 export function animate(frame: number, info: ArtInfo) {
   const max = info.attrs.frames + 1;
-  if (info.attrs.type == NO_ANIMATION) return 0;
-  else if (info.attrs.type == OSCILLATING_ANIMATION) {
+  if (info.attrs.type == AnimationType.NO_ANIMATION) return 0;
+  else if (info.attrs.type == AnimationType.OSCILLATING_ANIMATION) {
     const x = frame % (max * 2 - 2);
     return x >= max ? max * 2 - 2 - x : x;
-  } else if (info.attrs.type == ANIMATE_FORWARD) return frame % max;
-  else if (info.attrs.type == ANIMATE_BACKWARD) return max - frame % max;
+  } else if (info.attrs.type == AnimationType.ANIMATE_FORWARD) return frame % max;
+  else if (info.attrs.type == AnimationType.ANIMATE_BACKWARD) return max - frame % max;
 }
 
 var anumStruct = struct(Attributes)
@@ -104,8 +105,7 @@ export class ArtFiles implements ArtInfoProvider {
   constructor(private arts: ArtFile[]) { }
 
   private getArt(id: number) {
-    for (var i in this.arts) {
-      var art = this.arts[i];
+    for (const art of this.arts) {
       if (id >= art.getStart() && id <= art.getEnd())
         return art;
     }

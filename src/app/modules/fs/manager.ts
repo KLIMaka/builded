@@ -48,12 +48,12 @@ class FileBrowser implements GridModel {
       .build();
 
     this.activeFs = mounts[0];
-    const win = this.window.winElement;
+    const win = this.window.win;
     addDragAndDrop(win, this.dragAndDropHandler);
     const { root, sidebar, main } = paneGroup();
     this.sidebar = sidebar;
     this.main = main;
-    replaceContent(this.window.contentElement, root);
+    replaceContent(this.window.content, root);
   }
 
   public async stop() { this.window.destroy() }

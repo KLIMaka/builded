@@ -140,8 +140,8 @@ export function cubic(x: number): number {
 }
 
 export function smothstep(x: number, min: number, max: number) {
-  if (x < min) return 0;
-  if (x > max) return 1;
+  if (x <= min) return 0;
+  if (x >= max) return 1;
   return cubic((x - min) / (max - min));
 }
 

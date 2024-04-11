@@ -1,4 +1,4 @@
-import { Stream, byte, atomic_array, struct, bits, Accessor, ubyte, short, ushort, int, uint, float, string, array } from '../src/utils/stream';
+import { Stream, byte, atomic_array, struct, bits, Accessor, ubyte, short, ushort, int, uint, float, string, array, bits_signed } from '../src/utils/stream';
 
 class Test {
   a: number;
@@ -31,7 +31,7 @@ test('write', () => {
   const s = struct(Test)
     .field('a', byte)
     .field('b', bits(4))
-    .field('c', bits(-4));
+    .field('c', bits_signed(4));
   stream.setOffset(0);
   const t = new Test();
   t.a = 12;

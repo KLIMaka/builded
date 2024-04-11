@@ -1,6 +1,6 @@
 import { handle, value } from "../../../../utils/callbacks";
 import { VecStack } from "../../../../utils/vecstack";
-import { Context, Image } from "../api";
+import { Context, Image, propSection } from "../api";
 import { ImageBuilder, param, transformedParam, VOID_RENDERER } from "./common";
 
 function grad(f: (stack: VecStack, pos: number) => number, stack: VecStack, pos: number, d: number) {
@@ -15,10 +15,10 @@ function grad(f: (stack: VecStack, pos: number) => number, stack: VecStack, pos:
 
 export function gradient(ctx: Context): Image {
   const builder = new ImageBuilder();
-  const src = transformedParam('Source', ctx.imageProvider(), ctx.oracle(builder.object()), ctx.currentImageName());
-  const scale = param('Scale', 1);
-  const sample = param('Samle Scale', 0.001);
-  const props = [src.prop, scale.prop, sample.prop];
+  const src = transformedParam(ctx.ui(), 'Source', ctx.imageProvider(), ctx.images(builder.object()), ctx.currentImageName());
+  const scale = param(ctx.ui(), 'Scale', 1);
+  const sample = param(ctx.ui(), 'Samle Scale', 0.001);
+  const props = propSection('Gradient', src.prop, scale.prop, sample.prop);
 
   const renderer = value(VOID_RENDERER);
   const settings = value(props);

@@ -1,0 +1,79 @@
+actions = { label = "Actions", bind = "control+3" }
+test = { label = "Test", bind = "control+t" }
+
+close = { label = "Close", bind = "escape" }
+navigate-next = { label = "Next", bind = "arrowdown" }
+navigate-prev = { label = "Previous", bind = "arrowup" }
+navigate-next-page = { label = "Next Page", bind = "pagedown" }
+navigate-prev-page = { label = "Previous Page", bind = "pageup" }
+select = { label = "Select", bind = "enter" }
+
+[menu]
+close = { parent = "close" }
+
+[win]
+close = { parent = "close" }
+
+[list]
+next = { parent = "navigate-next" }
+prev = { parent = "navigate-prev" }
+next-page = { parent = "navigate-next-page" }
+prev-page = { parent = "navigate-prev-page" }
+select = { parent = "select" }
+
+[table]
+next = { parent = "navigate-next" }
+prev = { parent = "navigate-prev" }
+next-page = { parent = "navigate-next-page" }
+prev-page = { parent = "navigate-prev-page" }
+select = { parent = "select" }
+
+[painter]
+label = "Painter"
+bind = "control+p"
+toggle-mode = { bind = "m" }
+add-shape = { bind = " " }
+grid = { bind = "g" }
+grid-inc = { bind = "]" }
+grid-dec = { bind = "[" }
+reset-workplane = { bind = "backspace" }
+
+[fs]
+label = "File System"
+bind = "control+f"
+add_dir = { label = "Add directory", icon = "folder", bind = "control+d" }
+add_zip = { label = "Add Zip File", icon = "zip", bind = "control+z" }
+add_rff = { label = "Add Rff File", icon = "rff", bind = "control+r" }
+add_res = { label = "Add resource", bind = "control+r" }
+
+[controls]
+check = { label = "Check", bind = " " }
+
+[controls.numberbox]
+micro-step-up = { label = "Micro step up", bind = "alt+arrowup" }
+micro-step-down = { label = "Micro step down", bind = "alt+arrowdown" }
+macro-step-up = { label = "Macro step up", bind = "pageup" }
+macro-step-down = { label = "Macro step down", bind = "pagedown" }
+step-up = { label = "Step up", bind = "arrowup" }
+step-down = { label = "Step down", bind = "arrowdown" }
+escape = { label = "Escape", bind = "escape" }
+enter = { label = "Eneter", bind = "enter" }
+undo = { label = "Undo", bind = "control+z" }
+
+[controls.textbox]
+enter = { label = "Enter", bind = "enter" }
+close = { parent = "close" }
+
+[arteditor]
+next = { parent = "navigate-next" }
+prev = { parent = "navigate-prev" }
+search = { label = "Search", bind = "/" }
+next-plu = { label = "Next PalSwap", bind = "p" }
+prev-plu = { label = "Previous PalSwap", bind = "o" }
+reset-plu = { label = "Reset PalSwap", bind = "control+p" }
+center = { label = "Center Picture", bind = "backspace" }
+grid = { bind = "g" }
+grid-inc = { bind = "]" }
+grid-dec = { bind = "[" }
+toggle-repeat = { label = "Toggle Repeat", bind = "r" }
+toggle-scale = { label = "Toggle SuperSample", bind = "s" }

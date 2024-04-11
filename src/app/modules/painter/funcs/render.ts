@@ -1,17 +1,18 @@
 import { handle, value } from "../../../../utils/callbacks";
 import { clamp } from "../../../../utils/mathutils";
 import { VecStack } from "../../../../utils/vecstack";
+import { Context, Image, propSectionGroups } from "../api";
 import { ambientOcclusion, sdf3d, softShadow } from "../sdf/sdf";
-import { Context, Image } from "../api";
-import { ImageBuilder, param, transformedParam, VOID_RENDERER } from "./common";
+import { ImageBuilder, VOID_RENDERER, param, transformedParam } from "./common";
 
 export function render(ctx: Context): Image {
   const builder = new ImageBuilder();
-  const hmap = transformedParam('Height Map', ctx.imageProvider(), ctx.oracle(builder.object()), ctx.currentImageName());
-  const lightX = param('Light X', 0.7);
-  const lightY = param('Light Y', 0);
-  const lightZ = param('Light Z', -0.5);
-  const props = [hmap.prop, lightX.prop, lightY.prop, lightZ.prop];
+  const hmap = transformedParam(ctx.ui(), 'Height Map', ctx.imageProvider(), ctx.images(builder.object()), ctx.currentImageName());
+  const scale = param(ctx.ui(), 'Scale', 1);
+  const lightX = param(ctx.ui(), 'Light X', 0.7);
+  const lightY = param(ctx.ui(), 'Y', 0);
+  const lightZ = param(ctx.ui(), 'Z', -0.5);
+  const props = propSectionGroups('Renderer', [hmap.prop], [scale.prop], [lightX.prop, lightY.prop, lightZ.prop]);
 
   const toLight = ctx.stack().pushGlobal(0, 0, 0, 0);
 
@@ -25,21 +26,19 @@ export function render(ctx: Context): Image {
       return
     }
 
-    handle(p, (p, hmap, lightX, lightY, lightZ) => {
-      ctx.stack().begin();
-      ctx.stack().copy(toLight,
-        ctx.stack().normalize(
-          ctx.stack().sub(
-            ctx.stack().push(lightX, lightY, lightZ, 0),
-            ctx.stack().push(0.5, 0.5, 0, 0)
+    handle(p, (p, hmap, scale, lightX, lightY, lightZ) => {
+      const stack = ctx.stack();
+      stack.begin();
+      stack.copy(toLight,
+        stack.normalize(
+          stack.sub(
+            stack.push(lightX, lightY, lightZ, 0),
+            stack.push(0.5, 0.5, 0, 0)
           )));
-      ctx.stack().end();
+      stack.end();
       const shape = (stack: VecStack, pos: number) => {
-        const x = stack.x(pos);
-        const y = stack.y(pos);
-        const z = stack.z(pos);
-        const v = stack.x(stack.call(hmap, stack.push(x, y, 0, 0)));
-        return stack.pushScalar(-v - z);
+        const v = stack.callScalar(hmap, stack.push(stack.x(pos), stack.y(pos), 0, 0)) * scale;
+        return stack.pushScalar(-v - stack.z(pos));
       };
       const r = (stack: VecStack, pos: number, normal: number) => {
         const fromEye = stack.sub(pos, stack.push(0.5, 0.5, -1, 0));
@@ -52,7 +51,7 @@ export function render(ctx: Context): Image {
       };
       const plane = sdf3d(shape, r);
       renderer.set((stack: VecStack, pos: number) => stack.call(plane, pos));
-    }, hmap.renderer, lightX.value, lightY.value, lightZ.value);
+    }, hmap.renderer, scale.value, lightX.value, lightY.value, lightZ.value);
 
     handle(p, (p, s) => {
       settings.set([...props, ...s]);

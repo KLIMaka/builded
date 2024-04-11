@@ -1,21 +1,22 @@
+import { FS, FileSystem } from 'app/apis/fs';
 import { BloodBoard } from 'build/blood/structs';
+import Optional from 'optional-js';
 import { cloneBoard, cloneSector, cloneSprite, cloneWall, loadBloodMap, newBoard, newSector, newSprite, newWall, saveBloodMap } from '../../../build/blood/maploader';
 import { BloodImplementationConstructor } from '../../../build/blood/utils';
 import { EngineApi } from '../../../build/board/mutations/api';
 import { ArtFile, ArtFiles } from '../../../build/formats/art';
 import { RffFile } from '../../../build/formats/rff';
-import { enumerate } from '../../../utils/collections';
+import { EMPTY_COLLECTION, enumerate } from '../../../utils/collections';
 import { createTexture } from '../../../utils/gl/textures';
-import { getInstances, Injector, instance, lifecycle, Module, plugin, provider } from '../../../utils/injector';
+import { Injector, Module, getInstances, instance, lifecycle, plugin, provider } from '../../../utils/injector';
 import { iter } from '../../../utils/iter';
 import { Stream } from '../../../utils/stream';
-import { ACTIVITY, BOARD, ENGINE_API, RESOURCES } from '../../apis/app';
+import { BOARD, ENGINE_API, RESOURCES } from '../../apis/app';
 import { BUS, busDisconnector } from '../../apis/handler';
 import { LoadBoard, namedMessageHandler } from '../../edit/messages';
 import { DefaultMapName, MAP_NAME } from '../../modules/default/mapnamedialog';
-import { Palette, PicTags, PIC_TAGS, RAW_PAL, RAW_PLUs, TRANS_TABLE } from '../artselector';
+import { PIC_TAGS, Palette, PicTags, RAW_PAL, RAW_PLUs, TRANS_TABLE } from '../artselector';
 import { ART_FILES, GL, PARALLAX_TEXTURES } from '../buildartprovider';
-import { FileSystem, FS } from '../fs/fs';
 import { MOUNTS } from '../fs/mount';
 import { PALSWAPS, PAL_TEXTURE, PLU_TEXTURE, SHADOWSTEPS, TRANS_TEXTURE } from '../gl/buildgl';
 import { DefaultMapSelector, MAP_NAMES, MAP_SELECTOR } from '../selectmap';
@@ -138,15 +139,12 @@ const trans = provider(async (injector: Injector) => {
   return new Uint8Array(await res.get('TRANS.TLU'));
 });
 
-const BloodResources = provider(async (injector: Injector) => {
+const BloodResources = provider(async (injector: Injector): Promise<FileSystem> => {
   const fs = await injector.getInstance(FS);
   const rfffs = await loadRffFs(injector);
-  return <FileSystem>{
-    get: async name => {
-      const file = await fs.get(name);
-      if (file != null) return file;
-      return rfffs.get(name);
-    },
+  return {
+    get: async name => fs.get(name).or(rfffs.get(name)),
+    write: async () => Optional.empty(),
     list: async () => {
       const files = new Set<string>(await rfffs.list());
       (await fs.list()).forEach(f => files.add(f));
@@ -155,19 +153,19 @@ const BloodResources = provider(async (injector: Injector) => {
   }
 });
 
-const picTags = provider(async (injector: Injector) => {
-  const fs = await injector.getInstance(RESOURCES);
-  const surfaceDat = await fs.get('SURFACE.DAT');
-  if (surfaceDat == null) return <PicTags>{ allTags: () => [], tags: id => [] }
+const picTags = provider(async (injector: Injector): Promise<PicTags> => {
+  const resources = await injector.getInstance(RESOURCES);
+  const surfaceDat = await resources.get('SURFACE.DAT');
+  if (surfaceDat == null) return { allTags: () => EMPTY_COLLECTION, tags: _ => EMPTY_COLLECTION }
   return loadTags(surfaceDat);
 });
 
-function loadTags(surfaceDat: ArrayBuffer) {
+function loadTags(surfaceDat: ArrayBuffer): PicTags {
   const surface = new Uint8Array(surfaceDat);
   const tags = ['None', 'Stone', 'Metal', 'Wood', 'Flesh', 'Water', 'Dirt', 'Clay', 'Snow', 'Ice', 'Leaves', 'Cloth', 'Plant', 'Goo', 'Lava'];
-  return <PicTags>{
+  return {
     allTags: () => tags,
-    tags: id => surface.length <= id ? [] : [tags[surface[id]]]
+    tags: id => surface.length <= id ? EMPTY_COLLECTION : [tags[surface[id]]]
   };
 }
 

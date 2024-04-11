@@ -1,24 +1,24 @@
 import { BuildReferenceTrackerImpl } from '../src/app/modules/default/reftracker';
 import * as BLOOD from '../src/build/blood/maploader';
-import { BloodBoard, BloodSector, BloodSprite, BloodWall } from '../src/build/blood/structs';
+import { BloodBoard } from '../src/build/blood/structs';
 import { canonicalWall, innerSectors, innerSectorsOfLoop, innerWalls, isOuterLoop, loopPoints, loopStart, loopWalls, sectorWalls, wallsBetween } from '../src/build/board/loops';
 import { EngineApi } from '../src/build/board/mutations/api';
 import { createNewSector } from "../src/build/board/mutations/ceatesector";
-import { deleteSector } from '../src/build/board/mutations/internal';
-import { createInnerLoop, deleteLoop, fillInnerLoop, setFirstWall } from "../src/build/board/mutations/sectors";
-import { joinSectors } from "../src/build/board/mutations/joinsectors";
-import { splitSector, splitSectorFromPoint } from '../src/build/board/mutations/splitsector';
 import { deleteWall, mergePoints, splitWall } from '../src/build/board/mutations/walls';
-import { findContainingSector, findContainingSectorMidPoints, findSector, findSectorsAtPoint, inSector, wallInSector, walllen } from '../src/build/board/query';
+import { walllen, inSector, wallInSector, findContainingSector, findContainingSectorMidPoints, findSectorsAtPoint, findSector } from '../src/build/board/query';
+import { Board } from '../src/build/board/structs';
 import { ArtInfo, ArtInfoProvider, Attributes } from '../src/build/formats/art';
 import * as BUILD from '../src/build/maploader';
-import { clockwise, inPolygon } from '../src/build/utils';
 import { map, wrap } from '../src/utils/collections';
-import { iter } from '../src/utils/iter';
 import { Stream } from '../src/utils/stream';
-import { Board, Sector, Sprite, Wall } from '../src/build/board/structs';
+import { createInnerLoop, deleteLoop, fillInnerLoop } from "../src/build/board/mutations/sectors"
+import { deleteSector } from '../src/build/board/mutations/internal';
+import { iter } from '../src/utils/iter';
+import { splitSector, splitSectorFromPoint } from '../src/build/board/mutations/splitsector';
+import { joinSectors } from '../src/build/board/mutations/joinsectors';
+import { inPolygon, clockwise } from '../src/build/utils';
 
-const REFS = new BuildReferenceTrackerImpl();
+const REFS = new BuildReferenceTrackerImpl()
 const NULL_IMG = new Uint8Array();
 const ART: ArtInfoProvider = {
   getInfo(picnum: number): ArtInfo {

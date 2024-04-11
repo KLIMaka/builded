@@ -1,7 +1,7 @@
 import { CallbackChannel, Destenation, Source } from "../../callbacks";
 
 export type Oracle<T> = (s: string) => Iterable<T>;
-export type Handle<T> = Source<T> & Destenation<T> & CallbackChannel<[]>;
+export type Handle<T> = Source<T> & Destenation<T> & CallbackChannel<[T]>;
 export type Validator<T> = (value: T) => boolean;
 
 export function setter<T>(setter: (v: T) => void, validator: Validator<T>) {

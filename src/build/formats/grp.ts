@@ -27,14 +27,14 @@ export class GrpFile {
 
   public get(fname: string): Stream | null {
     const info = this.infos.get(fname.toLowerCase());
-    if (info == undefined) return null;
+    if (info === undefined) return null;
     this.data.setOffset(info.off);
     return this.data.subView();
   }
 
   public getArrayBuffer(fname: string) {
     const info = this.infos.get(fname.toLowerCase());
-    if (info == undefined) return null;
+    if (info === undefined) return null;
     this.data.setOffset(info.off);
     return this.data.subView().readArrayBuffer(info.size);
   }
@@ -44,7 +44,8 @@ export function create(buf: ArrayBuffer): GrpFile {
   return new GrpFile(buf);
 }
 
-export function createPalette(stream: Stream): Uint8Array {
+export function createPalette(buffer: ArrayBuffer): Uint8Array {
+  const stream = new Stream(buffer);
   const pal = new Uint8Array(768);
   for (let i = 0; i < 256; i++) {
     pal[i * 3 + 0] = stream.readUByte() * 4;
@@ -54,7 +55,16 @@ export function createPalette(stream: Stream): Uint8Array {
   return pal;
 }
 
-export function loadShadeTables(stream: Stream): Uint8Array[] {
+export function loadTrans(buffer: ArrayBuffer): Uint8Array {
+  const stream = new Stream(buffer);
+  stream.skip(0x300);
+  const size = stream.readUShort();
+  stream.skip(0x100 * size);
+  return atomic_array(ubyte, 256 * 256).read(stream);
+}
+
+export function loadShadeTables(buffer: ArrayBuffer): Uint8Array[] {
+  const stream = new Stream(buffer);
   stream.skip(0x300);
   const size = stream.readUShort();
   const table = atomic_array(ubyte, 256);
@@ -63,7 +73,8 @@ export function loadShadeTables(stream: Stream): Uint8Array[] {
   return result;
 }
 
-export function loadPlus(stream: Stream): Uint8Array[] {
+export function loadPlus(buffer: ArrayBuffer): Uint8Array[] {
+  const stream = new Stream(buffer);
   const size = stream.readUByte();
   const table = atomic_array(ubyte, 256);
   const plus: Uint8Array[] = [];

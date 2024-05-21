@@ -1,5 +1,5 @@
 import { getOrCreate, map } from "./collections";
-import { DirecredGraph } from "./graph";
+import { DirectionalGraph } from "./graph";
 import { iter } from "./iter";
 
 export type InstanceProvider<T> = (i: Injector) => Promise<T>;
@@ -111,7 +111,7 @@ function getDependencyChain(dependency: Dependency<any>, injector: Injector) {
 export const RUNTIME = new Dependency<Runtime>('Runtime');
 
 class RootInjector implements ParentInjector, Runtime {
-  private graph = new DirecredGraph<Dependency<any>>();
+  private graph = new DirectionalGraph<Dependency<any>>();
   private instances = new Map<Dependency<any>, Promise<any>>();
 
 
@@ -147,7 +147,7 @@ class RootInjector implements ParentInjector, Runtime {
 
   private async create<T>(dependency: Dependency<T>, parent: ParentInjector) {
     const provider = this.providers.get(dependency);
-    if (provider == undefined) throw new Error(`No provider bound to ${dependency.name}`);
+    if (provider === undefined) throw new Error(`No provider bound to ${dependency.name}`);
     const injector = new ChildInjector(dependency, parent);
     try {
       const instance = await provider.start(injector);
@@ -175,9 +175,9 @@ class RootInjector implements ParentInjector, Runtime {
 type Dependencyfy<T> = { [P in keyof T]: Dependency<T[P]> };
 
 export async function create<U, T extends any[]>(injector: Injector, ctr: { new(...args: T): U }, ...args: Dependencyfy<T>): Promise<U> {
-  return new ctr(...<T>await getInstances(injector, ...args));
+  return new ctr(...await getInstances(injector, ...args) as T);
 }
 
 export async function getInstances<T extends any[]>(injector: Injector, ...args: Dependencyfy<T>): Promise<T> {
-  return <T>await Promise.all(args.map(a => injector.getInstance(a)));
+  return await Promise.all(args.map(a => injector.getInstance(a))) as T;
 }

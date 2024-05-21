@@ -9,14 +9,18 @@ module.exports = {
     filename: 'app.bundle.js'
   },
   resolve: {
-    extensions: ['.ts', '.js'],
+    extensions: ['.ts', '.js', '.tsx'],
     plugins: [new TsconfigPathsPlugin()]
   },
   module: {
     rules: [{
-      test: /\.(ts|js)$/,
+      test: /\.(ts|js|tsx)$/i,
       exclude: /node_modules/,
       loader: 'babel-loader',
+    },
+    {
+      test: /\.css$/i,
+      use: ["style-loader", "css-loader"],
     }],
   },
   devtool: 'source-map',

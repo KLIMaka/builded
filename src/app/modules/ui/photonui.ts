@@ -3,15 +3,13 @@ import { chain } from "@utils/collections";
 import { Module, Plugin, lifecycle } from "@utils/injector";
 import { iter } from "@utils/iter";
 import { List, Node } from "@utils/list";
+import { clamp } from "@utils/mathutils";
 import { Consumer, Supplier, Transform, nil } from "@utils/types";
-import { DragConsumer, Element, addDragController, center, div, dragElement } from "@utils/ui/ui";
+import { DragConsumer, Element, center, div, dragElement } from "@utils/ui/ui";
 import { ACTION_DESCRIPTORS, Action, ActionDescriptors, ActionsProvider } from "app/apis/actions";
-import $ from "jquery";
-import "jqueryui";
+import Optional from "optional-js";
 import tippy, { Instance, Props } from "tippy.js";
 import { Block, ElemMod, Event, EventType, Layout, Menu, UI, Ui, Widget, Window, WindowBuilder, clazz, style } from "../../apis/ui";
-import Optional from "optional-js";
-import { clamp } from "@utils/mathutils";
 
 class WindowImpl implements Window, ActionsProvider {
   public onclose: () => void;
@@ -19,7 +17,6 @@ class WindowImpl implements Window, ActionsProvider {
   private content: Block;
   private header: Block;
   private footer: Block;
-  private jqw: JQuery<HTMLElement>;
   private subActions: ActionsProvider;
   private autoclose: boolean;
   private winActions: Action[];
@@ -49,9 +46,6 @@ class WindowImpl implements Window, ActionsProvider {
     this.autoclose = builder.isAutoclose;
     this.ui.getContent().appendHtml(this.win.elem());
 
-    this.jqw = $(this.win.elem());
-    if (builder.resizable) this.jqw.resizable();
-    if (builder.draggable) this.jqw.draggable({ handle: (this.header ?? this.win).elem() });
     this.win.mod(style.custom(s => {
       s.width = `${builder.width}px`;
       s.height = `${builder.height}px`;
@@ -72,8 +66,8 @@ class WindowImpl implements Window, ActionsProvider {
       : chain(this.subActions.actions(), this.winActions);
   }
 
-  hide() { this.jqw.hide() }
-  show() { this.jqw.show() }
+  hide() { /*this.jqw.hide()*/ }
+  show() { /*this.jqw.show()*/ }
   setZ(z: number) { this.win.mod(style.z(z)) }
   destroy() { this.ui.getDesktop().elem().removeChild(this.win.elem()) }
   loseFocus() { if (this.autoclose) this.ui.hideWindow(this) }
@@ -172,34 +166,6 @@ class LayoutImpl implements Layout {
 
   classes(classes: string[], size?: string): this {
     return this.builder(() => this.block().mod(clazz.add(...classes)), size);
-  }
-
-  separator(): this {
-    const musemove = (e: MouseEvent) => {
-      const dx = e.clientX - startX;
-      const elem = next.cast();
-      elem.style.flexBasis = `${startSize - dx}px`;
-    }
-    const mouseup = (e: MouseEvent) => {
-      document.body.removeEventListener('mouseup', mouseup);
-      document.body.removeEventListener('mousemove', musemove);
-      document.body.style.cursor = 'default';
-    }
-    const last = this.last;
-    let next: Block = null;
-    this.nextConsumer = Optional.of(b => next = b);
-    const separator = this.block().mod(clazz.add('separator'));
-    let startX = 0;
-    let startSize = 0;
-    const drag: DragConsumer = (dx, dy) => {
-
-    }
-    const dragStart = () => {
-      const px = next.cast().style.flexBasis;
-      // startSize = 
-    }
-    // dragElement(separator.cast(), 'col-resize', drag)
-    return this.builder(() => separator, '5px', true);
   }
 
   clear(): void {

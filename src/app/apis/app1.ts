@@ -1,17 +1,12 @@
+import { Source } from "@utils/callbacks";
 import { Dependency } from "@utils/injector";
-import { Consumer } from "@utils/types";
+import { Consumer, Function } from "@utils/types";
 import Optional from "optional-js";
-
-export class TaskInerruptedError extends Error {
-  constructor() {
-    super('Task Interrupted');
-  }
-};
 
 // General
 export type Disconnector = Consumer<void>;
 export class HandleProvider<T> implements Iterable<T> {
-  constructor(private handles = new Set<T>) { }
+  constructor(private handles = new Set<T>()) { }
   add(handle: T): Disconnector { this.handles.add(handle); return () => this.handles.delete(handle) }
   get(): Set<T> { return this.handles }
   [Symbol.iterator](): Iterator<T, any, undefined> { return this.handles[Symbol.iterator](); }
@@ -42,27 +37,50 @@ export interface Storage {
 export type Storages = (name: string) => Promise<Storage>;
 
 // Scheduler
-export type Callback<T> = (arg: T) => void;
-export type EventLoop = (cb: Callback<number>) => void;
+export class TaskInerruptedError extends Error {
+  constructor() {
+    super('Task Interrupted');
+  }
+};
 
-export interface TaskHandle {
-  wait(): Promise<void>;
-  waitFor<T>(promise: Promise<T>): Promise<T>;
+export type EventLoop = Consumer<Consumer<number>>;
+
+export type ProgressInfo = {
+  readonly progress: Source<number>;
+  readonly info: Source<string>;
+
+  percents(percents: number, count?: number): number;
+  inc(dp: number): void;
 }
 
-export interface TaskController {
+export interface TaskHandle {
+  wait(info: string, dp: number): Promise<void>;
+  waitFor<T>(promise: Promise<T>, info: string, dp: number): Promise<T>;
+  waitForParallel<T>(items: T[], mapper: Function<T, Promise<void>>, doneInfo: Function<T, string>, progress?: number): Promise<void>;
+}
+
+
+export type TaskDone<T> = { type: "done", result: T };
+export type TaskError = { type: "error", error: Error };
+export type TaskResult<T> = TaskDone<T> | TaskError;
+
+export interface TaskController<T> {
+  readonly paused: Source<boolean>;
+  readonly result: Source<Optional<TaskResult<T>>>;
+  readonly info: Source<string>;
+  readonly progress: Source<number>;
+
   pause(): void;
   unpause(): void;
   stop(): Promise<void>;
-  end(): Promise<void>;
+  end(): Promise<TaskResult<T>>;
 }
 
-export type Task = (handle: TaskHandle) => Promise<void>;
+export type Task<T> = (handle: TaskHandle) => Promise<T>;
 
 export interface Scheduler {
-  exec(task: Task): TaskController;
+  exec<T>(task: Task<T>): TaskController<T>;
 }
-
 
 export interface App {
   readonly logger: Logger;

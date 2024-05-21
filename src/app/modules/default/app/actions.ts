@@ -1,3 +1,4 @@
+import { constSource } from "@utils/callbacks";
 import { getOrCreate } from "@utils/collections";
 import { loadString } from "@utils/getter";
 import { Plugin, provider } from "@utils/injector";
@@ -8,9 +9,11 @@ import { Bind } from "app/input/keymap";
 import Optional from "optional-js";
 import toml from "toml";
 
+const ENABLED = constSource(true);
 
 class ActionDescriptorImpl implements ActionDescriptor {
   constructor(
+    readonly id: string,
     private parent: Supplier<Optional<ActionDescriptor>>,
     private _label: Optional<string>,
     private _icon: Optional<string>,
@@ -32,7 +35,7 @@ class ActionDescriptorsContext implements ActionDescriptors {
     const globalId = getId(this.name, localId);
     return getOrCreate(this.actions, globalId, _ => {
       this.logger.log("WARN", `Invalid action id: ${globalId}`);
-      return new ActionDescriptorImpl(() => Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+      return new ActionDescriptorImpl(globalId, () => Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
     });
   }
 
@@ -40,12 +43,12 @@ class ActionDescriptorsContext implements ActionDescriptors {
     return new ActionDescriptorsContext(getId(this.name, localId), this.actions, this.logger);
   }
 
-  bind(id: string, handler: ActionHandler): Action {
-    return { descriptor: this.get(id), handler };
+  bind(id: string, handler: ActionHandler, enabled = ENABLED): Action {
+    return { descriptor: this.get(id), handler, enabled };
   }
 
-  bindSync(id: string, handler: Consumer<void>): Action {
-    return this.bind(id, async () => handler());
+  bindSync(id: string, handler: Consumer<void>, enabled = ENABLED): Action {
+    return this.bind(id, async () => handler(), enabled);
   }
 }
 
@@ -57,8 +60,9 @@ function parseBind(bind: string): Optional<Bind> {
   return bind ? Optional.of(new Bind(bind.split('+'))) : Optional.empty();
 }
 
-function parseRecord(object: any, actions: Map<string, ActionDescriptor>): ActionDescriptor {
+function parseRecord(name: string, object: any, actions: Map<string, ActionDescriptor>): ActionDescriptor {
   return new ActionDescriptorImpl(
+    name,
     () => Optional.ofNullable(actions.get(object.parent)),
     Optional.ofNullable(object.label),
     Optional.ofNullable(object.icon),
@@ -73,7 +77,7 @@ function parseActions(object: any, name: string, actions: Map<string, ActionDesc
     const value = object[k];
     const id = getId(name, k);
     if (typeof value == 'object') parseActions(value, id, actions);
-    else actions.set(name, parseRecord(object, actions));
+    else actions.set(name, parseRecord(name, object, actions));
   }
   return actions;
 }

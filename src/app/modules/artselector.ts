@@ -60,7 +60,7 @@ export class Selector {
       .content(canvas)
       .build();
 
-    this.filter.add(() => this.updateFilter());
+    this.filter.subscribe(() => this.updateFilter());
     this.drawPanel = createDrawPanel(arts, pal, canvas, (id: number) => this.select(id), () => this.pics());
     this.hide();
   }

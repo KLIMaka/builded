@@ -1,4 +1,5 @@
-import { fit, Raster, Rasterizer, rect } from "./pixelprovider";
+import { int } from "./mathutils";
+import { Raster, Rasterizer } from "./pixelprovider";
 
 export function createEmptyCanvas(width: number, height: number): HTMLCanvasElement {
   const canvas: HTMLCanvasElement = document.createElement('canvas');
@@ -36,7 +37,7 @@ export function loadImageFromBuffer(buff: ArrayBuffer): Promise<[number, number,
     const img = new Image();
     img.src = imageUrl;
     img.onload = (evt) => {
-      const img = <HTMLImageElement>evt.target;
+      const img = evt.target as HTMLImageElement;
       const canvas = document.createElement('canvas');
       canvas.width = img.width;
       canvas.height = img.height;
@@ -53,7 +54,7 @@ export function loadImage(name: string): Promise<[number, number, Uint8Array]> {
     const image = new Image();
     image.src = name;
     image.onload = (evt) => {
-      const img = <HTMLImageElement>evt.target;
+      const img = evt.target as HTMLImageElement;
       const canvas = document.createElement('canvas');
       canvas.width = img.width;
       canvas.height = img.height;
@@ -62,4 +63,43 @@ export function loadImage(name: string): Promise<[number, number, Uint8Array]> {
       resolve([img.width, img.height, new Uint8Array(ctx.getImageData(0, 0, img.width, img.height).data)]);
     }
   });
+}
+
+function drawGrid(ctx: CanvasRenderingContext2D, size: number, w: number, h: number, xoff: number, yoff: number, scale: number, goff: number) {
+  const dg = size * scale;
+
+  ctx.beginPath();
+  const xcount = 2 + int(w / scale / size);
+  const startx = xoff + Math.floor(-xoff / dg) * dg;
+  for (let i = 0; i < xcount; i++) {
+    const x = startx + i * dg;
+    ctx.moveTo(x, 0.5 - goff);
+    ctx.lineTo(x, goff + h + 0.5);
+  }
+
+  const ycount = 2 + int(h / scale / size);
+  const starty = yoff + Math.floor(-yoff / dg) * dg;
+  for (let i = 0; i < ycount; i++) {
+    const y = starty + i * dg;
+    ctx.moveTo(0.5 - goff, y);
+    ctx.lineTo(goff + w + 0.5, y);
+  }
+  ctx.stroke();
+}
+
+export function renderGrid(canvas: HTMLCanvasElement, xoff: number, yoff: number, scale: number, size: number, pixels: number) {
+  if (canvas.width === 0 || canvas.height === 0) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.setLineDash([3, 3]);
+  ctx.clearRect(0, 0, w, h);
+  ctx.lineWidth = 0.9;
+  if (size === 0) return;
+
+  const gsize = pixels / size;
+  ctx.strokeStyle = 'white';
+  drawGrid(ctx, gsize, w, h, xoff, yoff, scale, 0);
+  ctx.strokeStyle = 'black';
+  drawGrid(ctx, gsize, w, h, xoff, yoff, scale, 3);
 }

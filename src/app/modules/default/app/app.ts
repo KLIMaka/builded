@@ -1,6 +1,6 @@
 import { App } from "../../../apis/app1";
 import { DefaultLogger } from "./logger";
-import { DefaultScheduler } from "./scheduler";
+import { DefaultScheduler } from "../../scheduler/scheduler";
 import { DefaultStorages } from "./storage";
 
 export function DefaultApp(appName: string): App {

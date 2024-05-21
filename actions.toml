@@ -1,5 +1,7 @@
 actions = { label = "Actions", bind = "control+3" }
-test = { label = "Test", bind = "control+t" }
+test = { label = "Test", bind = "t" }
+test1 = { label = "Test", bind = "y" }
+test2 = { label = "Test", bind = "u" }
 
 close = { label = "Close", bind = "escape" }
 navigate-next = { label = "Next", bind = "arrowdown" }
@@ -7,12 +9,30 @@ navigate-prev = { label = "Previous", bind = "arrowup" }
 navigate-next-page = { label = "Next Page", bind = "pagedown" }
 navigate-prev-page = { label = "Previous Page", bind = "pageup" }
 select = { label = "Select", bind = "enter" }
+copy = { label = "Copy", icon = "copy", bind = "control+c" }
+paste = { label = "Psste", icon = "paste", bind = "control+v" }
+delete = { label = "Delete", icon = "trash-can", bind = "delete" }
 
 [menu]
 close = { parent = "close" }
 
 [win]
 close = { parent = "close" }
+
+[message-box]
+close = { parent = "close" }
+ok = { bind = "enter" }
+cancel = { bind = "escape" }
+
+[progress-box]
+stop = { parent = "close" }
+resume-pause = { bind = "p" }
+
+[overwrite-box]
+yes = { parent = "select" }
+no = { parent = "close" }
+all-yes = { bind = "control+enter" }
+all-no = { bind = "control+escape" }
 
 [list]
 next = { parent = "navigate-next" }
@@ -27,6 +47,7 @@ prev = { parent = "navigate-prev" }
 next-page = { parent = "navigate-next-page" }
 prev-page = { parent = "navigate-prev-page" }
 select = { parent = "select" }
+select-all = { bind = "control+a" }
 
 [painter]
 label = "Painter"
@@ -41,10 +62,20 @@ reset-workplane = { bind = "backspace" }
 [fs]
 label = "File System"
 bind = "control+f"
-add_dir = { label = "Add directory", icon = "folder", bind = "control+d" }
-add_zip = { label = "Add Zip File", icon = "zip", bind = "control+z" }
-add_rff = { label = "Add Rff File", icon = "rff", bind = "control+r" }
-add_res = { label = "Add resource", bind = "control+r" }
+add-dir = { label = "Add directory...", icon = "folder-open", bind = "control+d" }
+add-zip = { label = "Add Zip File...", icon = "file-zipper", bind = "control+z" }
+add-rff = { label = "Add Rff File...", icon = "box", bind = "control+r" }
+add-grp = { label = "Add Grp File...", icon = "box", bind = "control+g" }
+add-res = { label = "Add resource", bind = "control+r" }
+add-menu = { bind = "m" }
+refresh = { label = "Refresh", icon = "arrows-rotate", bind = "f5" }
+search = { bind = "/" }
+copy = { parent = "copy" }
+paste = { parent = "paste" }
+delete = { parent = "delete" }
+create-engine-blood = { label = "Blood", icon = "gears" }
+create-engine-duke = { label = "Duke", icon = "gears" }
+create-engine-fury = { label = "Ion Fury", icon = "gears" }
 
 [controls]
 check = { label = "Check", bind = " " }
@@ -64,7 +95,7 @@ undo = { label = "Undo", bind = "control+z" }
 enter = { label = "Enter", bind = "enter" }
 close = { parent = "close" }
 
-[arteditor]
+[art-editor]
 next = { parent = "navigate-next" }
 prev = { parent = "navigate-prev" }
 search = { label = "Search", bind = "/" }
@@ -72,8 +103,10 @@ next-plu = { label = "Next PalSwap", bind = "p" }
 prev-plu = { label = "Previous PalSwap", bind = "o" }
 reset-plu = { label = "Reset PalSwap", bind = "control+p" }
 center = { label = "Center Picture", bind = "backspace" }
-grid = { bind = "g" }
+toggle-grid = { bind = "g" }
+grid = { bind = "control+g" }
 grid-inc = { bind = "]" }
 grid-dec = { bind = "[" }
 toggle-repeat = { label = "Toggle Repeat", bind = "r" }
 toggle-scale = { label = "Toggle SuperSample", bind = "s" }
+copy = { parent = "copy" }

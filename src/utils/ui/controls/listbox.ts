@@ -30,7 +30,7 @@ export function listBox(hint: string, ico: string, oracle: Oracle<string>, handl
   let suggestModel: SuggestionModel = null;
   const suggestions = menu(input, suggestContainer);
   suggestions.setProps({ onHide: () => { input.value = handle.get() } })
-  handle.add(() => { input.value = handle.get(); suggestions.hide(); });
+  handle.subscribe(() => { input.value = handle.get(); suggestions.hide(); });
   const update = (it: Iterable<string>) => {
     const items = [...it];
     if (items.length == 0) return;

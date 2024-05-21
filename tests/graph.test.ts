@@ -1,4 +1,4 @@
-import { DirecredGraph, Links } from "../src/utils/graph";
+import { DirectionalGraph, Links } from "../src/utils/graph";
 
 
 function build<T>() {
@@ -11,7 +11,7 @@ function build<T>() {
 }
 
 test('graph', () => {
-  const graph = new DirecredGraph<string>();
+  const graph = new DirectionalGraph<string>();
   graph.add('a', 'b');
   graph.add('b', 'c');
   expect(graph.nodes).toStrictEqual(build().node('a', ['b'], []).node('b', ['c'], ['a']).node('c', [], ['b']).get());
@@ -36,7 +36,7 @@ test('graph', () => {
 });
 
 test('order', () => {
-  const graph = new DirecredGraph<string>();
+  const graph = new DirectionalGraph<string>();
   graph.add('a', 'd');
   graph.add('a', 'e');
   graph.add('b', 'd');
@@ -53,7 +53,7 @@ test('order', () => {
 });
 
 test('value dependency', () => {
-  const graph = new DirecredGraph<string>();
+  const graph = new DirectionalGraph<string>();
   graph.add('a', 'b');
   graph.add('b', 'c');
   graph.add('e', 'x');
@@ -62,7 +62,7 @@ test('value dependency', () => {
 });
 
 test('subgraph', () => {
-  const graph = new DirecredGraph<string>();
+  const graph = new DirectionalGraph<string>();
   graph.add('a', 'b');
   graph.add('b', 'c');
   graph.add('d', 'e');

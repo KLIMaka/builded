@@ -1,9 +1,23 @@
-import { struct, bits, Stream, array, ushort, atomic_array, ubyte, byte } from "../../utils/stream";
+import { range } from "@utils/collections";
+import { Stream, array, atomic_array, bits, byte, struct, ubyte, uint, ushort } from "../../utils/stream";
+import { iter } from "@utils/iter";
 
 export class ArtInfo {
   constructor(public w: number, public h: number, public attrs: Attributes, public img: Uint8Array) { }
 }
 
+export class Header {
+  version: number;
+  numtiles: number;
+  start: number;
+  end: number;
+}
+
+const headerStruct = struct(Header)
+  .field('version', uint)
+  .field('numtiles', uint)
+  .field('start', uint)
+  .field('end', uint);
 
 export enum AnimationType {
   NO_ANIMATION = 0,
@@ -13,108 +27,66 @@ export enum AnimationType {
 }
 
 export class Attributes {
-  public frames = 0;
-  public type = AnimationType.NO_ANIMATION;
-  public xoff = 0;
-  public yoff = 0;
-  public speed = 0;
-  public unk = 0;
+  frames = 0;
+  animType = AnimationType.NO_ANIMATION;
+  xoff = 0;
+  yoff = 0;
+  speed = 0;
+  type = 0;
 }
 
 export const EMPTY_INFO = new ArtInfo(0, 0, new Attributes(), new Uint8Array(0));
 
 export function animate(frame: number, info: ArtInfo) {
+  if (info.attrs.frames === 0) return 0;
   const max = info.attrs.frames + 1;
-  if (info.attrs.type == AnimationType.NO_ANIMATION) return 0;
-  else if (info.attrs.type == AnimationType.OSCILLATING_ANIMATION) {
+  if (info.attrs.animType === AnimationType.NO_ANIMATION) return 0;
+  else if (info.attrs.animType === AnimationType.OSCILLATING_ANIMATION) {
     const x = frame % (max * 2 - 2);
     return x >= max ? max * 2 - 2 - x : x;
-  } else if (info.attrs.type == AnimationType.ANIMATE_FORWARD) return frame % max;
-  else if (info.attrs.type == AnimationType.ANIMATE_BACKWARD) return max - frame % max;
+  } else if (info.attrs.animType === AnimationType.ANIMATE_FORWARD) return frame % max;
+  else if (info.attrs.animType === AnimationType.ANIMATE_BACKWARD) return max - frame % max;
 }
 
-var anumStruct = struct(Attributes)
+const anumStruct = struct(Attributes)
   .field('frames', bits(6))
-  .field('type', bits(2))
+  .field('animType', bits(2))
   .field('xoff', byte)
   .field('yoff', byte)
   .field('speed', bits(4))
-  .field('unk', bits(4));
+  .field('type', bits(4));
 
-export class ArtFile {
+export type ArtFile = {
+  header: Header,
+  arts: ArtInfo[]
+}
 
-  public offsets: number[];
-  public ws: number[];
-  public hs: number[];
-  public anums: Attributes[];
-  public start: number;
-  public end: number;
-  public size: number;
+function checkVersion(stream: Stream) {
+  const version = stream.readUInt();
+  if (version === 1) {
+    stream.setOffset(0); return;
+  } else if (version === 0x4c495542 && stream.readUInt() === 0x54524144) return; // BUILDART
+  throw new Error('Invalid Art File');
+}
 
-
-  constructor(private stream: Stream) {
-    var version = stream.readUInt();
-    var numtiles = stream.readUInt();
-    var start = stream.readUInt();
-    var end = stream.readUInt();
-    var size = end - start + 1;
-    var hs = array(ushort, size).read(stream);
-    var ws = array(ushort, size).read(stream);
-    var anums = array(anumStruct, size).read(stream);
-    var offsets = new Array<number>(size);
-    var offset = stream.mark();
-    for (var i = 0; i < size; i++) {
-      offsets[i] = offset;
-      offset += ws[i] * hs[i];
-    }
-
-    this.offsets = offsets;
-    this.ws = ws;
-    this.hs = hs;
-    this.anums = anums;
-    this.start = start;
-    this.end = end;
-    this.size = size;
-  }
-
-  public getInfo(id: number): ArtInfo {
-    var offset = this.offsets[id];
-    this.stream.setOffset(offset);
-    var w = this.ws[id];
-    var h = this.hs[id];
-    var anum = this.anums[id];
-    var pixels = atomic_array(ubyte, w * h).read(this.stream);
-    return new ArtInfo(h, w, anum, pixels);
-  }
-
-  public getStart(): number {
-    return this.start;
-  }
-
-  public getEnd(): number {
-    return this.end;
-  }
+export function readArtFile(buffer: ArrayBuffer): ArtFile {
+  const stream = new Stream(buffer);
+  checkVersion(stream);
+  const header = headerStruct.read(stream);
+  const size = header.end - header.start + 1;
+  const hs = array(ushort, size).read(stream);
+  const ws = array(ushort, size).read(stream);
+  const attrs = array(anumStruct, size).read(stream);
+  const arts = iter(range(0, size)).map(i => {
+    const w = ws[i];
+    const h = hs[i];
+    const attr = attrs[i];
+    const pixels = atomic_array(ubyte, w * h).read(stream);
+    return new ArtInfo(h, w, attr, pixels);
+  }).collect();
+  return { header, arts }
 }
 
 export interface ArtInfoProvider {
   getInfo(picnum: number): ArtInfo;
-}
-
-export class ArtFiles implements ArtInfoProvider {
-
-  constructor(private arts: ArtFile[]) { }
-
-  private getArt(id: number) {
-    for (const art of this.arts) {
-      if (id >= art.getStart() && id <= art.getEnd())
-        return art;
-    }
-    return null;
-  }
-
-  public getInfo(id: number): ArtInfo {
-    var art = this.getArt(id);
-    if (art == null) return EMPTY_INFO;
-    return art.getInfo(id - art.getStart());
-  }
 }

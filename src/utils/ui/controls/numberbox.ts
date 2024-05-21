@@ -145,6 +145,6 @@ export function numberBox(ui: Ui, value: Value<number>, model: NumberModel, widt
   input.event('focusout', _ => { value.set(editValue); ui.setTopActionsProvider(null); refresh(); root.asWidget().mod(clazz.remove('edit')) });
   let start = 0;
   dragElement(input.cast(), 'progress', (dx, dy) => { set(start - dx) }, () => { start = value.get(); }, () => { value.set(editValue); }, () => box.select());
-  value.add(refresh);
+  value.subscribe(refresh);
   return root.asWidget();
 }

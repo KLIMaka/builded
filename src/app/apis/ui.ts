@@ -42,7 +42,6 @@ export interface Layout extends Widget {
   widget(widget: Widget, size?: string): this;
   clazz(clazz: string, size?: string): this;
   classes(classes: string[], size?: string): this;
-  separator(): this;
   resizable(block: Block, size: number, min: number, max: number): this;
   clear(): void;
 }

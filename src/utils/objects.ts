@@ -1,5 +1,6 @@
+import Optional from "optional-js";
 import { cyclic } from "./mathutils";
-import { Supplier } from "./types";
+import { Function, Supplier } from "./types";
 
 export class LazyValue<T> {
   private initialized = false;
@@ -45,7 +46,7 @@ export class CyclicToggler<T> {
 
   set(value: T): T {
     const idx = this.values.indexOf(value);
-    if (idx != -1) this.index = idx;
+    if (idx !== -1) this.index = idx;
     return value;
   }
 }
@@ -58,4 +59,19 @@ export function cyclicToggler<T>(values: T[], currentValue: T) {
 
 export function promisify<T>(f: Supplier<T>): Supplier<Promise<T>> {
   return async () => f();
+}
+
+export function applyDefaults<T>(value: T, def: T) {
+  return { ...def, ...value };
+}
+
+type Optionalify<T> = { [P in keyof T]: Optional<T[P]> };
+export function andOptional<T extends any[]>(...opts: Optionalify<T>): Optional<T> {
+  if (opts.find(o => !o.isPresent()) !== undefined) return Optional.empty();
+  return Optional.of(opts.map(o => o.get()) as T)
+}
+
+export async function asyncFlatMapOptional<T, U>(src: Optional<T>, mapper: Function<T, Promise<Optional<U>>>): Promise<Optional<U>> {
+  if (!src.isPresent()) return Optional.empty();
+  return await mapper(src.get());
 }

@@ -54,7 +54,7 @@ export class RffFile {
     this.fat = array(fatRecord, numFiles).read(stream);
     this.fat.forEach(r => {
       r.filename = this.convertFname(r.filename);
-      this.namesTable.set(r.filename.toLocaleLowerCase(), r);
+      this.namesTable.set(r.filename.toLowerCase(), r);
     });
   }
 

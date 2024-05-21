@@ -1,6 +1,6 @@
 import { Timer } from "../app/apis/app1";
 import { int } from "./mathutils";
-import { Supplier } from "./types";
+import { Consumer, Supplier } from "./types";
 
 const MS_IN_SEC = 1000;
 const MS_IN_MIN = MS_IN_SEC * 60;
@@ -49,5 +49,13 @@ export class StopWatch {
 
   print(): string {
     return printTime(this.get());
+  }
+}
+
+export function debounced(f: Consumer<void>, delayMs: number) {
+  let timeoutId = null;
+  return () => {
+    if (timeoutId) clearTimeout(timeoutId);
+    timeoutId = setTimeout(f, delayMs);
   }
 }

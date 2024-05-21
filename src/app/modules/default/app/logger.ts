@@ -9,8 +9,7 @@ class LoggerImpl implements Logger {
 
   addHandler(handler: LogHandler): Disconnector {
     this.handlers.add(handler);
-    const remove = () => this.handlers.delete(handler);
-    return { remove };
+    return () => this.handlers.delete(handler);
   }
 }
 

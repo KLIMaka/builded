@@ -14,7 +14,8 @@ module.exports = api => {
     : {
       presets: [
         ['@babel/preset-env', { modules: false, targets: { chrome: 100 }, loose: true }],
-        '@babel/preset-typescript'
+        '@babel/preset-typescript',
+        '@babel/preset-react'
       ],
       plugins: [
         ['@babel/plugin-transform-typescript', { allowDeclareFields: true }],

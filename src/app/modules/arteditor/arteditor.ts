@@ -1,22 +1,22 @@
 import { int } from "@utils/mathutils";
+import { cyclicToggler } from "@utils/objects";
 import { Consumer, Function, Supplier } from "@utils/types";
 import { INT_MODEL, NumberModelBuilder, numberBox } from "@utils/ui/controls/numberbox";
+import { props, widgetProp } from "@utils/ui/renderers";
 import { Action, ActionDescriptors } from "app/apis/actions";
 import { ArtProvider, EngineContext, Palette, PicTags } from "app/apis/engine";
 import Optional from "optional-js";
-import { art } from "../../build/artraster";
-import { ArtInfo, Attributes, animate } from "../../build/formats/art";
-import { Source, handle, transformed, tuple, value } from "../../utils/callbacks";
-import { range } from "../../utils/collections";
-import { iter } from "../../utils/iter";
-import { Raster, Rasterizer, palRasterizer, rect, rectRepeat, resize, superResize, transform } from "../../utils/pixelprovider";
-import { DrawPanel, ScrollType } from "../../utils/ui/drawpanel";
-import { ActionsWidget, Block, Ui, Window, WindowBuilder, blockActions, style } from "../apis/ui";
-import { PicNumCallback } from "../edit/tools/selection";
-import { Workplane, WorkplaneRendererBuilder, createImageDataCache, renderGrid } from "./painter/workplane";
-import { listBuilder, singleActionWidget, suggestedTextBox } from "./ui/builders";
-import { cyclicToggler, toggler } from "@utils/objects";
-import { props, widgetProp } from "@utils/ui/renderers";
+import { art } from "../../../build/artraster";
+import { ArtInfo, Attributes, animate } from "../../../build/formats/art";
+import { Source, handle, transformed, tuple, value } from "../../../utils/callbacks";
+import { range } from "../../../utils/collections";
+import { iter } from "../../../utils/iter";
+import { Raster, Rasterizer, palRasterizer, rect, rectRepeat, resize, superResize, transform } from "../../../utils/pixelprovider";
+import { DrawPanel, ScrollType } from "../../../utils/ui/drawpanel";
+import { ActionsWidget, Block, Ui, Window, WindowBuilder, blockActions, style } from "../../apis/ui";
+import { PicNumCallback } from "../../edit/tools/selection";
+import { Workplane, WorkplaneRendererBuilder, createImageDataCache, renderGrid } from "../painter/workplane";
+import { listBuilder, singleActionWidget, suggestedTextBox } from "../ui/builders";
 
 function createDrawPanel(
   rasterizer: Rasterizer<number>,
@@ -27,7 +27,7 @@ function createDrawPanel(
 ) {
   const rasters = rasterProvider.get();
   const panel = new DrawPanel(canvas, iter, rasters, rasterizer, 0, cb);
-  rasterProvider.add(p => panel.setSource(p));
+  rasterProvider.subscribe(p => panel.setSource(p));
   return panel;
 }
 
@@ -113,7 +113,7 @@ export class ArtEditor {
       .actions(this.actions);
     this.window = ui.createWindow(builder);
 
-    this.filter.add(() => this.updateFilter());
+    this.filter.subscribe(() => this.updateFilter());
     let animHandle = -1;
     handle(null, (p, mainFrame) => {
       this.animationFrame.set(0);
@@ -121,7 +121,7 @@ export class ArtEditor {
       if (mainFrame.attrs.frames == 0) return;
       const speed = Math.pow(2, mainFrame.attrs.speed) * 10;
       animHandle = window.setInterval(() => this.animationFrame.set(this.animationFrame.get() + 1), speed);
-      p.add(() => { if (animHandle != -1) clearTimeout(animHandle) });
+      p.subscribe(() => { if (animHandle != -1) clearTimeout(animHandle) });
     }, this.mainFrameInfo);
 
     this.actions.push(this.aCtx.bindSync('toggle-repeat', () => this.repeat.set(!this.repeat.get())));
@@ -171,7 +171,7 @@ export class ArtEditor {
   private createGridRenderer(): WorkplaneRendererBuilder {
     return (canvas, ctx) => {
       const renderer = () => renderGrid(canvas, ctx, this.gridSize.get(), this.gridSize.get() * this.gridSize.get());
-      this.gridSize.add(_ => renderer());
+      this.gridSize.subscribe(_ => renderer());
       return renderer;
     }
   }
@@ -265,7 +265,7 @@ export class ArtEditor {
 
   private createPalSelectingMenu() {
     const toggler = cyclicToggler([...this.plus.get().keys()], this.currentPlu.get());
-    this.currentPlu.add(plu => toggler.set(plu));
+    this.currentPlu.subscribe(plu => toggler.set(plu));
     this.actions.push(this.aCtx.bindSync('next-plu', () => this.currentPlu.set(toggler.toggleNext())));
     this.actions.push(this.aCtx.bindSync('prev-plu', () => this.currentPlu.set(toggler.togglePrev())));
     this.actions.push(this.aCtx.bindSync('reset-plu', () => this.currentPlu.set(0)));
@@ -281,7 +281,7 @@ export class ArtEditor {
   private gridControl() {
     const sizes = [0, 4, 8, 16, 32, 64, 128, 256];
     const sizesToggler = cyclicToggler(sizes, this.gridSize.get());
-    this.gridSize.add(value => sizesToggler.set(value));
+    this.gridSize.subscribe(value => sizesToggler.set(value));
     const box = listBuilder(this.ui, this.gridSize)
       .items(sizes)
       .renderer(s => s == 0 ? 'None' : `${s}px`)

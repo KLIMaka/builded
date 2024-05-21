@@ -7,10 +7,7 @@ import { Action, ActionHandler, ActionsProvider } from "app/apis/actions";
 import { ActionsList, ActionsWidget, Block, BlockBuilder, ElemMod, GroupsModel, Menu, Selector, TableColumn, TableModel, Ui, Widget, WidgetRenderer, clazz } from "app/apis/ui";
 import { Bind } from "app/input/keymap";
 import Optional from "optional-js";
-import { ActionsListImpl } from "./actions-list";
 import { GroupsModelImpl } from "./groups";
-import { MenuImpl } from "./menu";
-import { TableModelImpl } from "./table";
 
 export function rowGroup<T>(ui: Ui, rootClass?: string[], itemClass?: string[], renderer: Function<T, Block> = item => ui.block().text(item.toString())): GroupsModel<T> {
   return new GroupsModelImpl(
@@ -207,7 +204,7 @@ function list<T>(ui: Ui, values: Supplier<Iterable<T>>, value: Value<T>, rendere
   const oracle = (s: string) => iter(values())
     .filter(n => renderer(n).toLowerCase().startsWith(s.toLowerCase()))
     .map(n => getOrCreate(cache, n, createWidget));
-  value.add(v => { label.text(labelRenderer(v)); selected = cache.get(v) });
+  value.subscribe(v => { label.text(labelRenderer(v)); selected = cache.get(v) });
   return suggestionBox(ui, label, oracle, w => selected == w, search);
 }
 
@@ -284,7 +281,7 @@ export function suggestedTextBox(ui: Ui, value: Value<string>, oracle: Oracle<Ac
     .insert(textBox, '1')
     .insert(clear);
   const input: HTMLInputElement = textBox.cast();
-  value.add(v => { input.value = v; clear.mod(e => e.style.display = v.length == 0 ? 'none' : 'block') });
+  value.subscribe(v => { input.value = v; clear.mod(e => e.style.display = v.length == 0 ? 'none' : 'block') });
   return {
     asWidget: () => root.asWidget(),
     focus: () => input.focus()

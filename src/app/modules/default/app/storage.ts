@@ -81,7 +81,7 @@ class StorageImpl implements Storage {
       request.onsuccess = () => {
         const cursor = request.result;
         if (!cursor) return ok(values);
-        values.push(cursor.value);
+        values.push(cursor.value.data);
         cursor.continue();
       }
       request.onerror = e => error(e);

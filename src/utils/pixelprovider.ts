@@ -8,7 +8,7 @@ export interface Raster<P> {
 
 export type Rasterizer<P> = (raster: Raster<P>, out: Uint8Array | Uint8ClampedArray | number[]) => void;
 
-export function palRasterizer(pal: ArrayLike<number>): Rasterizer<number> {
+export function palRasterizer(pal: ArrayLike<number>, trans = 255, transColor = [0, 0, 0, 255]): Rasterizer<number> {
   return (raster, out) => {
     const w = raster.width;
     const h = raster.height;
@@ -16,13 +16,18 @@ export function palRasterizer(pal: ArrayLike<number>): Rasterizer<number> {
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         const color = raster.pixel(x, y);
-        if (color != 255) {
+        if (color !== trans) {
           const palIdx = color * 3;
           out[off + 0] = pal[palIdx + 0];
           out[off + 1] = pal[palIdx + 1];
           out[off + 2] = pal[palIdx + 2];
+          out[off + 3] = 255;
+        } else {
+          out[off + 0] = transColor[0];
+          out[off + 1] = transColor[1];
+          out[off + 2] = transColor[2];
+          out[off + 3] = transColor[3];
         }
-        out[off + 3] = 255;
         off += 4;
       }
     }
@@ -46,7 +51,7 @@ export class ConstRaster<P> implements Raster<P> {
 
 export class ArrayRaster<P> implements Raster<P> {
   constructor(readonly width: number, readonly height: number, private pixels: ArrayLike<P>) {
-    if (pixels.length != width * height) throw new Error(`Invalid dimensions`);
+    if (pixels.length !== width * height) throw new Error(`Invalid dimensions`);
   }
   pixel(x: number, y: number) { return this.pixels[int(y) * this.width + int(x)] };
 }
@@ -54,7 +59,7 @@ export class ArrayRaster<P> implements Raster<P> {
 export type Mapper = (r: number, g: number, b: number, a: number) => number;
 export class F32RGBAArrayRaster implements Raster<number> {
   constructor(readonly width: number, readonly height: number, private pixels: Float32Array, private mapper: Mapper) {
-    if (pixels.length != width * height * 4) throw new Error('Invalid dimensions');
+    if (pixels.length !== width * height * 4) throw new Error('Invalid dimensions');
   }
 
   pixel(x: number, y: number): number {
@@ -81,6 +86,16 @@ export class AxisSwapRaster<P> implements Raster<P> {
     this.height = src.width;
   }
   pixel(x: number, y: number) { return this.src.pixel(y, x) };
+}
+
+export class Mirror<P> implements Raster<P> {
+  readonly width: number;
+  readonly height: number;
+  constructor(private src: Raster<P>, private xmirrored: boolean, private ymirrored: boolean) {
+    this.width = src.width;
+    this.height = src.height;
+  }
+  pixel(x: number, y: number) { return this.src.pixel(this.xmirrored ? this.width - x : x, this.ymirrored ? this.height - y : y) };
 }
 
 export class RectRaster<P> implements Raster<P> {
@@ -135,12 +150,10 @@ function dithOffset(x: number, y: number) {
 }
 
 export class SuperResizeRaster<P> implements Raster<P> {
-  private readonly dx: number;
-  private readonly dy: number;
-  private readonly hdx: number;
-  private readonly hdy: number;
-  private readonly maxw: number;
-  private readonly maxh: number;
+  private dx: number;
+  private dy: number;
+  private maxw: number;
+  private maxh: number;
 
   constructor(
     private src: Raster<P>,
@@ -151,15 +164,13 @@ export class SuperResizeRaster<P> implements Raster<P> {
   ) {
     this.dx = src.width / this.width;
     this.dy = src.height / this.height;
-    this.hdx = this.dx / 2;
-    this.hdy = this.dy / 2;
     this.maxw = src.width - 1;
     this.maxh = src.height - 1;
   }
 
   pixel(x: number, y: number): P {
-    const nx = x * this.dx + this.hdx;
-    const ny = y * this.dy + this.hdy;
+    const nx = x * this.dx;
+    const ny = y * this.dy;
     const inx = int(nx);
     const iny = int(ny);
     const doff = dithOffset(x, y);
@@ -193,12 +204,12 @@ export function axisSwap<P>(src: Raster<P>) {
 }
 
 export function rect<P>(src: Raster<P>, sx: number, sy: number, ex: number, ey: number, padd: P) {
-  if (sx == 0 && sy == 0 && src.height == ey && src.width == ex) return src;
+  if (sx === 0 && sy === 0 && src.height === ey && src.width === ex) return src;
   return new RectRaster(src, sx, sy, ex, ey, (x, y, r) => padd);
 }
 
 export function rectRepeat<P>(src: Raster<P>, sx: number, sy: number, ex: number, ey: number) {
-  if (sx == 0 && sy == 0 && src.height == ey && src.width == ex) return src;
+  if (sx === 0 && sy === 0 && src.height === ey && src.width === ex) return src;
   return new RectRaster(src, sx, sy, ex, ey, (x, y, r) => r.pixel(x, y));
 }
 
@@ -209,17 +220,33 @@ export function center<P>(src: Raster<P>, w: number, h: number, padd: P) {
 }
 
 export function resize<P>(src: Raster<P>, w: number, h: number) {
-  if (src.height == h && src.width == w) return src;
+  if (src.height === h && src.width === w) return src;
   return new ResizeRaster(src, w, h);
 }
 
 export function superResize<P>(src: Raster<P>, w: number, h: number, op1: PixelOperator<P>, op2: PixelOperator<P>) {
-  if (src.height == h && src.width == w) return src;
+  if (src.height === h && src.width === w) return src;
   return new SuperResizeRaster(src, w, h, op1, op2);
 }
 
+export function constColor<P>(w: number, h: number, color: P) {
+  return new ConstRaster<P>(w, h, color);
+}
+
+export function mirrorX<P>(src: Raster<P>) {
+  return new Mirror<P>(src, true, false);
+}
+
+export function mirrorY<P>(src: Raster<P>) {
+  return new Mirror<P>(src, false, true);
+}
+
+export function mirrorXY<P>(src: Raster<P>) {
+  return new Mirror<P>(src, true, true);
+}
+
 export function fit<P>(w: number, h: number, src: Raster<P>, padd: P) {
-  if (src.height == h && src.width == w) return src;
+  if (src.height === h && src.width === w) return src;
   if (src.width <= w && src.height <= h) {
     const sx = int((src.width - w) / 2);
     const sy = int((src.height - h) / 2);

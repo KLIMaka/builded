@@ -12,12 +12,15 @@
     "rootDir": "src",
     "sourceMap": true,
     "moduleResolution": "node",
-    "jsx": "preserve",
+    "jsx": "react",
     "allowJs": true,
     "baseUrl": "./src",
     "paths": {
       "@utils/*": [
         "utils/*"
+      ],
+      "@ui/*": [
+        "app/modules/ui/*"
       ]
     },
     "allowSyntheticDefaultImports": true,

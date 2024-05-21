@@ -96,35 +96,35 @@ export class Element {
   public next(nth = 0): Element {
     let next = this.element.nextElementSibling;
     for (; next != null && nth > 0; next = next.nextElementSibling, nth--);
-    return next == null ? null : new Element(<HTMLElement>next);
+    return next == null ? null : new Element(next as HTMLElement);
   }
 
   public nextValid(nth = 0): Element {
     let next: globalThis.Element = this.element;
     for (; next != null && nth >= 0 && next.nextElementSibling != null; next = next.nextElementSibling, nth--);
-    return next == this.element ? this : new Element(<HTMLElement>next);
+    return next === this.element ? this : new Element(next as HTMLElement);
   }
 
   public prev(nth = 0): Element {
     let prev = this.element.previousElementSibling;
     for (; prev != null && nth > 0; prev = prev.previousElementSibling, nth--);
-    return prev == null ? null : new Element(<HTMLElement>prev);
+    return prev == null ? null : new Element(prev as HTMLElement);
   }
 
   public prevValid(nth = 0): Element {
     let prev: globalThis.Element = this.element;
     for (; prev != null && nth >= 0 && prev.previousElementSibling != null; prev = prev.previousElementSibling, nth--);
-    return prev == this.element ? this : new Element(<HTMLElement>prev);
+    return prev === this.element ? this : new Element(prev as HTMLElement);
   }
 
   public child(): Element {
     const child = this.element.firstElementChild;
-    return child == null ? null : new Element(<HTMLElement>child);
+    return child == null ? null : new Element(child as HTMLElement);
   }
 
   public change(cb: (s: string) => void): Element {
     this.element.oninput = (e) => {
-      cb((<HTMLInputElement>e.target).value);
+      cb((e.target as HTMLInputElement).value);
     };
     return this;
   }
@@ -213,10 +213,7 @@ export function stopPropagation(e: Event) {
 export function addDragAndDrop(elem: HTMLElement, dropHandler: (e: DragEvent) => void) {
   elem.addEventListener("dragenter", stopPropagation, false);
   elem.addEventListener("dragover", stopPropagation, false);
-  elem.addEventListener("drop", (e) => {
-    stopPropagation(e);
-    dropHandler(e);
-  }, false);
+  elem.addEventListener("drop", (e) => { stopPropagation(e); dropHandler(e); }, false);
 }
 
 export function replaceContent(root: HTMLElement, newchild: HTMLElement) {
@@ -236,11 +233,11 @@ export function addDragController(elem: HTMLElement, controller: DragController)
   let oldx = 0;
   let oldy = 0;
   elem.addEventListener('mousemove', e => {
-    isDrag = e.buttons == 2;
+    isDrag = e.buttons === 2;
     if (isDrag) {
       const dx = e.x - oldx;
       const dy = e.y - oldy;
-      if (dx != 0 || dy != 0) controller(e.x, e.y, dx, dy, 1);
+      if (dx !== 0 || dy !== 0) controller(e.x, e.y, dx, dy, 1);
     }
     oldx = e.x;
     oldy = e.y;

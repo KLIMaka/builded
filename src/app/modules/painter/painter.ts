@@ -2,7 +2,7 @@ import { cyclicToggler } from "@utils/objects";
 import { Consumer, Supplier, nil } from "@utils/types";
 import { Action, ActionDescriptors } from "app/apis/actions";
 import { Scheduler, TaskController, TaskHandle } from "app/apis/app1";
-import { CallbackChannelImpl, CallbackHandlerImpl, transformed, value } from "../../../utils/callbacks";
+// import { CallbackChannelImpl, transformed, value } from "../../../utils/callbacks";
 import { chain, getOrCreate, mapBuilder } from "../../../utils/collections";
 import { Range, Vec3Interpolator } from "../../../utils/interpolator";
 import { iter } from "../../../utils/iter";
@@ -168,9 +168,9 @@ export class Painter implements Context {
     this.actionsContext = actions.sub('painter');
     this.buffer = this.createBuffer();
     this.renderer = new Image2dRenderer(scheduler, this._stack, this.buffer, this.bufferSize, this.createProgressHandler());
-    this.renderer.add(_ => this.redraw());
-    this.currentImage.add(img => this.renderer.set(img.renderer))
-    this.limiter.add(lmt => { this.limiters.set(this.currentImage.get(), lmt); this.redraw() });
+    this.renderer.subscribe(_ => this.redraw());
+    this.currentImage.subscribe(img => this.renderer.set(img.renderer))
+    this.limiter.subscribe(lmt => { this.limiters.set(this.currentImage.get(), lmt); this.redraw() });
 
     const builder = new WindowBuilder()
       .title(_ui.block().text('Painter'))
@@ -203,7 +203,7 @@ export class Painter implements Context {
       .add(this.VECTOR, 'Vector')
       .build();
     const modesToggler = cyclicToggler([...modes.keys()], this.limiter.get());
-    this.limiter.add(l => modesToggler.set(l));
+    this.limiter.subscribe(l => modesToggler.set(l));
     const box = listBuilder(this._ui, this.limiter)
       .items([...modes.keys()])
       .labelMod(style.width('90px'))
@@ -387,7 +387,7 @@ export class Painter implements Context {
   private createGridRenderer(): WorkplaneRendererBuilder {
     return (canvas, ctx) => {
       const renderer = () => renderGrid(canvas, ctx, this.gridSize.get(), this.bufferSize);
-      this.gridSize.add(_ => renderer());
+      this.gridSize.subscribe(_ => renderer());
       return renderer;
     }
   }
@@ -395,7 +395,7 @@ export class Painter implements Context {
   private gridControl() {
     const sizes = ["0", "1", "2", "3", "4", "5", "6", "12"];
     const sizesToggler = cyclicToggler(sizes, this.gridSizeName.get());
-    this.gridSizeName.add(value => sizesToggler.set(value));
+    this.gridSizeName.subscribe(value => sizesToggler.set(value));
     const box = listBuilder(this._ui, this.gridSizeName)
       .items(sizes)
       .labelPrefix('Grid: ')

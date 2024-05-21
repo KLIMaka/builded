@@ -9,7 +9,7 @@ export interface Collection<T> extends Iterable<T> {
 
 export function last<T>(c: Collection<T>): T { return c.get(c.length() - 1) }
 export function first<T>(c: Collection<T>): T { return c.get(0) }
-export function isEmpty<T>(c: Collection<T>): boolean { return c.length() == 0 }
+export function isEmpty<T>(c: Collection<T>): boolean { return c.length() === 0 }
 
 export interface MutableCollection<T> extends Collection<T> {
   set(idx: number, value: T): void;
@@ -52,7 +52,7 @@ export class ArrayWrapper<T> implements MutableCollection<T> {
 }
 export function wrap<T>(array: T[]) { return new ArrayWrapper(array) }
 
-export class Deck<T> implements MutableCollection<T>{
+export class Deck<T> implements MutableCollection<T> {
   private array: T[] = [];
   private size = 0;
 
@@ -99,13 +99,13 @@ export class Deck<T> implements MutableCollection<T>{
 
   public [Symbol.iterator]() {
     let i = 0;
-    return this.size == 0
+    return this.size === 0
       ? EMPTY_ITERATOR
-      : { next: () => { return iteratorResult(i == this.size, this.array[i++]) } }
+      : { next: () => { return iteratorResult(i === this.size, this.array[i++]) } }
   }
 }
 
-export class IndexedDeck<T> extends Deck<T>{
+export class IndexedDeck<T> extends Deck<T> {
   private index = new Map<T, number>();
 
   public push(value: T): IndexedDeck<T> {
@@ -133,7 +133,7 @@ export class IndexedDeck<T> extends Deck<T>{
   }
 
   public hasAny(i: Iterable<T>): boolean {
-    for (const v of i) if (this.indexOf(v) != -1) return true;
+    for (const v of i) if (this.indexOf(v) !== -1) return true;
     return false;
   }
 }
@@ -246,7 +246,7 @@ export function* enumerate<T>(c: Iterable<T>): Generator<[T, number]> {
 
 export function* range(start: number, end: number): Generator<number> {
   const di = start > end ? -1 : 1;
-  for (let i = start; i != end; i += di) yield i;
+  for (let i = start; i !== end; i += di) yield i;
 }
 
 export function* cyclicRange(start: number, length: number) {
@@ -382,13 +382,13 @@ export function* flatten<T>(i: Iterable<T>): Generator<Deiterable<T>> {
 
 export function toMap<T, K, V>(i: Iterable<T>, keyMapper: Function<T, K>, valueMapper: Function<T, V>): Map<K, V> {
   const map = new Map<K, V>();
-  for (const item of i) { map.set(keyMapper(item), valueMapper(item)) }
+  for (const item of i) map.set(keyMapper(item), valueMapper(item))
   return map;
 }
 
 export function getOrCreate<K, V>(map: Map<K, V>, key: K, value: (k: K) => V) {
   let v = map.get(key);
-  if (v == undefined) {
+  if (v === undefined) {
     v = value(key);
     map.set(key, v);
   }
@@ -397,7 +397,7 @@ export function getOrCreate<K, V>(map: Map<K, V>, key: K, value: (k: K) => V) {
 
 export function getOrDefault<K, V>(map: Map<K, V>, key: K, def: V) {
   const v = map.get(key);
-  return v == undefined ? def : v;
+  return v === undefined ? def : v;
 }
 
 export interface MapBuilder<K, V> {

@@ -1,7 +1,7 @@
-import Optional from "optional-js";
+import { Source } from "@utils/callbacks";
 import { Dependency } from "@utils/injector";
+import Optional from "optional-js";
 import { Disconnector } from "./app1";
-import { Consumer } from "@utils/types";
 
 export type FileInfo = {
   name: string,
@@ -24,10 +24,10 @@ export interface FileSystem {
 }
 
 export interface FileSystems {
+  readonly list: Source<string[]>;
+
   mount(name: string, fs: FileSystem): void;
-  list(): string[];
   get(name: string): Optional<FileSystem>;
-  subscribe(handler: Consumer<void>): Disconnector;
 }
 
 export type FileSystemHandler = (name: string, deleted: boolean) => void;

@@ -94,6 +94,7 @@ undo = { label = "Undo", bind = "control+z" }
 [controls.textbox]
 enter = { label = "Enter", bind = "enter" }
 close = { parent = "close" }
+suggestions = { bind = "arrowdown" }
 
 [art-editor]
 next = { parent = "navigate-next" }

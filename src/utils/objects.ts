@@ -75,3 +75,7 @@ export async function asyncFlatMapOptional<T, U>(src: Optional<T>, mapper: Funct
   if (!src.isPresent()) return Optional.empty();
   return await mapper(src.get());
 }
+
+export function strcmpci(str1: string, str2: string) {
+  return str1.toLowerCase() === str2.toLowerCase();
+}

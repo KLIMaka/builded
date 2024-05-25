@@ -1,22 +1,25 @@
 import { ActionDescriptorsContext, ActionsChannelContext, Column, CurrentActionsChannelContext, Row, Spacer, styles, useValue } from "@ui/commons";
 import { MenuButton } from "@ui/menu-button";
 import { SearchBox, SearchBoxRef } from "@ui/search-box";
-import { Disconnector, Source, transformed, value } from "@utils/callbacks";
+import { Disconnector, Source, Value, transformed, value } from "@utils/callbacks";
+import { getOrDefault } from "@utils/collections";
 import { int } from "@utils/mathutils";
 import { Consumer, Function } from "@utils/types";
 import { Window } from "app/apis/ui1";
-import React, { MouseEvent, WheelEvent, useContext, useEffect, useRef } from "react";
+import { AnimationType, EMPTY_INFO } from "build/formats/art";
+import React, { MouseEvent, WheelEvent, useContext, useEffect, useMemo, useRef } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { AutoSizer, Grid, GridCellRenderer } from "react-virtualized";
 import WinBox from "react-winbox";
 import { ArtEditorContext, ArtEditorImpl } from "./model";
-import { AnimationType } from "build/formats/art";
+import { ActionItem } from "@ui/action-list";
+import { iter } from "@utils/iter";
 
 export type WorkplaneBuilder = Function<HTMLCanvasElement, Disconnector>;
 
 function Art({ src, size, picnum }: { src: Source<string>, size: number, picnum: number }) {
   const artEditor = useContext(ArtEditorContext);
-  const info = artEditor.artFiles.get().get(picnum);
+  const { info, artFile } = getOrDefault(artEditor.artFiles.get(), picnum, { info: EMPTY_INFO, artFile: "" });
   const url = useValue(src);
   const selected = useValue(artEditor.currentId);
   return <div className={`column-block art-preview ${styles({ selected: selected === picnum })}`}>
@@ -24,8 +27,9 @@ function Art({ src, size, picnum }: { src: Source<string>, size: number, picnum:
     <div className="row-block art-preview-picnum">
       <div className="flex-fill" >{picnum}</div>
     </div>
-    <div style={{ fontSize: '10px', position: 'absolute', padding: '2px 2px', left: 10 }}>{info?.w}x{info?.h}</div>
-    {info?.attrs.animType !== AnimationType.NO_ANIMATION && info?.attrs.frames !== 0
+    <div style={{ fontSize: '10px', position: 'absolute', padding: '2px 2px', left: 10 }}>{info.w}x{info.h}</div>
+    <div style={{ fontSize: '10px', position: 'absolute', padding: '2px 2px', left: 10, bottom: 13 }}>{artFile.substring(5, 8)}</div>
+    {info.attrs.animType !== AnimationType.NO_ANIMATION && info.attrs.frames !== 0
       ? <div className="fa-solid fa-video" style={{ fontSize: '10px', position: 'absolute', padding: '2px 2px', right: 10 }} />
       : <></>}
   </div>;
@@ -163,6 +167,15 @@ export function ArtEditorUiImpl({ onClose, windowConsumer }: { onClose: Consumer
     );
   }, [actionDescriptors, artEditor, channel, gridMenu, windowConsumer]);
 
+  const tags = useValue(artEditor.tags);
+  const searchOracle = (q: Value<string>): ActionItem[] => {
+    const action = (query: string) => q.set(query);
+    return iter(tags.allTags())
+      .filter(tag => tag.toLowerCase().startsWith(q.get().toLowerCase()))
+      .map(tag => { return { action: () => action(tag), element: <div>{tag}</div> } as ActionItem })
+      .collect()
+  };
+
   return (
     <ActionsChannelContext.Provider value={channel}>
       <WinBox
@@ -186,7 +199,7 @@ export function ArtEditorUiImpl({ onClose, windowConsumer }: { onClose: Consumer
             <MenuButton openValue={pluMenu} label={pluLabel} items={artEditor.pluItems} />
             <MenuButton openValue={gridMenu} label={gridLabel} items={artEditor.gridSizes} />
             <Spacer />
-            <SearchBox ref={searchRef} value={artEditor.filter} channelName='search' />
+            <SearchBox ref={searchRef} value={artEditor.filter} channelName='search' oracle={searchOracle} />
           </Row>
           <PanelGroup direction={"horizontal"} className="flex-fill">
             <Panel className="column-block">

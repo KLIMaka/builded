@@ -400,6 +400,11 @@ export function getOrDefault<K, V>(map: Map<K, V>, key: K, def: V) {
   return v === undefined ? def : v;
 }
 
+export function getOrDefaultMap<K, V, V1>(map: Map<K, V>, key: K, mapper: Function<V, V1>, def: V1) {
+  const v = map.get(key);
+  return v === undefined ? def : mapper(v);
+}
+
 export interface MapBuilder<K, V> {
   add(k: K, v: V): this;
   build(): Map<K, V>;

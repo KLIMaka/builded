@@ -1,4 +1,4 @@
-import { Disconnector, Source, transformed, transformedAsync, value } from "@utils/callbacks";
+import { Source, Value, transformed, transformedAsync } from "@utils/callbacks";
 import { Function } from "@utils/types";
 import { NamedArtFile } from "app/apis/engine";
 import { FileSystem } from "app/apis/fs";
@@ -35,19 +35,13 @@ async function loadArts(fs: FileSystem): Promise<NamedArtFile[]> {
 }
 
 export async function loadArt(fs: Source<FileSystem>): Promise<Source<NamedArtFile[]>> {
-  const files = value(await loadArts(fs.get()));
-
   const addFile = (filesDraft: Draft<NamedArtFile[]>, file: NamedArtFile) => {
     const idx = filesDraft.findIndex(f => f.name === file.name);
     if (idx === -1) filesDraft.push(file)
     else filesDraft[idx] = file;
   }
-
-  let fsDisconnector: Disconnector;
-  fs.subscribe(async fs => {
-    files.set(await loadArts(fs));
-    fsDisconnector?.();
-    fsDisconnector = fs.subscribe(async (fn, deleted) => {
+  const subscriber = (fs: FileSystem, files: Value<NamedArtFile[]>) => {
+    return fs.subscribe(async (fn, deleted) => {
       if (fn.match(TILES_REGEXP)) {
         const name = fn.toUpperCase();
         if (deleted) {
@@ -58,7 +52,7 @@ export async function loadArt(fs: Source<FileSystem>): Promise<Source<NamedArtFi
           files.modImmer(fs => addFile(fs, { name, art }));
         }
       }
-    })
-  });
-  return files;
+    });
+  }
+  return transformedAsync(fs, loadArts, subscriber)
 }

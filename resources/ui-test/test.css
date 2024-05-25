@@ -744,10 +744,13 @@
   border: none;
   padding: 0px 5px;
   min-width: 0px;
+  transition: width 0.3s;
+  width: 150px;
 }
 
 .text-box>input:focus-visible {
   outline: none;
+  width: 200px;
 }
 
 .text-box:hover {

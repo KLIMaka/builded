@@ -1,7 +1,7 @@
 import { ActionItem } from "@ui/action-list";
 import { ActionsNode } from "@ui/commons";
 import { Source, Value, transformed, transformedAsyncImmediate, tuple, value } from "@utils/callbacks";
-import { getOrCreate, getOrDefault, range } from "@utils/collections";
+import { getOrCreate, getOrDefaultMap, range } from "@utils/collections";
 import { createCanvas, drawToCanvas, renderGrid } from "@utils/imgutils";
 import { Dependency, Injector, getInstances } from "@utils/injector";
 import { iter } from "@utils/iter";
@@ -78,6 +78,11 @@ type RenderInfo = {
   type: RenderType,
 }
 
+type ArtDetailedInfo = {
+  info: ArtInfo,
+  artFile: string,
+}
+
 export class ArtEditorImpl implements ArtEditor {
   private channel: ActionsNode;
   readonly filter = value("");
@@ -88,7 +93,7 @@ export class ArtEditorImpl implements ArtEditor {
   private superSample = value(false);
   private repeat = value(false);
   private showEmpty = value(false);
-  readonly artFiles: Source<Map<number, ArtInfo>>;
+  readonly artFiles: Source<Map<number, ArtDetailedInfo>>;
   readonly picnums: Source<number[]>;
   readonly filteredPicnums: Source<number[]>;
   private mainFrameInfo: Source<ArtInfo>;
@@ -116,7 +121,7 @@ export class ArtEditorImpl implements ArtEditor {
     private pal: Source<Uint8Array>,
     private trans: Source<Uint8Array>,
     readonly plus: Source<Map<number, Palette>>,
-    private tags: Source<PicTags>,
+    readonly tags: Source<PicTags>,
     private shadowsteps: number
   ) {
     this.gridSize = value(state.get().grid);
@@ -124,9 +129,10 @@ export class ArtEditorImpl implements ArtEditor {
     this.rasterizer = palRasterizer(pal.get());
     this.artFiles = transformed(this.art, art => this.updateArtCache(art));
     this.picnums = transformed(tuple(this.artFiles, this.showEmpty), ([art, showEmpty]) =>
-      iter(art.entries()).filter(([_, info]) => showEmpty ? true : info.w !== 0 && info.h !== 0).map(first).collect().sort((l, r) => l - r));
-    this.filteredPicnums = transformed(tuple(this.picnums, this.filter), ([picnums, filter]) => picnums.filter(p => p.toString().includes(filter)));
-    this.mainFrameInfo = transformed(tuple(this.artFiles, this.currentId), ([art, id]) => getOrDefault(art, id, EMPTY_INFO));
+      iter(art.entries()).filter(([_, { info }]) => showEmpty ? true : info.w !== 0 && info.h !== 0).map(first).collect().sort((l, r) => l - r));
+    this.filteredPicnums = transformed(tuple(this.picnums, this.filter, this.tags), ([picnums, filter, tags]) =>
+      picnums.filter(p => iter(tags.tags(p)).any(t => t.toLowerCase().startsWith(filter.toLowerCase())) || p.toString().includes(filter)));
+    this.mainFrameInfo = transformed(tuple(this.artFiles, this.currentId), ([art, id]) => getOrDefaultMap(art, id, i => i.info, EMPTY_INFO));
     this.currentFrameInfo = transformed(tuple(this.artFiles, this.currentId, this.animationFrame, this.mainFrameInfo),
       ([art, id, frame, mainFrame]) => this.animate(art, id, frame, mainFrame));
     this.pluProvider = transformed(tuple(this.plus, this.currentShadow, this.currentPlu),
@@ -153,15 +159,16 @@ export class ArtEditorImpl implements ArtEditor {
     });
   }
 
-  private animate(art: Map<number, ArtInfo>, id: number, frame: number, mainFrame: ArtInfo): RenderInfo {
+  private animate(art: Map<number, ArtDetailedInfo>, id: number, frame: number, mainFrame: ArtInfo): RenderInfo {
+    const getArt = (pid: number) => getOrDefaultMap(art, pid, i => i.info, EMPTY_INFO);
     if ((mainFrame.attrs.type & 7) === 1) {
       const side = frame % 8;
-      if (side <= 4) return { type: 'regular', info: getOrDefault(art, id + side, EMPTY_INFO) }
-      else return { type: 'mirrored', info: getOrDefault(art, id + (8 - side), EMPTY_INFO) }
+      if (side <= 4) return { type: 'regular', info: getArt(id + side) }
+      else return { type: 'mirrored', info: getArt(id + (8 - side)) }
     } else if ((mainFrame.attrs.type & 7) === 2) {
-      return { type: 'regular', info: getOrDefault(art, id + (frame % 8), EMPTY_INFO) }
+      return { type: 'regular', info: getArt(id + (frame % 8)) }
     }
-    else return { type: 'regular', info: getOrDefault(art, id + animate(frame, mainFrame), EMPTY_INFO) }
+    else return { type: 'regular', info: getArt(id + animate(frame, mainFrame)) }
   }
 
   private createActions(actionDescriptors: ActionDescriptors): ArtEditorActions {
@@ -315,9 +322,9 @@ export class ArtEditorImpl implements ArtEditor {
   }
 
   getArt(picnum: number, size: number): Source<string> {
-    const renderPreview = (picnum: number, artFiles: Map<number, ArtInfo>) =>
+    const renderPreview = (picnum: number, artFiles: Map<number, ArtDetailedInfo>) =>
       new Promise<string>(ok => setTimeout(() => {
-        createCanvas(fit(size - 2, size - 16, art(getOrDefault(artFiles, picnum, EMPTY_INFO)), 0), this.rasterizer).toBlob(blob =>
+        createCanvas(fit(size - 2, size - 16, art(getOrDefaultMap(artFiles, picnum, i => i.info, EMPTY_INFO)), 0), this.rasterizer).toBlob(blob =>
           ok(URL.createObjectURL(blob)))
       }));
     return getOrCreate(this.previewCache, picnum, _ => transformedAsyncImmediate(this.artFiles, DEFAULT_PREVIEW, art => renderPreview(picnum, art)));
@@ -368,11 +375,11 @@ export class ArtEditorImpl implements ArtEditor {
       iter(plus.entries()).map(([pid, p]) => item(p, pid, currentPlu)).collect())
   }
 
-  private updateArtCache(artFiles: NamedArtFile[]) {
+  private updateArtCache(artFiles: NamedArtFile[]): Map<number, ArtDetailedInfo> {
     return iter(artFiles)
-      .map(af => iter(af.art.arts)
+      .map(file => iter(file.art.arts)
         .enumerate()
-        .map(([a, i]) => [af.art.header.start + i, a] as [number, ArtInfo]))
+        .map(([info, i]) => [file.art.header.start + i, { info, artFile: file.name }] as [number, ArtDetailedInfo]))
       .flatten()
       .toMap(first, second)
   }

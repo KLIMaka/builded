@@ -15,7 +15,8 @@ import { APP, App } from "./app/apis/app1";
 import { FS } from "./app/apis/fs";
 import { DefaultApp } from "./app/modules/default/app/app";
 import { DefaultLifecycleListener } from "./app/modules/default/lifecycle-listener";
-import { DefaultFileSystems, inMemoryFS, storageFS } from "./app/modules/fs/fs";
+import { DefaultFileSystems, GLOBAL_FS_HANDLERS, inMemoryFS, storageFS } from "./app/modules/fs/fs";
+import { GLOBAL_CALLBACK_HANDLERS } from "@utils/callbacks";
 
 const app = DefaultApp("App");
 const injector = new AppInjector(new DefaultLifecycleListener(app.timer, app.logger));
@@ -81,6 +82,7 @@ app.scheduler.exec(async handler => {
     const [ui, actions, fsManager] = await getInstances(i, UI, ACTION_DESCRIPTORS, FS_MANAGER);
 
     ui.globalActions().add(
+      actions.bindSync('test1', () => console.log(`FS_HANDLERS=${GLOBAL_FS_HANDLERS} VALUE_HANDLERS=${GLOBAL_CALLBACK_HANDLERS}`)),
       actions.bindSync('test', async () => ui.showWindow(await fsManager.newWindow()))
     )
 

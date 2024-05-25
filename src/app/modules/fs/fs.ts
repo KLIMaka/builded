@@ -1,34 +1,25 @@
-import { Source, value } from "@utils/callbacks";
+import { Source, proxyAsync, value } from "@utils/callbacks";
 import { iter } from "@utils/iter";
-import { Consumer, Function, identity, nil, seq } from "@utils/types";
+import { strcmpci as streqci } from "@utils/objects";
+import { Function, identity, nil, seq } from "@utils/types";
+import { GrpFile } from "build/formats/grp";
 import { RffFile } from "build/formats/rff";
 import JSZip from "jszip";
 import Optional from "optional-js";
-import { Disconnector, HandleProvider, Storage, Storages, Timer } from "../../apis/app1";
+import { Disconnector, Storage, Storages, Timer } from "../../apis/app1";
 import { FileInfo, FileSystem, FileSystemHandler, FileSystems, WritableFileSystem } from "../../apis/fs";
-import { GrpFile } from "build/formats/grp";
 
 class FileSystemsImpl implements FileSystems {
   private mounts: Map<string, FileSystem> = new Map();
-  private handlers = new HandleProvider<Consumer<void>>();
-  private mountNames: string[] = []
+  readonly list = value<string[]>([]);
 
   mount(name: string, fs: FileSystem): void {
     this.mounts.set(name, fs);
-    this.mountNames = [...this.mounts.keys()];
-    this.handlers.get().forEach(h => h());
-  }
-
-  list(): string[] {
-    return this.mountNames;
+    this.list.set([...this.mounts.keys()]);
   }
 
   get(name: string): Optional<FileSystem> {
     return Optional.ofNullable(this.mounts.get(name))
-  }
-
-  subscribe(handler: any): Disconnector {
-    return this.handlers.add(handler);
   }
 }
 
@@ -61,13 +52,15 @@ class StubFs implements FileSystem {
 }
 
 export const EMPTY: FileSystem = new StubFs();
+export let GLOBAL_FS_HANDLERS = 0;
 
 class BaseFS {
   private handlers = new Set<FileSystemHandler>();
   subscribe(handler: FileSystemHandler): Disconnector {
+    GLOBAL_FS_HANDLERS++;
     if (this.handlers.size === 0) this.firstSubscribed();
     this.handlers.add(handler);
-    return seq(() => this.handlers.delete(handler), () => this.check())
+    return seq(() => { GLOBAL_FS_HANDLERS--; this.handlers.delete(handler) }, () => this.check())
   }
   private check() { if (this.handlers.size === 0) this.lastDisconnected() }
   onDelete(name: string) { this.handlers.forEach(h => h(name, true)) }
@@ -440,7 +433,5 @@ export function fetchFs(root: string) {
 }
 
 export async function watchFile(name: string, fs: FileSystem): Promise<Source<Optional<ArrayBuffer>>> {
-  fs.subscribe(async (n, _) => { if (name === n) result.set(await fs.read(name)) });
-  const result = value(await fs.read(name));
-  return result;
+  return proxyAsync(() => fs.read(name), signal => fs.subscribe(async (n, _) => { if (streqci(name, n)) signal() }));
 }

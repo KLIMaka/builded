@@ -2,17 +2,22 @@ import { ActionItem } from "@ui/action-list";
 import { ActionsNode, actionsToActionItem, line } from "@ui/commons";
 import { confirm, info } from "@ui/message-box";
 import { Sort } from "@ui/table";
-import { ConnectedSource, Disconnector, Source, Value, subscribe, transformed, transformedAsyncImmediate, tuple, value } from "@utils/callbacks";
+import { Disconnector, Source, Value, transformed, transformedAsyncImmediate, tuple, value } from "@utils/callbacks";
 import { Dependency, Injector, getInstances, provider } from "@utils/injector";
 import { iter } from "@utils/iter";
 import { applyDefaults, asyncFlatMapOptional } from "@utils/objects";
 import { size } from "@utils/size";
 import { debounced } from "@utils/time";
-import { Consumer, Function, Supplier, identity, seq } from "@utils/types";
+import { Consumer, Function, Supplier, identity, nil, seq } from "@utils/types";
 import { ACTION_DESCRIPTORS, Action, ActionDescriptors } from "app/apis/actions";
 import { APP, App, Storage } from "app/apis/app1";
+import { EngineContext } from "app/apis/engine";
 import { FS, FileSystem, FileSystems } from "app/apis/fs";
 import { UI, Ui, Window, WindowRenderer } from "app/apis/ui1";
+import { createArtEditor } from "app/modules/arteditor/model";
+import { createEngineContext as contextBlood } from "app/modules/blood/module";
+import { createEngineContext as contextDuke } from "app/modules/duke/module";
+import { createEngineContext as contextFury } from "app/modules/fury/module";
 import { waitFor } from "app/modules/scheduler/ui/task-propgress";
 import Optional from "optional-js";
 import * as React from 'react';
@@ -20,11 +25,6 @@ import { createContext } from "react";
 import { createGrpFs, createLocalFs, createRffFs, createZipFsFile } from "../fs";
 import { OverwriteOption, confirmOverwrite } from "./overwrite";
 import { FsManagerUiImpl } from "./view";
-import { createEngineContext as contextFury } from "app/modules/fury/module";
-import { createEngineContext as contextBlood } from "app/modules/blood/module";
-import { createEngineContext as contextDuke } from "app/modules/duke/module";
-import { createArtEditor } from "app/modules/arteditor/model";
-import { EngineContext } from "app/apis/engine";
 
 const GLOBAL = 'fs.global';
 const LOCAL = 'fs.';
@@ -183,8 +183,8 @@ export const StateManagerContext = createContext<FileSystemsManagerImpl>(null);
 
 class GlobalFileSystemsManagerImpl implements GlobalFileSystemsManager {
   readonly clipboard: Value<Optional<FilesList>> = value(Optional.empty());
-  readonly fsNames: ConnectedSource<string[]>;
-  readonly recentResources: ConnectedSource<RecentResource[]>;
+  readonly fsNames: Source<string[]>;
+  readonly recentResources: Source<RecentResource[]>;
 
   private counter = 0;
 
@@ -197,8 +197,8 @@ class GlobalFileSystemsManagerImpl implements GlobalFileSystemsManager {
     readonly actionDescriptors: ActionDescriptors,
     readonly injector: Injector,
   ) {
-    this.fsNames = subscribe(() => fs.list(), l => fs.subscribe(l));
-    this.recentResources = subscribe(() => state.get().recent, l => state.subscribe(_ => l()));
+    this.fsNames = fs.list;
+    this.recentResources = transformed(this.state, s => s.recent);
   }
 
   addRecent(res: RecentResource) {
@@ -211,7 +211,7 @@ class GlobalFileSystemsManagerImpl implements GlobalFileSystemsManager {
     const manager = new FileSystemsManagerImpl(savedState, this);
     return (onClose: Consumer<void>, windowConsumer: Consumer<Window>) =>
       <StateManagerContext.Provider value={manager}>
-        <FsManagerUiImpl onClose={seq(onClose)} name={name} windowConsumer={windowConsumer} />
+        <FsManagerUiImpl onClose={seq(onClose, () => manager.stop())} name={name} windowConsumer={windowConsumer} />
       </StateManagerContext.Provider>
   }
 }
@@ -247,6 +247,7 @@ class FileSystemsManagerImpl {
   readonly query = value('');
 
   private actionsChannel: ActionsNode;
+  private disconnectors: Disconnector[] = [];
 
   constructor(
     readonly state: Value<SavedState>,
@@ -258,20 +259,25 @@ class FileSystemsManagerImpl {
     [this.loadedFiles, this.reloadFiles] = this.createLoadedFiles(this.selectedFs);
     this.files = this.createFiles(this.loadedFiles, this.sort, this.query);
     this.actions = this.createActions(global.actionDescriptors, res => global.addRecent(res), global.fs, this.selectedFsName);
-    this.storages = this.createStorages(global.fsNames.value, global.recentResources.value, global.fs, this.selectedFsName,
+    this.storages = this.createStorages(global.fsNames, global.recentResources, global.fs, this.selectedFsName,
       [this.actions.addDir, this.actions.addZip, this.actions.addRff, this.actions.addGrp]);
     this.selectedFsName.set(global.fs.get(state.get().selectedFsName).map(_ => state.get().selectedFsName).orElse(''));
   }
 
+  stop() {
+    this.disconnectors.forEach(d => d());
+    this.disconnectors = [];
+  }
+
   private createSelectedFsName(): Value<string> {
     const selectedFsName = value('');
-    selectedFsName.subscribe(fs => this.state.modImmer(s => s.selectedFsName = fs));
+    this.disconnectors.push(selectedFsName.subscribe(fs => this.state.modImmer(s => s.selectedFsName = fs)));
     return selectedFsName;
   }
 
   private createSort(): Value<Sort> {
     const sort = value(this.state.get().sort);
-    sort.subscribe(sort => this.state.modImmer(s => s.sort = sort));
+    this.disconnectors.push(sort.subscribe(sort => this.state.modImmer(s => s.sort = sort)));
     return sort;
   }
 
@@ -281,20 +287,13 @@ class FileSystemsManagerImpl {
       const files = await fs.map(async fs => fs.list()).orElse(Promise.resolve([]));
       return files.map(f => { return { name: f.name, size: f.size, type: getExtension(f.name) } })
     }
-    const loadedFiles = transformedAsyncImmediate(selectedFs, [], loadFiles)
+    const debouncedReload = debounced(() => loadedFiles.forceReload(), 100);
+    const loadedFiles = transformedAsyncImmediate(selectedFs, [], loadFiles, (fs, files) => fs.map(fs => fs.subscribe((name, deleted) => debouncedReload())).orElse(nil()))
     return [loadedFiles, () => loadedFiles.forceReload()];
   }
 
   private createSelectedFs(selectedFsName: Source<string>): Source<Optional<FileSystem>> {
-    let fsHandlerDisconnector: Disconnector = null;
-    const debouncedReload = debounced(() => this.reloadFiles(), 100);
-    const selectedFs = transformed(selectedFsName, fs => {
-      fsHandlerDisconnector?.();
-      const newFs = this.global.fs.get(fs);
-      newFs.ifPresent(fs => { fsHandlerDisconnector = fs.subscribe((name, deleted) => debouncedReload()) })
-      return newFs;
-    });
-    return selectedFs;
+    return transformed(selectedFsName, name => this.global.fs.get(name));
   }
 
   private createFiles(files: Source<FileInfo[]>, sort: Source<Sort>, query: Source<string>): Source<FileInfo[]> {

@@ -4,7 +4,7 @@ class LoggerImpl implements Logger {
   private handlers: Set<LogHandler> = new Set();
 
   log(level: LogLevel, ...msg: any[]): void {
-    this.handlers.forEach(h => h(level, msg));
+    this.handlers.forEach(h => h(level, ...msg));
   }
 
   addHandler(handler: LogHandler): Disconnector {

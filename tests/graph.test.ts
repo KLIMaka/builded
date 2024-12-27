@@ -46,10 +46,12 @@ test('order', () => {
   graph.add('g', 'h');
   graph.add('d', 'x');
 
-  expect(['a', 'b', 'c', 'd', 'e', 'f', 'x'].map(e => graph.order(e))).toStrictEqual([2, 2, 1, 1, 0, 2, 0]);
+  expect(['a', 'b', 'c', 'd', 'e', 'f', 'x', 'h', 'g'].map(e => graph.order(e))).toStrictEqual([2, 2, 1, 1, 0, 2, 0, 0, 1]);
+  expect(['a', 'b', 'c', 'd', 'e', 'f', 'x', 'h', 'g'].map(e => graph.order(e, n => n.from))).toStrictEqual([0, 0, 0, 1, 2, 0, 2, 1, 0]);
   expect(graph.orderedTo('e')).toStrictEqual(['a', 'b', 'f', 'd', 'c', 'e']);
   expect(graph.orderedTo('x')).toStrictEqual(['a', 'b', 'f', 'd', 'x']);
   expect(graph.orderedAll()).toStrictEqual(['a', 'b', 'f', 'd', 'c', 'g', 'e', 'h', 'x']);
+  expect(graph.orderedAll(n => n.from)).toStrictEqual(['e', 'x', 'd', 'h', 'a', 'b', 'c', 'f', 'g']);
 });
 
 test('value dependency', () => {
@@ -57,8 +59,9 @@ test('value dependency', () => {
   graph.add('a', 'b');
   graph.add('b', 'c');
   graph.add('e', 'x');
-  expect(['a', 'c', 'x'].map(e => graph.order(e))).toStrictEqual([2, 0, 0]);
-
+  graph.addNode('xx');
+  expect(['a', 'c', 'x', 'xx'].map(e => graph.order(e))).toStrictEqual([2, 0, 0, 0]);
+  expect(graph.orderedAll()).toStrictEqual(['a', 'b', 'e', 'c', 'x', 'xx']);
 });
 
 test('subgraph', () => {

@@ -68,7 +68,11 @@ export function VirtualTable<R>(props: VirtualTableProps<R>) {
   const tableRef = useRef<Table>();
 
   const moveCursor = useCallback((off: number) => {
-    const currentItem = takeFirst(selected);
+    if (rows.length === 0) {
+      props.selected.set(new Set());
+      return;
+    }
+    const currentItem = takeFirst(selected).orElse(null);
     const currentItemIndex = rows.indexOf(currentItem);
     const next = clamp(currentItemIndex + off, 0, rows.length - 1);
     tableRef.current?.scrollToRow(next);

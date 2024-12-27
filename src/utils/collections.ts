@@ -1,6 +1,6 @@
 import Optional from "optional-js";
 import { cyclic } from "./mathutils";
-import { BiFunction, Function } from "./types";
+import { BiFunction, Function, MultiFunction } from "./types";
 
 export interface Collection<T> extends Iterable<T> {
   get(i: number): T;
@@ -22,6 +22,15 @@ export const EMPTY_COLLECTION: Collection<any> = {
   get: (i: number) => undefined,
   length: () => 0,
   [Symbol.iterator]: () => EMPTY_ITERATOR
+}
+const EMPTY_MAP = new Map();
+export function emptyMap<K, V>(): Map<K, V> {
+  return EMPTY_MAP;
+}
+
+export const EMPTY_SET = new Set();
+export function emptySet<T>(): Set<T> {
+  return EMPTY_SET as Set<T>;
 }
 
 export function singletonIterable<T>(value: T): Iterator<T> {
@@ -105,6 +114,61 @@ export class Deck<T> implements MutableCollection<T> {
   }
 }
 
+export class Ring<T> implements Collection<T> {
+  private data: T[];
+  private head = 0;
+  private size = 0;
+
+  constructor(private maxSize: number) {
+    this.data = new Array<T>(maxSize);
+  }
+
+  get(i: number): T { return this.data[cyclic(this.head + i, this.maxSize)] }
+  length(): number { return this.size }
+
+  private getHeadOff(off: number) {
+    return cyclic(this.head + off, this.maxSize);
+  }
+
+  push(value: T) {
+    if (this.length() === this.maxSize) throw new Error();
+    this.data[this.getHeadOff(this.size)] = value;
+    this.size++;
+  }
+
+  pop(): T {
+    if (this.length() === 0) throw new Error();
+    const off = this.getHeadOff(this.size - 1);
+    const value = this.data[off];
+    this.data[off] = null;
+    this.size--;
+    return value;
+  }
+
+  pushHead(value: T) {
+    if (this.length() === this.maxSize) throw new Error();
+    this.head = cyclic(this.head - 1, this.maxSize);
+    this.data[this.getHeadOff(0)] = value;
+    this.size++;
+  }
+
+  popHead() {
+    if (this.length() === 0) throw new Error();
+    const value = this.data[this.head];
+    this.data[this.head] = null;
+    this.head = cyclic(this.head + 1, this.maxSize);
+    this.size--;
+    return value;
+  }
+
+  [Symbol.iterator](): Iterator<T, any, any> {
+    let i = 0;
+    return this.size === 0
+      ? EMPTY_ITERATOR
+      : { next: () => iteratorResult(i === this.size, this.get(i++)) }
+  }
+}
+
 export class IndexedDeck<T> extends Deck<T> {
   private index = new Map<T, number>();
 
@@ -150,6 +214,7 @@ export function reverse<T>(c: Collection<T>): Collection<T> {
 
 export function length<T>(it: Iterable<T>): number {
   let length = 0;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   for (const _ of it) length++;
   return length;
 }
@@ -213,9 +278,9 @@ export function iterIsEmpty<T>(i: Iterable<T>): boolean {
   return ii.next().done;
 }
 
-export function findFirst<T>(i: Iterable<T>, f: (t: T) => boolean, def: T): T {
-  for (const t of i) if (f(t)) return t;
-  return def;
+export function findFirst<T>(i: Iterable<T>, f: (t: T) => boolean = _ => true): Optional<T> {
+  for (const t of i) if (f(t)) return Optional.of(t);
+  return Optional.empty();
 }
 
 export function* chain<T>(i1: Iterable<T>, i2: Iterable<T>): Generator<T> {
@@ -249,6 +314,11 @@ export function* range(start: number, end: number): Generator<number> {
   for (let i = start; i !== end; i += di) yield i;
 }
 
+export function* repeat<T>(value: T, count: number): Generator<T> {
+  if (count <= 0) return;
+  for (let i = 0; i < count; i++) yield value;
+}
+
 export function* cyclicRange(start: number, length: number) {
   if (start >= length) throw new Error(`${start} >= ${length}`);
   for (let i = 0; i < length; i++) yield cyclic(start + i, length);
@@ -273,7 +343,7 @@ export function* loopPairs<T>(i: Iterable<T>): Generator<[T, T]> {
   yield [lh.value, first.value];
 }
 
-export function* pairs<T>(i: Iterable<T>): Generator<[T, T]> {
+export function* slidingPairs<T>(i: Iterable<T>): Generator<[T, T]> {
   const iter = i[Symbol.iterator]();
   const first = iter.next();
   if (first.done) return;
@@ -283,6 +353,19 @@ export function* pairs<T>(i: Iterable<T>): Generator<[T, T]> {
     yield [lh.value, rh.value];
     lh = rh;
     rh = iter.next();
+  }
+}
+
+export function* slidingWindow<T>(i: Iterable<T>, size: number): Generator<T[]> {
+  const iter = i[Symbol.iterator]();
+  let window = [...takeIterator(iter, size)];
+  if (window.length < size) return;
+  yield window;
+  for (; ;) {
+    const item = iter.next();
+    if (item.done) return;
+    window = [...window.slice(1), item.value];
+    yield window;
   }
 }
 
@@ -297,9 +380,14 @@ export function* join<T>(i: Iterable<T>, delim: T): Generator<T> {
   }
 }
 
-export function* take<T>(c: Iterable<T>, count: number): Generator<T> {
+export function take<T>(i: Iterable<T>, count: number): Generator<T> {
   if (count < 0) return;
-  const iter = c[Symbol.iterator]();
+  const iter = i[Symbol.iterator]();
+  return takeIterator(iter, count);
+}
+
+export function* takeIterator<T>(iter: Iterator<T>, count: number): Generator<T> {
+  if (count < 0) return;
   while (count > 0) {
     const next = iter.next();
     if (next.done) return;
@@ -308,10 +396,20 @@ export function* take<T>(c: Iterable<T>, count: number): Generator<T> {
   }
 }
 
-export function takeFirst<T>(i: Iterable<T>): T {
+export function* groups<T>(i: Iterable<T>, size: number): Generator<T[]> {
+  const iter = i[Symbol.iterator]();
+  for (; ;) {
+    const next = [...takeIterator(iter, size)];
+    if (next.length === 0) return;
+    else if (next.length !== size) throw Error();
+    yield next;
+  }
+}
+
+export function takeFirst<T>(i: Iterable<T>): Optional<T> {
   const iter = i[Symbol.iterator]();
   const item = iter.next();
-  return item.done ? null : item.value;
+  return item.done ? Optional.empty() : Optional.of(item.value);
 }
 
 export function toIterable<T>(iter: Iterator<T>): Iterable<T> {
@@ -343,6 +441,17 @@ export function skipWhile<T>(i: Iterable<T>, f: (t: T) => boolean): Iterable<T> 
   return toIterable(iter);
 }
 
+export function* prefixNotEmpty<T>(prefix: Iterable<T>, i: Iterable<T>): Generator<T> {
+  const iter = i[Symbol.iterator]();
+  let item = iter.next();
+  if (item.done) return;
+  for (const p of prefix) yield p;
+  while (!item.done) {
+    yield item.value;
+    item = iter.next();
+  }
+}
+
 export function* rect(w: number, h: number): Generator<[number, number]> {
   if (w < 0) throw new Error(`${w} < 0`)
   if (h < 0) throw new Error(`${h} < 0`)
@@ -355,7 +464,7 @@ export function intersect<T>(lh: Set<T>, rh: Set<T>): Set<T> {
   return new Set([...lh].filter(t => rh.has(t)));
 }
 
-export function* interpolate<T>(ii: Iterable<T>, f: (lh: T, rh: T, t: number) => T, points = [0.5]) {
+export function* interpolate<T>(ii: Iterable<T>, f: MultiFunction<[T, T, number], T>, points = [0.5]): Generator<T> {
   const i = ii[Symbol.iterator]();
   let lh = i.next();
   if (lh.done) return;
@@ -386,7 +495,19 @@ export function toMap<T, K, V>(i: Iterable<T>, keyMapper: Function<T, K>, valueM
   return map;
 }
 
-export function getOrCreate<K, V>(map: Map<K, V>, key: K, value: (k: K) => V) {
+export function toObject<T, U>(i: Iterable<T>, keyMapper: Function<T, keyof U>, valueMapper: Function<T, any>): U {
+  const result = {} as U;
+  for (const item of i) result[keyMapper(item)] = valueMapper(item);
+  return result;
+}
+
+export function group<T, K, V>(i: Iterable<T>, keyMapper: Function<T, K>, valueMapper: Function<T, V>): Map<K, V[]> {
+  const map = new Map<K, V[]>();
+  for (const item of i) getOrCreate(map, keyMapper(item), _ => []).push(valueMapper(item));
+  return map;
+}
+
+export function getOrCreate<K, V>(map: Map<K, V>, key: K, value: Function<K, V>) {
   let v = map.get(key);
   if (v === undefined) {
     v = value(key);
@@ -400,9 +521,9 @@ export function getOrDefault<K, V>(map: Map<K, V>, key: K, def: V) {
   return v === undefined ? def : v;
 }
 
-export function getOrDefaultMap<K, V, V1>(map: Map<K, V>, key: K, mapper: Function<V, V1>, def: V1) {
+export function getOrDefaultF<K, V>(map: Map<K, V>, key: K, def: Function<K, V>) {
   const v = map.get(key);
-  return v === undefined ? def : mapper(v);
+  return v === undefined ? def(key) : v;
 }
 
 export interface MapBuilder<K, V> {
@@ -417,4 +538,10 @@ export function mapBuilder<K, V>(): MapBuilder<K, V> {
     build: () => map
   }
   return builder;
+}
+
+export function reverseMap<K, V>(map: Map<K, V>): Map<V, K> {
+  const nmap = new Map<V, K>();
+  map.forEach((v, k) => nmap.set(v, k));
+  return nmap;
 }

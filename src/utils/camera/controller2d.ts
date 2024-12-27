@@ -1,59 +1,69 @@
+import { Source, Value, ValuesContainer } from "@utils/callbacks";
+import { mat4, vec2, vec3 } from "gl-matrix";
 import { Camera } from "./camera";
-import { mat4, vec3 } from "gl-matrix";
 
 export class Controller2D {
-  private camera = new Camera(0, 0, 0, 0, 0);
-  private width = 0;
-  private height = 0;
-  private oldX = 0;
-  private oldY = 0;
-  private scale = 1;
-  private projection = mat4.create();
+  private camera: Camera;
+  private size: Value<vec2>;
+  private mousePos: Value<vec2>;
+  private scale: Value<number>;
+  private projection: Source<mat4>;
 
-  public track(x: number, y: number, z: number, move: boolean) {
+  constructor(values: ValuesContainer) {
+    this.camera = new Camera(values, 0, 0, 0, 0, 0);
+    this.size = values.valueBuilder<vec2>({ name: 'size', value: vec2.create(), eq: vec2.exactEquals });
+    this.mousePos = values.valueBuilder<vec2>({ name: 'mousePos', value: vec2.create(), eq: vec2.exactEquals });
+    this.scale = values.value('scale', 1);
+    this.projection = values.transformedTuple('projection', [this.size, this.scale], ([[w, h], scale]) => {
+      const projection = mat4.create();
+      const wscale = w / 2 * scale;
+      const hscale = h / 2 * scale;
+      mat4.identity(projection);
+      mat4.ortho(projection, -wscale, wscale, hscale, -hscale, 0, 0xFFFF);
+      mat4.rotateX(projection, projection, -Math.PI / 2);
+      return projection;
+    });
+  }
+
+  track(x: number, y: number, z: number, move: boolean) {
+    const [mx, my] = this.mousePos.get();
+    const scale = this.scale.get();
     if (move) {
-      const dx = (x - this.oldX) * this.scale;
-      const dy = (y - this.oldY) * this.scale;
-      const pos = this.camera.getPosition();
+      const dx = (x - mx) * scale;
+      const dy = (y - my) * scale;
+      const pos = this.camera.position.get();
       this.camera.setPosition(pos[0] - dx, z, pos[2] - dy);
     }
-    this.oldX = x;
-    this.oldY = y;
+    this.mousePos.set(vec2.fromValues(x, y));
   }
 
-  public setSize(w: number, h: number) {
-    this.width = w;
-    this.height = h;
+  setSize(w: number, h: number) {
+    this.size.set(vec2.fromValues(w, h));
   }
 
-  public getWidth() { return this.width }
-  public getHeight() { return this.height }
-  public setUnitsPerPixel(scale: number) { this.scale = scale }
-  public getUnitsPerPixel() { return this.scale }
-  public setPosition(x: number, y: number, z: number): void { this.camera.setPosition(x, z, y) }
-  public getPosition() { return this.camera.getPosition() }
-  public getTransformMatrix() { return this.camera.getTransformMatrix() }
+  setUnitsPerPixel(scale: number) { this.scale.set(scale) }
+  getUnitsPerPixel() { return this.scale.get() }
+  setPosition(x: number, y: number, z: number): void { this.camera.setPosition(x, z, y) }
+  getPosition() { return this.camera.position.get() }
+  getTransformMatrix() { return this.camera.transform.get() }
 
-  public getPointerPosition(pointer: vec3) {
-    const lx = this.oldX - (this.width / 2);
-    const ly = this.oldY - (this.height / 2);
-    const [cx, cz, cy] = this.camera.getPosition();
-    return vec3.set(pointer, cx + lx * this.scale, cz, cy + ly * this.scale);
+  getPointerPosition(pointer: vec3) {
+    const [mx, my] = this.mousePos.get();
+    const [w, h] = this.size.get();
+    const lx = mx - (w / 2);
+    const ly = my - (h / 2);
+    const [cx, cz, cy] = this.camera.position.get();
+    const scale = this.scale.get();
+    return vec3.set(pointer, cx + lx * scale, cz, cy + ly * scale);
   }
 
-  public getMaxDist() {
-    const max = Math.max(this.height, this.width);
-    return (max / 2) * this.scale;
+  getMaxDist() {
+    const [w, h] = this.size.get();
+    const max = Math.max(h, w);
+    return (max / 2) * this.scale.get();
   }
 
-  public getProjectionMatrix() {
-    const projection = this.projection;
-    const wscale = this.width / 2 * this.scale;
-    const hscale = this.height / 2 * this.scale;
-    mat4.identity(projection);
-    mat4.ortho(projection, -wscale, wscale, hscale, -hscale, 1, 0xFFFF);
-    mat4.rotateX(projection, projection, -Math.PI / 2);
-    return projection;
+  getProjectionMatrix() {
+    return this.projection.get();
   }
-
 }

@@ -1,79 +1,14 @@
-import { Consumer, Function } from "@utils/types";
-import { Ui, Window, WindowRenderer } from "app/apis/ui1";
+import { createContainer, Source, Value } from "@utils/callbacks";
+import { Consumer } from "@utils/types";
+import { ActionDescriptors } from "app/apis/actions";
+import { Ui } from "app/apis/ui1";
 import Optional from "optional-js";
-import React, { ReactElement, useCallback, useContext, useEffect, useRef } from "react";
-import WinBox from "react-winbox";
-import { ActionDescriptorsContext, CurrentActionsChannelContext, ActionsChannelContext, ActionsNode } from "./commons";
-
-export type MessageBoxProps<R> = {
-  title: string,
-  width: number,
-  height: number,
-  content: Function<Consumer<R>, ReactElement>,
-  resultConsumer: Consumer<Optional<R>>,
-  parentChannel: ActionsNode,
-  channelConsumer?: Consumer<ActionsNode>
-}
-
-function MessageBoxImpl<R>(props: MessageBoxProps<R> & { onClose: Consumer<void>, windowConsumer: Consumer<Window> }) {
-  const currentActions = useContext(CurrentActionsChannelContext);
-  const actionsChannel = props.parentChannel;
-  const channel = actionsChannel.child('message-box', true);
-  const winRef = useRef<WinBox>();
-
-  const handleClose = useCallback((result: Optional<R>) => {
-    if (winRef.current) {
-      currentActions(props.parentChannel);
-      winRef.current.hide();
-      props.onClose();
-      props.resultConsumer(result);
-    }
-  }, [currentActions, props]);
-  const handleCloseEmpty = useCallback(() => handleClose(Optional.empty()), [handleClose]);
-
-
-  useEffect(() => {
-    props.channelConsumer?.(channel);
-    props.windowConsumer({ winbox: winRef.current })
-  }, [channel, props]);
-
-  return (
-    <ActionsChannelContext.Provider value={channel}>
-      <WinBox
-        ref={winRef}
-        modal={true}
-        title={props.title}
-        className="window"
-        x='center'
-        y='center'
-        noFull={true}
-        width={props.width}
-        height={props.height}
-        onClose={handleCloseEmpty}
-        onFocus={() => currentActions(channel)}
-      >
-        {props.content(r => handleClose(Optional.ofNullable(r)))}
-      </WinBox>
-    </ActionsChannelContext.Provider>);
-}
-
-
-export async function MessageBox<R>(props: MessageBoxProps<R>): Promise<WindowRenderer> {
-  return (onClose: Consumer<void>, windowConsumer: Consumer<Window>) => <MessageBoxImpl<R> {...props} onClose={onClose} windowConsumer={windowConsumer} />
-}
+import React, { useContext, useEffect, useRef } from "react";
+import { ActionDescriptorsContext, ActionsChannelContext, Button, Column, CurrentActionsChannelContext, Icon, Row, Spacer, useValue } from "./commons";
+import { modalResult, WindowBuilder } from "./windows-common";
+import { App } from "app/apis/app1";
 
 function ConfirmOkCancel({ result, text, icon }: { result: Consumer<boolean>, text: string, icon: string }) {
-  const actionsChannel = useContext(ActionsChannelContext);
-  const actionDescriptors = useContext(ActionDescriptorsContext);
-
-  useEffect(() => {
-    const ctx = actionDescriptors.sub('message-box');
-    return actionsChannel.collector().add(
-      ctx.bindSync('ok', () => result(true)),
-      ctx.bindSync('cancel', () => result(false)),
-    );
-  }, [actionDescriptors, actionsChannel, result]);
-
   return <div className='column-block'>
     <div className='flex-fill row-block'>
       <div className={`fa-folid fa ${icon} padded-10`} style={{ fontSize: 32, alignContent: 'center' }} />
@@ -87,31 +22,24 @@ function ConfirmOkCancel({ result, text, icon }: { result: Consumer<boolean>, te
   </div>
 }
 
-export function confirm(actionsChannel: ActionsNode, ui: Ui, title: string, text: string): Promise<Optional<boolean>> {
-  return new Promise<Optional<boolean>>(async (ok, error) => {
-    ui.showWindow(await MessageBox<boolean>({
-      content: result => <ConfirmOkCancel result={result} text={text} icon='fa-triangle-exclamation' />,
-      resultConsumer: ok,
-      height: 150,
-      width: 300,
-      title: title,
-      parentChannel: actionsChannel
-    }));
+export function confirm(ui: Ui, actionDescriptors: ActionDescriptors, title: string, text: string): Promise<Optional<boolean>> {
+  const values = createContainer('confirm-box');
+  return new Promise<Optional<boolean>>(async result => {
+    const [resultAndClose, close] = modalResult(() => window.close(), result);
+    const window = new WindowBuilder('message-box', actionDescriptors, values)
+      .modal()
+      .title(title)
+      .size(300, 150)
+      .action('ok', () => resultAndClose(true))
+      .action('cancel', () => resultAndClose(false))
+      .onClose(close)
+      .disposable(values)
+      .build(<ConfirmOkCancel result={resultAndClose} text={text} icon='fa-triangle-exclamation' />);
+    ui.addWindow(window);
   })
 }
 
 function Info({ result, text, icon }: { result: Consumer<void>, text: string, icon: string }) {
-  const actionsChannel = useContext(ActionsChannelContext);
-  const actionDescriptors = useContext(ActionDescriptorsContext);
-
-  useEffect(() => {
-    const ctx = actionDescriptors.sub('message-box');
-    return actionsChannel.collector().add(
-      ctx.bindSync('ok', () => result()),
-      ctx.bindSync('cancel', () => result()),
-    );
-  }, [actionDescriptors, actionsChannel, result]);
-
   return <div className='column-block'>
     <div className='flex-fill row-block'>
       <div className={`fa-folid fa ${icon} padded-10`} style={{ fontSize: 32, alignContent: 'center' }} />
@@ -124,15 +52,100 @@ function Info({ result, text, icon }: { result: Consumer<void>, text: string, ic
   </div>
 }
 
-export function info(actionsChannel: ActionsNode, ui: Ui, title: string, text: string): Promise<void> {
-  return new Promise<void>(async ok => {
-    ui.showWindow(await MessageBox<void>({
-      content: result => <Info result={result} text={text} icon='' />,
-      resultConsumer: _ => ok(),
-      height: 150,
-      width: 300,
-      title: title,
-      parentChannel: actionsChannel
-    }));
-  })
+export function info(ui: Ui, actionDescriptors: ActionDescriptors, title: string, text: string, icon = 'fa-triangle-exclamation'): Promise<Optional<void>> {
+  const values = createContainer('info-box');
+  return new Promise<Optional<void>>(async result => {
+    const [resultAndClose, close] = modalResult(() => window.close(), result);
+    const window = new WindowBuilder('message-box', actionDescriptors, values)
+      .modal()
+      .title(title)
+      .size(300, 150)
+      .action('ok', resultAndClose)
+      .action('cancel', resultAndClose)
+      .onClose(close)
+      .disposable(values)
+      .build(<Info result={resultAndClose} text={text} icon={icon} />);
+    ui.addWindow(window)
+  });
+}
+
+function InputText(props: { result: Consumer<boolean>, text: string, icon: string, value: Value<string>, isValid: Source<boolean> }) {
+  const actionDescriptors = useContext(ActionDescriptorsContext);
+  const actionsChannel = useContext(ActionsChannelContext);
+  const currentActions = useContext(CurrentActionsChannelContext);
+  const searchChannel = actionsChannel.child('input-text-box', true);
+
+  const ref = useRef<HTMLInputElement>();
+  const value = useValue(props.value);
+  const isValid = useValue(props.isValid);
+  useEffect(() => {
+    const ctx = actionDescriptors.sub('controls.textbox');
+    ref.current.focus()
+    return searchChannel.collector().add(
+      ctx.bindSync('close', () => props.result(false)),
+      ctx.bindSync('enter', () => props.result(true))
+    )
+  }, [actionDescriptors, props, searchChannel]);
+
+  return <ActionsChannelContext.Provider value={searchChannel}>
+    <Column className='gap-10 padded-10'>
+      <Row className="gap-10">
+        <Icon icon={props.icon} className='padded-10' style={{ fontSize: 32, alignContent: 'center' }} />
+        <Column className='flex-fill baseline-aligned gap-10'>
+          <div className='flex-auto'>{props.text}</div>
+          <Row className='flex-auto' style={{ alignSelf: 'stretch' }}>
+            <div className="text-box flex-fill">
+              <input
+                className="flex-fill"
+                ref={ref}
+                type="text"
+                value={value}
+                onChange={e => props.value.set(e.target.value)}
+                onFocus={_ => currentActions(searchChannel)}
+                onBlur={_ => currentActions(actionsChannel)}
+              />
+            </div>
+          </Row>
+        </Column>
+      </Row>
+      <Row className='gap-10 flex-auto'>
+        <Spacer />
+        <Button
+          className={`flex-auto ${isValid ? 'default' : 'disabled'}`}
+          style={{ width: '60px', textAlign: 'center' }}
+          onClick={() => isValid ? props.result(true) : 0}>
+          <div>OK</div>
+        </Button>
+        <Button className='flex-auto' style={{ width: '60px', textAlign: 'center' }} onClick={() => props.result(false)}>Cancel</Button>
+      </Row>
+    </Column>
+  </ActionsChannelContext.Provider>
+}
+
+export function inputText(app: App, ui: Ui, actionDescriptors: ActionDescriptors, title: string, text: string, icon: string, def?: string, width?: number, height?: number): Promise<Optional<string>> {
+  const ID = 'input-text-box';
+  const values = createContainer(ID);
+  const value = values.value('value', def);
+  const isValid = values.transformed('isValid', value, v => v.length > 0);
+  return new Promise<Optional<string>>(async ok => {
+    const [resultAndClose, close] = modalResult(() => window.close(), ok);
+    const result = (isOk: boolean) => isOk ? resultAndClose(value.get()) : resultAndClose(null);
+
+    const window = new WindowBuilder(ID, actionDescriptors, values)
+      .modal()
+      .title(title)
+      .size(width ?? 300, height ?? 150)
+      .action('ok', () => result(true), isValid)
+      .action('cancel', () => result(false))
+      .onClose(close)
+      .onClose(() => app.timer.delayed(() => values.dispose()))
+      .build(<InputText
+        result={result}
+        text={text}
+        icon={icon}
+        value={value}
+        isValid={isValid}
+      />);
+    ui.addWindow(window)
+  });
 }

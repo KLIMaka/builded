@@ -1,6 +1,9 @@
+import { toValuesMap, Value, ValuesContainer, ValuesMap } from "@utils/callbacks";
+import Optional from "optional-js";
 import { Storage, Storages } from "../../../../app/apis/app1";
 import { getOrCreate } from "../../../../utils/collections";
-import Optional from "optional-js";
+import { applyDefaults } from "@utils/objects";
+import { debounced } from "@utils/time";
 
 class StorageImpl implements Storage {
   private db: Promise<IDBDatabase>;
@@ -23,15 +26,13 @@ class StorageImpl implements Storage {
   }
 
   private async request(mode: IDBTransactionMode) {
-    const db = await this.db;
-    const transaction = db.transaction(this.name, mode);
-    return transaction.objectStore(this.name);
+    return this.db.then(db => db.transaction(this.name, mode).objectStore(this.name))
   }
 
   get<T>(key: string): Promise<Optional<T>> {
     return new Promise<Optional<T>>(async (ok, error) => {
-      const request = (await this.request('readonly')).get(key.toUpperCase());
-      request.onsuccess = () => ok(request.result ? Optional.of(request.result.data) : Optional.empty());
+      const request = await this.request('readonly').then(r => r.get(key.toUpperCase()));
+      request.onsuccess = () => ok(Optional.ofNullable(request.result).map(r => r.data));
       request.onerror = e => error(e);
     })
   }
@@ -87,11 +88,31 @@ class StorageImpl implements Storage {
       request.onerror = e => error(e);
     })
   }
+
+  async dispose(): Promise<void> {
+    return this.db.then(db => db.close());
+  }
 }
 
 export function DefaultStorages(appName: string): Storages {
-  const storages: Map<string, Storage> = new Map();
+  const storages = new Map<string, Storage>();
   return async (name: string) => {
     return getOrCreate(storages, name, _ => new StorageImpl(`${appName}.${name}`));
   }
+}
+
+export async function storageValue<T>(values: ValuesContainer, storage: Storage, name: string, def: T): Promise<Value<T>> {
+  const initValue = (await storage.get(name)).orElse(def) as T;
+  const value = values.value(name, initValue);
+  values.handleStandalone([value], v => storage.set(name, v))
+  return value;
+}
+
+export async function createSavedState<T>(values: ValuesContainer, storage: Storage, id: string, def: T, debounce = 1000): Promise<ValuesMap<T>> {
+  const save = debounced(() => storage.set(id, state.getObject()), debounce);
+  const loadedState = await storage.get<T>(id);
+  const initialState = loadedState.map(s => applyDefaults(s, def)).orElse(def);
+  const state = toValuesMap(initialState, values);
+  state.handle(values, save);
+  return state;
 }

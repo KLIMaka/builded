@@ -1,4 +1,4 @@
-import { Deck, IndexedDeck, first, last, map, reduce, sub, wrap, reversed, enumerate, range, cyclicRange, cyclicPairs, rect, all, take, isEmpty, flatten } from "../src/utils/collections";
+import { Deck, IndexedDeck, all, cyclicPairs, cyclicRange, enumerate, findFirst, first, flatten, isEmpty, last, map, slidingPairs, range, rect, reduce, reversed, sub, take, wrap, slidingWindow, groups, Ring } from "../src/utils/collections";
 import { SortedList } from "../src/utils/list";
 import { rand0 } from "../src/utils/random";
 
@@ -47,6 +47,37 @@ test('Deck', () => {
   expect([...deck1]).toStrictEqual([1, 2, 3]);
 });
 
+test('Ring', () => {
+  const ring1 = new Ring<number>(10);
+
+  expect(ring1.length()).toBe(0);
+
+  ring1.push(1);
+  ring1.pushHead(-1);
+  expect(ring1.length()).toBe(2);
+  expect(ring1.get(0)).toBe(-1);
+  expect(ring1.get(1)).toBe(1);
+
+  ring1.pushHead(2);
+  ring1.pushHead(3);
+  ring1.pushHead(4);
+  ring1.pushHead(5);
+  ring1.pushHead(6);
+  ring1.pushHead(7);
+  ring1.pushHead(8);
+  ring1.pushHead(9);
+  expect(ring1.length()).toBe(10);
+  expect([...ring1]).toStrictEqual([9, 8, 7, 6, 5, 4, 3, 2, -1, 1]);
+
+  expect(() => ring1.push(1)).toThrow();
+
+  ring1.pop();
+  ring1.pop();
+  ring1.popHead();
+  ring1.popHead();
+  expect([...ring1]).toStrictEqual([7, 6, 5, 4, 3, 2]);
+})
+
 test('IndexedDeck', () => {
   const deck = new IndexedDeck<number>();
 
@@ -83,9 +114,9 @@ test('IndexedDeck', () => {
 test('Utils', () => {
   expect([...map([1, 2, 3, 4], x => x * x)]).toStrictEqual([1, 4, 9, 16]);
   expect([...map([], x => x * x)]).toStrictEqual([]);
-  expect(all([0, 0, 0], x => x == 0)).toBe(true);
-  expect(all([0, 0, 1], x => x == 0)).toBe(false);
-  expect(all([], x => x == 0)).toBe(true);
+  expect(all([0, 0, 0], x => x === 0)).toBe(true);
+  expect(all([0, 0, 1], x => x === 0)).toBe(false);
+  expect(all([], x => x === 0)).toBe(true);
   expect(reduce([1, 2, 3], (r, h) => r * h, 1)).toBe(6);
   expect(reduce([], (r: number, h: number) => r * h, 1)).toBe(1);
   expect([...sub(wrap([1, 2, 3]), 1, 1)]).toStrictEqual([2]);
@@ -102,10 +133,19 @@ test('Utils', () => {
   expect([...cyclicPairs(3)]).toStrictEqual([[0, 1], [1, 2], [2, 0]]);
   expect(() => [...cyclicPairs(-3)]).toThrow();
   expect([...cyclicPairs(0)]).toStrictEqual([]);
+  expect([...slidingPairs([1, 2, 3, 4])]).toStrictEqual([[1, 2], [2, 3], [3, 4]]);
+  expect([...slidingPairs([1])]).toStrictEqual([]);
+  expect([...slidingWindow([1, 2, 3, 4], 3)]).toStrictEqual([[1, 2, 3], [2, 3, 4]]);
+  expect([...groups([1, 2, 3, 4], 2)]).toStrictEqual([[1, 2], [3, 4]]);
+  expect(() => [...groups([1, 2, 3, 4], 3)]).toThrow();
   expect([...rect(1, 1)]).toStrictEqual([[0, 0]]);
   expect([...rect(2, 2)]).toStrictEqual([[0, 0], [1, 0], [0, 1], [1, 1]]);
   expect(() => [...rect(-2, 2)]).toThrow();
   expect([...flatten([[1, 2, 3], [4], [], [5, [6, 7]]])]).toStrictEqual([1, 2, 3, 4, 5, [6, 7]]);
+  expect(findFirst([1, 2, 3, 4]).get()).toBe(1);
+  expect(findFirst([]).isPresent()).toBe(false);
+  expect(findFirst([1, 2, 3], x => x === 42).isPresent()).toBe(false);
+  expect(findFirst([1, 2, 3], x => x === 3).get()).toBe(3);
 });
 
 test('Sorted List', () => {

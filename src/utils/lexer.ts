@@ -10,7 +10,7 @@ export class LexerRule {
 }
 
 export class Lexer {
-  private rulesIndex: { [index: string]: LexerRule } = {};
+  private rulesIndex = new Map<string, LexerRule>();
   private rules: LexerRule[] = [];
   private src: string;
   private offset = 0;
@@ -18,33 +18,37 @@ export class Lexer {
   private eoi = false;
 
   private matchedRule: LexerRule = null;
-  private matchedValue = null;
+  private matchedValue: RegExpMatchArray = null;
 
-  public addRule(rule: LexerRule): Lexer {
-    let r = this.rulesIndex[rule.name];
-    if (r == undefined) {
+  addRule(rule: LexerRule): this {
+    const r = this.rulesIndex.get(rule.name);
+    if (r === undefined) {
       rule.id = this.rules.length;
       this.rules.push(rule);
     } else {
       throw new Error('Rule ' + rule.name + ' already exist');
     }
 
-    this.rulesIndex[rule.name] = rule;
+    this.rulesIndex.set(rule.name, rule);
     return this;
   }
 
-  public mark(): number {
+  add(pattern: RegExp, name: string, mid = 0, conv: (s: string) => any = s => s) {
+    return this.addRule(new LexerRule(pattern, name, mid, conv))
+  }
+
+  mark(): number {
     return this.lastOffset;
   }
 
-  public reset(offset: number = 0): string {
+  reset(offset: number = 0): string {
     this.offset = offset;
     this.lastOffset = offset;
     this.eoi = false;
     return this.next();
   }
 
-  public setSource(src: string): void {
+  setSource(src: string): void {
     this.src = src;
     this.offset = 0;
     this.eoi = false;
@@ -57,10 +61,9 @@ export class Lexer {
     let len = 0;
     let matchedValue = null;
     let matchedRule: LexerRule = null;
-    let subsrc = this.src.substr(this.offset);
-    for (let i = 0; i < this.rules.length; i++) {
-      let rule = this.rules[i];
-      let match = rule.pattern.exec(subsrc);
+    let subsrc = this.src.substring(this.offset);
+    for (const rule of this.rules) {
+      const match = rule.pattern.exec(subsrc);
       if (match != null && match[0].length >= len) {
         matchedValue = match;
         matchedRule = rule;
@@ -74,24 +77,24 @@ export class Lexer {
     this.offset += len;
 
     if (matchedRule == null)
-      throw new Error('Unexpected input "' + subsrc.substr(0, 10) + '..."');
+      throw new Error('Unexpected input "' + subsrc.substring(0, 10) + '..."');
 
     return matchedRule.name;
   }
 
-  public next(): string {
+  next(): string {
     return this.exec()
   }
 
-  public rule(): LexerRule {
+  rule(): LexerRule {
     return this.matchedRule;
   }
 
-  public value(): any {
+  value(): any {
     return this.rule().conv(this.matchedValue[this.rule().mid]);
   }
 
-  public isEoi(): boolean {
+  isEoi(): boolean {
     return this.eoi;
   }
 }

@@ -45,7 +45,7 @@ export function animate(frame: number, info: ArtInfo) {
     const x = frame % (max * 2 - 2);
     return x >= max ? max * 2 - 2 - x : x;
   } else if (info.attrs.animType === AnimationType.ANIMATE_FORWARD) return frame % max;
-  else if (info.attrs.animType === AnimationType.ANIMATE_BACKWARD) return max - frame % max;
+  else if (info.attrs.animType === AnimationType.ANIMATE_BACKWARD) return - frame % max;
 }
 
 const anumStruct = struct(Attributes)

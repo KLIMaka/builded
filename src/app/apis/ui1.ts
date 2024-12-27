@@ -3,12 +3,22 @@ import { Dependency } from "@utils/injector";
 import { Consumer } from "@utils/types";
 import { ReactElement } from "react";
 import { ActionsProvider } from "./actions";
-import WinBox from "react-winbox";
+import { Disconnector } from "./app1";
 
-export type Window = { winbox: WinBox };
-export type WindowRenderer = (onClose: Consumer<void>, windowConsumer: Consumer<Window>) => ReactElement;
+export type Window = {
+  content: ReactElement,
+  show(): Promise<void>,
+  close(force?: boolean): Promise<void>,
+  onClose(handle: Consumer<boolean>): Disconnector;
+  focus(): Promise<void>;
+  onFocus(handle: Consumer<void>): Disconnector;
+  isModal(): boolean;
+  getId(): string;
+}
+
 export interface Ui extends ActionsProvider {
-  showWindow(renderer: WindowRenderer): Promise<Window>;
+  addWindow(window: Window): void;
+  removeWindow(window: Window): void;
   globalActions(): ActionsCollector;
 }
 

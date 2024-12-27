@@ -1,26 +1,17 @@
-import { ActionDescriptorsContext, ActionsChannelContext, ActionsNode, useValue } from "@ui/commons";
-import { MessageBox } from "@ui/message-box";
-import { Consumer } from "@utils/types";
+import { useValue } from "@ui/commons";
+import { WindowBuilder } from "@ui/windows-common";
+import { createContainer } from "@utils/callbacks";
+import { ActionDescriptors } from "app/apis/actions";
 import { TaskController } from "app/apis/app1";
 import { Ui } from "app/apis/ui1";
-import React, { useContext, useEffect } from "react";
+import React from "react";
 
-function Progress<T>({ result, task }: { result: Consumer<T>, task: TaskController<T> }) {
-  const actionsChannel = useContext(ActionsChannelContext);
-  const actionDescriptors = useContext(ActionDescriptorsContext);
+function Progress<T>({ task }: { task: TaskController<T> }) {
   const info = useValue(task.info);
   const propgress = useValue(task.progress);
   const paused = useValue(task.paused);
 
-  useEffect(() => {
-    const ctx = actionDescriptors.sub('progress-box');
-    return actionsChannel.collector().add(
-      ctx.bindSync('stop', () => task.stop()),
-      ctx.bindSync('resume-pause', () => paused ? task.unpause() : task.pause()),
-    );
-  }, [actionDescriptors, actionsChannel, paused, task]);
-
-  return (<div className='column-block'>
+  return (<div className='column-block flex-nonwrap'>
     <div className='flex-fill row-block'>
       <div className="flex-auto padded-10 fa-solid fa-file" style={{ fontSize: '32px', alignContent: 'center' }}></div>
       <div className="flex-fill" style={{ alignContent: 'center' }}>{info}</div>
@@ -40,17 +31,20 @@ function Progress<T>({ result, task }: { result: Consumer<T>, task: TaskControll
   </div>);
 }
 
-export async function waitFor<T>(channel: ActionsNode, ui: Ui, title: string, task: TaskController<T>, channelConsumer?: Consumer<ActionsNode>) {
-  const window = await ui.showWindow(await MessageBox<T>({
-    content: result => <Progress result={result} task={task} />,
-    height: 170,
-    width: 400,
-    title: title,
-    parentChannel: channel,
-    channelConsumer,
-    resultConsumer: _ => task.stop()
-  }));
+export async function waitFor<T>(ui: Ui, actionDescriptors: ActionDescriptors, title: string, task: TaskController<T>) {
+  const values = createContainer('task-window');
+  const window = new WindowBuilder('progress-box', actionDescriptors, values)
+    .modal()
+    .title(title)
+    .size(400, 170)
+    .action('stop', () => task.stop())
+    .action('resume-pause', () => task.paused.get() ? task.unpause() : task.pause())
+    .onClose(() => task.stop())
+    .disposable(values)
+    .build(<Progress task={task} />);
+  ui.addWindow(window);
+  await window.show();
   const result = await task.end();
-  window.winbox.winBoxObj?.close();
+  await window.close();
   return result;
 }

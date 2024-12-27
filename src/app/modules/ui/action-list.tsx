@@ -12,20 +12,22 @@ type ActionItemProps = {
   selected: boolean,
   disabled: boolean,
   active: number,
-  setActive: Consumer<number>
+  setActive: Consumer<number>,
+  stripped: boolean,
 }
 
 
-function ActionListItem({ children, id, action, selected, active, setActive, disabled }: ActionItemProps) {
+function ActionListItem({ children, id, action, selected, active, setActive, disabled, stripped }: ActionItemProps) {
   const actions: HTMLProps<HTMLDivElement> = disabled ? {} : { onClick: _ => action(), onMouseEnter: _ => setActive(id), onMouseLeave: _ => setActive(-1) }
   return (
-    <div className={'action-list-item ' + styles({ selected, disabled, active: active === id })} {...actions} >
+    <div className={'action-list-item ' + styles({ selected, disabled, active: active === id, even: stripped && (id % 2 === 0) })} {...actions} >
       {children}
     </div>
   )
 }
 
 function scrollToView(parent: HTMLElement) {
+  if (!parent) return;
   const parentRect = parent.getBoundingClientRect()
   const activeList = parent.getElementsByClassName('active');
   if (activeList.length !== 1) return;
@@ -36,31 +38,50 @@ function scrollToView(parent: HTMLElement) {
 }
 
 export type ActionItem = { element: ReactNode, disabled?: boolean, action: Consumer<void>, selected?: boolean }
+export function createActionItem(element: ReactNode, action: Consumer<void>, disabled?: boolean, selected?: boolean): ActionItem {
+  return { element, action, disabled, selected }
+}
 
 export type ActionListProps = {
   items: ActionItem[],
   onAction?: Consumer<void>
+  className?: string,
+  stripped?: boolean,
 }
 
-export function ActionList(props: ActionListProps) {
+export function ActionList(props: ActionListProps & React.HTMLProps<HTMLDivElement>) {
   const [active, setActive] = useState(-1);
   const actionDescriptors = useContext(ActionDescriptorsContext);
   const actionsChannel = useContext(ActionsChannelContext);
   const listContainerRef = useRef<HTMLDivElement>();
   const onAction = props.onAction ?? nil();
+  const stripped = props.stripped ?? false;
 
   const moveActive = useCallback((current: number, off: number) => {
+    const items = props.items;
+    if (items.length === 0) return -1;
+    const skipDisabled = (idx: number, dir: number, first = true) => {
+      let ptr = idx;
+      for (; ;) {
+        if (!items[ptr].disabled) return ptr;
+        if (dir > 0 && ptr >= items.length - 1) return first ? skipDisabled(idx, -dir, false) : idx;
+        if (dir < 0 && ptr === 0) return first ? skipDisabled(idx, -dir, false) : idx;
+        ptr += dir;
+      }
+    }
     const next = clamp(current + off, 0, props.items.length - 1);
     setTimeout(() => scrollToView(listContainerRef.current));
-    return next;
-  }, [props.items.length])
+    return skipDisabled(next, Math.sign(off));
+  }, [props.items])
 
   const createActions = useCallback(() => {
     const ctx = actionDescriptors.sub('list');
     const next = ctx.bindSync('next', () => setActive(i => moveActive(i, 1)))
     const prev = ctx.bindSync('prev', () => setActive(i => moveActive(i, -1)))
+    const pgdwn = ctx.bindSync('next-page', () => setActive(i => moveActive(i, 10)))
+    const pgup = ctx.bindSync('prev-page', () => setActive(i => moveActive(i, -10)))
     const select = ctx.bindSync('select', () => { props.items[active]?.action(); onAction() });
-    return [next, prev, select];
+    return [next, prev, select, pgup, pgdwn];
   }, [actionDescriptors, active, moveActive, onAction, props.items]);
 
   useEffect(() => {
@@ -68,7 +89,7 @@ export function ActionList(props: ActionListProps) {
   }, [actionsChannel, createActions]);
 
   return (
-    <div className='actions-list' ref={listContainerRef}>
+    <div className={`actions-list ${props.className ?? ''}`} ref={listContainerRef} style={props.style}>
       {iter(props.items)
         .enumerate()
         .map(([item, i]) => <ActionListItem
@@ -79,6 +100,7 @@ export function ActionList(props: ActionListProps) {
           disabled={item.disabled}
           active={active}
           setActive={setActive}
+          stripped={stripped}
         >
           {item.element}
         </ActionListItem>)

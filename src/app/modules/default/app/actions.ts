@@ -9,7 +9,7 @@ import { Bind } from "app/input/keymap";
 import Optional from "optional-js";
 import toml from "toml";
 
-const ENABLED = constSource(true);
+const ENABLED = constSource('defaultEnabled', true);
 
 class ActionDescriptorImpl implements ActionDescriptor {
   constructor(

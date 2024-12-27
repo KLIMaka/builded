@@ -1,8 +1,8 @@
 import Optional from "optional-js";
-import { filter, map, reduce, forEach, all, enumerate, take, findFirst, chain, butLast, skip, any, iterIsEmpty, skipWhile, flatten, Deiterable, zip, join, length, toMap, reduceFirst } from "./collections";
+import { filter, map, reduce, forEach, all, enumerate, take, findFirst, chain, butLast, skip, any, iterIsEmpty, skipWhile, flatten, Deiterable, zip, join, length, toMap, reduceFirst, group, toObject } from "./collections";
 import { Function } from "./types";
 
-export class Iter<T> implements Iterable<T>{
+export class Iter<T> implements Iterable<T> {
   public static of<T>(iter: Iterable<T>) { return new Iter(iter) }
 
   constructor(public iter: Iterable<T>) { };
@@ -22,7 +22,7 @@ export class Iter<T> implements Iterable<T>{
   all(f: (t: T) => boolean): boolean { return all(this.iter, f) }
   any(f: (t: T) => boolean): boolean { return any(this.iter, f) }
   isEmpty(): boolean { return iterIsEmpty(this.iter) }
-  first(f: (t: T) => boolean, def: T): T { return findFirst(this.iter, f, def) }
+  first(f: (t: T) => boolean = _ => true): Optional<T> { return findFirst(this.iter, f) }
   chain(i: Iterable<T>): Iter<T> { return new Iter(chain(this.iter, i)) }
   butLast(): Iter<T> { return new Iter(butLast(this.iter)) }
   flatten(): Iter<Deiterable<T>> { return new Iter(flatten(this.iter)) }
@@ -30,6 +30,9 @@ export class Iter<T> implements Iterable<T>{
   set(): Set<T> { return new Set(this.iter) }
   length(): number { return length(this.iter) }
   toMap<K, V>(keyMapper: Function<T, K>, valueMapper: Function<T, V>): Map<K, V> { return toMap(this.iter, keyMapper, valueMapper) }
+  toObject<U>(keyMapper: Function<T, keyof U>, valueMapper: Function<T, any>): U { return toObject(this.iter, keyMapper, valueMapper) }
+  group<K, V>(keyMapper: Function<T, K>, valueMapper: Function<T, V>): Map<K, V[]> { return group(this.iter, keyMapper, valueMapper) }
+  async await_(): Promise<Iter<Awaited<T>>> { return new Iter(await Promise.all([...this.iter])) }
 }
 
 export function iter<T>(iter: Iterable<T>) {

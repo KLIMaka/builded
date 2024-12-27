@@ -1,7 +1,7 @@
 import { point_3d, buildHull, Point } from '../src/build/board/mutations/drawwall';
 import { cyclic } from '../src/utils/mathutils';
 
-const proj = (x: number, y: number) => <[number, number, number]>[0, 0, x];
+const proj = (x: number, y: number) => [0, 0, x] as [number, number, number];
 
 function shift(points: point_3d[], off: number): point_3d[] {
   const npoints: point_3d[] = [];

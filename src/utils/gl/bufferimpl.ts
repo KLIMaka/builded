@@ -1,3 +1,4 @@
+import { TypedTableCellProps } from "@ui/table";
 import { IndexBuffer, VertexBuffer } from "./drawstruct";
 
 export class VertexBufferImpl implements VertexBuffer {
@@ -44,11 +45,11 @@ export function genIndexBuffer(gl: WebGLRenderingContext, count: number, pattern
     }
   }
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bufIdx);
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, <ArrayBuffer>data.buffer, gl.STATIC_DRAW);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, data.buffer as ArrayBuffer, gl.STATIC_DRAW);
   return new IndexBufferImpl(bufIdx, gl.UNSIGNED_SHORT);
 }
 
-export function GlType2ArrayType(glType: number): any {
+export function GlType2ArrayType(glType: number) {
   switch (glType) {
     case WebGLRenderingContext.BYTE: return Int8Array;
     case WebGLRenderingContext.UNSIGNED_BYTE: return Uint8Array;
@@ -105,7 +106,7 @@ export class VertexBufferDynamic extends VertexBufferImpl implements Updatable {
   }
 
   public updateRegion(gl: WebGLRenderingContext, offset: number, length: number): void {
-    var sizeof = (<any>this.data).BYTES_PER_ELEMENT * this.getSpacing();
+    var sizeof = (this.data as any).BYTES_PER_ELEMENT * this.getSpacing();
     var region = new Uint8Array(this.data.buffer, offset * sizeof, length * sizeof);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.getBuffer());
     gl.bufferSubData(gl.ARRAY_BUFFER, offset * sizeof, region);
@@ -118,7 +119,7 @@ export class DynamicIndexBuffer extends IndexBufferImpl implements Updatable {
   constructor(
     gl: WebGLRenderingContext,
     data: ArrayBufferView,
-    type: number = WebGLRenderingContext.UNSIGNED_SHORT,
+    type: number = WebGLRenderingContext.UNSIGNED_INT,
     usage: number = WebGLRenderingContext.STREAM_DRAW
   ) {
     super(gl.createBuffer(), type);
@@ -133,7 +134,7 @@ export class DynamicIndexBuffer extends IndexBufferImpl implements Updatable {
   }
 
   public updateRegion(gl: WebGLRenderingContext, offset: number, length: number): void {
-    var sizeof = 2;
+    var sizeof = GlType2ArrayType(this.getType()).BYTES_PER_ELEMENT;
     var region = new Uint8Array(this.data.buffer, offset * sizeof, length * sizeof);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.getBuffer());
     gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, offset * sizeof, region);
@@ -144,7 +145,7 @@ export class DynamicIndexBuffer extends IndexBufferImpl implements Updatable {
 export function createVertexBuffer(gl: WebGLRenderingContext, type: number, data: any, spacing: number, usage: number = WebGLRenderingContext.DYNAMIC_DRAW, norm: boolean = false): VertexBufferDynamic {
   var arrtype = GlType2ArrayType(type);
   if (typeof data == 'number') data = new arrtype(data * spacing)
-  else if (arrtype != data.constructor) throw new Error('GL Type and ArrayBuffer is incompatible')
+  else if (arrtype !== data.constructor) throw new Error('GL Type and ArrayBuffer is incompatible')
   return new VertexBufferDynamic(gl, type, data, spacing, usage, norm);
 }
 
@@ -156,7 +157,7 @@ export function wrap(gl: WebGLRenderingContext, data: ArrayBufferView, spacing: 
 export function createIndexBuffer(gl: WebGLRenderingContext, type: number, data: any, usage: number = WebGLRenderingContext.STREAM_DRAW): DynamicIndexBuffer {
   const arrtype = GlType2ArrayType(type);
   if (typeof data == 'number') data = new arrtype(data);
-  else if (arrtype != data.constructor) throw new Error('GL Type and ArrayBuffer is incompatible')
+  else if (arrtype !== data.constructor) throw new Error('GL Type and ArrayBuffer is incompatible')
   return new DynamicIndexBuffer(gl, data, type, usage);
 }
 

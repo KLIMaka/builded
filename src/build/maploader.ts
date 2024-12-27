@@ -31,7 +31,7 @@ export const sectorStruct = struct(Sector)
   .field('floorpal', ubyte)
   .field('floorxpanning', ubyte)
   .field('floorypanning', ubyte)
-  .field('visibility', byte)
+  .field('visibility', ubyte)
   .field('filler', byte)
   .field('lotag', ushort)
   .field('hitag', ushort)
@@ -92,7 +92,7 @@ export const spriteStruct = struct(Sprite)
   .field('shade', byte)
   .field('pal', ubyte)
   .field('clipdist', ubyte)
-  .field('filler', ubyte)
+  .field('blend', ubyte)
   .field('xrepeat', ubyte)
   .field('yrepeat', ubyte)
   .field('xoffset', byte)
@@ -274,7 +274,7 @@ export function initSprite(sprite: Sprite) {
   sprite.yvel = 0;
   sprite.xrepeat = 40;
   sprite.yrepeat = 40;
-  sprite.filler = 0;
+  sprite.blend = 0;
   return sprite;
 }
 

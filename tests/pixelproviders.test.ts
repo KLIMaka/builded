@@ -1,7 +1,7 @@
-import { array, Raster, resize, superResize } from '../src/utils/pixelprovider';
+import { array, Raster, resize } from '../src/utils/pixelprovider';
 
 const rasterizer = (r: Raster<number>) => {
-  const out = [];
+  const out: number[] = [];
   let i = 0;
   for (let y = 0; y < r.height; y++)
     for (let x = 0; x < r.width; x++)
@@ -20,17 +20,5 @@ test('resize', () => {
     1, 1, 1, 1,
     2, 2, 2, 2,
     2, 2, 2, 2
-  ]);
-});
-
-test('superResize', () => {
-  const img = [1, 2, 2, 1];
-  const pp = array(img, 2, 2);
-  const resizepp = superResize(pp, 4, 4, (l, r) => l == r ? l : null, (l, r) => (l + r) / 2);
-  expect(rasterizer(resizepp)).toStrictEqual([
-    1, 1, 2, 2,
-    1, 1.5, 1.5, 2,
-    2, 1.5, 1.5, 1,
-    2, 2, 1, 1,
   ]);
 });

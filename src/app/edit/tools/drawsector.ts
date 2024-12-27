@@ -1,3 +1,4 @@
+import { vec3 } from "gl-matrix";
 import { closestWallPointDist } from "../../../build/board/distances";
 import { EngineApi } from "../../../build/board/mutations/api";
 import { createNewSector } from "../../../build/board/mutations/ceatesector";
@@ -7,17 +8,16 @@ import { findContainingSectorMidPoints, sectorOfWall, wallInSector } from "../..
 import { Board } from "../../../build/board/structs";
 import { Target } from "../../../build/hitscan";
 import { ZSCALE } from "../../../build/utils";
-import { vec3 } from "gl-matrix";
 import { Deck, wrap } from "../../../utils/collections";
-import { create, lifecycle, Module, plugin } from "../../../utils/injector";
+import { Module, create, lifecycle, plugin } from "../../../utils/injector";
 import { int, len2d } from "../../../utils/mathutils";
-import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, REFERENCE_TRACKER, SnapType, View, VIEW } from "../../apis/app";
-import { BUS, busDisconnector, MessageBus } from "../../apis/handler";
+import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, REFERENCE_TRACKER, VIEW, View } from "../../apis/app";
+import { BUS, MessageBus, busDisconnector } from "../../apis/handler";
 import { NULL_RENDERABLE, Renderable, Renderables } from "../../apis/renderable";
-import { writeText } from "../../modules/geometry/builders/common";
-import { RenderablesCache, RENDRABLES_CACHE } from "../../modules/geometry/cache";
-import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
 import { LineBuilder, PointSpritesBuilder } from "../../modules/gl/buffers";
+import { writeText } from "../../modules/gl/geometry/builders/common";
+import { RENDRABLES_CACHE, RenderablesCache } from "../../modules/gl/geometry/cache";
+import { BuildersFactory } from "../../modules/gl/geometry/common";
 import { getClosestSectorZ } from "../editutils";
 import { BoardInvalidate, Commit, Frame, NamedMessage, Render } from "../messages";
 import { DefaultTool, TOOLS_BUS } from "./toolsbus";
@@ -57,7 +57,7 @@ class Contour {
   }
 
   private updateRenderable() {
-    if (this.size == 0) return;
+    if (this.size === 0) return;
     this.updateContourPoints();
     this.updateContour();
     this.updateLength();
@@ -68,8 +68,8 @@ class Contour {
     this.contourPoints.tex = this.art.get(-1);
     const builder = new PointSpritesBuilder();
     for (let i = 0; i < this.size; i++) {
-      const p = this.points[i];
-      builder.add(p[0], this.z, p[1]);
+      const [x, y] = this.points[i];
+      builder.add(x, this.z, y);
     }
     builder.build(this.contourPoints.buff, 2.5);
   }
@@ -77,13 +77,12 @@ class Contour {
   private updateContour() {
     this.contour.needToRebuild();
     const buff = this.contour.buff;
-    buff.deallocate();
     const size = this.size - 1;
     const builder = new LineBuilder();
     for (let i = 0; i < size; i++) {
-      const p1 = this.points[i];
-      const p2 = this.points[i + 1];
-      builder.segment(p1[0], this.z, p1[1], p2[0], this.z, p2[1]);
+      const [x1, y1] = this.points[i];
+      const [x2, y2] = this.points[i + 1];
+      builder.segment(x1, this.z, y1, x2, this.z, y2);
     }
     builder.build(buff);
   }
@@ -184,12 +183,12 @@ export class DrawSector<B extends Board> extends DefaultTool {
     if (snapTarget.entity == null) {
       const [x, y] = snapTarget.coords;
       const [w] = closestWallPointDist(board, x, y);
-      const z = w == -1 ? 0 : board.sectors[sectorOfWall(board, w)].ceilingz;
+      const z = w === -1 ? 0 : board.sectors[sectorOfWall(board, w)].ceilingz;
       vec3.set(this.pointer, x, y, z);
       this.contour.setZ(z / ZSCALE);
       this.contour.updateLastPoint(x, y);
     } else if (snapTarget.entity.isSector() || snapTarget.entity.isSprite() || (target.entity == null || target.entity.isSector())) {
-      const [x, y,] = snapTarget.coords;
+      const [x, y] = snapTarget.coords;
       const z = this.getPointerZ(board, snapTarget);
       vec3.set(this.pointer, x, y, z);
       this.contour.setZ(z / ZSCALE);
@@ -215,20 +214,20 @@ export class DrawSector<B extends Board> extends DefaultTool {
 
   private isSplitSector(x: number, y: number) {
     const sectorId = this.findContainingSector();
-    if (sectorId == -1) return -1;
+    if (sectorId === -1) return -1;
     const fp = this.points.get(0);
     const board = this.board();
-    return wallInSector(board, sectorId, fp[0], fp[1]) != -1
-      && wallInSector(board, sectorId, x, y) != -1 ? sectorId : -1;
+    return wallInSector(board, sectorId, fp[0], fp[1]) !== -1
+      && wallInSector(board, sectorId, x, y) !== -1 ? sectorId : -1;
   }
 
   private insertPoint(rect: boolean) {
-    if (this.points.length() == 0) {
+    if (this.points.length() === 0) {
       const target = this.view.target();
       if (target.entity != null && !target.entity.isSector()) return;
     }
     this.activate();
-    if (this.points.length() == 0) this.isRect = rect;
+    if (this.points.length() === 0) this.isRect = rect;
     if (this.checkFinish()) {
       this.deactivate();
       return;
@@ -246,17 +245,17 @@ export class DrawSector<B extends Board> extends DefaultTool {
   }
 
   private checkFinish() {
-    if (this.points.length() == 0) return false;
+    if (this.points.length() === 0) return false;
 
     const splitSector = this.isSplitSector(this.pointer[0], this.pointer[1]);
-    if (splitSector != -1) {
+    if (splitSector !== -1) {
       this.splitSector(splitSector);
       return true;
     }
     const latsPoint = this.points.get(this.points.length() - 1);
-    if (latsPoint[0] == this.pointer[0] && latsPoint[1] == this.pointer[1]) return false;
+    if (latsPoint[0] === this.pointer[0] && latsPoint[1] === this.pointer[1]) return false;
     const firstPoint = this.points.get(0);
-    if (firstPoint[0] == this.pointer[0] && firstPoint[1] == this.pointer[1] || this.isRect) {
+    if (firstPoint[0] === this.pointer[0] && firstPoint[1] === this.pointer[1] || this.isRect) {
       this.createSector();
       return true;
     }
@@ -264,7 +263,7 @@ export class DrawSector<B extends Board> extends DefaultTool {
   }
 
   private popPoint() {
-    if (this.points.length() == 0) return;
+    if (this.points.length() === 0) return;
     if (this.isRect) {
       for (let i = 0; i < 4; i++) {
         this.points.pop();
@@ -274,7 +273,7 @@ export class DrawSector<B extends Board> extends DefaultTool {
       this.points.pop();
       this.contour.popPoint();
     }
-    if (this, this.points.length() == 0) this.deactivate();
+    if (this.points.length() === 0) this.deactivate();
     this.contour.updateLastPoint(this.pointer[0], this.pointer[1]);
   }
 
@@ -286,13 +285,13 @@ export class DrawSector<B extends Board> extends DefaultTool {
 
   private findContainingSector() {
     const sectors = findContainingSectorMidPoints(this.board(), [...this.points, [this.pointer[0], this.pointer[1]]]);
-    return sectors.size == 1 ? sectors.values().next().value : -1;
+    return sectors.size === 1 ? sectors.values().next().value : -1;
   }
 
   private createSector() {
     const sectorId = this.findContainingSector();
     const board = this.board();
-    if (sectorId != -1)
+    if (sectorId !== -1)
       createInnerLoop(board, sectorId, this.points, this.refs, this.api);
     const nsectorId = createNewSector(board, this.points, this.refs, this.api);
     this.bus.handle(new Commit(`Create Sector ${nsectorId}`));

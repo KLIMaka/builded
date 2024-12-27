@@ -36,14 +36,14 @@ export const IndexedImgLibJsConstructor = provider(async (injector: Injector) =>
   return {
     palettize: (w: number, h: number, img: Uint8Array) => {
       const dst = new Uint8Array(w * h);
-      for (const [x, y] of rect(w, h)) {
-        const idx = y * w + x;
-        const r = img[idx * 4];
-        const g = img[idx * 4 + 1];
-        const b = img[idx * 4 + 2];
-        const xyz = rgb2xyz(r, g, b);
-        const lab = xyz2lab(xyz[0], xyz[1], xyz[2]);
-        dst[idx] = findLab(labpal, lab[0], lab[1], lab[2])[0];
+      for (const [xc, yc] of rect(w, h)) {
+        const idx = yc * w + xc;
+        const r_ = img[idx * 4];
+        const g_ = img[idx * 4 + 1];
+        const b_ = img[idx * 4 + 2];
+        const [x, y, z] = rgb2xyz(r_, g_, b_);
+        const [l, a, b] = xyz2lab(x, y, z);
+        dst[idx] = findLab(labpal, l, a, b)[0];
       }
       return dst;
     },

@@ -1,18 +1,18 @@
 
 export function createContextFromCanvas(id: string, opts = {}): WebGLRenderingContext {
-  const canvas = <HTMLCanvasElement>document.getElementById(id);
-  const gl = <WebGLRenderingContext>canvas.getContext('webgl2', opts);
+  const canvas = document.getElementById(id) as HTMLCanvasElement;
+  const gl = canvas.getContext('webgl2', opts) as WebGLRenderingContext;
   return gl;
 }
 
 export function resize(gl: WebGLRenderingContext) {
-  const canvas = <HTMLCanvasElement>gl.canvas;
+  const canvas = gl.canvas as HTMLCanvasElement;
   const parent = canvas.parentElement.parentElement;
 
   const displayWidth = parent.clientWidth - 2;
   const displayHeight = parent.clientHeight - 35;
 
-  if (canvas.width != displayWidth || canvas.height != displayHeight) {
+  if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
 
     canvas.width = displayWidth;
     canvas.height = displayHeight;
@@ -22,7 +22,7 @@ export function resize(gl: WebGLRenderingContext) {
 }
 
 export function switchContext(gl: WebGL2RenderingContext, elem: HTMLElement) {
-  const canvas = <HTMLCanvasElement>gl.canvas;
+  const canvas = gl.canvas as HTMLCanvasElement;
   const rect = elem.getBoundingClientRect();
   if (rect.bottom < 0 || rect.top > canvas.clientHeight ||
     rect.right < 0 || rect.left > canvas.clientWidth)

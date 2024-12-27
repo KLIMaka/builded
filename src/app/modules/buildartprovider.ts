@@ -1,4 +1,4 @@
-import { ArtFiles, ArtInfo, Attributes, EMPTY_INFO } from "../../build/formats/art";
+import { ArtInfo, Attributes, EMPTY_INFO } from "../../build/formats/art";
 import { rect } from "../../utils/collections";
 import { Texture } from "../../utils/gl/drawstruct";
 import { createTexture, TextureImpl } from "../../utils/gl/textures";

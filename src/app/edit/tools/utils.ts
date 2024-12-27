@@ -153,7 +153,7 @@ class Utils extends DefaultTool {
         sprite.sectnum = sectorId;
         sprite.picnum = picnum;
         const spriteId = addSprite(board, sprite);
-        const info = spriteInfo(board, spriteId, this.art);
+        const info = spriteInfo(board, spriteId, this.art.get());
         sprite.z -= (ent.type == EntityType.CEILING ? info.ztop : info.zbottom) * ZSCALE;
       }
       this.commit(`Insert Sprite`);

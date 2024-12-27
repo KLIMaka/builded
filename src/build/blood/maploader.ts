@@ -1,10 +1,10 @@
-import { buf } from "crc-32";
 import { range } from '@utils/collections';
 import { iter } from '@utils/iter';
-import { Accessor, Stream, array, atomic_array, bits, bits_signed, byte, int, short, string, struct, ubyte, uint, ushort } from '@utils/stream';
-import { Header1, SectorStats, SpriteStats, WallStats } from '../board/structs';
-import { fixSectorSlopes, initSector, initSprite, initWall, sectorStruct, spriteStruct, wallStruct } from '../maploader';
-import { BloodBoard, BloodSector, BloodSprite, BloodWall, SectorExtra, SpriteExtra, WallExtra } from './structs';
+import { Accessor, Stream, array, atomic_array, bit, bits, bits_signed, byte, int, short, string, struct, ubyte, uint, ushort } from '@utils/stream';
+import { buf } from "crc-32";
+import { Header1, SpriteStats, WallStats } from '../board/structs';
+import { fixSectorSlopes, initSector, initSprite, initWall, spriteStruct, wallStruct } from '../maploader';
+import { BloodBoard, BloodSector, BloodSectorStats, BloodSprite, BloodWall, SectorExtra, SpriteExtra, WallExtra } from './structs';
 
 
 function decryptBuffer(buffer: Uint8Array, size: number, key: number) {
@@ -23,13 +23,49 @@ function crc(buff: ArrayBuffer) {
   return buf(new Uint8Array(buff, 0, buff.byteLength - 4));
 }
 
+const sectorStats = struct(BloodSectorStats)
+  .field('parallaxing', bit())
+  .field('slopped', bits(1))
+  .field('swapXY', bits(1))
+  .field('doubleSmooshiness', bits(1))
+  .field('xflip', bits(1))
+  .field('yflip', bits(1))
+  .field('alignToFirstWall', bits(1))
+  .field('unk', bits(8))
+  .field('floorShade', bit());
+
+const sectorStruct = struct(BloodSector)
+  .field('wallptr', ushort)
+  .field('wallnum', ushort)
+  .field('ceilingz', int)
+  .field('floorz', int)
+  .field('ceilingstat', sectorStats)
+  .field('floorstat', sectorStats)
+  .field('ceilingpicnum', ushort)
+  .field('ceilingheinum', short)
+  .field('ceilingshade', byte)
+  .field('ceilingpal', ubyte)
+  .field('ceilingxpanning', ubyte)
+  .field('ceilingypanning', ubyte)
+  .field('floorpicnum', ushort)
+  .field('floorheinum', short)
+  .field('floorshade', byte)
+  .field('floorpal', ubyte)
+  .field('floorxpanning', ubyte)
+  .field('floorypanning', ubyte)
+  .field('visibility', byte)
+  .field('filler', byte)
+  .field('lotag', ushort)
+  .field('hitag', ushort)
+  .field('extra', ushort);
+
 const header1Struct = struct(Header1)
   .field('startX', int)
   .field('startY', int)
   .field('startZ', int)
   .field('startAng', short)
   .field('startSec', short)
-  .field('unk', short);
+  .field('parallaxSize', short);
 
 class Header2 {
   public visibility: number;
@@ -259,9 +295,9 @@ function readSectors(header3: Header3, stream: Stream): BloodSector[] {
   for (let i = 0; i < header3.numSectors; i++) {
     const buf = sectorReader.read(stream);
     decryptBuffer(buf, sectorStruct.size, dec);
-    const sector = cloneSector(<BloodSector>sectorStruct.read(createStream(buf)));
+    const sector = cloneSector(sectorStruct.read(createStream(buf)) as BloodSector);
     sectors.push(sector);
-    if (sector.extra != 0 && sector.extra != 65535) sector.extraData = sectorExtraStruct.read(stream);
+    if (sector.extra !== 0 && sector.extra !== 65535) sector.extraData = sectorExtraStruct.read(stream);
     else sector.extraData = null;
   }
   return sectors;
@@ -274,9 +310,9 @@ function readWalls(header3: Header3, stream: Stream): BloodWall[] {
   for (let i = 0; i < header3.numWalls; i++) {
     const buf = wallReader.read(stream);
     decryptBuffer(buf, wallStruct.size, dec);
-    const wall = cloneWall(<BloodWall>wallStruct.read(createStream(buf)));
+    const wall = cloneWall(wallStruct.read(createStream(buf)) as BloodWall);
     walls.push(wall);
-    if (wall.extra != 0 && wall.extra != 65535) wall.extraData = wallExtraStruct.read(stream);
+    if (wall.extra !== 0 && wall.extra !== 65535) wall.extraData = wallExtraStruct.read(stream);
     else wall.extraData = null;
   }
   return walls;
@@ -289,9 +325,9 @@ function readSprites(header3: Header3, stream: Stream): BloodSprite[] {
   for (let i = 0; i < header3.numSprites; i++) {
     const buf = spriteReader.read(stream);
     decryptBuffer(buf, spriteStruct.size, dec);
-    const sprite = cloneSprite(<BloodSprite>spriteStruct.read(createStream(buf)));
+    const sprite = cloneSprite(spriteStruct.read(createStream(buf)) as BloodSprite);
     sprites.push(sprite);
-    if (sprite.extra != 0 && sprite.extra != 65535) sprite.extraData = spriteExtraStruct.read(stream);
+    if (sprite.extra !== 0 && sprite.extra !== 65535) sprite.extraData = spriteExtraStruct.read(stream);
     else sprite.extraData = null;
   }
   return sprites;
@@ -312,6 +348,7 @@ function createBoard(version: number, header1: Header1, header2: Header2, header
   brd.walls = walls;
   brd.sprites = sprites;
   brd.visibility = header2.visibility;
+  brd.parallaxSize = header1.parallaxSize;
   return brd;
 }
 
@@ -329,7 +366,7 @@ export function loadBloodMap(stream: Stream): BloodBoard {
   const header3 = header3Struct.read(createStream(buf));
   buf = atomic_array(ubyte, 128).read(stream);
   decryptBuffer(buf, 128, header3.numWalls);
-  stream.skip((1 << header1.unk) * 2);
+  stream.skip((1 << header1.parallaxSize) * 2);
 
   const sectors = readSectors(header3, stream);
   const walls = readWalls(header3, stream);
@@ -437,7 +474,7 @@ function createHeader1(board: BloodBoard) {
   header1.startX = board.posx;
   header1.startY = board.posy;
   header1.startZ = board.posz;
-  header1.unk = 0;
+  header1.parallaxSize = 0;
   return header1;
 }
 
@@ -479,8 +516,8 @@ export function newSprite() {
 export function cloneSector(sector: BloodSector): BloodSector {
   const sectorCopy = new BloodSector();
   Object.assign(sectorCopy, sector);
-  sectorCopy.floorstat = Object.assign(new SectorStats(), sector.floorstat);
-  sectorCopy.ceilingstat = Object.assign(new SectorStats(), sector.ceilingstat);
+  sectorCopy.floorstat = Object.assign(new BloodSectorStats(), sector.floorstat);
+  sectorCopy.ceilingstat = Object.assign(new BloodSectorStats(), sector.ceilingstat);
   if (sector.extraData) sectorCopy.extraData = Object.assign(new SectorExtra(), sector.extraData);
   return sectorCopy;
 }

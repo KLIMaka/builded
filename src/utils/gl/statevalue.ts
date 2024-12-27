@@ -4,7 +4,7 @@ export interface StateValue<T> {
   set(v: T): void;
 }
 
-export class StateValueGeneric<T> implements StateValue<T>{
+export class StateValueGeneric<T> implements StateValue<T> {
   constructor(
     private changecb: () => void,
     public value: T,
@@ -27,7 +27,7 @@ export class StateValueMatrix<T> {
   ) { }
   get(): T { return this.value; }
   set(v: T) {
-    if (!this.cmp(v, this.value)) {
+    if (v !== this.value && !this.cmp(v, this.value)) {
       this.setter(this.value, v);
       this.changecb();
     }

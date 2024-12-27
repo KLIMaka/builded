@@ -1,4 +1,4 @@
-import { Deck, EMPTY_ITERATOR, ITERATOR_RESULT, TERMINAL_ITERATOR_RESULT, map } from "./collections";
+import { EMPTY_ITERATOR, ITERATOR_RESULT, TERMINAL_ITERATOR_RESULT, map } from "./collections";
 
 export class Node<T> {
   constructor(
@@ -8,7 +8,7 @@ export class Node<T> {
   }
 }
 
-export class List<T> implements Iterable<T>{
+export class List<T> implements Iterable<T> {
   private nil = new Node<T>();
 
   constructor() {
@@ -49,7 +49,7 @@ export class List<T> implements Iterable<T>{
   }
 
   public isEmpty(): boolean {
-    return this.nil.next == this.nil;
+    return this.nil.next === this.nil;
   }
 
   public insertNodeBefore(node: Node<T>, ref: Node<T> = this.nil.next): Node<T> {
@@ -77,7 +77,7 @@ export class List<T> implements Iterable<T>{
   }
 
   public remove(ref: Node<T>): Node<T> {
-    if (ref == this.nil) return;
+    if (ref === this.nil) return;
     ref.next.prev = ref.prev;
     ref.prev.next = ref.next;
     return ref;
@@ -88,13 +88,13 @@ export class List<T> implements Iterable<T>{
     this.nil.prev = this.nil;
   }
 
-  public [Symbol.iterator]() {
+  public [Symbol.iterator](): Iterator<T> {
     let pointer = this.first();
-    return pointer == this.terminator()
+    return pointer === this.terminator()
       ? EMPTY_ITERATOR
       : {
         next: () => {
-          if (pointer == this.terminator())
+          if (pointer === this.terminator())
             return TERMINAL_ITERATOR_RESULT;
           else {
             const obj = pointer.obj;
@@ -107,69 +107,61 @@ export class List<T> implements Iterable<T>{
 }
 
 export class FastList<T> implements Iterable<T> {
-  private elements = new Deck<T>();
-  private nextIdx = new Deck<number>();
-  private lastIdx = new Deck<number>();
+  private elements: any[] = [];
 
-  constructor() { this.clear() }
+  constructor() {
+    this.clear();
+  }
 
-  public insertAfter(value: T, after: number = this.lastIdx.get(0)): number {
-    const idx = this.elements.length();
-    const next = this.nextIdx.get(after);
-    this.elements.push(value);
-    this.nextIdx.push(next)
-    this.lastIdx.push(after);
-    this.nextIdx.set(after, idx);
-    this.lastIdx.set(next, idx);
+  private static nextOff(idx: number) { return idx * 3 + 1 }
+  private static lastOff(idx: number) { return idx * 3 + 2 }
+
+  insertAfter(value: T, after: number = this.elements[1]): number {
+    const idx = this.length() + 1;
+    const next = this.next(after);
+    this.elements.push(value, next, after);
+    this.elements[FastList.nextOff(after)] = idx;
+    this.elements[FastList.lastOff(next)] = idx;
     return idx;
   }
 
-  public insertBefore(value: T, before: number = this.nextIdx.get(0)): number {
-    const idx = this.elements.length();
-    const last = this.lastIdx.get(before);
-    this.elements.push(value);
-    this.nextIdx.push(before)
-    this.lastIdx.push(last);
-    this.nextIdx.set(last, idx);
-    this.lastIdx.set(before, idx);
+  insertBefore(value: T, before: number = this.elements[2]): number {
+    const idx = this.length() + 1;
+    const last = this.last(before);
+    this.elements.push(value, before, last);
+    this.elements[FastList.nextOff(last)] = idx;
+    this.elements[FastList.lastOff(before)] = idx;
     return idx;
   }
 
-  public remove(idx: number): T {
-    if (idx <= 0 || idx >= this.elements.length() || this.nextIdx.get(idx) == -1) return null;
-    this.nextIdx.set(this.lastIdx.get(idx), this.nextIdx.get(idx));
-    this.lastIdx.set(this.nextIdx.get(idx), this.lastIdx.get(idx));
-    this.nextIdx.set(idx, -1);
-    return this.elements.get(idx);
+  remove(idx: number): T {
+    if (idx <= 0 || idx >= this.length() || this.next(idx) === -1) return null;
+    this.elements[FastList.nextOff(this.last(idx))] = this.next(idx);
+    this.elements[FastList.lastOff(this.next(idx))] = this.last(idx);
+    this.elements[FastList.nextOff(idx)] = -1;
+    this.elements[FastList.lastOff(idx)] = -1;
+    const elem = this.elements[idx * 3];
+    this.elements[idx * 3] = null;
+    return elem;
   }
 
-  public pop() {
-    const lastId = this.last(0);
-    const last = this.get(lastId);
-    this.remove(lastId);
-    return last;
-  }
+  clear() { this.elements = [null, 0, 0] }
+  length(): number { return this.elements.length / 3 - 1 }
+  get(idx: number): T { return this.elements[idx * 3] as T }
+  next(idx: number): number { return this.elements[FastList.nextOff(idx)] as number }
+  last(idx: number): number { return this.elements[FastList.lastOff(idx)] as number }
+  push(value: T): number { return this.insertAfter(value) }
+  pop() { return this.remove(this.last(0)) }
+  first() { return this.next(0) }
+  isEmpty() { return this.length() === 0 }
 
-  public get(idx: number): T { return this.elements.get(idx) }
-  public next(idx: number): number { return this.nextIdx.get(idx) }
-  public last(idx: number): number { return this.lastIdx.get(idx) }
-  public push(value: T): number { return this.insertAfter(value) }
-  public first() { return this.next(0) }
-  public isEmpty() { return this.nextIdx.get(0) == 0 }
-
-  public clear() {
-    this.elements.clear().push(null);
-    this.nextIdx.clear().push(0);
-    this.lastIdx.clear().push(0);
-  }
-
-  public [Symbol.iterator]() {
+  public [Symbol.iterator](): Iterator<T> {
     let ptr = this.first();
-    return ptr == 0
+    return ptr === 0
       ? EMPTY_ITERATOR
       : {
         next: () => {
-          if (ptr == 0) return TERMINAL_ITERATOR_RESULT;
+          if (ptr === 0) return TERMINAL_ITERATOR_RESULT;
           else {
             const obj = this.get(ptr);
             ptr = this.next(ptr);
@@ -187,15 +179,12 @@ function advance(iter: number, list: FastList<any>, steps: number) {
 
 function length(list: FastList<any>, from: number, to: number) {
   let length = 0;
-  for (let i = from; i != to; i = list.next(i)) length++;
+  for (let i = from; i !== to; i = list.next(i)) length++;
   return length;
 }
 
-export class SortedList<T> {
+export class SortedList<T> implements Iterable<T> {
   private values = new FastList<[T, number]>();
-
-  constructor() {
-  }
 
   add(value: T, sortValue: number) {
     const ptr = this.binaryIndexOf(sortValue);
@@ -218,7 +207,7 @@ export class SortedList<T> {
     if (searchElement < values.get(min)[1]) return 0;
     if (searchElement >= values.get(max)[1]) return max;
     let size = length(values, min, max);
-    while (min != max) {
+    while (min !== max) {
       const ds = Math.ceil(size / 2);
       size -= ds;
       const current = advance(min, values, ds);
@@ -227,5 +216,15 @@ export class SortedList<T> {
       else max = values.last(current);
     }
     return min;
+  }
+
+  public [Symbol.iterator](): Iterator<T> {
+    const iter = this.values[Symbol.iterator]();
+    return {
+      next: () => {
+        const v = iter.next();
+        return v.done ? TERMINAL_ITERATOR_RESULT : ITERATOR_RESULT(v.value[0]);
+      }
+    }
   }
 }

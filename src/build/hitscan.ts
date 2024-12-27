@@ -1,12 +1,12 @@
 import { BoardUtils } from "app/apis/app";
 import { vec3 } from "gl-matrix";
 import { range } from "../utils/collections";
-import { SortedList as SortedList } from "../utils/list";
+import { SortedList } from "../utils/list";
 import { cross2d, int, len2d, ortonorm2d, sign } from "../utils/mathutils";
-import { inSector, isValidSectorId } from "./board/query";
+import { inSector } from "./board/query";
 import { Board, FACE_SPRITE, FLOOR_SPRITE, Sector, WALL_SPRITE } from "./board/structs";
-import { ArtInfoProvider } from "./formats/art";
-import { SpriteInfo, floorSprite, spriteInfo, wallSprite } from "./sprites";
+import { ArtInfo } from "./formats/art";
+import { SpriteInfo, faceSprite, floorSprite, spriteInfo, wallSprite } from "./sprites";
 import { ANGSCALE, ZSCALE, inPolygon, rayIntersect, slope } from "./utils";
 
 export enum EntityType {
@@ -32,7 +32,7 @@ export class Entity {
   isSector() { return isSector(this.type) }
   isSprite() { return isSprite(this.type) }
   clone() { return new Entity(this.id, this.type) }
-  equals(ent: Entity) { return ent == null ? false : ent == this ? true : ent.id == this.id && ent.type == this.type }
+  equals(ent: Entity) { return ent == null ? false : ent === this ? true : ent.id === this.id && ent.type === this.type }
 }
 
 export interface Target {
@@ -62,7 +62,7 @@ export function isWall(type: EntityType) {
 }
 
 export function isSprite(type: EntityType) {
-  return type == EntityType.SPRITE;
+  return type === EntityType.SPRITE;
 }
 
 export class Ray {
@@ -79,7 +79,7 @@ export function pointOnRay(out: vec3, ray: Ray, t: number) {
   return out;
 }
 
-const EMPTY: Target = { entity: null, coords: [0, 0, 0] };
+const EMPTY = { entity: null, coords: [0, 0, 0] } as Target;
 
 export class Hitscan {
   constructor(
@@ -127,8 +127,8 @@ function intersectPlane(x1: number, y1: number, x2: number, y2: number, planez: 
   const dx = x2 - x1;
   const dy = y2 - y1;
   const dl = len2d(dx, dy);
-  const dxn = dl == 0 ? 0 : dx / dl;
-  const dyn = dl == 0 ? 0 : dy / dl;
+  const dxn = dl === 0 ? 0 : dx / dl;
+  const dyn = dl === 0 ? 0 : dy / dl;
   const rdx = hit.ray.dir[0];
   const rdy = hit.ray.dir[1];
   const angk = -cross2d(dxn, dyn, rdx, rdy);
@@ -151,18 +151,20 @@ function intersectPlane(x1: number, y1: number, x2: number, y2: number, planez: 
 function intersectSectorPlanes(board: Board, sec: Sector, secId: number, hit: Hitscan) {
   const wall1 = board.walls[sec.wallptr]
   const wall2 = board.walls[wall1.point2];
-  const ceilt = intersectPlane(wall1.x, wall1.y, wall2.x, wall2.y, sec.ceilingz, sec.ceilingheinum, hit, true);
-  if (ceilt != -1) hitSector(board, secId, ceilt, hit, EntityType.CEILING);
-  const floort = intersectPlane(wall1.x, wall1.y, wall2.x, wall2.y, sec.floorz, sec.floorheinum, hit, false);
-  if (floort != -1) hitSector(board, secId, floort, hit, EntityType.FLOOR);
+  const ceilingheinum = sec.ceilingstat.slopped ? sec.ceilingheinum : 0;
+  const floorheinum = sec.floorstat.slopped ? sec.floorheinum : 0;
+  const ceilt = intersectPlane(wall1.x, wall1.y, wall2.x, wall2.y, sec.ceilingz, ceilingheinum, hit, true);
+  if (ceilt !== -1) hitSector(board, secId, ceilt, hit, EntityType.CEILING);
+  const floort = intersectPlane(wall1.x, wall1.y, wall2.x, wall2.y, sec.floorz, floorheinum, hit, false);
+  if (floort !== -1) hitSector(board, secId, floort, hit, EntityType.FLOOR);
 
-  if (sec.lotag == 32 && isValidSectorId(board, sec.hitag)) {
-    const tds = board.sectors[sec.hitag];
-    const ceilt = intersectPlane(wall1.x, wall1.y, wall2.x, wall2.y, tds.ceilingz, tds.ceilingheinum, hit, false);
-    if (ceilt != -1) hitSector3dFloor(board, sec.hitag, secId, ceilt, hit, EntityType.CEILING);
-    const floort = intersectPlane(wall1.x, wall1.y, wall2.x, wall2.y, tds.floorz, tds.floorheinum, hit, true);
-    if (floort != -1) hitSector3dFloor(board, sec.hitag, secId, floort, hit, EntityType.FLOOR);
-  }
+  // if (sec.lotag === 32 && isValidSectorId(board, sec.hitag)) {
+  //   const tds = board.sectors[sec.hitag];
+  //   const ceilt = intersectPlane(wall1.x, wall1.y, wall2.x, wall2.y, tds.ceilingz, tds.ceilingheinum, hit, false);
+  //   if (ceilt !== -1) hitSector3dFloor(board, sec.hitag, secId, ceilt, hit, EntityType.CEILING);
+  //   const floort = intersectPlane(wall1.x, wall1.y, wall2.x, wall2.y, tds.floorz, tds.floorheinum, hit, true);
+  //   if (floort !== -1) hitSector3dFloor(board, sec.hitag, secId, floort, hit, EntityType.FLOOR);
+  // }
 }
 
 function intersectWall(board: Board, wallId: number, hit: Hitscan): number {
@@ -182,14 +184,16 @@ function intersectWall(board: Board, wallId: number, hit: Hitscan): number {
   const [ix, iy, iz, it] = intersect;
 
   const nextsecId = wall.nextsector;
-  if (nextsecId == -1) {
+  if (nextsecId === -1) {
     hit.hit(it, wallId, EntityType.MID_WALL, ix, iy, iz);
     return -1;
   }
 
   const nextsec = board.sectors[nextsecId];
-  const floorz = slope(board, nextsecId, ix, iy, nextsec.floorheinum) + nextsec.floorz;
-  const ceilz = slope(board, nextsecId, ix, iy, nextsec.ceilingheinum) + nextsec.ceilingz;
+  const nextfloorheighnum = nextsec.floorstat.slopped ? nextsec.floorheinum : 0;
+  const nextceilingheighnum = nextsec.floorstat.slopped ? nextsec.floorheinum : 0;
+  const floorz = slope(board, nextsecId, ix, iy, nextfloorheighnum) + nextsec.floorz;
+  const ceilz = slope(board, nextsecId, ix, iy, nextceilingheighnum) + nextsec.ceilingz;
   if (iz <= ceilz) {
     hit.hit(it, wallId, EntityType.UPPER_WALL, ix, iy, iz);
     return -1;
@@ -201,15 +205,15 @@ function intersectWall(board: Board, wallId: number, hit: Hitscan): number {
     return -1;
   }
 
-  if (nextsec.lotag == 32 && isValidSectorId(board, nextsec.hitag)) {
-    const tds = board.sectors[nextsec.hitag];
-    const floorz = slope(board, nextsecId, ix, iy, tds.floorheinum) + tds.floorz;
-    const ceilz = slope(board, nextsecId, ix, iy, tds.ceilingheinum) + tds.ceilingz;
-    if (iz >= ceilz && iz <= floorz) {
-      hit.hit(it, tds.wallptr, EntityType.MID_WALL, ix, iy, iz);
-      return -1;
-    }
-  }
+  // if (nextsec.lotag === 32 && isValidSectorId(board, nextsec.hitag)) {
+  //   const tds = board.sectors[nextsec.hitag];
+  //   const floorz = slope(board, nextsecId, ix, iy, tds.floorheinum) + tds.floorz;
+  //   const ceilz = slope(board, nextsecId, ix, iy, tds.ceilingheinum) + tds.ceilingz;
+  //   if (iz >= ceilz && iz <= floorz) {
+  //     hit.hit(it, tds.wallptr, EntityType.MID_WALL, ix, iy, iz);
+  //     return -1;
+  //   }
+  // }
 
   return nextsecId;
 }
@@ -217,21 +221,22 @@ function intersectWall(board: Board, wallId: number, hit: Hitscan): number {
 function intersectFaceSprite(sprId: number, sinfo: SpriteInfo, hit: Hitscan) {
   const [xs, ys, zs] = hit.ray.start;
   const [vx, vy, vz] = hit.ray.dir;
-  const [fx, fy, fz] = hit.forward;
-  if (vx == 0 && vy == 0) return;
+  const [fx, fy] = hit.forward;
+  if (vx === 0 && vy === 0) return;
 
+  const sprite = faceSprite(sinfo);
   const [ofx, ofy] = ortonorm2d(fx, fy);
-  const p1 = -sinfo.hw - sinfo.xo;
-  const p2 = sinfo.hw - sinfo.xo;
+  const p1 = sprite.left;
+  const p2 = sprite.right;
   const x1 = sinfo.x + ofx * p1;
   const y1 = sinfo.y + ofy * p1;
   const x2 = sinfo.x + ofx * p2;
   const y2 = sinfo.y + ofy * p2;
 
   const inter = rayIntersect(xs, ys, zs / ZSCALE, vx, vy, vz / ZSCALE, x1, y1, x2, y2);
-  if (inter == null) return;
+  if (inter === null) return;
   const [ix, iy, iz, it] = inter;
-  if ((iz > sinfo.z + sinfo.hh + sinfo.yo) || (iz < sinfo.z - sinfo.hh + sinfo.yo)) return;
+  if ((iz > sinfo.z + sprite.top) || (iz < sinfo.z + sprite.bottom)) return;
   hit.hit(it, sprId, EntityType.SPRITE, ix, iy, iz * ZSCALE);
 }
 
@@ -264,13 +269,13 @@ function points(x1: number, y1: number, x2: number, y2: number, x3: number, y3: 
 function intersectFloorSprite(sprId: number, sinfo: SpriteInfo, hit: Hitscan) {
   const [xs, ys, zs] = hit.ray.start;
   const [vx, vy, vz] = hit.ray.dir;
-  if (vz == 0) return;
+  if (vz === 0) return;
   const zss = zs / ZSCALE;
   const vzs = vz / ZSCALE;
   if (sinfo.onesided && !sinfo.yf && vzs > 0) return;
   if (sinfo.onesided && sinfo.yf && vzs < 0) return;
   const dz = sinfo.z - zss;
-  if (sign(dz) != sign(vzs)) return;
+  if (sign(dz) !== sign(vzs)) return;
   const t = dz / vzs;
   const ix = xs + int(vx * t);
   const iy = ys + int(vy * t);
@@ -279,25 +284,25 @@ function intersectFloorSprite(sprId: number, sinfo: SpriteInfo, hit: Hitscan) {
   hit.hit(t - SPRITE_OFF, sprId, EntityType.SPRITE, ix, iy, sinfo.z);
 }
 
-function intersectSprite(board: Board, artInfo: ArtInfoProvider, sprId: number, hit: Hitscan) {
+function intersectSprite(board: Board, artInfo: Map<number, ArtInfo>, sprId: number, hit: Hitscan) {
   const spr = board.sprites[sprId];
-  if (spr.picnum == 0 || spr.cstat.invisible) return;
+  if (/*spr.picnum === 0 ||*/ spr.cstat.invisible) return;
   const sinfo = spriteInfo(board, sprId, artInfo);
-  if (spr.cstat.type == FACE_SPRITE) {
+  if (spr.cstat.type === FACE_SPRITE) {
     intersectFaceSprite(sprId, sinfo, hit);
-  } else if (spr.cstat.type == WALL_SPRITE) {
+  } else if (spr.cstat.type === WALL_SPRITE) {
     intersectWallSprite(board, sprId, sinfo, hit);
-  } else if (spr.cstat.type == FLOOR_SPRITE) {
+  } else if (spr.cstat.type === FLOOR_SPRITE) {
     intersectFloorSprite(sprId, sinfo, hit);
   }
 }
 
 function resetStack(board: Board, sectorId: number): Set<number> {
-  if (sectorId == -1 || !board.sectors[sectorId]) return new Set(range(0, board.numsectors));
+  if (sectorId === -1 || !board.sectors[sectorId]) return new Set(range(0, board.numsectors));
   else return new Set([sectorId]);
 }
 
-export function hitscan(board: Board, boardUtils: BoardUtils, artInfo: ArtInfoProvider, secId: number, hit: Hitscan, cliptype: number) {
+export function hitscan(board: Board, boardUtils: BoardUtils, artInfo: Map<number, ArtInfo>, secId: number, hit: Hitscan, cliptype: number) {
   const stack = resetStack(board, secId);
   for (const s of stack) {
     const sec = board.sectors[s];
@@ -306,14 +311,14 @@ export function hitscan(board: Board, boardUtils: BoardUtils, artInfo: ArtInfoPr
     const endwall = sec.wallptr + sec.wallnum;
     for (let w = sec.wallptr; w < endwall; w++) {
       const nextsec = intersectWall(board, w, hit);
-      if (nextsec != -1 && !stack.has(nextsec)) {
+      if (nextsec !== -1 && !stack.has(nextsec)) {
         stack.add(nextsec);
       }
     }
 
-    if (cliptype == 1) continue;
+    if (cliptype === 1) continue;
     const sprs = boardUtils.spritesBySector(s);
-    if (sprs == undefined) continue;
+    if (sprs === undefined) continue;
     for (let j = 0; j < sprs.length; j++) {
       intersectSprite(board, artInfo, sprs[j], hit);
     }

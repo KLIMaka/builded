@@ -1,8 +1,8 @@
 import { enableMapSet } from "immer";
-import { transformed, tuple, value } from "../src/utils/callbacks";
+import { createContainer, transformed, transformedBuilder, value } from "../src/utils/callbacks";
 
 test('value', () => {
-  const a = value(1);
+  const a = value('a', 1);
   const log: number[] = [];
   a.subscribe(a => log.push(a));
 
@@ -19,7 +19,7 @@ test('value', () => {
 
 test('complex value', () => {
   const a = { first: 1, second: 'a' };
-  const valueA = value(a);
+  const valueA = value('a', a);
   let changes = 0;
   valueA.subscribe(a => changes++);
 
@@ -41,7 +41,7 @@ test('complex value', () => {
 test('set/map value', () => {
   enableMapSet();
   const a = { map: new Map<string, string>(), set: new Set<String>() };
-  const valueA = value(a);
+  const valueA = value('a', a);
   let changes = 0;
   valueA.subscribe(_ => changes++);
 
@@ -57,8 +57,8 @@ test('set/map value', () => {
 });
 
 test('transformed', () => {
-  const src = value(42);
-  const tsrc = transformed(src, v => v.toString());
+  const src = value('src', 42);
+  const tsrc = transformedBuilder<[number], string>({ name: 'tsrc', source: src, value: '', transformer: v => v.toString() });
 
   expect(tsrc.get()).toBe('42');
 
@@ -101,31 +101,88 @@ test('transformed', () => {
 });
 
 test('tuple1', () => {
-  const a = value(1);
-  const tr = transformed(a, x => x + 1);
-  const t = tuple(a, tr);
-  const tr1 = transformed(tuple(a, t), x => x.toString());
+  const values = createContainer('container');
+  const a = values.value('a', 1);
+  const tr = values.transformed('tr', a, x => x + 1);
+  const tr1 = values.transformedTuple('tr1', [a, tr], x => x.toString());
+
+  expect(() => values.transformedTuple('', [a, a], x => x.toString())).toThrow('Duplicate sources');
+  expect(() => values.transformedTuple('', [tr, a], x => x.toString())).toThrow('Tuple with different order already exist');
 
   const log: string[] = [];
   tr1.subscribe(a => log.push(a));
 
   a.set(42);
-  expect(log).toStrictEqual(["42,42,43"]);
+  expect(log).toStrictEqual(["42,43"]);
 });
 
 test('transformedTuple', () => {
-  const a = value(1);
-  const b = value(new Set<string>());
-  const c = value('str');
+  const values = createContainer('container');
+  const a = values.value('a', 1);
+  const b = values.value('b', new Set<string>());
+  const c = values.value('c', 'str');
 
-  const t = transformed(tuple(a, b, c), ([a, b, c]) => (a + b.size) + c);
+  const t = values.transformedTuple('t', [a, b, c], ([a, b, c]) => (a + b.size) + c);
   const log: string[] = [];
   t.subscribe(t => log.push(t));
 
   expect(log).toStrictEqual([]);
   expect(t.get()).toBe('1str');
-  expect(log).toStrictEqual(['1str']);
+  expect(log).toStrictEqual([]);
 
   b.set(new Set(['1', '2']));
-  expect(log).toStrictEqual(['1str', '3str']);
+  expect(log).toStrictEqual(['3str']);
+});
+
+test('values container', async () => {
+  const cont = createContainer('container');
+  const log: string[] = [];
+  const disposer = (arg: any) => log.push(`${arg} disposed`);
+  const a = cont.valueBuilder({ name: 'a', value: 42, disposer })
+  const b = cont.transformed('b', a, x => x * x, { disposer });
+  const c = cont.transformedTuple('c', [a, b], ([a, b]) => a + b, { disposer });
+  const d = cont.transformed('d', b, x => x + 1);
+
+  expect(d.get()).toBe(42 * 42 + 1);
+  expect(c.get()).toBe(42 * 42 + 42);
+  expect(b.get()).toBe(42 * 42);
+
+  a.set(11);
+  expect(d.get()).toBe(11 * 11 + 1);
+  expect(c.get()).toBe(11 * 11 + 11);
+  expect(b.get()).toBe(11 * 11);
+
+  await cont.dispose();
+  expect(log).toStrictEqual([
+    "42 disposed",
+    `${42 * 42} disposed`,
+    `${42 * 42 + 42} disposed`,
+    `${11 * 11 + 11} disposed`,
+    `${11 * 11} disposed`,
+    "11 disposed",
+  ]);
+});
+
+test('custom eq', () => {
+  const values = createContainer('container');
+  type T = { value: number };
+  const a: T = { value: 42 };
+
+  const value = values.valueBuilder({
+    value: a,
+    eq: (l, r) => l.value === r.value,
+    setter: (dst, src) => { dst.value = src.value; return dst }
+  });
+
+  const a1 = { value: 42 };
+  value.set(a1);
+  expect(value.mods()).toBe(0);
+  expect(value.get() === a).toBeTruthy();
+
+  const b = { value: 12 };
+  value.set(b);
+  expect(value.mods()).toBe(1);
+  expect(value.get() === a).toBeTruthy();
+  expect(value.get() !== b).toBeTruthy();
+  expect(value.get().value).toBe(12);
 });

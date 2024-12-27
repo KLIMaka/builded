@@ -12,9 +12,9 @@ export function printTime(t: number) {
 }
 
 export async function measure<T>(f: Supplier<Promise<T>>, timer: Timer): Promise<[T, number]> {
-  const start = timer();
+  const start = timer.now();
   const result = await f();
-  return [result, timer() - start];
+  return [result, timer.now() - start];
 }
 
 export class StopWatch {
@@ -24,24 +24,24 @@ export class StopWatch {
   constructor(private timer: Timer) { };
 
   get() {
-    return this.startTime != -1
-      ? this.timer() - this.startTime
+    return this.startTime !== -1
+      ? this.timer.now() - this.startTime
       : this.time
   }
 
   start() {
-    if (this.startTime == -1) this.startTime = this.timer();
+    if (this.startTime === -1) this.startTime = this.timer.now();
     return this;
   }
 
   restart() {
-    this.startTime = this.timer();
+    this.startTime = this.timer.now();
     return this;
   }
 
   stop() {
-    if (this.startTime != -1) {
-      this.time = this.timer() - this.startTime;
+    if (this.startTime !== -1) {
+      this.time = this.timer.now() - this.startTime;
       this.startTime = -1;
     }
     return this;

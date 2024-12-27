@@ -25,13 +25,13 @@ export class DefaultLifecycleListener implements LifecycleListener {
 
   async start<T>(dep: Dependency<T>, promise: Promise<T>): Promise<T> {
     try {
-      const start = this.timer()
+      const start = this.timer.now()
       const result = await promise;
-      const end = this.timer();
+      const end = this.timer.now();
       this.stats.set(dep, { start, end });
       return result;
     } catch (e) {
-      this.logger.log('ERROR', `${dep.name} failed to start. ${(<DependencyError>e).cause.stack}`)
+      this.logger.log('ERROR', `${dep.name} failed to start. ${(e as DependencyError).cause.stack}`)
       throw e;
     }
   }
@@ -39,7 +39,7 @@ export class DefaultLifecycleListener implements LifecycleListener {
   private printStart() {
     const labelMax = iter(this.stats.keys()).map(d => d.name.length).reduce(Math.max, 20);
     const maxEnd = iter(this.stats.values()).map(s => s.end).reduce(Math.max, 0);
-    const minStart = iter(this.stats.values()).map(s => s.start).reduce(Math.min, this.timer());
+    const minStart = iter(this.stats.values()).map(s => s.start).reduce(Math.min, this.timer.now());
     const maxw = 80;
     const timeline = maxw - labelMax - 1;
     for (const [d, s] of this.stats) {

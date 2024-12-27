@@ -245,14 +245,24 @@ export function mirrorXY<P>(src: Raster<P>) {
   return new Mirror<P>(src, true, true);
 }
 
-export function fit<P>(w: number, h: number, src: Raster<P>, padd: P) {
-  if (src.height === h && src.width === w) return src;
-  if (src.width <= w && src.height <= h) {
+export function fit<P>(w: number, h: number, src: Raster<P>, padd: P, upscale = false) {
+  const aspect = src.width / src.height;
+  if (src.height === h && src.width === w) {
+    return src;
+  } else if (upscale && src.width < w && src.height < h) {
+    const wsf = w / src.width;
+    const hsf = h / src.height;
+    const sf = Math.min(wsf, hsf);
+    const nw = int(src.width * sf);
+    const nh = int(src.height * sf);
+    const sx = int((nw - w) / 2);
+    const sy = int((nh - h) / 2);
+    return rect(resize(src, nw, nh), sx, sy, w + sx, h + sy, padd);
+  } else if (src.width <= w && src.height <= h) {
     const sx = int((src.width - w) / 2);
     const sy = int((src.height - h) / 2);
     return rect(src, sx, sy, w + sx, h + sy, padd);
   } else {
-    const aspect = src.width / src.height;
     let nw = src.width;
     let nh = src.height;
     let r = false;

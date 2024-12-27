@@ -1,4 +1,3 @@
-import * as PROFILE from '../profiler';
 import { VertexBufferDynamic, createVertexBuffer, DynamicIndexBuffer, createIndexBuffer, Updatable } from './bufferimpl';
 import { Place, BagController, createController } from '../bag';
 
@@ -21,7 +20,7 @@ export class BufferBuilder {
 
   constructor(public size: number = 64 * 1024) { }
 
-  public addVertexBuffer(gl: WebGLRenderingContext, type: number, spacing: number): BufferBuilder {
+  addVertexBuffer(gl: WebGLRenderingContext, type: number, spacing: number): BufferBuilder {
     this.vtxBuffers.push(createVertexBuffer(gl, type, this.size, spacing));
     return this;
   }
@@ -42,37 +41,42 @@ export class Buffer {
     const vtxSize = builder.size;
     const idxSize = vtxSize * 2;
     this.vtxBuffers = builder.vtxBuffers;
-    this.idxBuffer = createIndexBuffer(gl, gl.UNSIGNED_SHORT, idxSize);
+    this.idxBuffer = createIndexBuffer(gl, gl.UNSIGNED_INT, idxSize);
 
     this.vtxBag = createController(vtxSize, (place: Place, noffset: number) => {
       for (const v of this.vtxBuffers) {
-        const buff = <any>v.getData();
+        const buff = v.getData() as any;
         const spacing = v.getSpacing();
         buff.set(buff.subarray(place.offset * spacing, (place.offset + place.size) * spacing), noffset * spacing);
       }
-      const ptr = <Place>place.data;
+      const ptr = place.data as Place;
       const offdiff = noffset - place.offset;
-      const buff = <Uint16Array>this.idxBuffer.getData();
+      const buff = this.idxBuffer.getData() as Uint16Array;
       for (let i = 0; i < ptr.size; i++) buff[ptr.offset + i] += offdiff;
     });
 
     this.idxBag = createController(idxSize, (place: Place, noffset: number) => {
-      const buff = <Uint16Array>this.idxBuffer.getData();
+      const buff = this.idxBuffer.getData() as Uint16Array;
       buff.set(buff.subarray(place.offset, place.offset + place.size), noffset);
     });
 
     for (let i = 0; i < this.vtxBuffers.length; i++) this.vtxRegions.push([]);
   }
 
-  public getVertexBuffer(idx: number): VertexBufferDynamic {
+  destroy(gl: WebGL2RenderingContext) {
+    this.idxBuffer.destroy(gl);
+    this.vtxBuffers.forEach(v => v.destroy(gl));
+  }
+
+  getVertexBuffer(idx: number): VertexBufferDynamic {
     return this.vtxBuffers[idx];
   }
 
-  public getIndexBuffer(): DynamicIndexBuffer {
+  getIndexBuffer(): DynamicIndexBuffer {
     return this.idxBuffer;
   }
 
-  public allocate(vtxs: number, idxs: number): Pointer {
+  allocate(vtxs: number, idxs: number): Pointer {
     const vtx = this.vtxBag.get(vtxs);
     if (vtx == null) return null;
     const idx = this.idxBag.get(idxs);
@@ -84,14 +88,14 @@ export class Buffer {
     return new Pointerimpl(this, vtx, idx);
   }
 
-  public deallocate(ptr: Pointer): void {
-    if (ptr.buffer != this)
+  deallocate(ptr: Pointer): void {
+    if (ptr.buffer !== this)
       throw new Error('Invalid Buffer for this Pointer');
     this.vtxBag.put(ptr.vtx);
     this.idxBag.put(ptr.idx);
   }
 
-  public writeVertex(ptr: Pointer, idx: number, off: number, vdata: number[]) {
+  writeVertex(ptr: Pointer, idx: number, off: number, vdata: number[]) {
     const buff = this.vtxBuffers[idx];
     const offset = (ptr.vtx.offset + off) * buff.getSpacing();
     const data = buff.getData();
@@ -100,7 +104,7 @@ export class Buffer {
     this.needUpdate = true;
   }
 
-  public writeIndex(ptr: Pointer, off: number, idata: number[]) {
+  writeIndex(ptr: Pointer, off: number, idata: number[]) {
     const buff = this.idxBuffer;
     const offset = ptr.idx.offset + off;
     const vtxoff = ptr.vtx.offset;
@@ -108,6 +112,19 @@ export class Buffer {
     for (let i = 0; i < idata.length; i++) data[offset + i] = idata[i] + vtxoff;
     this.idxRegions.push([offset, idata.length]);
     this.needUpdate = true;
+  }
+
+  writeTriangle(ptr: Pointer, off: number, a: number, b: number, c: number) {
+    this.writeIndex(ptr, off, [a, b, c]);
+  }
+
+  writeQuad(ptr: Pointer, off: number, a: number, b: number, c: number, d: number) {
+    this.writeIndex(ptr, off, [a, c, b, a, d, c]);
+  }
+
+  writeLine(ptr: Pointer, off: number, a: number, b: number): number {
+    this.writeIndex(ptr, off, [a, b]);
+    return off + 2;
   }
 
 
@@ -135,14 +152,14 @@ export class Buffer {
     return true;
   }
 
-  public update(gl: WebGLRenderingContext) {
+  update(gl: WebGLRenderingContext) {
     if (!this.needUpdate) return;
     for (let v = 0; v < this.vtxBuffers.length; v++) {
-      if (this.vtxRegions[v].length == 0) continue;
+      if (this.vtxRegions[v].length === 0) continue;
       this.updateBuffer(gl, this.vtxBuffers[v], this.vtxRegions[v]);
       this.vtxRegions[v] = [];
     }
-    if (this.idxRegions.length != 0) {
+    if (this.idxRegions.length !== 0) {
       this.updateBuffer(gl, this.idxBuffer, this.idxRegions);
       this.idxRegions = [];
     }

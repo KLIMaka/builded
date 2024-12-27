@@ -15,6 +15,10 @@ export function gl2build(out: vec3, vec: vec3): vec3 {
   return vec3.set(out, vec[0], vec[2], vec[1] * ZSCALE);
 }
 
+export function convertVisibility(vis: number) {
+  return ((vis + 16) & 0xff) / 16;
+}
+
 let fakePlayerStart_: Sprite;
 function fakePlayerStart() {
   if (fakePlayerStart_ == null) {
@@ -30,7 +34,7 @@ function fakePlayerStart() {
 export function getPlayerStart(board: Board): Sprite {
   for (let i = 0; i < board.numsprites; i++) {
     const sprite = board.sprites[i];
-    if (sprite.lotag == 1)
+    if (sprite.lotag === 1)
       return sprite;
   }
   return fakePlayerStart();
@@ -52,52 +56,52 @@ export function inPolygon(x: number, y: number, points: Iterable<[number, number
     const dx2 = x2 - x;
     const dy1 = y1 - y;
     const dy2 = y2 - y;
-    if (dx1 == 0 && dx2 == 0 && (dy1 == 0 || dy2 == 0 || (dy1 ^ dy2) < 0)) return true;
-    if (dy1 == 0 && dy2 == 0 && (dx1 == 0 || dx2 == 0 || (dx1 ^ dx2) < 0)) return true;
+    if (dx1 === 0 && dx2 === 0 && (dy1 === 0 || dy2 === 0 || (dy1 ^ dy2) < 0)) return true;
+    if (dy1 === 0 && dy2 === 0 && (dx1 === 0 || dx2 === 0 || (dx1 ^ dx2) < 0)) return true;
 
     if ((dy1 ^ dy2) < 0) {
       if ((dx1 ^ dx2) >= 0) inter ^= dx1;
       else inter ^= cross2d(dx1, dy1, dx2, dy2) ^ dy2;
     }
   }
-  return (inter >>> 31) == 1;
+  return (inter >>> 31) === 1;
 }
 
 export function sectorZ(board: Board, sectorEnt: Entity) {
   const sec = board.sectors[sectorEnt.id];
-  return (sectorEnt.type == EntityType.CEILING ? sec.ceilingz : sec.floorz);
+  return (sectorEnt.type === EntityType.CEILING ? sec.ceilingz : sec.floorz);
 }
 
 export function sectorHeinum(board: Board, sectorEnt: Entity) {
   const sec = board.sectors[sectorEnt.id];
-  return (sectorEnt.type == EntityType.CEILING ? sec.ceilingheinum : sec.floorheinum);
+  return (sectorEnt.type === EntityType.CEILING ? sec.ceilingheinum : sec.floorheinum);
 }
 
 export function setSectorZ(board: Board, sectorEnt: Entity, z: number): boolean {
   const pz = sectorZ(board, sectorEnt);
-  if (pz == z) return false;
+  if (pz === z) return false;
   const sec = board.sectors[sectorEnt.id];
-  if (sectorEnt.type == EntityType.CEILING) sec.ceilingz = z; else sec.floorz = z;
+  if (sectorEnt.type === EntityType.CEILING) sec.ceilingz = z; else sec.floorz = z;
   return true;
 }
 
 export function setSectorHeinum(board: Board, sectorEnt: Entity, h: number): boolean {
   const ph = sectorHeinum(board, sectorEnt);
-  if (ph == h) return false;
+  if (ph === h) return false;
   const sec = board.sectors[sectorEnt.id];
-  if (sectorEnt.type == EntityType.CEILING) sec.ceilingheinum = h; else sec.floorheinum = h;
+  if (sectorEnt.type === EntityType.CEILING) sec.ceilingheinum = h; else sec.floorheinum = h;
   return true;
 }
 
 export function sectorPicnum(board: Board, sectorEnt: Entity) {
   const sec = board.sectors[sectorEnt.id];
-  return sectorEnt.type == EntityType.CEILING ? sec.ceilingpicnum : sec.floorpicnum;
+  return sectorEnt.type === EntityType.CEILING ? sec.ceilingpicnum : sec.floorpicnum;
 }
 
 export function setSectorPicnum(board: Board, sectorEnt: Entity, picnum: number): boolean {
-  if (picnum == -1 || sectorPicnum(board, sectorEnt) == picnum) return false;
+  if (picnum === -1 || sectorPicnum(board, sectorEnt) === picnum) return false;
   const sec = board.sectors[sectorEnt.id];
-  if (sectorEnt.type == EntityType.CEILING) sec.ceilingpicnum = picnum; else sec.floorpicnum = picnum;
+  if (sectorEnt.type === EntityType.CEILING) sec.ceilingpicnum = picnum; else sec.floorpicnum = picnum;
   return true;
 }
 
@@ -116,7 +120,7 @@ export function createSlopeCalculator(board: Board, sectorId: number): SlopeCalc
   const dx = wall2.x - wall1.x;
   const dy = wall2.y - wall1.y;
   const ln = len2d(dx, dy);
-  if (ln == 0) return (x: number, y: number, heinum: number) => 0;
+  if (ln === 0) return (x: number, y: number, heinum: number) => 0;
   const dxn = dx / ln;
   const dyn = dy / ln;
   return (x: number, y: number, heinum: number): number => {
@@ -136,7 +140,7 @@ export function lineIntersect(
   const y21 = y2 - sy, y34 = y3 - y4;
   const bot = cross2d(x21, y21, x34, y34);
 
-  if (bot == 0) return null;
+  if (bot === 0) return null;
 
   const x31 = x3 - sx, y31 = y3 - sy;
   const topt = cross2d(x31, y31, x34, y34);
@@ -171,7 +175,7 @@ export function rayIntersect(
   const x34 = x3 - x4;
   const y34 = y3 - y4;
   const bot = cross2d(vx, vy, x34, y34);
-  if (bot == 0) return null;
+  if (bot === 0) return null;
   const x31 = x3 - xs;
   const y31 = y3 - ys;
   const topt = cross2d(x31, y31, x34, y34);
@@ -237,29 +241,16 @@ export function sectorNormal(out: vec3, board: Board, sectorId: number, ceiling:
   return out;
 }
 
-export function posOffRotate(x: number, y: number, xo: number, yo: number, ang: number): mat2d {
+
+export function ang2vec(rad: number): vec2 {
   const mat = mat2d.create();
-  mat2d.translate(mat, mat, [x, y]);
-  mat2d.rotate(mat, mat, ang);
+  mat2d.rotate(mat, mat, rad);
   mat2d.scale(mat, mat, [1, -1]);
   mat2d.rotate(mat, mat, deg2rad(-90));
-  mat2d.translate(mat, mat, [xo, yo]);
-  return mat;
+  return vec2.transformMat2d(vec2.create(), [0, 1], mat);
 }
 
-export function rotate(ang: number): mat2d {
-  const mat = mat2d.create();
-  mat2d.rotate(mat, mat, ang);
-  mat2d.scale(mat, mat, [1, -1]);
-  mat2d.rotate(mat, mat, deg2rad(-90));
-  return mat;
-}
-
-export function ang2vec(ang: number): vec2 {
-  return vec2.transformMat2d(vec2.create(), [0, 1], rotate(ang));
-}
-
-export function spriteAngle(ang: number): number {
+export function spriteAngleRad(ang: number): number {
   return ang * ANGSCALE * 2 * PI2;
 }
 
@@ -291,7 +282,7 @@ export function clockwise(polygon: Iterable<[number, number]>): boolean {
 
 export function order(points: Iterable<[number, number]>, cw = true): Iterable<[number, number]> {
   const actual = clockwise(points);
-  if (actual == cw) return points;
+  if (actual === cw) return points;
   else return [...points].reverse();
 }
 
@@ -339,30 +330,4 @@ export function getMaskedWallCoords(x1: number, y1: number, x2: number, y2: numb
   const z3 = Math.max(currz3, nextz3);
   const z4 = Math.max(currz4, nextz4);
   return [x1, y1, z1, x2, y2, z2, x2, y2, z3, x1, y1, z4];
-}
-
-export function wallSpriteCoords(x: number, y: number, z: number, xo: number, yo: number, hw: number, hh: number, ang: number) {
-  const mat = posOffRotate(x, y, xo, 0, ang);
-  const [x1, y1] = vec2.transformMat2d(vec2.create(), [hw, 0], mat);
-  const [x2, y2] = vec2.transformMat2d(vec2.create(), [-hw, 0], mat);
-  return [
-    x1, y1, z + hh + yo,
-    x2, y2, z + hh + yo,
-    x2, y2, z - hh + yo,
-    x1, y1, z - hh + yo
-  ];
-}
-
-export function floorSpriteCoords(x: number, y: number, z: number, xo: number, yo: number, hw: number, hh: number, ang: number) {
-  const mat = posOffRotate(x, y, xo, yo, ang);
-  const [x1, y1] = vec2.transformMat2d(vec2.create(), [-hw, hh], mat)
-  const [x2, y2] = vec2.transformMat2d(vec2.create(), [hw, hh], mat)
-  const [x3, y3] = vec2.transformMat2d(vec2.create(), [hw, -hh], mat)
-  const [x4, y4] = vec2.transformMat2d(vec2.create(), [-hw, -hh], mat)
-  return [
-    x1, y1, z,
-    x2, y2, z,
-    x3, y3, z,
-    x4, y4, z
-  ];
 }

@@ -4,7 +4,7 @@ import { iter } from "./iter";
 
 export type InstanceProvider<T> = (i: Injector) => Promise<T>;
 export type Plugin<T> = { start: InstanceProvider<T>, stop: InstanceProvider<void> }
-export class Dependency<T> { constructor(readonly name: string, readonly isVoid = false) { } }
+export class Dependency<_T> { constructor(readonly name: string, readonly isVoid = false) { } }
 export type SubModule = (module: Module) => void;
 
 const STOP = async (i: Injector) => { };

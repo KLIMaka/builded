@@ -1,64 +1,41 @@
+import { Source, Value, ValuesContainer, arrayEq } from '@utils/callbacks';
 import { mat4, vec3 } from 'gl-matrix';
 import { deg2rad } from '../mathutils';
 
 export class Camera {
-  private transform: mat4;
-  private position: vec3;
-  private angleX: number;
-  private angleY: number;
-  private needUpdate: boolean = true;
+  readonly transform: Source<mat4>;
+  readonly position: Value<vec3>;
+  readonly forward: Source<vec3>;
+  readonly side: Source<vec3>;
+  private angle: Value<[number, number]>;
 
-  constructor(x: number, y: number, z: number, ax: number, ay: number) {
-    this.transform = mat4.create();
-    this.position = vec3.fromValues(x, y, z);
-    this.angleX = ax;
-    this.angleY = ay;
-  }
-
-  public setPosition(x: number, y: number, z: number): void {
-    vec3.set(this.position, x, y, z);
-    this.needUpdate = true;
-  }
-
-  public getPosition(): vec3 {
-    return this.position;
-  }
-
-  public forward(): vec3 {
-    const mat4 = this.getTransformMatrix()
-    return vec3.fromValues(-mat4[2], -mat4[6], -mat4[10]);
-  }
-
-  public side(): vec3 {
-    const mat4 = this.getTransformMatrix()
-    return vec3.fromValues(mat4[0], mat4[4], mat4[8]);
-  }
-
-  public updateAngles(dx: number, dy: number): void {
-    this.angleY -= dx;
-    this.angleX -= dy;
-    this.angleX = Math.max(-90, Math.min(90, this.angleX));
-    this.needUpdate = true;
-  }
-
-  public setAngles(ax: number, ay: number): void {
-    this.angleX = Math.max(-90, Math.min(90, ax));
-    this.angleY = ay;
-    this.needUpdate = true;
-  }
-
-  public getTransformMatrix(): mat4 {
-    const mat = this.transform;
-    if (this.needUpdate) {
-      var pos = this.position;
+  constructor(values: ValuesContainer, x: number, y: number, z: number, ax: number, ay: number) {
+    this.position = values.valueBuilder<vec3>({ name: 'position', value: vec3.fromValues(x, y, z), eq: vec3.exactEquals });
+    this.angle = values.valueBuilder({ name: 'angle', value: [ax, ay], eq: arrayEq });
+    this.transform = values.transformedTuple('transform', [this.position, this.angle], ([pos, ang]) => {
+      const mat = mat4.create();
+      const [angx, angy] = ang;
       mat4.identity(mat);
-      mat4.rotateX(mat, mat, deg2rad(-this.angleX));
-      mat4.rotateY(mat, mat, deg2rad(-this.angleY));
+      mat4.rotateX(mat, mat, deg2rad(-angx));
+      mat4.rotateY(mat, mat, deg2rad(-angy));
       vec3.negate(pos, pos);
       mat4.translate(mat, mat, pos);
       vec3.negate(pos, pos);
-      this.needUpdate = false;
-    }
-    return mat;
+      return mat;
+    });
+    this.forward = values.transformed('forward', this.transform, trans => vec3.fromValues(-trans[2], -trans[6], -trans[10]))
+    this.side = values.transformed('side', this.transform, trans => vec3.fromValues(trans[0], trans[4], trans[8]))
+  }
+
+  setPosition(x: number, y: number, z: number): void {
+    this.position.set(vec3.fromValues(x, y, z));
+  }
+
+  updateAngles(dx: number, dy: number): void {
+    this.angle.mod(([ax, ay]) => [Math.max(-90, Math.min(90, ax - dy)), ay - dx]);
+  }
+
+  setAngles(ax: number, ay: number): void {
+    this.angle.set([Math.max(-90, Math.min(90, ax)), ay]);
   }
 }

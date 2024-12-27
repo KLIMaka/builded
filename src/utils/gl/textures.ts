@@ -1,6 +1,6 @@
-import * as DS from './drawstruct';
+import { Texture } from './drawstruct';
 
-export class TextureStub implements DS.Texture {
+export class TextureStub implements Texture {
   constructor(public w: number, public h: number) { }
   public get(): WebGLTexture { return null }
   public getWidth(): number { return this.w }
@@ -23,8 +23,7 @@ function getMagFilter(filter: number): number {
   }
 }
 
-export class TextureImpl implements DS.Texture {
-
+export class TextureImpl implements Texture {
   public id: WebGLTexture;
   public width: number;
   public height: number;
@@ -55,8 +54,7 @@ export class TextureImpl implements DS.Texture {
     if (img == null) img = new Uint8Array(width * height * bpp);
     this.data = img;
     gl.texImage2D(gl.TEXTURE_2D, 0, this.format, width, height, 0, this.format, this.type, this.data);
-
-    gl.bindTexture(gl.TEXTURE_2D, null);
+    // gl.bindTexture(gl.TEXTURE_2D, null);
   }
 
   public get(): WebGLTexture {

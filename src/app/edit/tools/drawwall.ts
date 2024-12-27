@@ -9,7 +9,7 @@ import { dot2d } from "../../../utils/mathutils";
 import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, GRID, GridController, REFERENCE_TRACKER, SnapType, View, VIEW } from "../../apis/app";
 import { BUS, busDisconnector, MessageBus } from "../../apis/handler";
 import { Renderables } from "../../apis/renderable";
-import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
+import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/gl/geometry/common";
 import { LineBuilder } from "../../modules/gl/buffers";
 import { MovingHandle } from "../handle";
 import { BoardInvalidate, Commit, Frame, NamedMessage, Render } from "../messages";

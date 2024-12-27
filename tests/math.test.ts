@@ -1,10 +1,9 @@
-import { mat2d, vec2 } from "gl-matrix";
-import { NumberInterpolator } from "../src/utils/interpolator";
-import { bilinear, deg2rad, nextpow2, optimize, quadratic, RadialSegments } from "../src/utils/mathutils";
+import { LinearInterpolator } from "../src/utils/interpolator";
+import { RadialSegments, bilinear, nextpow2, quadratic } from "../src/utils/mathutils";
 
 test('interpolator', () => {
   const arr = [1, 2, 2, 1];
-  const b = bilinear(2, 2, arr, NumberInterpolator);
+  const b = bilinear(2, 2, arr, LinearInterpolator);
   expect(b(0, 0.5)).toBe(1.5);
   expect(b(0.5, 0.5)).toBe(1.5);
 });

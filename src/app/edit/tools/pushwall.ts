@@ -7,7 +7,7 @@ import { create, lifecycle, Module, plugin } from "../../../utils/injector";
 import { dot2d, int } from "../../../utils/mathutils";
 import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, GRID, GridController, REFERENCE_TRACKER, SnapType, View, VIEW } from "../../apis/app";
 import { BUS, busDisconnector, MessageBus } from "../../apis/handler";
-import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
+import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/gl/geometry/common";
 import { LineBuilder } from "../../modules/gl/buffers";
 import { MovingHandle } from "../handle";
 import { Commit, Frame, INVALIDATE_ALL, NamedMessage, Render } from "../messages";

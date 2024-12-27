@@ -26,7 +26,7 @@ function getClosestWallByIds(board: Board, target: Target, ids: Iterable<number>
       mindist = dist;
     }
   }
-  return id == -1 ? takeFirst(ids) : id;
+  return id === -1 ? takeFirst(ids).orElse(-1) : id;
 }
 
 function collectConnectedWalls(board: Board, walls: Iterable<number>) {
@@ -157,7 +157,7 @@ export class WallSegmentsEnt extends MessageHandlerReflective {
     } else {
       const hwalls = this.highlighted;
       for (const w of hwalls) msg.set.add(tuple(2, w.id));
-    } 13
+    }
   }
 
   public SetPicnum(msg: SetPicnum) {

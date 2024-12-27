@@ -1,41 +1,68 @@
-import { BloodBoard } from 'build/blood/structs';
+import { BoardContext, EngineContext } from 'app/apis/engine';
 import { mat4, vec3, vec4 } from 'gl-matrix';
-import { Shader, Texture } from '../../../utils/gl/drawstruct';
 import { createShader } from '../../../utils/gl/shaders';
-import { Profile, State } from '../../../utils/gl/stategl';
-import { Dependency, getInstances, lifecycle } from '../../../utils/injector';
-import { Profiler, PROFILER } from '../../../utils/profiler';
-import { BOARD, BoardProvider, Logger, LOGGER } from '../../apis/app';
+import { State } from '../../../utils/gl/stategl';
 import { Renderable } from '../../apis/renderable';
-import { GL } from '../buildartprovider';
+import { createRenderablesCache, RenderablesCache } from './geometry/cache';
+import { BuildersFactory, createBuildersFactory } from './geometry/common';
+import { createEngineTextures, EngineTextures, GlContext } from './gl-context';
+import { iter } from '@utils/iter';
 
-export const PAL_TEXTURE = new Dependency<Texture>('PAL Texture');
-export const PLU_TEXTURE = new Dependency<Texture>('PLU Texture');
-export const TRANS_TEXTURE = new Dependency<Texture>('Trans Texture');
-export const SHADOWSTEPS = new Dependency<number>('Shadowsteps');
-export const PALSWAPS = new Dependency<number>('Palswaps');
-export const BUILD_GL = new Dependency<BuildGl>('BuildGL');
+export class BuildGlEngineContext {
+  private textures_: Promise<EngineTextures>;
+  private bgl_: Promise<BuildGl>;
+  private builders_: Promise<BuildersFactory>;
 
-export const BuildGlConstructor = lifecycle(async (injector, lifecycle) => {
-  const [gl, pal, plus, trans, palswaps, shadowsteps, profiler, logger, board] =
-    await getInstances(injector, GL, PAL_TEXTURE, PLU_TEXTURE, TRANS_TEXTURE, PALSWAPS, SHADOWSTEPS, PROFILER, LOGGER, BOARD);
+  constructor(
+    readonly engine: EngineContext,
+    readonly glContext: GlContext
+  ) { }
+
+  textures(): Promise<EngineTextures> {
+    if (this.textures_) return this.textures_;
+    this.textures_ = createEngineTextures(this.engine, this.glContext, null);
+    return this.textures_;
+  }
+
+  bgl(): Promise<BuildGl> {
+    if (this.bgl_) return this.bgl_;
+    this.bgl_ = this.textures().then(textures => createBuildGl(this.engine, textures, this.glContext));
+    return this.bgl_;
+  }
+
+  builders(): Promise<BuildersFactory> {
+    if (this.builders_) return this.builders_;
+    this.builders_ = this.bgl().then(bgl => createBuildersFactory(bgl, this.glContext));
+    return this.builders_;
+  }
+
+  async cache(ctx: BoardContext): Promise<RenderablesCache> {
+    return Promise.all([this.textures(), this.builders(), this.engine.spriteVoxelSwap])
+      .then(([textures, builders, voxels]) => createRenderablesCache(ctx, textures, builders, this.engine.settings, voxels));
+  }
+}
+
+export async function createBuildGl(engine: EngineContext<any>, textures: EngineTextures, glCtx: GlContext): Promise<BuildGl> {
+  const palswaps = iter((await engine.plus).get()).map(p => p.id).reduce(Math.max, 0) + 1;
+  const shadowsteps = (await engine.shadowsteps).get();
   const defs = ['PALSWAPS (' + palswaps + '.0)', 'SHADOWSTEPS (' + shadowsteps + '.0)', 'PAL_LIGHTING'];
   const SHADER_NAME = 'resources/shaders/build';
   const state = new State()
-  const shaderCleaner = async (s: Shader) => s.destroy(gl);
-  state.registerShader('baseShader', lifecycle(await createShader(gl, SHADER_NAME, [...defs]), shaderCleaner));
-  state.registerShader('baseNonrepeatShader', lifecycle(await createShader(gl, SHADER_NAME, [...defs, 'NONREPEAT', 'ADD_DEPTH']), shaderCleaner));
-  state.registerShader('spriteShader', lifecycle(await createShader(gl, SHADER_NAME, [...defs, 'SPRITE', 'ADD_DEPTH']), shaderCleaner));
-  state.registerShader('baseFlatShader', lifecycle(await createShader(gl, SHADER_NAME, [...defs, 'FLAT']), shaderCleaner));
-  state.registerShader('spriteFlatShader', lifecycle(await createShader(gl, SHADER_NAME, [...defs, 'SPRITE', 'FLAT']), shaderCleaner));
-  state.registerShader('parallax', lifecycle(await createShader(gl, SHADER_NAME, [...defs, 'PARALLAX']), shaderCleaner));
-  state.registerShader('grid', lifecycle(await createShader(gl, SHADER_NAME, [...defs, 'GRID']), shaderCleaner));
-  state.registerShader('spriteFaceShader', lifecycle(await createShader(gl, SHADER_NAME, [...defs, 'SPRITE_FACE']), shaderCleaner));
-  state.setTexture('pal', pal);
-  state.setTexture('plu', plus);
-  if (state.isTextureEnabled('trans')) state.setTexture('trans', trans);
-  return new BuildGl(state, gl, profiler, logger, board);
-});
+  const { gl } = glCtx;
+  state.registerShader('baseShader', await createShader(gl, SHADER_NAME, [...defs]));
+  state.registerShader('baseNonrepeatShader', await createShader(gl, SHADER_NAME, [...defs, 'NONREPEAT', 'ADD_DEPTH']));
+  state.registerShader('spriteShader', await createShader(gl, SHADER_NAME, [...defs, 'SPRITE', 'ADD_DEPTH']));
+  state.registerShader('baseFlatShader', await createShader(gl, SHADER_NAME, [...defs, 'FLAT']));
+  state.registerShader('spriteFlatShader', await createShader(gl, SHADER_NAME, [...defs, 'SPRITE', 'FLAT']));
+  state.registerShader('parallax', await createShader(gl, SHADER_NAME, [...defs, 'PARALLAX']));
+  state.registerShader('grid', await createShader(gl, SHADER_NAME, [...defs, 'GRID']));
+  state.registerShader('spriteFaceShader', await createShader(gl, SHADER_NAME, [...defs, 'SPRITE_FACE']));
+  state.registerShader('voxelShader', await createShader(gl, SHADER_NAME, [...defs, 'VOXEL']));
+  state.setTexture('pal', textures.pal.get());
+  state.setTexture('plu', textures.plu.get());
+  if (state.isTextureEnabled('trans')) state.setTexture('trans', textures.trans.get());
+  return new BuildGl(state, gl);
+}
 
 const inv = mat4.create();
 const pos = vec3.create();
@@ -45,9 +72,8 @@ export class BuildGl {
   constructor(
     readonly state: State,
     readonly gl: WebGL2RenderingContext,
-    private profiler: Profiler,
-    private logger: Logger,
-    private board: BoardProvider) {
+    private visibility = 512
+  ) {
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.enable(gl.CULL_FACE);
     gl.enable(gl.DEPTH_TEST);
@@ -77,33 +103,25 @@ export class BuildGl {
     renderable.drawCall(dc => this.state.run(this.gl, dc));
   }
 
-  public newFrame(canvas: HTMLElement) {
-    this.updateProfile(this.state.profile);
+  public newFrame(width: number, height: number) {
+    this.state.start();
+    this.gl.viewport(0, 0, width, height);
     this.gl.clearColor(0.2, 0.2, 0.2, 1.0);
     this.gl.clearStencil(0);
     this.gl.clearDepth(1);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT | this.gl.STENCIL_BUFFER_BIT);
-    this.state.setUniform('sys', [performance.now(), canvas.clientWidth, canvas.clientHeight, (<BloodBoard>this.board()).visibility]);
+    this.state.setUniform('sys', [performance.now(), width, height, this.visibility]);
     this.modulation(1, 1, 1, 1);
   }
 
+  public setVisibility(vis: number) {
+    this.visibility = vis;
+  }
+
+
   public modulation(r: number, g: number, b: number, a: number) {
-    if (this.state.isUniformEnabled('modulation')) this.state.setUniform('modulation', [r, g, b, a]);
-  }
-
-  private updateProfile(profile: Profile) {
-    const p = this.profiler.frame();
-    p.counter('drawsRequested').set(profile.drawsRequested);
-    p.counter('drawsMerged').set(profile.drawsMerged);
-    p.counter('shaderChanges').set(profile.shaderChanges);
-    p.counter('uniformChanges').set(profile.uniformChanges);
-    p.counter('textureChanges').set(profile.textureChanges);
-    p.counter('bufferChanges').set(profile.bufferChanges);
-    profile.reset();
-  }
-
-  public printInfo() {
-    this.logger('INFO', this.state.profile + '');
+    if (this.state.isUniformEnabled('modulation'))
+      this.state.setUniform('modulation', [r, g, b, a]);
   }
 
   public flush() {

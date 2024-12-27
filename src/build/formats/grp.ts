@@ -36,7 +36,7 @@ export class GrpFile {
     const info = this.infos.get(fname.toLowerCase());
     if (info === undefined) return null;
     this.data.setOffset(info.off);
-    return this.data.subView().readArrayBuffer(info.size);
+    return this.data.readArrayBuffer(info.size);
   }
 }
 

@@ -1,4 +1,6 @@
+import { getOrCreate } from "@utils/collections";
 import { struct, string, uint, array, byte, ubyte, Stream, atomic_array } from "@utils/stream";
+import Optional from "optional-js";
 
 class Header {
   public sign: string;
@@ -8,12 +10,14 @@ class Header {
 }
 
 class FatRecord {
-  public unk: any;
+  public unk1: number[];
+  public unk2: number;
   public offset: number;
   public size: number;
   public time: number;
   public flags: number;
   public filename: string;
+  public fileId: number;
 }
 
 const headerStruct = struct(Header)
@@ -23,20 +27,21 @@ const headerStruct = struct(Header)
   .field('numFiles', uint);
 
 const fatRecord = struct(FatRecord)
-  .field('unk', array(byte, 16))
+  .field('unk1', array(byte, 16))
   .field('offset', uint)
   .field('size', uint)
-  .field('unk', uint)
+  .field('unk2', uint)
   .field('time', uint)
   .field('flags', ubyte)
   .field('filename', string(11))
-  .field('unk', uint);
+  .field('fileId', uint);
 
 export class RffFile {
   private data: Stream;
   private header: Header;
   private namesTable = new Map<string, FatRecord>();
-  public fat: FatRecord[];
+  private fileIdMap = new Map<string, Map<number, FatRecord>>();
+  readonly fat: FatRecord[];
 
   constructor(buf: ArrayBuffer) {
     this.data = new Stream(buf);
@@ -47,15 +52,19 @@ export class RffFile {
     this.decodeFat(fat);
     const fatBuffer = new Stream(fat.buffer);
     fatBuffer.setOffset(fat.byteOffset);
-    this.loadFat(fatBuffer, this.header.numFiles);
+    this.fat = this.loadFat(fatBuffer, this.header.numFiles);
   }
 
-  private loadFat(stream: Stream, numFiles: number): void {
-    this.fat = array(fatRecord, numFiles).read(stream);
-    this.fat.forEach(r => {
-      r.filename = this.convertFname(r.filename);
+  private loadFat(stream: Stream, numFiles: number): FatRecord[] {
+    const fat = array(fatRecord, numFiles).read(stream);
+    fat.forEach(r => {
+      const [fname, ext] = [r.filename.substring(3), r.filename.substring(0, 3)];
+      r.filename = `${fname}.${ext}`;
+      const idMap = getOrCreate(this.fileIdMap, ext.toLowerCase(), _ => new Map());
+      idMap.set(r.fileId, r);
       this.namesTable.set(r.filename.toLowerCase(), r);
     });
+    return fat;
   }
 
   private decodeFat(fat: Uint8Array) {
@@ -69,22 +78,28 @@ export class RffFile {
     }
   }
 
-  private convertFname(name: string): string {
-    return name.substring(3) + '.' + name.substring(0, 3);
-  }
-
-  public get(fname: string): Uint8Array {
-    const record = this.getRecord(fname);
-    this.data.setOffset(record.offset);
-    const arr = atomic_array(ubyte, record.size).read(this.data);
-    if (record.flags & 0x10)
+  get(rec: FatRecord): ArrayBuffer {
+    this.data.setOffset(rec.offset);
+    const arr = atomic_array(ubyte, rec.size).read(this.data);
+    if (rec.flags & 0x10)
       for (let i = 0; i < 256; i++)
         arr[i] ^= (i >> 1);
-    return arr;
+    return arr.buffer;
   }
 
-  public getRecord(fname: string): FatRecord {
+  getByName(fname: string): ArrayBuffer {
+    const record = this.getRecord(fname);
+    return record ? this.get(record) : null;
+  }
+
+  getRecord(fname: string): FatRecord {
     return this.namesTable.get(fname.toLowerCase());
+  }
+
+  getRecordById(ext: string, fid: number): FatRecord {
+    return Optional.ofNullable(this.fileIdMap.get(ext.toLowerCase()))
+      .map(m => m.get(fid))
+      .orElse(null)
   }
 }
 

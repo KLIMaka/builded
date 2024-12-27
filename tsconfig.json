@@ -1,12 +1,11 @@
 {
   "compilerOptions": {
-    "module": "es2022",
+    "module": "esNext",
     "target": "ESNext",
     "lib": [
-      "ES2017",
+      "ESNext",
       "DOM",
       "DOM.Iterable",
-      "esnext.asynciterable"
     ],
     "outDir": "distr",
     "rootDir": "src",
@@ -34,5 +33,5 @@
   "exclude": [
     "node_modules",
     "**/node_modules/*"
-  ]
+  ],
 }

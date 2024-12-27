@@ -130,7 +130,7 @@ export class Stream {
     let str = new Array<string>(len);
     for (let i = 0; i < len; i++) {
       let c = this.readByte();
-      if (c == 0) {
+      if (c === 0) {
         this.skip(len - i - 1);
         break;
       }
@@ -170,7 +170,7 @@ export class Stream {
     if (this.aligned) this.currentByte = this.readUByte();
     const bit = ((this.currentByte >> (this.currentBit)) & 1);
     this.currentBit = (this.currentBit + 1) % 8;
-    this.aligned = this.currentBit == 0;
+    this.aligned = this.currentBit === 0;
     return bit;
   }
 
@@ -179,7 +179,7 @@ export class Stream {
     if (bit) this.currentByte |= (1 << this.currentBit)
     else this.currentByte &= (~(1 << this.currentBit) & 0xff);
     this.currentBit = (this.currentBit + 1) % 8;
-    this.aligned = this.currentBit == 0;
+    this.aligned = this.currentBit === 0;
     if (this.aligned) this.writeUByte(this.currentByte);
   }
 
@@ -202,7 +202,7 @@ export class Stream {
     const signed = bits < 0;
     bits = signed ? -bits : bits;
     value = signed ? fromSigned(value, bits) : value;
-    for (let i = 0; i < bits; i++)  this.writeBit(((value >> i) & 1) == 1);
+    for (let i = 0; i < bits; i++)  this.writeBit(((value >> i) & 1) === 1);
   }
 }
 
@@ -252,7 +252,7 @@ export const float = atomicReader(s => s.readFloat(), (s, v) => s.writeFloat(v),
 export const string = (len: number) => accessor(s => s.readByteString(len), (s, v) => s.writeByteString(len, v), len);
 export const bits = (len: number) => accessor(s => s.readBits(len), (s, v) => s.writeBits(len, v), Math.abs(len) / 8);
 export const bits_signed = (len: number) => accessor(s => s.readBitsSigned(len), (s, v) => s.writeBits(len, v), Math.abs(len) / 8);
-export const bit = () => accessor(s => s.readBits(1) == 1, (s, v) => s.writeBits(1, v ? 1 : 0), 1 / 8);
+export const bit = () => accessor(s => s.readBits(1) === 1, (s, v) => s.writeBits(1, v ? 1 : 0), 1 / 8);
 export const array = <T>(type: Accessor<T>, len: number) => accessor(s => readArray(s, type, len), (s, v) => writeArray(s, type, len, v), type.size * len);
 export const atomic_array = <T>(type: AtomicReader<any, T>, len: number) => accessor(s => readAtomicArray(s, type, len), (s, v) => writeAtomicArray(s, type, len, v), type.size * len);
 export const struct = <T>(type: Constructor<T>) => new StructBuilder(type);
@@ -271,11 +271,11 @@ const writeArray = <T>(s: Stream, type: Accessor<T>, len: number, value: Array<T
 const readAtomicArray = <T>(s: Stream, type: AtomicReader<any, T>, len: number) => {
   const ctr = type.atomicArrayConstructor;
   const buffer = s.readArrayBuffer(len * type.size);
-  return new ctr(buffer, 0, len * type.size);
+  return new ctr(buffer, 0, len);
 }
 
 const writeAtomicArray = <T>(s: Stream, type: AtomicReader<any, T>, len: number, value: T) => {
-  s.writeArrayBuffer((<any>value).buffer, len);
+  s.writeArrayBuffer((value as any).buffer, len);
 }
 
 type Constructor<T> = { new(): T };

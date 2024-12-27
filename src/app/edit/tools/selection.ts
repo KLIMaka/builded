@@ -7,7 +7,7 @@ import { create, Dependency, getInstances, instance, lifecycle, Module, plugin }
 import { detuple0, detuple1 } from "../../../utils/mathutils";
 import { SnapType, STATE } from "../../apis/app";
 import { busDisconnector, Message, MessageHandler, MessageHandlerList, NULL_MESSAGE_HANDLER } from "../../apis/handler";
-import { RenderablesCache, RENDRABLES_CACHE } from "../../modules/geometry/cache";
+import { RenderablesCache, RENDRABLES_CACHE } from "../../modules/gl/geometry/cache";
 import { EntityFactory, ENTITY_FACTORY } from "../context";
 import { Frame, Highlight, NamedMessage, Render } from "../messages";
 import { DefaultTool, TOOLS_BUS } from "./toolsbus";

@@ -1,6 +1,6 @@
 import { GridController } from "../../app/apis/app";
 import { any, findFirst, interpolate, intersect, range } from "../../utils/collections";
-import { NumberInterpolator } from "../../utils/interpolator";
+import { LinearInterpolator } from "../../utils/interpolator";
 import { iter } from "../../utils/iter";
 import { clamp, cross2d, int, len2d } from "../../utils/mathutils";
 import { connectedWalls, sectorWalls } from "./loops";
@@ -20,7 +20,7 @@ export function isValidSpriteId(board: Board, spriteId: number): boolean {
 }
 
 export function wallInSector(board: Board, sectorId: number, x: number, y: number) {
-  return findFirst(sectorWalls(board, sectorId), w => board.walls[w].x == x && board.walls[w].y == y, -1);
+  return findFirst(sectorWalls(board, sectorId), w => board.walls[w].x === x && board.walls[w].y === y).orElse(-1);
 }
 
 export function walllen(board: Board, wallId: number) {
@@ -34,9 +34,9 @@ export function walllen(board: Board, wallId: number) {
 
 export function lastwall(board: Board, wallId: number): number {
   if (!isValidWallId(board, wallId)) throw new Error(`Invalid wallId: ${wallId}`);
-  if (wallId > 0 && board.walls[wallId - 1].point2 == wallId) return wallId - 1;
+  if (wallId > 0 && board.walls[wallId - 1].point2 === wallId) return wallId - 1;
   for (let w = wallId; ; w = board.walls[w].point2) {
-    if (board.walls[w].point2 == wallId) return w;
+    if (board.walls[w].point2 === wallId) return w;
   }
 }
 
@@ -53,15 +53,15 @@ export function isTJunction(board: Board, wallId: number) {
   if (!isValidWallId(board, wallId)) throw new Error(`Invalid wallId: ${wallId}`);
   const wall = board.walls[wallId];
   const lwall = board.walls[lastwall(board, wallId)];
-  return wall.nextsector != lwall.nextsector;
+  return wall.nextsector !== lwall.nextsector;
 }
 
 const NULL_SECTOR_SET = new Set([-1]);
 export function findSectorsAtPoint(board: Board, x: number, y: number): Set<number> {
   const sectorId = findSector(board, x, y);
-  if (sectorId == -1) return NULL_SECTOR_SET;
+  if (sectorId === -1) return NULL_SECTOR_SET;
   const wallId = wallInSector(board, sectorId, x, y);
-  if (wallId == -1) return new Set([sectorId]);
+  if (wallId === -1) return new Set([sectorId]);
   return new Set(iter(connectedWalls(board, wallId))
     .map(w => sectorOfWall(board, w)));
 }
@@ -74,7 +74,7 @@ export function findContainingSector(board: Board, points: Iterable<[number, num
 }
 
 function pointInterpolator(lh: [number, number], rh: [number, number], t: number) {
-  return <[number, number]>[NumberInterpolator(lh[0], rh[0], t), NumberInterpolator(lh[1], rh[1], t)]
+  return <[number, number]>[LinearInterpolator(lh[0], rh[0], t), LinearInterpolator(lh[1], rh[1], t)]
 }
 
 export function findContainingSectorMidPoints(board: Board, points: Iterable<[number, number]>): Set<number> {
@@ -108,7 +108,10 @@ export function inSector(board: Board, x: number, y: number, sectorId: number): 
 export function sectorOfWall(board: Board, wallId: number): number {
   if (wallId < 0 || wallId >= board.numwalls) return -1;
   const wall = board.walls[wallId];
-  if (wall.nextwall != -1) return board.walls[wall.nextwall].nextsector;
+  if (wall.nextwall !== -1) {
+    const nextwall = board.walls[wall.nextwall];
+    if (nextwall.nextsector !== -1) return nextwall.nextsector
+  }
   let start = 0;
   let end = board.numsectors - 1;
   while (end - start >= 0) {
@@ -137,7 +140,7 @@ export function findSector(board: Board, x: number, y: number, sectorId: number 
 }
 
 function findSectorAll(board: Board, x: number, y: number) {
-  return findFirst(range(0, board.numsectors), s => inSector(board, x, y, s), -1);
+  return findFirst(range(0, board.numsectors), s => inSector(board, x, y, s)).orElse(-1);
 }
 
 export function snapWall(board: Board, wallId: number, x: number, y: number, grid: GridController) {

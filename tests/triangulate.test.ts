@@ -1,5 +1,5 @@
 import { BuildReferenceTrackerImpl } from '../src/app/modules/default/reftracker';
-import { triangulate } from '../src/app/modules/geometry/builders/sector';
+import { triangulate } from '../src/app/modules/gl/geometry/builders/sector';
 import { createNewSector } from '../src/build/board/mutations/ceatesector';
 import { cloneBoard, cloneSector, cloneSprite, cloneWall, newBoard, newSector, newSprite, newWall } from '../src/build/maploader';
 import { wrap } from '../src/utils/collections';

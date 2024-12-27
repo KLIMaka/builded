@@ -1,22 +1,29 @@
-import { useFloating, autoUpdate, size, useClick, useDismiss, useInteractions, FloatingPortal } from "@floating-ui/react";
-import React, { ReactElement, useCallback, useContext, useEffect } from "react";
-import { ActionItem, ActionList } from "./action-list";
-import { useValue, ActionDescriptorsContext, ActionsChannelContext, CurrentActionsChannelContext, DropdownButton } from "./commons";
-import { Source, Value } from "@utils/callbacks";
+import { autoUpdate, FloatingPortal, size, useClick, useDismiss, useFloating, useInteractions } from "@floating-ui/react";
+import { constSource, Source, Value } from "@utils/callbacks";
+import { EMPTY_NAVIGATOR, NavigateAction, Navigator } from "@utils/navigators";
 import { seq } from "@utils/types";
+import React, { ReactElement, useCallback, useContext, useEffect } from "react";
+import { match } from "ts-pattern";
+import { ActionItem, ActionList } from "./action-list";
+import { ActionDescriptorsContext, ActionsChannelContext, CurrentActionsChannelContext, Icon, styles, useValue } from "./commons";
 
 export type MenuButtonProps = {
   label: Source<ReactElement>,
+  labelAutoSize?: boolean,
   items: Source<ActionItem[]>,
   openValue: Value<boolean>,
+  navigator?: Source<Navigator>,
   menuMinWidth?: number
   menuMaxWidth?: number
 }
+
+const emptyNavigator = constSource('emptyNavigator', EMPTY_NAVIGATOR);
 
 export function MenuButton(props: MenuButtonProps) {
   const openValue = props.openValue;
   const items = useValue(props.items);
   const label = useValue(props.label);
+  const navigator = useValue(props.navigator ?? emptyNavigator);
   const isOpen = useValue(openValue);
   const { refs, floatingStyles, context } = useFloating({
     placement: "bottom-start",
@@ -48,18 +55,36 @@ export function MenuButton(props: MenuButtonProps) {
   const listChannel = actionsChannel.child("list", true);
 
   useEffect(() => {
-    const openValueDisconnector = openValue.subscribe(o => currentActions(o ? listChannel : actionsChannel))
+    const openValueDisconnector = openValue.subscribe(o => currentActions(o ? listChannel : actionsChannel));
     const closeAction = actionDescriptors.bindSync('close', () => closeMenu());
-    return seq(listChannel.collector().add(closeAction), openValueDisconnector);
+    return seq(openValueDisconnector, listChannel.collector().add(closeAction));
   }, [actionDescriptors, actionsChannel, currentActions, isOpen, listChannel, closeMenu, openValue]);
+
+  const handleWheel = (deltaY: number, alt: boolean, shift: boolean, ctrl: boolean, navigator: Navigator) => {
+    const up = deltaY < 0;
+    const action = match([up, alt, shift, ctrl])
+      .returnType<NavigateAction>()
+      .with([true, false, false, false], () => 'prev')
+      .with([false, false, false, false], () => 'next')
+      .with([true, false, true, false], () => 'prevMacro')
+      .with([false, false, true, false], () => 'nextMacro')
+      .with([true, true, false, false], () => 'start')
+      .with([false, true, false, false], () => 'end')
+      .otherwise(() => 'nop')
+    navigator(action);
+  }
 
   return (
     <>
-      <DropdownButton
+      <div
         ref={refs.setReference}
+        className={`row-block button gap-5 ${(props.labelAutoSize ?? true) ? 'flex-auto' : 'flex-fill'} ${styles({ active: isOpen })}`}
         {...getReferenceProps()}
-        className={`${isOpen ? 'active' : ''}`}
-      >{label}</DropdownButton>
+        onWheel={e => handleWheel(e.deltaY, e.altKey, e.shiftKey, e.ctrlKey, navigator)}
+      >
+        {label}
+        <Icon icon='angle-down' />
+      </div>
       {isOpen && (
         <ActionsChannelContext.Provider value={listChannel}>
           <FloatingPortal>

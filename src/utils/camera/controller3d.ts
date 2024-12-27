@@ -1,87 +1,100 @@
+import { Source, Value, ValuesContainer } from '@utils/callbacks';
+import { mat4, vec2, vec3 } from 'gl-matrix';
 import { deg2rad } from 'utils/mathutils';
 import { Camera } from './camera';
-import { mat4, vec3 } from 'gl-matrix';
 
-let invertTrans = mat4.create();
-let invTP = mat4.create();
-let forward = vec3.create();
+const invertTrans = mat4.create();
+const invTP = mat4.create();
 
 export class Controller3D {
-  private camera = new Camera(0, 0, 0, 0, 0);
-  private projection = mat4.create();
-  private fovRad: number;
-  private oldX = 0;
-  private oldY = 0;
-  private width: number;
-  private height: number;
-  private aspect: number;
+  readonly camera: Camera;
+  readonly size: Value<vec2>;
+  readonly mousePos: Value<vec2>;
+  readonly fovRad: Value<number>;
+  readonly aspect: Source<number>;
+  readonly projection: Source<mat4>;
+  readonly forwardMouse: Source<vec3>;
 
-  public setFov(fov: number) {
-    this.fovRad = deg2rad(fov);
+  constructor(values: ValuesContainer) {
+    this.camera = new Camera(values, 0, 0, 0, 0, 0);
+    this.size = values.valueBuilder<vec2>({ name: 'size', value: vec2.create(), eq: vec2.exactEquals });
+    this.mousePos = values.valueBuilder<vec2>({ name: 'mousePos', value: vec2.create(), eq: vec2.exactEquals });
+    this.fovRad = values.value('fovRad', deg2rad(90))
+    this.aspect = values.transformed('aspect', this.size, ([w, h]) => w / h);
+    this.projection = values.transformedTuple('projection', [this.fovRad, this.aspect], ([fov, aspect]) => mat4.perspective(mat4.create(), fov, aspect, 1, null));
+    this.forwardMouse = values.transformedTuple('forwardMouse', [this.mousePos, this.size, this.projection, this.camera.transform, this.camera.position], ([[mx, my], [w, h], proj, trans, pos]) => {
+      const x = (mx / w) * 2 - 1;
+      const y = (my / h) * 2 - 1;
+      mat4.invert(invertTrans, trans);
+      mat4.invert(invTP, proj);
+      mat4.mul(invTP, invertTrans, invTP);
+
+      const forward = vec3.set(vec3.create(), x, -y, -1);
+      vec3.transformMat4(forward, forward, invTP);
+      vec3.sub(forward, forward, pos);
+      return vec3.normalize(forward, forward);
+    }, { eq: (l: vec3, r: vec3) => vec3.exactEquals(l, r) });
+  }
+
+  setFov(fov: number) {
+    this.fovRad.set(deg2rad(fov));
   }
 
   setSize(w: number, h: number) {
-    this.width = w;
-    this.height = h;
-    this.aspect = w / h;
+    this.size.set(vec2.fromValues(w, h));
   }
 
-  public getProjectionMatrix(): mat4 {
-    return mat4.perspective(this.projection, this.fovRad, this.aspect, 1, null);
+  getSize(): vec2 {
+    return this.size.get();
   }
 
-  public getTransformMatrix() {
-    return this.camera.getTransformMatrix();
+  getProjectionMatrix(): mat4 {
+    return this.projection.get();
   }
 
-  public getPosition() {
-    return this.camera.getPosition();
+  getTransformMatrix() {
+    return this.camera.transform.get();
   }
 
-  public setPosition(x: number, y: number, z: number) {
+  getPosition() {
+    return this.camera.position;
+  }
+
+  getForwardUnprojected(): vec3 {
+    return this.forwardMouse.get();
+  }
+
+  setPosition(x: number, y: number, z: number) {
     this.camera.setPosition(x, y, z);
   }
 
-  public getForward() {
-    return this.camera.forward();
+  getForward() {
+    return this.camera.forward.get();
   }
 
-  public getForwardUnprojected(): vec3 {
-    const x = (this.oldX / this.width) * 2 - 1;
-    const y = (this.oldY / this.height) * 2 - 1;
-    mat4.invert(invertTrans, this.getTransformMatrix());
-    mat4.invert(invTP, this.getProjectionMatrix());
-    mat4.mul(invTP, invertTrans, invTP);
-
-    vec3.set(forward, x, -y, -1);
-    vec3.transformMat4(forward, forward, invTP);
-    vec3.sub(forward, forward, this.getPosition());
-    return vec3.normalize(forward, forward);
-  }
-
-  public moveForward(dist: number) {
-    const forward = this.camera.forward();
-    const campos = this.camera.getPosition();
+  moveForward(dist: number) {
+    const forward = vec3.copy(vec3.create(), this.camera.forward.get());
+    const campos = vec3.copy(vec3.create(), this.camera.position.get());
     vec3.scale(forward, forward, dist);
     vec3.add(campos, campos, forward);
     this.camera.setPosition(campos[0], campos[1], campos[2]);
   }
 
-  public moveSideway(dist: number) {
-    const sideways = this.camera.side();
-    const campos = this.camera.getPosition();
+  moveSideway(dist: number) {
+    const sideways = vec3.copy(vec3.create(), this.camera.side.get());
+    const campos = vec3.copy(vec3.create(), this.camera.position.get());
     vec3.scale(sideways, sideways, dist);
     vec3.add(campos, campos, sideways);
     this.camera.setPosition(campos[0], campos[1], campos[2]);
   }
 
-  public track(x: number, y: number, move: boolean) {
-    if (move) this.camera.updateAngles((x - this.oldX) / 2, (y - this.oldY) / 2);
-    this.oldX = x;
-    this.oldY = y;
+  track(x: number, y: number, move: boolean) {
+    const [mx, my] = this.mousePos.get();
+    if (move) this.camera.updateAngles((x - mx) / 2, (y - my) / 2);
+    this.mousePos.set(vec2.fromValues(x, y));
   }
 
-  public getCamera(): Camera {
+  getCamera(): Camera {
     return this.camera;
   }
 }

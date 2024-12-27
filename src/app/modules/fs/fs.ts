@@ -1,33 +1,163 @@
-import { Source, proxyAsync, value } from "@utils/callbacks";
+import { BaseValue, Source, Value, ValuesContainer } from "@utils/callbacks";
+import { getInstances, Plugin, provider } from "@utils/injector";
 import { iter } from "@utils/iter";
-import { strcmpci as streqci } from "@utils/objects";
-import { Function, identity, nil, seq } from "@utils/types";
+import { asyncMapOptional, strcmpci as streqci } from "@utils/objects";
+import { BiFunction, Function, identity, nil, Result, resultAsync, seq, SingleTuple } from "@utils/types";
+import { ACTION_DESCRIPTORS, ActionDescriptors } from "app/apis/actions";
+import { Ui, UI } from "app/apis/ui1";
 import { GrpFile } from "build/formats/grp";
 import { RffFile } from "build/formats/rff";
 import JSZip from "jszip";
 import Optional from "optional-js";
-import { Disconnector, Storage, Storages, Timer } from "../../apis/app1";
-import { FileInfo, FileSystem, FileSystemHandler, FileSystems, WritableFileSystem } from "../../apis/fs";
+import { match } from "ts-pattern";
+import { App, APP, Disconnector, Storage, Storages, Timer } from "../../apis/app1";
+import { DirectoryFileSystemHandle, FileFileSystemHandle, FileInfo, FileSystem, FileSystemHandle, FileSystemHandler, FileSystems, MemoryFileSystemHandle, SerializedFileSystemHandle, StackFileSystemHandle, StorageFileSystemHandle, WritableFileSystem } from "../../apis/fs";
+import { selectStorageFs } from "./ui/select-storage";
+import { getOrCreate } from "@utils/collections";
+import { Stream } from "@utils/stream";
+
+async function pickDir(): Promise<Optional<DirectoryFileSystemHandle>> {
+  try {
+    const handle = await window.showDirectoryPicker();
+    return Optional.of({ type: 'dir', handle });
+  } catch {
+    return Optional.empty();
+  }
+}
+
+async function pickFile(
+  type: 'rff' | 'zip' | 'grp'
+): Promise<Optional<FileFileSystemHandle>> {
+  try {
+    const pickType = match(type)
+      .returnType<FilePickerAcceptType>()
+      .with('grp', () => ({ description: 'Grp File', accept: { 'application/grp': '.grp' } }))
+      .with('zip', () => ({ description: 'Zip File', accept: { 'application/zip': '.zip' } }))
+      .with('rff', () => ({ description: 'Rff File', accept: { 'application/rff': '.rff' } }))
+      .exhaustive();
+    const [handle] = await window.showOpenFilePicker({ types: [pickType] });
+    return Optional.of({ type, handle });
+  } catch {
+    return Optional.empty();
+  }
+}
+
+async function requestPermissions<T extends FileSystemFileHandle | FileSystemDirectoryHandle>(handle: T): Promise<T> {
+  const permission = await handle.requestPermission();
+  if (permission !== 'granted') throw new Error(`Permission on ${handle.name} is not granted`)
+  return handle;
+}
+
+
+class FileSystemHandleImpl<T extends SerializedFileSystemHandle> implements FileSystemHandle {
+  constructor(
+    public name: string,
+    public serialized: T,
+    private doOpen: Function<FileSystemHandle, Promise<FileSystem>>,
+    private isSame: Function<FileSystemHandle, Promise<boolean>>
+  ) { }
+
+  async open(): Promise<Result<FileSystem>> {
+    return resultAsync(() => this.doOpen(this))
+  }
+
+  isSameEntry(handle: FileSystemHandle): Promise<boolean> {
+    return this.isSame(handle);
+  }
+}
 
 class FileSystemsImpl implements FileSystems {
-  private mounts: Map<string, FileSystem> = new Map();
-  readonly list = value<string[]>([]);
+  constructor(
+    private app: App,
+    private ui: Ui,
+    private aDescriptors: ActionDescriptors,
+  ) { }
 
-  mount(name: string, fs: FileSystem): void {
-    this.mounts.set(name, fs);
-    this.list.set([...this.mounts.keys()]);
+  deserialize(serialized: SerializedFileSystemHandle): FileSystemHandle {
+    return match(serialized)
+      .with({ type: 'storage' }, s => this.createStorage(s))
+      .with({ type: 'memory' }, s => this.createMemory(s))
+      .with({ type: 'dir' }, s => this.createDir(s))
+      .with({ type: 'zip' }, s => this.createFile(s, createZipFsFile))
+      .with({ type: 'rff' }, s => this.createFile(s, createRffFs))
+      .with({ type: 'grp' }, s => this.createFile(s, createGrpFs))
+      .with({ type: 'stack' }, s => this.createStack(s))
+      .exhaustive()
   }
 
-  get(name: string): Optional<FileSystem> {
-    return Optional.ofNullable(this.mounts.get(name))
+  async pickHandle(src: SerializedFileSystemHandle['type']): Promise<Optional<FileSystemHandle>> {
+    return match(src)
+      .returnType<Promise<Optional<FileSystemHandle>>>()
+      .with('storage', async () => (await this.pickStorage()).map(name => this.deserialize({ type: 'storage', name })))
+      .with('memory', async () => Optional.of(this.deserialize({ type: 'memory', name: 'inMemory' })))
+      .with('dir', async () => (await pickDir()).map(d => this.deserialize(d)))
+      .with('zip', async () => (await pickFile('zip')).map(d => this.deserialize(d)))
+      .with('rff', async () => (await pickFile('rff')).map(d => this.deserialize(d)))
+      .with('grp', async () => (await pickFile('grp')).map(d => this.deserialize(d)))
+      .with('stack', async () => Optional.empty())
+      .exhaustive();
+  }
+
+  private async pickStorage(): Promise<Optional<string>> {
+    return selectStorageFs(this.app, this.ui, this.aDescriptors, this)
+  }
+
+  private createStorage(serialized: StorageFileSystemHandle): FileSystemHandle {
+    return new FileSystemHandleImpl(
+      serialized.name,
+      serialized,
+      async h => storageFS(serialized.name, this.app.storages, this.app.timer),
+      async h => h.serialized.type === 'storage' && h.serialized.name === serialized.name
+    );
+  }
+
+  private createDir(serialized: DirectoryFileSystemHandle): FileSystemHandle {
+    return new FileSystemHandleImpl(
+      serialized.handle.name,
+      serialized,
+      async h => requestPermissions(serialized.handle).then(fh => createLocalFs(fh)),
+      async h => h.serialized.type === 'dir' && await h.serialized.handle.isSameEntry(serialized.handle)
+    )
+  }
+
+  private createFile(serialized: FileFileSystemHandle, factory: Function<File, Promise<FileSystem>>): FileSystemHandle {
+    return new FileSystemHandleImpl(
+      serialized.handle.name,
+      serialized,
+      async h => requestPermissions(serialized.handle).then(fh => fh.getFile()).then(fh => factory(fh)),
+      async h => h.serialized.type === serialized.type && await h.serialized.handle.isSameEntry(serialized.handle)
+    );
+  }
+
+  private createMemory(serialized: MemoryFileSystemHandle): FileSystemHandle {
+    return new FileSystemHandleImpl(
+      serialized.name,
+      serialized,
+      async h => inMemoryFS(this.app.timer),
+      async h => h.serialized.type === 'memory' && serialized.name === h.name
+    );
+  }
+
+  private createStack(serialized: StackFileSystemHandle): FileSystemHandle {
+    const topHandle = this.deserialize(serialized.top);
+    const bottomHandle = this.deserialize(serialized.bottom);
+    return new FileSystemHandleImpl(
+      'stack',
+      serialized,
+      async h => stack((await topHandle.open()).unwrap(), (await bottomHandle.open()).unwrap()),
+      async h => h.serialized.type === 'stack' && this.deserialize(h.serialized.top).isSameEntry(topHandle) && this.deserialize(h.serialized.bottom).isSameEntry(bottomHandle)
+    )
   }
 }
 
-export function DefaultFileSystems(): FileSystems {
-  return new FileSystemsImpl();
-}
+export const DefaultFileSystemsConstructor: Plugin<FileSystems> = provider(async injector => {
+  const [app, ui, aDescriptors] = await getInstances(injector, APP, UI, ACTION_DESCRIPTORS);
+  return new FileSystemsImpl(app, ui, aDescriptors);
+});
 
 class StubFs implements FileSystem {
+  readonly type = 'memory';
+
   async info(name: string): Promise<Optional<FileInfo>> {
     return Optional.empty();
   }
@@ -46,25 +176,45 @@ class StubFs implements FileSystem {
     return nil();
   }
 
-  type(): string {
-    return "stub";
-  }
+  async dispose(): Promise<void> { }
 }
 
 export const EMPTY: FileSystem = new StubFs();
 export let GLOBAL_FS_HANDLERS = 0;
 
-class BaseFS {
-  private handlers = new Set<FileSystemHandler>();
+abstract class BaseFS implements FileSystem {
+
+  constructor(
+    readonly type: SerializedFileSystemHandle['type'],
+    private handlers = new Set<FileSystemHandler>()) {
+
+  }
+  abstract info(name: string): Promise<Optional<FileInfo>>;
+  abstract read(name: string): Promise<Optional<ArrayBuffer>>;
+  abstract list(): Promise<FileInfo[]>;
+  abstract writable(): Promise<Optional<WritableFileSystem>>;
+
   subscribe(handler: FileSystemHandler): Disconnector {
     GLOBAL_FS_HANDLERS++;
     if (this.handlers.size === 0) this.firstSubscribed();
     this.handlers.add(handler);
     return seq(() => { GLOBAL_FS_HANDLERS--; this.handlers.delete(handler) }, () => this.check())
   }
-  private check() { if (this.handlers.size === 0) this.lastDisconnected() }
-  onDelete(name: string) { this.handlers.forEach(h => h(name, true)) }
-  onChange(name: string) { this.handlers.forEach(h => h(name, false)) }
+
+  private check() {
+    if (this.handlers.size === 0) this.lastDisconnected()
+  }
+
+  onDelete(name: string) {
+    this.handlers.forEach(h => h(name, true))
+  }
+
+  onChange(name: string) {
+    this.handlers.forEach(h => h(name, false))
+  }
+
+  async dispose(): Promise<void> { }
+
   protected firstSubscribed() { }
   protected lastDisconnected() { }
 }
@@ -76,7 +226,9 @@ class StackFs extends BaseFS implements FileSystem {
   constructor(
     private top: FileSystem,
     private bottom: FileSystem,
-  ) { super() }
+  ) {
+    super('stack')
+  }
 
   private async call<T>(call: Function<FileSystem, Promise<Optional<T>>>): Promise<Optional<T>> {
     const top = await call(this.top);
@@ -103,11 +255,11 @@ class StackFs extends BaseFS implements FileSystem {
   }
 
   protected firstSubscribed(): void {
-    this.topDisconnector = this.top.subscribe(async (name, deleted) => {
+    this.topDisconnector = this.top.subscribe((name, deleted) => {
       if (deleted) this.bottom.info(name).then(file => file.ifPresentOrElse(_ => this.onChange(name), () => this.onDelete(name)));
       else this.onChange(name);
     });
-    this.bottomDisconnector = this.bottom.subscribe(async (name, deleted) => {
+    this.bottomDisconnector = this.bottom.subscribe((name, deleted) => {
       if (deleted) this.top.info(name).then(file => file.ifPresentOrElse(nil(), () => this.onDelete(name)));
       else this.top.info(name).then(file => file.ifPresentOrElse(nil(), () => this.onChange(name)));
     });
@@ -118,8 +270,8 @@ class StackFs extends BaseFS implements FileSystem {
     this.bottomDisconnector();
   }
 
-  type(): string {
-    return "stack";
+  async dispose(): Promise<void> {
+    await Promise.all([this.top.dispose(), this.bottom.dispose()]);
   }
 }
 
@@ -128,15 +280,18 @@ export function stack(top: FileSystem, bottom: FileSystem) {
 }
 
 class StorageFS extends BaseFS implements FileSystem, WritableFileSystem {
-  constructor(private timer: Timer, private filesStorage: Storage, private infoStorage: Storage) { super(); }
+  constructor(
+    private timer: Timer,
+    private filesStorage: Storage,
+    private infoStorage: Storage) {
+    super('storage');
+  }
 
   async read(name: string): Promise<Optional<ArrayBuffer>> {
-    name = name.toUpperCase();
     return this.filesStorage.get(name);
   }
 
   async info(name: string): Promise<Optional<FileInfo>> {
-    name = name.toUpperCase();
     return this.infoStorage.get<FileInfo>(name);
   }
 
@@ -152,7 +307,7 @@ class StorageFS extends BaseFS implements FileSystem, WritableFileSystem {
 
   async write(name: string, data: ArrayBuffer) {
     await this.filesStorage.set(name, data);
-    await this.infoStorage.set(name, { name, size: data.byteLength, lastModified: this.timer() } as FileInfo);
+    await this.infoStorage.set(name, { name, size: data.byteLength, lastModified: this.timer.now() } as FileInfo);
     this.onChange(name);
   }
 
@@ -160,22 +315,27 @@ class StorageFS extends BaseFS implements FileSystem, WritableFileSystem {
     return Optional.of(this);
   }
 
-  type(): string {
-    return 'storage'
+  async dispose(): Promise<void> {
+    // await Promise.all([this.filesStorage.dispose(), this.infoStorage.dispose()]);
   }
 }
-
-export async function storageFS(name: string, storages: Storages, timer: Timer): Promise<FileSystem> {
-  const files = await storages(`${name}_files`);
-  const info = await storages(`${name}_info`);
-  return new StorageFS(timer, files, info);
+const ACTIVE_STORAGE_FS = new Map<string, Promise<StorageFS>>();
+export async function storageFS(name: string, storages: Storages, timer: Timer): Promise<StorageFS> {
+  return getOrCreate(ACTIVE_STORAGE_FS, name, async _ => {
+    const files = await storages(`${name}_files`);
+    const info = await storages(`${name}_info`);
+    return new StorageFS(timer, files, info);
+  })
 }
 
 type MemoryFile = { data: ArrayBuffer, info: FileInfo }
 class InMemoryFS extends BaseFS implements FileSystem {
   private data: Map<string, MemoryFile> = new Map();
 
-  constructor(private timer: Timer) { super(); }
+  constructor(
+    private timer: Timer) {
+    super('memory');
+  }
 
   async info(name: string): Promise<Optional<FileInfo>> {
     return Optional.ofNullable(this.data.get(name.toUpperCase())?.info)
@@ -195,16 +355,12 @@ class InMemoryFS extends BaseFS implements FileSystem {
   }
 
   async write(name: string, data: ArrayBuffer) {
-    this.data.set(name.toUpperCase(), { data, info: { size: data.byteLength, name, lastModified: this.timer() } })
+    this.data.set(name.toUpperCase(), { data, info: { size: data.byteLength, name, lastModified: this.timer.now() } })
     this.onChange(name);
   }
 
   async writable(): Promise<Optional<WritableFileSystem>> {
     return Optional.of(this);
-  }
-
-  type(): string {
-    return 'memory'
   }
 }
 
@@ -213,11 +369,29 @@ export function inMemoryFS(timer: Timer) {
 }
 
 class LocalFS extends BaseFS implements FileSystem, WritableFileSystem {
-  constructor(private handle: FileSystemDirectoryHandle) { super(); }
+  constructor(
+    private directoryHandle: FileSystemDirectoryHandle) {
+    super('dir');
+  }
 
-  async tryGetFile(file: string): Promise<Optional<File>> {
+  private async getChain(root: FileSystemDirectoryHandle, chain: string[]): Promise<FileSystemFileHandle> {
+    if (chain.length === 0) throw new Error();
+    else if (chain[0] === '') {
+      chain.shift();
+      return this.getChain(root, chain);
+    } else if (chain.length === 1) {
+      return root.getFileHandle(chain[0]);
+    } else {
+      const dir = chain.shift();
+      return this.getChain(await root.getDirectoryHandle(dir), chain);
+    }
+  }
+
+  private async tryGetFile(file: string): Promise<Optional<File>> {
     try {
-      return Optional.of(await (await this.handle.getFileHandle(file)).getFile());
+      const handle = await this.getChain(this.directoryHandle, file.split('/'));
+      const content = await handle.getFile();
+      return Optional.of(content);
     } catch (e) {
       if (e.name === 'NotFoundError' || e.name === 'TypeError') return Optional.empty();
       throw e;
@@ -226,8 +400,7 @@ class LocalFS extends BaseFS implements FileSystem, WritableFileSystem {
 
   async read(name: string): Promise<Optional<ArrayBuffer>> {
     const file = await this.tryGetFile(name);
-    if (!file.isPresent()) return Optional.empty();
-    return Optional.of(await file.get().arrayBuffer());
+    return asyncMapOptional(file, file => file.arrayBuffer());
   }
 
   async info(name: string): Promise<Optional<FileInfo>> {
@@ -239,20 +412,20 @@ class LocalFS extends BaseFS implements FileSystem, WritableFileSystem {
 
   async list(): Promise<FileInfo[]> {
     const infos: Promise<FileInfo>[] = [];
-    for await (const e of this.handle.values())
+    for await (const e of this.directoryHandle.values())
       if (e.kind === 'file')
         infos.push(e.getFile().then(f => { return { size: f.size, lastModified: f.lastModified, name: f.name } }));
     return Promise.all(infos)
   }
 
   async writable(): Promise<Optional<WritableFileSystem>> {
-    const permission = await this.handle.requestPermission({ mode: "readwrite" });
+    const permission = await this.directoryHandle.requestPermission({ mode: "readwrite" });
     if (permission !== 'granted') return Optional.empty();
     return Optional.of(this);
   }
 
   async write(name: string, buffer: ArrayBuffer) {
-    const fileHandle = await this.handle.getFileHandle(name, { create: true });
+    const fileHandle = await this.directoryHandle.getFileHandle(name, { create: true });
     const writable = await fileHandle.createWritable();
     await writable.write(buffer);
     await writable.close();
@@ -260,22 +433,20 @@ class LocalFS extends BaseFS implements FileSystem, WritableFileSystem {
   }
 
   async delete(name: string) {
-    await this.handle.removeEntry(name);
+    await this.directoryHandle.removeEntry(name);
     this.onDelete(name);
-  }
-
-  type(): string {
-    return 'local'
   }
 }
 
-export function createLocalFs(handle: FileSystemDirectoryHandle): FileSystem {
-  return new LocalFS(handle);
+export function createLocalFs(dirHandle: FileSystemDirectoryHandle) {
+  return new LocalFS(dirHandle);
 }
 
 class ZipFS extends BaseFS implements FileSystem {
 
-  constructor(private zip: JSZip) { super(); }
+  constructor(private zip: JSZip) {
+    super("zip");
+  }
 
   async read(name: string): Promise<Optional<ArrayBuffer>> {
     const file = this.zip.file(name);
@@ -309,13 +480,9 @@ class ZipFS extends BaseFS implements FileSystem {
   async writable(): Promise<Optional<WritableFileSystem>> {
     return Optional.empty()
   }
-
-  type(): string {
-    return 'zip'
-  }
 }
 
-export async function createZipFsFile(file: File): Promise<FileSystem> {
+export async function createZipFsFile(file: File): Promise<ZipFS> {
   return new ZipFS(await JSZip.loadAsync(file));
 }
 
@@ -323,11 +490,22 @@ export async function createZipFsArrayBuffer(file: ArrayBuffer): Promise<FileSys
   return new ZipFS(await JSZip.loadAsync(file));
 }
 
+export async function createGrpOrZipFsArrayBuffeer(file: ArrayBuffer): Promise<FileSystem> {
+  const stream = new Stream(file);
+  return (stream.readByteString(12) === 'KenSilverman')
+    ? createGrpFsArrayBuffer(file)
+    : createZipFsArrayBuffer(file);
+}
+
 class RffFS extends BaseFS implements FileSystem {
-  constructor(private rff: RffFile, private fileLastModified: number = 0) { super() }
+  constructor(
+    private rff: RffFile,
+    private fileLastModified: number = 0) {
+    super('rff')
+  }
 
   async read(name: string): Promise<Optional<ArrayBuffer>> {
-    return Optional.ofNullable(this.rff.get(name));
+    return Optional.ofNullable(this.rff.getByName(name));
   }
 
   async info(name: string): Promise<Optional<FileInfo>> {
@@ -343,13 +521,9 @@ class RffFS extends BaseFS implements FileSystem {
   async writable(): Promise<Optional<WritableFileSystem>> {
     return Optional.empty()
   }
-
-  type(): string {
-    return 'rff'
-  }
 }
 
-export async function createRffFs(file: File): Promise<FileSystem> {
+export async function createRffFs(file: File): Promise<RffFS> {
   return new RffFS(new RffFile(await file.arrayBuffer()));
 }
 
@@ -358,7 +532,11 @@ export function createRffFsArrayBuffer(buffer: ArrayBuffer): FileSystem {
 }
 
 class GrpFS extends BaseFS implements FileSystem {
-  constructor(private grp: GrpFile, private fileLastModified: number = 0) { super() }
+  constructor(
+    private grp: GrpFile,
+    private fileLastModified: number = 0) {
+    super('grp')
+  }
 
   async read(name: string): Promise<Optional<ArrayBuffer>> {
     return Optional.ofNullable(this.grp.getArrayBuffer(name));
@@ -377,61 +555,38 @@ class GrpFS extends BaseFS implements FileSystem {
   async writable(): Promise<Optional<WritableFileSystem>> {
     return Optional.empty()
   }
-
-  type(): string {
-    return 'grp'
-  }
 }
 
-export async function createGrpFs(file: File): Promise<FileSystem> {
+export async function createGrpFs(file: File,): Promise<GrpFS> {
   return new GrpFS(new GrpFile(await file.arrayBuffer()));
 }
 
-export function createGrpFsArrayuBuffer(buffer: ArrayBuffer): FileSystem {
+export function createGrpFsArrayBuffer(buffer: ArrayBuffer): FileSystem {
   return new GrpFS(new GrpFile(buffer));
 }
 
-class FetchFs extends BaseFS implements FileSystem {
-  constructor(private root: string) { super() }
-
-  async read(name: string): Promise<Optional<ArrayBuffer>> {
-    const response = await fetch(`${this.root}/${name}`);
-    if (response.ok) return response.arrayBuffer().then(buff => Optional.of(buff))
-    else return Optional.empty();
+export async function watchFile(values: ValuesContainer, name: string, fs: Source<FileSystem>): Promise<Source<Optional<ArrayBuffer>>> {
+  const srcConnector = (fs: FileSystem, file: Value<Optional<ArrayBuffer>>): Disconnector => {
+    return fs.subscribe(async (changed, deleted) => {
+      if (!streqci(name, changed)) return;
+      if (deleted) file.set(Optional.empty())
+      else file.set(await fs.read(name));
+    })
   }
-
-  async info(name: string): Promise<Optional<FileInfo>> {
-    return this.read(name)
-      .then(f => f.map(f => {
-        return {
-          name,
-          size: f.byteLength,
-          lastModified: 0
-        } as FileInfo
-      }));
-  }
-
-  async list(): Promise<FileInfo[]> {
-    return [];
-  }
-
-  async write(): Promise<Optional<WritableFileSystem>> {
-    return Optional.empty();
-  }
-
-  type(): string {
-    return "fetch"
-  }
-
-  async writable(): Promise<Optional<WritableFileSystem>> {
-    return Optional.empty()
-  }
+  return values.transformedAsync<FileSystem, Optional<ArrayBuffer>>(`watch file '${name}'`, fs, async fs => fs.read(name), srcConnector)
 }
 
-export function fetchFs(root: string) {
-  return new FetchFs(root);
+export function trackFiles<Args extends any[], T>(
+  files: Iterable<string>,
+  selector: Function<SingleTuple<Args>, FileSystem>,
+  reloader: Function<SingleTuple<Args>, Promise<T>>
+): BiFunction<SingleTuple<Args>, BaseValue<T>, Disconnector> {
+  return (fs, value) => selector(fs).subscribe((changed, _) => {
+    if (iter(files).all(f => !streqci(f, changed))) return;
+    value.setPromise(_ => reloader(fs))
+  })
 }
 
-export async function watchFile(name: string, fs: FileSystem): Promise<Source<Optional<ArrayBuffer>>> {
-  return proxyAsync(() => fs.read(name), signal => fs.subscribe(async (n, _) => { if (streqci(name, n)) signal() }));
+export function trackFilesSingle<T>(files: Iterable<string>, reloader: Function<FileSystem, Promise<T>>): BiFunction<FileSystem, BaseValue<T>, Disconnector> {
+  return trackFiles<[FileSystem], T>(files, identity(), reloader);
 }

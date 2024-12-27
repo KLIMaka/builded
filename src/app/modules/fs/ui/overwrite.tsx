@@ -1,27 +1,14 @@
-import { ActionDescriptorsContext, ActionsChannelContext, ActionsNode } from "@ui/commons";
-import { MessageBox } from "@ui/message-box";
+import { modalResult, WindowBuilder } from "@ui/windows-common";
+import { createContainer } from "@utils/callbacks";
 import { Consumer } from "@utils/types";
+import { ActionDescriptors } from "app/apis/actions";
 import { Ui } from "app/apis/ui1";
 import Optional from "optional-js";
 import React from "react";
-import { useContext, useEffect } from "react";
 
 export type OverwriteOption = 'yes' | 'no' | 'all-yes' | 'all-no';
 
 export function ConfirmOkCancel({ result, text, icon }: { result: Consumer<OverwriteOption>, text: string, icon: string }) {
-  const actionsChannel = useContext(ActionsChannelContext);
-  const actionDescriptors = useContext(ActionDescriptorsContext);
-
-  useEffect(() => {
-    const ctx = actionDescriptors.sub('overwrite-box');
-    return actionsChannel.collector().add(
-      ctx.bindSync('yes', () => result('yes')),
-      ctx.bindSync('no', () => result('no')),
-      ctx.bindSync('all-yes', () => result('all-yes')),
-      ctx.bindSync('all-no', () => result('all-no')),
-    );
-  }, [actionDescriptors, actionsChannel, result]);
-
   return <div className='column-block'>
     <div className='flex-fill row-block'>
       <div className={`fa-folid fa ${icon} padded-10`} style={{ fontSize: 32, alignContent: 'center' }} />
@@ -37,15 +24,21 @@ export function ConfirmOkCancel({ result, text, icon }: { result: Consumer<Overw
   </div>
 }
 
-export function confirmOverwrite(actionsChannel: ActionsNode, ui: Ui, title: string, text: string): Promise<Optional<OverwriteOption>> {
+export function confirmOverwrite(ui: Ui, actionDescriptors: ActionDescriptors, title: string, text: string): Promise<Optional<OverwriteOption>> {
+  const values = createContainer('override-box');
   return new Promise<Optional<OverwriteOption>>(async (ok, error) => {
-    ui.showWindow(await MessageBox<OverwriteOption>({
-      content: result => <ConfirmOkCancel result={result} text={text} icon='fa-triangle-exclamation' />,
-      resultConsumer: ok,
-      height: 150,
-      width: 450,
-      title: title,
-      parentChannel: actionsChannel
-    }));
-  })
+    const [resultAndClose, close] = modalResult(() => window.close(), ok);
+    const window = new WindowBuilder('overwrite-box', actionDescriptors, values)
+      .modal()
+      .title(title)
+      .size(450, 150)
+      .action('yes', () => resultAndClose('yes'))
+      .action('no', () => resultAndClose('no'))
+      .action('all-yes', () => resultAndClose('all-yes'))
+      .action('all-no', () => resultAndClose('all-no'))
+      .onClose(close)
+      .disposable(values)
+      .build(<ConfirmOkCancel result={resultAndClose} text={text} icon='fa-triangle-exclamation' />)
+    ui.addWindow(window);
+  });
 }

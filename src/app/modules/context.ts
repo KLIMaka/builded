@@ -30,12 +30,12 @@ import { DefaultInputConstructor, INPUT } from './default/input';
 import { BuildReferenceTrackerImpl } from './default/reftracker';
 import { StateImpl } from './default/state';
 import { DefaultAdditionalTextures } from './default/utiltex';
-import { RenderablesCacheModule } from './geometry/cache';
-import { BUILDERS_FACTORY, DefaultBuildersFactory } from './geometry/common';
+import { RenderablesCacheModule } from './gl/geometry/cache';
+import { BUILDERS_FACTORY, DefaultBuildersFactory } from './gl/geometry/common';
 import { BUFFER_FACTORY, DefaultBufferFactory } from './gl/buffers';
 import { BUILD_GL, BuildGlConstructor } from './gl/buildgl';
 import { InfoModule } from './info';
-import { SwappableViewModule } from './view/view';
+import { SwappableViewModule } from './board-view/view';
 
 function mapBackupService(module: Module) {
   module.bind(plugin('MapBackupService'), lifecycle(async (injector, lifecycle) => {

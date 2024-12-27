@@ -31,13 +31,13 @@ export class SectorStats {
   public unk: number;
 }
 
-export class Sector {
+export class Sector<Stats extends SectorStats = SectorStats> {
   public wallptr: number;
   public wallnum: number;
   public ceilingz: number;
   public floorz: number;
-  public ceilingstat: SectorStats;
-  public floorstat: SectorStats;
+  public ceilingstat: Stats;
+  public floorstat: Stats;
   public ceilingpicnum: number;
   public ceilingheinum: number;
   public ceilingshade: number;
@@ -173,7 +173,7 @@ export class Sprite {
   public shade: number;
   public pal: number;
   public clipdist: number;
-  public filler: number;
+  public blend: number;
   public xrepeat: number;
   public yrepeat: number;
   public xoffset: number;
@@ -212,6 +212,6 @@ export class Header1 {
   public startZ: number;
   public startAng: number;
   public startSec: number;
-  public unk: number;
+  public parallaxSize: number;
 }
 

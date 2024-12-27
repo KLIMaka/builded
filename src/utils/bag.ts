@@ -1,4 +1,4 @@
-import { FastList, List, Node } from "./list";
+import { List, Node } from "./list";
 
 export class Place {
   static of(offset: number, size: number): Place { return new Place(offset, size); }
@@ -15,14 +15,14 @@ export class Bag {
   }
 
   private getSuitablePlace(size: number): Node<Place> {
-    for (let hole = this.holes.first(); hole != this.holes.terminator(); hole = hole.next)
+    for (let hole = this.holes.first(); hole !== this.holes.terminator(); hole = hole.next)
       if (hole.obj.size >= size) return hole;
     return null;
   }
 
   private tryMerge(node: Node<Place>): void {
-    if (node != this.holes.terminator() && node.next != this.holes.terminator()) {
-      if (node.obj.offset + node.obj.size == node.next.obj.offset) {
+    if (node !== this.holes.terminator() && node.next !== this.holes.terminator()) {
+      if (node.obj.offset + node.obj.size === node.next.obj.offset) {
         node.obj.size += node.next.obj.size;
         this.holes.remove(node.next);
         this.tryMerge(node);
@@ -32,11 +32,11 @@ export class Bag {
 
   public put(offset: number, size: number): void {
     let hole = this.holes.first();
-    if (hole == this.holes.terminator()) {
+    if (hole === this.holes.terminator()) {
       this.holes.insertAfter(Place.of(offset, size));
       return;
     }
-    while (hole.next != this.holes.terminator()) {
+    while (hole.next !== this.holes.terminator()) {
       const next = hole.next;
       if (next.obj.offset >= size + offset) break;
       hole = next;
@@ -45,7 +45,7 @@ export class Bag {
     if (hole.obj.offset > offset) {
       const newHole = this.holes.insertBefore(Place.of(offset, size), hole);
       this.tryMerge(newHole);
-    } else if (end == offset) {
+    } else if (end === offset) {
       hole.obj.size += size;
       this.tryMerge(hole);
     } else {
@@ -57,7 +57,7 @@ export class Bag {
   public get(size: number): number {
     const hole = this.getSuitablePlace(size);
     if (hole == null) return null;
-    if (hole.obj.size == size) {
+    if (hole.obj.size === size) {
       const prev = hole.prev;
       this.holes.remove(hole);
       this.tryMerge(prev);
@@ -129,7 +129,7 @@ export class BagController {
     let offset = 0;
     for (const [_, place] of places) {
       this.places[offset] = place;
-      if (place.offset != offset) {
+      if (place.offset !== offset) {
         this.updater(place, offset);
         place.offset = offset;
       }

@@ -1,6 +1,6 @@
 import { mat2d, mat3, mat4, vec2, vec3 } from 'gl-matrix';
+import { loopPairs } from "./collections";
 import * as MU from './mathutils';
-import { loopPairs, pairs } from "./collections";
 
 export function intersect2d(p1s: vec2, p1e: vec2, p2s: vec2, p2e: vec2): vec2 {
   const t = intersect2dT(p1s, p1e, p2s, p2e);
@@ -50,9 +50,9 @@ export function intersect3d(p1s: vec3, p1e: vec3, p2s: vec3, p2e: vec3): vec3 {
   const dir2 = direction3d(p2s, p2e);
 
   const p =
-    (dir1[1] * dir2[0] - dir2[1] * dir1[0]) != 0 ? projectXY :
-      (dir1[0] * dir2[1] - dir2[0] * dir1[1]) != 0 ? projectXZ :
-        (dir1[1] * dir2[2] - dir2[1] * dir1[2]) != 0 ? projectYZ :
+    (dir1[1] * dir2[0] - dir2[1] * dir1[0]) !== 0 ? projectXY :
+      (dir1[0] * dir2[1] - dir2[0] * dir1[1]) !== 0 ? projectXZ :
+        (dir1[1] * dir2[2] - dir2[1] * dir1[2]) !== 0 ? projectYZ :
           null;
 
   if (p == null)

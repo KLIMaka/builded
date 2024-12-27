@@ -2,6 +2,7 @@ precision highp float;
 
 uniform mat4 P;
 uniform mat4 V;
+uniform mat4 M;
 uniform mat4 IV;
 uniform mat4 GT;
 uniform vec4 sys;
@@ -35,7 +36,7 @@ void main() {
   vec2 pos = (screenPos - halfscreen) / halfscreen;
   gl_Position = vec4(pos.x, pos.y, epos.z, epos.w);
 #else
-  gl_Position = P * V * vec4(aPos, 1.0);
+  gl_Position = P * V * M * vec4(aPos, 1.0);
   wnormal = aNorm;
   gridtc = (GT * vec4(aPos, 1.0)).xy;
 #endif

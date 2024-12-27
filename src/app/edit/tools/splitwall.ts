@@ -8,7 +8,7 @@ import { create, lifecycle, Module, plugin } from "../../../utils/injector";
 import { cross2d, dot2d, int, len2d } from "utils/mathutils";
 import { BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, REFERENCE_TRACKER, SnapType, View, VIEW } from "../../apis/app";
 import { busDisconnector } from "../../apis/handler";
-import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/geometry/common";
+import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/gl/geometry/common";
 import { LineBuilder } from "../../modules/gl/buffers";
 import { NamedMessage, Render } from "../messages";
 import { DefaultTool, TOOLS_BUS } from "./toolsbus";
@@ -66,30 +66,29 @@ export class SplitWall extends DefaultTool {
     }
 
     inters.sort((l, r) => l.t - r.t);
-    const closest = takeFirst(inters);
-    if (closest == null) return false;
-    if (loopStart(board, closest.w) != loopStart(board, wallId)) return false;
-    const [ex, ey] = [closest.x, closest.y];
-    const startWall = wallInSector(board, sectorId, sx, sy);
-    const endWall = wallInSector(board, sectorId, ex, ey);
-    if (startWall != -1 && endWall != -1 && (board.walls[startWall].point2 == endWall || board.walls[endWall].point2 == startWall)) return false;
+    return takeFirst(inters).map(closest => {
+      if (loopStart(board, closest.w) != loopStart(board, wallId)) return false;
+      const [ex, ey] = [closest.x, closest.y];
+      const startWall = wallInSector(board, sectorId, sx, sy);
+      const endWall = wallInSector(board, sectorId, ex, ey);
+      if (startWall != -1 && endWall != -1 && (board.walls[startWall].point2 == endWall || board.walls[endWall].point2 == startWall)) return false;
 
-    const slope = createSlopeCalculator(board, sectorId);
-    const sector = board.sectors[sectorId];
-    const z1 = (slope(sx, sy, sector.floorheinum) + sector.floorz) / ZSCALE;
-    const z2 = (slope(ex, ey, sector.floorheinum) + sector.floorz) / ZSCALE;
-    const z3 = (slope(ex, ey, sector.ceilingheinum) + sector.ceilingz) / ZSCALE;
-    const z4 = (slope(sx, sy, sector.ceilingheinum) + sector.ceilingz) / ZSCALE;
+      const slope = createSlopeCalculator(board, sectorId);
+      const sector = board.sectors[sectorId];
+      const z1 = (slope(sx, sy, sector.floorheinum) + sector.floorz) / ZSCALE;
+      const z2 = (slope(ex, ey, sector.floorheinum) + sector.floorz) / ZSCALE;
+      const z3 = (slope(ex, ey, sector.ceilingheinum) + sector.ceilingz) / ZSCALE;
+      const z4 = (slope(sx, sy, sector.ceilingheinum) + sector.ceilingz) / ZSCALE;
 
-    const line = new LineBuilder();
-    this.wireframe.needToRebuild();
-    line.segment(sx, z1, sy, ex, z2, ey);
-    line.segment(ex, z2, ey, ex, z3, ey);
-    line.segment(ex, z3, ey, sx, z4, sy);
-    line.segment(sx, z4, sy, sx, z1, sy);
-    line.build(this.wireframe.buff);
-
-    return true;
+      const line = new LineBuilder();
+      this.wireframe.needToRebuild();
+      line.segment(sx, z1, sy, ex, z2, ey);
+      line.segment(ex, z2, ey, ex, z3, ey);
+      line.segment(ex, z3, ey, sx, z4, sy);
+      line.segment(sx, z4, sy, sx, z1, sy);
+      line.build(this.wireframe.buff);
+      return true;
+    }).orElse(false);
   }
 
   private start() {

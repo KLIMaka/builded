@@ -1,25 +1,26 @@
-import { chain, getOrCreate, map, pairs, reduce } from './collections';
+import { chain, getOrCreate, map, slidingPairs, reduce } from './collections';
 import { iter } from './iter';
 import { memoize } from './mathutils';
+import { Function } from './types';
 
 export type Links<T> = { to: Set<T>, from: Set<T> };
 export class DirectionalGraph<T> {
   readonly nodes = new Map<T, Links<T>>();
 
-  private ensureNode(label: T) {
-    return getOrCreate(this.nodes, label, k => { return { to: new Set(), from: new Set() } });
+  addNode(label: T) {
+    return getOrCreate(this.nodes, label, _ => { return { to: new Set(), from: new Set() } });
   }
 
-  public add(from: T, to: T) {
-    this.ensureNode(to).from.add(from)
-    this.ensureNode(from).to.add(to);
+  add(from: T, to: T) {
+    this.addNode(to).from.add(from)
+    this.addNode(from).to.add(to);
   }
 
-  public addChain(chain: T[]) {
-    for (const [c1, c2] of pairs(chain)) this.add(c1, c2);
+  addChain(chain: T[]) {
+    for (const [c1, c2] of slidingPairs(chain)) this.add(c1, c2);
   }
 
-  public remove(n: T) {
+  remove(n: T) {
     const node = this.nodes.get(n);
     if (node === undefined) return;
     node.to.forEach(n1 => this.nodes.get(n1).from.delete(n));
@@ -27,13 +28,13 @@ export class DirectionalGraph<T> {
     this.nodes.delete(n);
   }
 
-  public order(node: T): number {
-    const links = this.nodes.get(node).to;
+  order(node: T, f: Function<Links<T>, Set<T>> = l => l.to): number {
+    const links = f(this.nodes.get(node));
     if (links.size === 0) return 0;
-    return reduce(map(links, n => this.order(n)), Math.max, 0) + 1
+    return reduce(map(links, n => this.order(n, f)), Math.max, 0) + 1;
   }
 
-  public orderedTo(node: T) {
+  orderedTo(node: T) {
     const result = new Set<T>();
     result.add(node);
     for (const n of result) this.nodes.get(n).from.forEach(n => result.add(n));
@@ -41,12 +42,12 @@ export class DirectionalGraph<T> {
     return [...result].sort((l, r) => order(r) - order(l));
   }
 
-  public orderedAll() {
-    const order = memoize((n: T) => this.order(n));
+  orderedAll(f: Function<Links<T>, Set<T>> = l => l.to) {
+    const order = memoize((n: T) => this.order(n, f));
     return [...this.nodes.keys()].sort((l, r) => order(r) - order(l));
   }
 
-  public findCycle(): T[] {
+  findCycle(): T[] {
     const colors = new Map<T, 'black' | 'gray'>();
     const nodes = this.nodes;
     const paint = function (node: T): T[] {
@@ -70,7 +71,7 @@ export class DirectionalGraph<T> {
     return null;
   }
 
-  public subgraphs(): T[][] {
+  subgraphs(): T[][] {
     const visited = new Set();
     const nodes = this.nodes;
     const collect: (node: T) => T[] = node => {

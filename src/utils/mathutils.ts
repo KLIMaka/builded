@@ -1,5 +1,5 @@
 import { getOrCreate, map, range } from "./collections";
-import { Interpolator, NumberInterpolator } from "./interpolator";
+import { Interpolator, LinearInterpolator } from "./interpolator";
 import { FastList } from "./list";
 
 export const radsInDeg = 180 / Math.PI;
@@ -48,11 +48,15 @@ export function normalize(x: number, min: number, max: number): number {
   return (x - min) / d;
 }
 
+export function sum(lh: number, rh: number): number {
+  return lh + rh;
+}
+
 export function trz(x: number) {
   x = int(x);
-  if (x == 0) return 32;
+  if (x === 0) return 32;
   let count = 0;
-  while ((x & 1) == 0) {
+  while ((x & 1) === 0) {
     x = x >> 1;
     count++;
   }
@@ -60,7 +64,7 @@ export function trz(x: number) {
 }
 
 export function ispow2(x: number): boolean {
-  return (x & (x - 1)) == 0;
+  return (x & (x - 1)) === 0;
 }
 
 export function fract(x: number): number {
@@ -69,8 +73,8 @@ export function fract(x: number): number {
 
 export function nextpow2(x: number) {
   --x;
-  for (var i = 1; i < 32; i <<= 1) {
-    x = x | x >> i;
+  for (let i = 1; i < 32; i <<= 1) {
+    x = x | (x >> i);
   }
   return x + 1;
 }
@@ -132,7 +136,11 @@ export function arcsIntersects(a1s: number, a1e: number, a2s: number, a2e: numbe
 
 export function cyclic(x: number, max: number): number {
   const mod = x % max;
-  return x >= 0 ? mod : mod == 0 ? max - 1 : max + mod;
+  return x >= 0 ? mod : mod === 0 ? max - 1 : max + mod;
+}
+
+export function linear(min: number, max: number, t: number) {
+  return min + (max - min) * t;
 }
 
 export function cubic(x: number): number {
@@ -195,14 +203,7 @@ export function minValue(start: number) {
 
 export function memoize<T, U>(f: (t: T) => U) {
   const cache = new Map<T, U>();
-  return (t: T) => {
-    let cached = cache.get(t);
-    if (cached == undefined) {
-      cached = f(t);
-      cache.set(t, cached);
-    }
-    return cached;
-  }
+  return (t: T) => getOrCreate(cache, t, _ => f(t))
 }
 
 export function quadratic(x0: number, x1: number, x2: number, t: number) {
@@ -302,9 +303,9 @@ export function perlin2d(x: number, y: number) {
   const B = PERLIN[X + 1] + Y;
   const BA = PERLIN[B];
   const BB = PERLIN[B + 1];
-  return NumberInterpolator(
-    NumberInterpolator(grad2d(PERLIN[AA], x, y), grad2d(PERLIN[BA], x - 1, y), u),
-    NumberInterpolator(grad2d(PERLIN[AB], x, y - 1), grad2d(PERLIN[BB], x - 1, y - 1), u),
+  return LinearInterpolator(
+    LinearInterpolator(grad2d(PERLIN[AA], x, y), grad2d(PERLIN[BA], x - 1, y), u),
+    LinearInterpolator(grad2d(PERLIN[AB], x, y - 1), grad2d(PERLIN[BB], x - 1, y - 1), u),
     v);
 }
 
@@ -323,9 +324,8 @@ export function octaves2d(f: (x: number, y: number) => number, octaves: number) 
   }
 }
 
-const SCALE = 27644437;
 export const Vec2Hash: (v: [number, number]) => number = ([x, y]) => (x * 9834497) ^ (y * 8503057);
-export const Vec2Eq: (v1: [number, number], v2: [number, number]) => boolean = ([x1, y1], [x2, y2]) => x1 == x2 && y1 == y2;
+export const Vec2Eq: (v1: [number, number], v2: [number, number]) => boolean = ([x1, y1], [x2, y2]) => x1 === x2 && y1 === y2;
 
 function slope(f: (x: number) => number, x: number, d = 0.01): number {
   const y1 = f(x - d);
@@ -364,6 +364,18 @@ export class RadialSegments {
     this.segments.push({ start: 0, end: 1, value: Number.MAX_VALUE });
   }
 
+  optimize() {
+    const nsegments = new FastList<RadialSegment>();
+    let lastSeg: RadialSegment = null;
+    for (const seg of this.segments) {
+      if (lastSeg === null) lastSeg = seg;
+      if (lastSeg.value === seg.value) lastSeg.end = seg.end;
+      else { nsegments.push(lastSeg); lastSeg = seg }
+    }
+    if (lastSeg !== null) nsegments.push(lastSeg);
+    this.segments = nsegments;
+  }
+
   getValue(x: number): number {
     const seg = this.findSegment(this.segments.first(), x);
     return this.segments.get(seg).value;
@@ -379,7 +391,7 @@ export class RadialSegments {
       let curr = startSeg;
       for (; ;) {
         if (seg.value <= this.segments.get(curr).value) return true;
-        if (curr == endSeg) return false;
+        if (curr === endSeg) return false;
         curr = this.segments.next(curr);
       }
     }
@@ -393,7 +405,7 @@ export class RadialSegments {
       const startSeg = this.insertPoint(this.segments.first(), seg.start);
       const endSeg = this.insertPoint(startSeg, seg.end);
       let ptr = startSeg;
-      while (ptr != 0 && ptr != endSeg) {
+      while (ptr !== 0 && ptr !== endSeg) {
         const segment = this.segments.get(ptr);
         segment.value = Math.min(segment.value, seg.value);
         ptr = this.segments.next(ptr);
@@ -404,8 +416,8 @@ export class RadialSegments {
   private insertPoint(start: number, x: number): number {
     const seg = this.findSegment(start, x);
     const segment = this.segments.get(seg);
-    if (segment.start == x) return seg;
-    if (segment.end == x) return this.segments.next(seg);
+    if (segment.start === x) return seg;
+    if (segment.end === x) return this.segments.next(seg);
     const nseg = this.segments.insertAfter(createSegment(x, segment.end, segment.value), seg);
     segment.end = x;
     return nseg;

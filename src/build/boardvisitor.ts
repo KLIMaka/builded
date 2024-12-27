@@ -1,10 +1,10 @@
 import { BoardUtils } from 'app/apis/app';
 import { vec3 } from 'gl-matrix';
-import { Deck, IndexedDeck } from '../utils/collections';
-import { createSegment, dot2d, len2d, monoatan2, PI2, RadialSegments } from '../utils/mathutils';
+import { Deck } from '../utils/collections';
+import { PI2, RadialSegment, RadialSegments, createSegment, dot2d, len2d, monoatan2 } from '../utils/mathutils';
 import { inSector } from './board/query';
 import { Board, Sector } from './board/structs';
-import { MoveStruct, wallVisible, ZSCALE } from './utils';
+import { MoveStruct, ZSCALE, slope, wallVisible } from './utils';
 
 export function packWallSectorId(wallId: number, sectorId: number) {
   return wallId | (sectorId << 16)
@@ -27,10 +27,10 @@ export interface VisResult {
 
 export type SectorVisitor<T> = (ctx: T, sectorId: number) => void;
 export type SectorPredicate<T> = (ctx: T, sectorId: number) => boolean;
-export type WallVisitor<T> = (ctx: T, wallId: number, sectorId: number) => void;
-export type WallPredicate<T> = (ctx: T, wallId: number, sectorId: number) => boolean;
-export type SpriteVisitor<T> = (ctx: T, spriteId: number) => void;
-export type SpritePredicate<T> = (ctx: T, spriteId: number) => boolean;
+export type WallVisitor<T> = (ctx: T, wallId: number, dist: number) => void;
+export type WallPredicate<T> = (ctx: T, wallId: number, dist: number) => boolean;
+export type SpriteVisitor<T> = (ctx: T, spriteId: number, dist: number) => void;
+export type SpritePredicate<T> = (ctx: T, spriteId: number, dist: number) => boolean;
 
 export class SectorCollector<T> {
   private visitor: SectorVisitor<T>;
@@ -58,9 +58,9 @@ export class WallCollector<T> {
   public walls = new Deck<number>();
 
   constructor(pred: WallPredicate<T>) {
-    this.visitor = (ctx: T, wallId: number, sectorId: number) => {
-      if (pred(ctx, wallId, sectorId))
-        this.walls.push(packWallSectorId(wallId, sectorId));
+    this.visitor = (ctx: T, wallId: number, dist: number) => {
+      if (pred(ctx, wallId, dist))
+        this.walls.push(wallId);
     }
   }
 
@@ -79,13 +79,13 @@ export class SpriteCollector<T> {
   public sprites = new Deck<number>();
 
   constructor(pred: SpritePredicate<T>) {
-    this.visitor = (ctx: T, spriteId: number) => {
-      if (pred(ctx, spriteId))
+    this.visitor = (ctx: T, spriteId: number, dist: number) => {
+      if (pred(ctx, spriteId, dist))
         this.sprites.push(spriteId);
     }
   }
 
-  public visit(): SectorVisitor<T> {
+  public visit(): SpriteVisitor<T> {
     this.sprites.clear();
     return this.visitor;
   }
@@ -98,9 +98,11 @@ export function createSpriteCollector<T>(pred: SpritePredicate<T>) {
 
 export class AllBoardVisitorResult implements VisResult {
   private board: Board;
+  private ms: MoveStruct;
 
-  visit(board: Board): VisResult {
+  visit(board: Board, ms: MoveStruct): VisResult {
     this.board = board;
+    this.ms = ms;
     return this;
   }
 
@@ -113,14 +115,20 @@ export class AllBoardVisitorResult implements VisResult {
     for (let s = 0; s < this.board.numsectors; s++) {
       const sec = this.board.sectors[s];
       const endwall = sec.wallptr + sec.wallnum;
-      for (let w = sec.wallptr; w < endwall; w++)
-        wallv(ctx, w, s);
+      for (let w = sec.wallptr; w < endwall; w++) {
+        const wall = this.board.walls[w];
+        const dist = len2d(wall.x - this.ms.x, wall.y - this.ms.y);
+        wallv(ctx, w, dist);
+      }
     }
   }
 
   public forSprite<T>(ctx: T, sprv: SpriteVisitor<T>) {
-    for (let s = 0; s < this.board.numsprites; s++)
-      sprv(ctx, s);
+    for (let s = 0; s < this.board.numsprites; s++) {
+      const spr = this.board.sprites[s];
+      const dist = len2d(spr.x - this.ms.x, spr.y - this.ms.y);
+      sprv(ctx, s, dist);
+    }
   }
 }
 
@@ -210,6 +218,15 @@ function calcSegment(board: Board, wallId: number, ms: MoveStruct, ismin: boolea
   return createSegment(start, end, value);
 }
 
+function calcSegmentSprite(board: Board, spriteId: number, ms: MoveStruct): RadialSegment {
+  const spr = board.sprites[spriteId];
+  const dx = spr.x - ms.x;
+  const dy = spr.y - ms.y;
+  const l = len2d(dx, dy);
+  const start = monoatan2(dy, dx) / PI2;
+  return createSegment(start, start, l);
+}
+
 export class PvsBoardVisitorResult implements VisResult {
   private sectors = new Deck<number>();
   private walls = new Deck<number>();
@@ -217,48 +234,51 @@ export class PvsBoardVisitorResult implements VisResult {
   private pvs = new Set<number>();
   private nonvoidWalls = new Deck<number>();
   private rad = new RadialSegments();
+  private ms: MoveStruct;
+  private board: Board;
 
   public visit(board: Board, boardUtils: BoardUtils, ms: MoveStruct, fwd: vec3): VisResult {
     this.sectors.clear();
     this.walls.clear();
     this.sprites.clear();
-    this.nonvoidWalls.clear();
     this.rad.clear();
     this.pvs.clear();
     this.pvs.add(ms.sec);
+    this.ms = ms;
+    this.board = board;
 
     for (const s of this.pvs) {
       const sec = board.sectors[s];
-      if (sec == undefined) continue;
+      if (!sec) continue;
 
       this.sectors.push(s);
       const endwall = sec.wallptr + sec.wallnum;
       this.nonvoidWalls.clear();
       for (let w = sec.wallptr; w < endwall; w++) {
         if (!wallVisible(board, w, ms) || wallBehind(board, sec, w, ms, fwd)) continue;
-        const wall1 = board.walls[w];
-        if (wall1.nextsector != -1 && !wall1.cstat.oneWay) {
+        const wall = board.walls[w];
+        if (wall.nextsector !== -1 && !wall.cstat.oneWay) {
           this.nonvoidWalls.push(w);
-          continue;
-        }
-        if (this.rad.scan(calcSegment(board, w, ms, true))) {
-          this.walls.push(packWallSectorId(w, s));
+        } else if (this.rad.scan(calcSegment(board, w, ms, true))) {
+          this.walls.push(w);
           this.rad.add(calcSegment(board, w, ms, false));
         }
       }
 
       for (const w of this.nonvoidWalls) {
-        const wall1 = board.walls[w];
+        const wall = board.walls[w];
         if (this.rad.scan(calcSegment(board, w, ms, true))) {
-          this.walls.push(packWallSectorId(w, s));
-          this.pvs.add(wall1.nextsector);
+          this.walls.push(w);
+          this.pvs.add(wall.nextsector);
         }
       }
 
       const sprs = boardUtils.spritesBySector(s);
-      if (sprs != undefined) {
-        for (let i = 0; i < sprs.length; i++)
-          this.sprites.push(sprs[i]);
+      if (sprs !== undefined) {
+        for (let i = 0; i < sprs.length; i++) {
+          const s = sprs[i];
+          this.sprites.push(s);
+        }
       }
     }
     return this;
@@ -271,13 +291,19 @@ export class PvsBoardVisitorResult implements VisResult {
 
   public forWall<T>(ctx: T, wallv: WallVisitor<T>) {
     for (let i = 0; i < this.walls.length(); i++) {
-      const id = this.walls.get(i);
-      wallv(ctx, unpackWallId(id), unpackSectorId(id));
+      const w = this.walls.get(i);
+      const wall = this.board.walls[w];
+      const dist = len2d(wall.x - this.ms.x, wall.y - this.ms.y);
+      wallv(ctx, w, dist);
     }
   }
 
   public forSprite<T>(ctx: T, sprv: SpriteVisitor<T>) {
-    for (let i = 0; i < this.sprites.length(); i++)
-      sprv(ctx, this.sprites.get(i));
+    for (let i = 0; i < this.sprites.length(); i++) {
+      const s = this.sprites.get(i);
+      const spr = this.board.sprites[s];
+      const dist = len2d(spr.x - this.ms.x, spr.y - this.ms.y);
+      sprv(ctx, s, dist);
+    }
   }
 }

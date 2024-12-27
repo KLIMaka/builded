@@ -10,8 +10,14 @@ navigate-next-page = { label = "Next Page", bind = "pagedown" }
 navigate-prev-page = { label = "Previous Page", bind = "pageup" }
 select = { label = "Select", bind = "enter" }
 copy = { label = "Copy", icon = "copy", bind = "control+c" }
-paste = { label = "Psste", icon = "paste", bind = "control+v" }
+paste = { label = "Paste", icon = "paste", bind = "control+v" }
 delete = { label = "Delete", icon = "trash-can", bind = "delete" }
+add-storage = { label = "Add storage...", icon = "database", bind = "control+s" }
+add-dir = { label = "Add directory...", icon = "folder-open", bind = "control+d" }
+add-zip = { label = "Add Zip File...", icon = "file-zipper", bind = "control+z" }
+add-rff = { label = "Add Rff File...", icon = "box", bind = "control+r" }
+add-grp = { label = "Add Grp File...", icon = "box", bind = "control+g" }
+add-memory = { label = "Add Memory Storage...", icon = "memory", bind = "control+m" }
 
 [menu]
 close = { parent = "close" }
@@ -62,20 +68,23 @@ reset-workplane = { bind = "backspace" }
 [fs]
 label = "File System"
 bind = "control+f"
-add-dir = { label = "Add directory...", icon = "folder-open", bind = "control+d" }
-add-zip = { label = "Add Zip File...", icon = "file-zipper", bind = "control+z" }
-add-rff = { label = "Add Rff File...", icon = "box", bind = "control+r" }
-add-grp = { label = "Add Grp File...", icon = "box", bind = "control+g" }
+add-storage = { parent = "add-storage" }
+add-dir = { parent = "add-dir" }
+add-zip = { parent = "add-zip" }
+add-rff = { parent = "add-rff" }
+add-grp = { parent = "add-rgp" }
 add-res = { label = "Add resource", bind = "control+r" }
 add-menu = { bind = "m" }
 refresh = { label = "Refresh", icon = "arrows-rotate", bind = "f5" }
 search = { bind = "/" }
+clear-search = { bind = "backspace" }
 copy = { parent = "copy" }
 paste = { parent = "paste" }
 delete = { parent = "delete" }
-create-engine-blood = { label = "Blood", icon = "gears" }
-create-engine-duke = { label = "Duke", icon = "gears" }
-create-engine-fury = { label = "Ion Fury", icon = "gears" }
+create-engine-blood = { label = "Blood", icon = "gears", bind = "b" }
+create-engine-duke = { label = "Duke", icon = "gears", bind = "d" }
+create-engine-fury = { label = "Ion Fury", icon = "gears", bind = "f" }
+create-engine = { bind = 'c' }
 
 [controls]
 check = { label = "Check", bind = " " }
@@ -94,15 +103,26 @@ undo = { label = "Undo", bind = "control+z" }
 [controls.textbox]
 enter = { label = "Enter", bind = "enter" }
 close = { parent = "close" }
-suggestions = { bind = "arrowdown" }
+suggestions = { bind = "pagedown" }
+
+[input-text-box]
+ok = { parent = "select" }
+cancel = { parent = "close" }
 
 [art-editor]
-next = { parent = "navigate-next" }
-prev = { parent = "navigate-prev" }
+label = "ART Editor"
+left = { bind = "arrowleft" }
+right = { bind = "arrowright" }
+up = { bind = "arrowup" }
+down = { bind = "arrowdown" }
+pageup = { bind = "pageup" }
+pagedown = { bind = "pagedown" }
 search = { label = "Search", bind = "/" }
+clear-search = { bind = "escape" }
 next-plu = { label = "Next PalSwap", bind = "p" }
 prev-plu = { label = "Previous PalSwap", bind = "o" }
 reset-plu = { label = "Reset PalSwap", bind = "control+p" }
+plu = { bind = "shift+p" }
 center = { label = "Center Picture", bind = "backspace" }
 toggle-grid = { bind = "g" }
 grid = { bind = "control+g" }
@@ -111,3 +131,45 @@ grid-dec = { bind = "[" }
 toggle-repeat = { label = "Toggle Repeat", bind = "r" }
 toggle-scale = { label = "Toggle SuperSample", bind = "s" }
 copy = { parent = "copy" }
+blend = { bind = "b" }
+toggle-upscale-preview = { bind = "i" }
+
+[board-view]
+forward = { bind = 'w' }
+back = { bind = 's' }
+strife-left = { bind = 'a' }
+strife-right = { bind = 'd' }
+print = { bind = ' ' }
+'vis_inc' = { bind = 'o' }
+'vis_dec' = { bind = 'p' }
+
+[rectifier]
+label = "Rectifier"
+bind = "r"
+toggle = { bind = 'tab' }
+paste = { parent = 'paste' }
+
+[engines-context]
+label = "Engines"
+bind = "e"
+open-map = { label = 'Open Map...' }
+open-voxel = { label = 'Open Voxel File...' }
+art-editor = { label = 'Open Art Editor...' }
+
+[engines-context-create]
+label = "Create Engine Context"
+add-storage = { parent = "add-storage" }
+add-dir = { parent = "add-dir" }
+add-zip = { parent = "add-zip" }
+add-rff = { parent = "add-rff" }
+add-grp = { parent = "add-grp" }
+add-memory = { parent = "add-memory" }
+delete = { icon = "trash", bind = "delete" }
+move-up = { icon = "caret-up", bind = "control+arrowup" }
+move-down = { icon = "caret-down", bind = "control+arrowdown" }
+
+[select-storage-fs]
+label = "Select Storage"
+add-storage = { bind = "control+a" }
+close = { parent = "close" }
+select = { parent = "select" }

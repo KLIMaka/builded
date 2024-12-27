@@ -1,97 +1,125 @@
-import { delayed, value } from "@utils/callbacks";
-import { Consumer, Function } from "@utils/types";
-import Optional from "optional-js";
-import { EventLoop, ProgressInfo, Scheduler, Task, TaskController, TaskHandle, TaskInerruptedError, TaskResult } from "../../apis/app1";
+import { transformedBuilder, tuple, value } from "@utils/callbacks";
+import { Consumer, Err, Ok, Result, second } from "@utils/types";
+import { done, EventLoop, progress, ProgressInfo, Scheduler, Task, TaskController, TaskHandle, TaskInerruptedError } from "../../apis/app1";
+
+const RESOLVED = Promise.resolve();
 
 class Barrier {
-  private promise: Promise<void>;
-  private ok: Consumer<void> | undefined;
-  private err: Consumer<Error> | undefined;
+  private promise = RESOLVED;
+  private ok: Consumer<void>;
+  private err: Consumer<Error>;
 
   constructor(private blocked = true) {
-    this.promise = this.updatePromise();
+    if (blocked) this.createBarrier();
   }
 
-  private updatePromise() {
-    return this.blocked
-      ? new Promise<void>((ok, err) => [this.ok, this.err] = [ok, err])
-      : Promise.resolve();
+  private createBarrier() {
+    const { promise, resolve, reject } = Promise.withResolvers<void>();
+    this.promise = promise;
+    this.ok = resolve;
+    this.err = reject;
+    this.blocked = true;
+  }
+
+  private releaseBarrier() {
+    this.ok();
+    this.promise = RESOLVED;
+    this.blocked = false;
   }
 
   wait(): Promise<void> { return this.promise }
-  block() { if (this.blocked) return; this.blocked = true; this.promise = this.updatePromise(); }
-  unblock() { if (!this.blocked) return; this.blocked = false; this.ok?.(); this.promise = this.updatePromise(); }
-  error(err: Error) { if (!this.blocked) return; this.err?.(err) }
-  isBlocking() { return this.blocked }
+  block() { if (!this.blocked) this.createBarrier() }
+  unblock() { if (this.blocked) this.releaseBarrier() }
+  error(err: Error) { if (this.blocked) this.err(err) }
 }
 
 class PropgressInfoImpl implements ProgressInfo {
-  readonly info = value('');
-  readonly progress = value(0);
+  private id = 0;
+  private infos = value<[number, string][]>('', []);
+  private planCount = value('', 0);
+  private currentCount = value('', 0);
+  readonly info = transformedBuilder({
+    value: '',
+    source: this.infos,
+    transformer: is => is.map(second).toString()
+  });
+  readonly progress = transformedBuilder({
+    value: 0,
+    source: tuple(this.planCount, this.currentCount),
+    transformer: ([plan, current]) => (plan === 0 ? 0 : current / plan) * 100
+  });
 
-  private rest(): number {
-    return 100 - this.progress.get();
+  plan(dc: number) {
+    this.planCount.mod(c => c + dc);
   }
 
-  percents(percents: number, count = 1): number {
-    return (this.rest() * (percents / 100)) / count;
+  inc(dc: number) {
+    this.currentCount.mod(c => c + dc);
   }
 
-  inc(dp: number): void {
-    this.progress.mod(p => p + dp);
+  beginTask(label: string): number {
+    const id = this.id++;
+    this.infos.mod(is => [...is, [id, label]]);
+    return id;
+  }
+
+  endTask(id: number): void {
+    this.infos.mod(is => is.filter(([itemId, _]) => id !== itemId));
   }
 }
 
 class TaskDescriptor<T> implements TaskController<T>, TaskHandle {
   private stopped = false;
   private pauseBarrier = new Barrier(false);
-  private task: Promise<TaskResult<T>>;
+  private taskImpl: Promise<Result<T>>;
   private progressImpl = new PropgressInfoImpl();
 
-  readonly paused = value(false);
-  readonly result = value<Optional<TaskResult<T>>>(Optional.empty());
-  readonly info = delayed(this.progressImpl.info, 16, () => performance.now());
-  readonly progress = delayed(this.progressImpl.progress, 16, () => performance.now());
-
+  readonly paused = value('', false);
+  readonly task = value('', progress<T>(this.progressImpl));
+  readonly info = this.progressImpl.info;
+  readonly progress = this.progressImpl.progress;
 
   constructor(private scheduler: SchedulerImpl) { }
 
-  async wait(info: string, dp: number): Promise<void> {
-    if (this.stopped) throw new TaskInerruptedError();
+  private checkStopped() { if (this.stopped) throw new TaskInerruptedError() }
+
+  plan(count: number): void {
+    this.progressImpl.plan(count);
+  }
+
+  incProgress(inc: number): void {
+    this.progressImpl.inc(inc);
+  }
+
+  async wait(info: string = '', count: number = 1): Promise<void> {
+    this.checkStopped();
     this.progressImpl.info.set(info);
     await this.scheduler.wait();
     await this.pauseBarrier.wait();
-    this.progressImpl.progress.mod(p => p + dp);
+    this.checkStopped();
+    this.progressImpl.inc(count);
   }
 
-  async waitFor<T>(promise: Promise<T>, info: string, dp: number): Promise<T> {
-    if (this.stopped) throw new TaskInerruptedError();
-    this.progressImpl.info.set(info);
+  async waitFor<T>(promise: Promise<T>, info: string = '', count: number = 1): Promise<T> {
+    this.checkStopped();
+    const infoId = this.progressImpl.beginTask(info);
     const result = await promise;
-    await this.scheduler.wait();
+    this.progressImpl.endTask(infoId);
+    this.progressImpl.inc(count);
     await this.pauseBarrier.wait();
-    this.progressImpl.progress.mod(p => p + dp);
+    this.checkStopped();
     return result;
-  }
-
-  async waitForParallel<T>(items: T[], mapper: Function<T, Promise<void>>, doneInfo: Function<T, string>, progress = 100): Promise<void> {
-    if (this.stopped) throw new TaskInerruptedError();
-    const dp = this.progressImpl.percents(progress, items.length);
-    const promises = items.map(i => mapper(i).then(_ => { this.progressImpl.info.set(doneInfo(i)); this.progressImpl.progress.mod(p => p + dp) }));
-    await Promise.all(promises);
-    await this.scheduler.wait();
-    await this.pauseBarrier.wait();
   }
 
   pause() { this.paused.set(true); this.pauseBarrier.block() }
   unpause() { this.paused.set(false); this.pauseBarrier.unblock() }
-  setTask(task: Promise<TaskResult<T>>) { this.task = task }
-  end() { return this.task }
+  setTask(task: Promise<Result<T>>) { this.taskImpl = task }
+  end() { return this.taskImpl }
 
   async stop(): Promise<void> {
     this.stopped = true;
     if (this.paused.get()) this.pauseBarrier.error(new TaskInerruptedError());
-    await this.task;
+    await this.taskImpl;
   }
 }
 
@@ -117,8 +145,8 @@ export class SchedulerImpl implements Scheduler {
   exec<T>(task: Task<T>): TaskController<T> {
     const descriptor = new TaskDescriptor<T>(this);
     const wrappedTask = task(descriptor)
-      .then(result => { const ok: TaskResult<T> = { type: "done", result }; descriptor.result.set(Optional.of(ok)); return ok })
-      .catch(error => { const err: TaskResult<T> = { type: "error", error }; descriptor.result.set(Optional.of(err)); return err })
+      .then(result => { const ok = new Ok<T>(result); descriptor.task.set(done(ok)); return ok })
+      .catch(error => { const err = new Err(error); descriptor.task.set(done(err)); console.log(error); return err })
     descriptor.setTask(wrappedTask);
     return descriptor;
   }

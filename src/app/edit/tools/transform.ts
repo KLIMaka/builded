@@ -4,7 +4,7 @@ import { create, getInstances, lifecycle, Module, plugin } from "../../../utils/
 import { detuple0, detuple1 } from "../../../utils/mathutils";
 import { LOGGER, Logger, STATE } from "../../apis/app";
 import { busDisconnector, MessageHandler, NULL_MESSAGE_HANDLER } from "../../apis/handler";
-import { RenderablesCache, RENDRABLES_CACHE } from "../../modules/geometry/cache";
+import { RenderablesCache, RENDRABLES_CACHE } from "../../modules/gl/geometry/cache";
 import { EntityFactory, ENTITY_FACTORY } from "../context";
 import { MovingHandle } from "../handle";
 import { Commit, EndMove, Frame, Highlight, Move, Render, StartMove } from "../messages";

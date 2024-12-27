@@ -39,7 +39,7 @@ export class VecStack {
   distance(lh: number, rh: number) { return Math.hypot(this.stack[lh] - this.stack[rh], this.stack[lh + 1] - this.stack[rh + 1], this.stack[lh + 2] - this.stack[rh + 2], this.stack[lh + 3] - this.stack[rh + 3]) }
   sqrdistance(lh: number, rh: number) { return this.sqrlength(this.sub(lh, rh)) }
   normalize(id: number): number { return this.scale(id, 1 / this.length(id)) }
-  eqz(id: number) { return this.stack[id] == 0 && this.stack[id + 1] == 0 && this.stack[id + 2] == 0 && this.stack[id + 3] == 0 }
+  eqz(id: number) { return this.stack[id] === 0 && this.stack[id + 1] === 0 && this.stack[id + 2] === 0 && this.stack[id + 3] === 0 }
 
   x(ptr: number) { return this.stack[ptr] }
   y(ptr: number) { return this.stack[ptr + 1] }

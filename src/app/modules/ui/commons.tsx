@@ -1,27 +1,25 @@
-import { Disconnector, Source, Value } from '@utils/callbacks';
+import { Disconnector, Source, Value, ValuesContainer } from '@utils/callbacks';
 import { getOrCreate } from '@utils/collections';
 import { iter } from '@utils/iter';
-import { Consumer, Supplier, identity, nil } from '@utils/types';
-import { Action, ActionDescriptors, ActionsProvider } from 'app/apis/actions';
+import { Consumer, MultiConsumer, MultiFunction, Supplier, identity, nil, seq } from '@utils/types';
+import { Action, ActionDescriptors, ActionsProvider, StateChecker } from 'app/apis/actions';
 import { Bind } from 'app/input/keymap';
-import * as React from 'react';
-import { ForwardedRef, HTMLProps, MouseEventHandler, ReactNode, createContext, forwardRef, useSyncExternalStore } from 'react';
+import React, { ForwardedRef, HTMLProps, MouseEventHandler, ReactNode, createContext, forwardRef, useContext, useRef, useSyncExternalStore } from 'react';
+import { AutoSizer } from 'react-virtualized';
 import { ActionItem } from './action-list';
 
-export const Column = forwardRef(function Column({ children, className }: { children: ReactNode, className?: string }, ref: ForwardedRef<HTMLDivElement>) {
+export const Column = forwardRef(function Column({ children, className, ...rest }: React.HTMLProps<HTMLDivElement> & { className?: string }, ref: ForwardedRef<HTMLDivElement>) {
   return (
-    <div ref={ref} className={`column-block ${className ?? ''}`}>
+    <div ref={ref} {...rest} className={`column-block ${className ?? ''}`}>
       {children}
-    </div>
-  )
+    </div>)
 })
 
-export const Row = forwardRef(function Row({ children, className }: { children: ReactNode, className?: string }, ref: ForwardedRef<HTMLDivElement>) {
+export const Row = forwardRef(function Row({ children, className, ...rest }: React.HTMLProps<HTMLDivElement> & { className?: string }, ref: ForwardedRef<HTMLDivElement>) {
   return (
-    <div ref={ref} className={`row-block ${className ?? ''}`}>
+    <div ref={ref} {...rest} className={`row-block ${className ?? ''}`} >
       {children}
-    </div>
-  )
+    </div>)
 })
 
 export type SizedTextProps = { text: string, size: string }
@@ -29,20 +27,25 @@ export const SizedText = forwardRef(function SizedText(props: SizedTextProps, re
   return (<div ref={ref} style={{ width: props.size }}>{props.text}</div>)
 })
 
-export const Empty = forwardRef(function Empty({ clazz }: { clazz: string }, ref: ForwardedRef<HTMLDivElement>) {
-  return (<div ref={ref} className={clazz}></div>)
+export const Icon = forwardRef(function Icon({ icon, ...rest }: React.HTMLProps<HTMLDivElement> & { icon: string }, ref: ForwardedRef<HTMLDivElement>) {
+  return <div ref={ref} {...rest} className={`fa-solid fa-${icon} ${rest.className ?? ''}`} ></div>
 })
 
-export type IconProps = { icon: string }
-export const Icon = forwardRef(function Icon(props: IconProps, ref: ForwardedRef<HTMLDivElement>) {
-  return <Empty ref={ref} clazz={`fa-solid fa-${props.icon}`} />
+export const Button = forwardRef(function Button({ ...rest }: React.HTMLProps<HTMLDivElement>, ref: ForwardedRef<HTMLDivElement>) {
+  return <div ref={ref} {...rest} className={`button ${rest.className ?? ''}`} />
 })
 
-export const DropdownButton = forwardRef(function DropdownButton({ children, ...rest }: React.HTMLProps<HTMLDivElement>, ref: ForwardedRef<HTMLDivElement>) {
+export const ToggleButton = forwardRef(function ToggleButton({ icon, pressedValue, children, ...rest }: React.HTMLProps<HTMLDivElement> & { icon?: string, pressedValue: Value<boolean> }, ref: ForwardedRef<HTMLDivElement>) {
+  const pressed = useValue(pressedValue);
   return (
-    <div ref={ref} {...rest} className={`row-block button baseline-aligned gap-5 flex-auto ${rest.className}`}>
+    <div
+      ref={ref}
+      {...rest}
+      className={`row-block button gap-5 flex-auto ${rest.className ?? ''} ${pressed ? 'active' : ''}`}
+      onClick={_ => pressedValue.mod(p => !p)}
+    >
+      {icon ? <div className={`fa-solid fa-${icon}`} /> : <></>}
       {children}
-      <div className='fa-solid fa-angle-down' />
     </div>)
 })
 
@@ -50,13 +53,40 @@ export function TextHeight() {
   return <div style={{ width: "0px" }}>&nbsp;</div>;
 }
 
+export type TextInputProps = {
+  name: string,
+  value: Value<string>,
+}
+export function TextInput(props: TextInputProps) {
+  const actionsChannel = useContext(ActionsChannelContext);
+  const currentActions = useContext(CurrentActionsChannelContext);
+  const searchChannel = actionsChannel.child(`input-text-${props.name}`, true);
+
+  const ref = useRef<HTMLInputElement>();
+  const value = useValue(props.value);
+
+  return (<ActionsChannelContext.Provider value={searchChannel}>
+    <div className="text-box flex-fill">
+      <input
+        className="flex-fill"
+        ref={ref}
+        type="text"
+        value={value}
+        onChange={e => props.value.set(e.target.value)}
+        onFocus={_ => currentActions(searchChannel)}
+        onBlur={_ => currentActions(actionsChannel)}
+      />
+    </div>
+  </ActionsChannelContext.Provider>)
+}
+
 export function ActionButton({ action }: { action: Action }) {
   const enabled = useValue(action.enabled);
   const onClick: HTMLProps<HTMLDivElement> = !enabled ? {} : { onClick: _ => action.handler() }
   return (
-    <div className={`row-block button flex-auto baseline-aligned gap-5 ${!enabled ? 'disabled' : ''}`} {...onClick} >
-      {action.descriptor.icon().map(i => <Icon icon={i} />).orElse(<></>)}
-      {action.descriptor.label().map(d => <div>{d}</div>).orElse(<TextHeight />)}
+    <div className={`row-block button flex-auto baseline-aligned gap-5 ${styles({ disabled: !enabled })}`} {...onClick} >
+      {action.descriptor.icon().map(i => <Row className='baseline-aligned'><Icon icon={i} /><TextHeight /></Row>).orElse(<></>)}
+      {action.descriptor.label().map(d => <div>{d}</div>).orElse(<></>)}
     </div>
   )
 }
@@ -81,6 +111,35 @@ export function Group({ items, active }: { items: Source<string[]>, active: Valu
   return <div className='column-block padded-5 '>{groupItems}</div>
 }
 
+export type TabItem = {
+  icon?: string,
+  label: string,
+  content: ReactNode
+}
+
+function TabButtons(props: { items: TabItem[], active: Value<number> }) {
+  return <Row className='flex-auto'><Spacer /> <Row className='tabs'>
+    {iter(props.items)
+      .enumerate()
+      .map(([t, i]) =>
+        <Row key={i} className={`tab flex-nonwrap gap-5 baseline-aligned ${styles({ active: props.active.get() === i })}`} onClick={_ => props.active.set(i)}>
+          {t.icon ? <Icon icon={t.icon} /> : <></>}
+          <div className='flex-fill'>{t.label}</div>
+        </Row>)
+      .collect()}
+  </Row><Spacer /></Row>
+}
+
+export function Tabs(props: { items: TabItem[], active: Value<number> }) {
+  const active = useValue(props.active);
+  const activeItem = props.items[active];
+
+  return <Column className='flex-fill tabs-container gap-5'>
+    <TabButtons items={props.items} active={props.active} />
+    {activeItem.content}
+  </Column>
+}
+
 export function line(text: string): ActionItem {
   return {
     element: (<div className='row-block center-aligned'>
@@ -89,6 +148,16 @@ export function line(text: string): ActionItem {
     </div>),
     action: nil(),
     disabled: true
+  }
+}
+
+export function menuItemDescripted(title: string, desc: string, action: Consumer<void>): ActionItem {
+  return {
+    element: (<div className='row-block baseline-aligned'>
+      <div className='flex-fill'>{title}</div>
+      <div className='muted2'>{desc}</div>
+    </div>),
+    action
   }
 }
 
@@ -124,7 +193,7 @@ export function actionsToActionItem(actions: Action[]): ActionItem[] {
     const element = (
       <div className='menu-item row-block'>
         {descr.icon().map(i => <div className={`fa-solid fa-fixwidth fa-${i}`}></div>).orElse(<></>)}
-        <div className='flex-fill'>{descr.label().orElse('')}</div>
+        <div className='flex-fill text-ellipsis text-stretch'>{descr.label().orElse('')}</div>
         {descr.bind().map(b => <KeyBind bind={b} />).orElse(<></>)}
       </div>
     )
@@ -152,19 +221,36 @@ export function asyncStateLoader<T>(loader: Supplier<Promise<T>>, consumer: Cons
 
 export class ActionsCollector implements ActionsProvider {
   private actionsSet = new Set<Action>();
+  private statesSet = new Set<StateChecker>();
 
   add(...actions: Action[]): Disconnector {
     actions.forEach(a => this.actionsSet.add(a));
     return () => actions.forEach(a => this.actionsSet.delete(a));
   }
 
+  addState(...states: StateChecker[]): Disconnector {
+    states.forEach(a => this.statesSet.add(a));
+    return () => states.forEach(a => this.statesSet.delete(a));
+  }
+
   actions(): Iterable<Action> {
     return this.actionsSet;
   }
+
+  states(): Iterable<StateChecker> {
+    return this.statesSet;
+  }
 }
 
-export function useValue<T>(value: Source<T>) {
+export function useValue<T>(value: Source<T>): T {
+  // return useSyncExternalStore(l => { console.log(`${value.name} connected`); return seq(() => console.log(`${value.name} disconnected`), value.subscribe(l)) }, () => value.get());
   return useSyncExternalStore(l => value.subscribe(l), () => value.get());
+}
+
+export function useValuesContainer(name: string): ValuesContainer {
+  const parentValues = useContext(ValuesContainerContext);
+  const values = parentValues.createChild(`${name}-react`);
+  return useSyncExternalStore(_ => nil, () => values);
 }
 
 export class ActionsNode implements ActionsProvider {
@@ -197,8 +283,82 @@ export class ActionsNode implements ActionsProvider {
       ? this.actionsCollector.actions()
       : iter(this.actionsCollector.actions()).chain(this.parent.actions())
   }
+
+  states(): Iterable<StateChecker> {
+    return this.blocking || this.parent == null
+      ? this.actionsCollector.states()
+      : iter(this.actionsCollector.states()).chain(this.parent.states())
+  }
 }
 
 export const ActionsChannelContext = createContext<ActionsNode>(null);
 export const CurrentActionsChannelContext = createContext<Consumer<ActionsNode>>(null);
 export const ActionDescriptorsContext = createContext<ActionDescriptors>(null);
+export const ValuesContainerContext = createContext<ValuesContainer>(null);
+
+
+export function addEventListener<K extends keyof HTMLElementEventMap>(elem: HTMLElement, type: K, listener: (this: HTMLElement, ev: HTMLElementEventMap[K]) => any): Disconnector {
+  elem.addEventListener(type, listener);
+  return () => elem.removeEventListener(type, listener);
+}
+
+export type WorkplaneBuilder = MultiConsumer<[HTMLCanvasElement, number, number]>;
+export type WorkplaneContext = { xmouse: number, ymouse: number, xoff: number, yoff: number, scale: number, dragging: boolean, disable: boolean, buttons: number }
+
+export function workplane(f: MultiFunction<[HTMLCanvasElement, number, number], Disconnector>): WorkplaneBuilder {
+  let disconnector: Disconnector;
+  return (canvas, width, height) => {
+    disconnector?.();
+    if (canvas != null) disconnector = f(canvas, width, height);
+  }
+}
+
+export function workplaneController(ctx: Value<WorkplaneContext>): WorkplaneBuilder {
+  function handleMouseMove(e: MouseEvent) {
+    const x = e.offsetX;
+    const y = e.offsetY;
+    if (ctx.get().dragging) {
+      const dx = x - ctx.get().xmouse;
+      const dy = y - ctx.get().ymouse;
+      ctx.modImmer(ctx => { ctx.xoff += dx; ctx.yoff += dy })
+    }
+    ctx.modImmer(ctx => { ctx.xmouse = x; ctx.ymouse = y })
+  }
+  function handleWheel(e: WheelEvent) {
+    ctx.modImmer(ctx => {
+      const ds = e.deltaY > 0 ? (1 / 1.1) : e.deltaY < 0 ? 1.1 : 1;
+      const x1 = ctx.xmouse / ctx.scale - ctx.xoff / ctx.scale;
+      const y1 = ctx.ymouse / ctx.scale - ctx.yoff / ctx.scale;
+      ctx.scale *= ds;
+      const x2 = ctx.xmouse / ctx.scale - ctx.xoff / ctx.scale;
+      const y2 = ctx.ymouse / ctx.scale - ctx.yoff / ctx.scale;
+      ctx.xoff += (x2 - x1) * ctx.scale;
+      ctx.yoff += (y2 - y1) * ctx.scale;
+    })
+  }
+  function handleMouseButton(e: MouseEvent) { ctx.modImmer(c => c.buttons = e.buttons); if (!ctx.get().disable) ctx.modImmer(c => c.dragging = e.buttons === 1) }
+  return workplane((canvas, w, h) => {
+    const moveD = addEventListener(canvas, 'mousemove', handleMouseMove);
+    const wheelD = addEventListener(canvas, 'wheel', handleWheel);
+    const mouseBtnDownD = addEventListener(canvas, 'mousedown', handleMouseButton);
+    const mouseBtnUpD = addEventListener(canvas, 'mouseup', handleMouseButton);
+    return seq(moveD, wheelD, mouseBtnDownD, mouseBtnUpD);
+  })
+}
+
+export function Workplane(props: { builders: WorkplaneBuilder[] }) {
+  return (<div className='flex-fill'>
+    <AutoSizer>
+      {({ height, width }) => (<>{iter(props.builders)
+        .enumerate()
+        .map(([b, i]) =>
+          <Plane width={width} height={height} builder={b} key={i} />
+        ).collect()}</>)}
+    </AutoSizer>
+  </div>)
+}
+
+
+function Plane({ height, width, builder }: { height: number, width: number, builder: WorkplaneBuilder }) {
+  return <canvas ref={ref => builder(ref, width, height)} height={height} width={width} style={{ position: 'absolute' }} />
+}

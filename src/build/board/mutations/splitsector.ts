@@ -127,16 +127,16 @@ export function splitSectorFromPoint<B extends Board>(board: B, wallId: number, 
     }
   }
   inters.sort((l, r) => l.t - r.t);
-  const closest = takeFirst(inters);
-  if (closest == null) return false;
-  if (loopStart(board, closest.w) != loopStart(board, wallId)) return false;
-  track(refs.walls, refwalls => {
-    const closestWallRef = refwalls.ref(closest.w);
-    const onWallPoint = px == wall.x && py == wall.y || px == wall2.x && py == wall2.y;
-    if (!onWallPoint) splitWall(board, wallId, px, py, art, refs, api.cloneWall);
-    const endWall = wallInSector(board, sectorId, closest.x, closest.y);
-    if (endWall == -1) splitWall(board, refwalls.val(closestWallRef), closest.x, closest.y, art, refs, api.cloneWall);
-  })
-  splitSector(board, sectorId, wrap([[px, py], [closest.x, closest.y]]), refs, api);
-  return true;
+  return takeFirst(inters).map(closest => {
+    if (loopStart(board, closest.w) != loopStart(board, wallId)) return false;
+    track(refs.walls, refwalls => {
+      const closestWallRef = refwalls.ref(closest.w);
+      const onWallPoint = px == wall.x && py == wall.y || px == wall2.x && py == wall2.y;
+      if (!onWallPoint) splitWall(board, wallId, px, py, art, refs, api.cloneWall);
+      const endWall = wallInSector(board, sectorId, closest.x, closest.y);
+      if (endWall == -1) splitWall(board, refwalls.val(closestWallRef), closest.x, closest.y, art, refs, api.cloneWall);
+    })
+    splitSector(board, sectorId, wrap([[px, py], [closest.x, closest.y]]), refs, api);
+    return true;
+  }).orElse(false);
 }

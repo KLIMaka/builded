@@ -1,3 +1,4 @@
+import { Timer } from "app/apis/app1";
 import { Interpolator } from "./interpolator";
 
 export type TimedValue<T> = (time: number) => T;
@@ -24,21 +25,26 @@ export class DelayedValue<T> {
   private endValue: T;
   private time: number;
 
-  constructor(private delay: number, value: T, private inter: Interpolator<T>) {
+  constructor(
+    private delay: number,
+    value: T,
+    private inter: Interpolator<T>,
+    private timer: Timer
+  ) {
     this.endValue = value;
     this.startValue = value;
     this.time = 0;
   }
 
   public set(val: T) {
-    if (this.endValue == val) return;
+    if (this.endValue === val) return;
     this.startValue = this.get();
-    this.time = performance.now();
+    this.time = this.timer.now();
     this.endValue = val;
   }
 
   public get() {
-    const t = performance.now() - this.time;
+    const t = this.timer.now() - this.time;
     if (t < 0) return this.startValue;
     if (t > this.delay) return this.endValue;
     return this.inter(this.startValue, this.endValue, t / this.delay);

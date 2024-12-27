@@ -150,7 +150,7 @@ export class SpriteEnt extends MessageHandlerReflective {
 
   private zoff(board: Board, bottom = true): number {
     const sprite = board.sprites[this.spriteId];
-    const sinfo = spriteInfo(board, this.spriteId, this.ctx.art);
+    const sinfo = spriteInfo(board, this.spriteId, this.ctx.art.get());
     return bottom
       ? sprite.cstat.type == FLOOR_SPRITE ? -1 : (sinfo.hh - sinfo.yo) * ZSCALE
       : sprite.cstat.type == FLOOR_SPRITE ? 1 : -(sinfo.hh + sinfo.yo) * ZSCALE;

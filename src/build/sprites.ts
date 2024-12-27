@@ -1,7 +1,8 @@
-import { vec2, vec3 } from "gl-matrix";
-import { ArtInfo, ArtInfoProvider } from "../build/formats/art";
-import { ang2vec, posOffRotate, spriteAngle, ZSCALE } from "../build/utils";
-import { Board, FLOOR_SPRITE, Sprite } from "./board/structs";
+import { mat2d, vec2, vec3 } from "gl-matrix";
+import { ZSCALE, ang2vec, spriteAngleRad } from "../build/utils";
+import { Board } from "./board/structs";
+import { ArtInfo } from "./formats/art";
+import { deg2rad, orto2d } from "@utils/mathutils";
 
 export class WallSprite {
   constructor(
@@ -57,58 +58,96 @@ export class FloorSprite {
 }
 
 export class FaceSprite {
+  constructor(
+    readonly left: number,
+    readonly right: number,
+    readonly top: number,
+    readonly bottom: number,
+  ) { }
 
+  coords(): number[] {
+    return [
+      this.left, this.top, 0,
+      this.right, this.top, 0,
+      this.right, this.bottom, 0,
+      this.left, this.bottom, 0
+    ]
+  }
 }
 
 export class SpriteInfo {
-  public x: number;
-  public y: number;
-  public z: number;
-  public w: number;
-  public h: number;
-  public hw: number;
-  public hh: number;
-  public ang: number;
-  public xo: number;
-  public yo: number;
-  public xf: boolean;
-  public yf: boolean;
-  public ztop: number;
-  public zbottom: number;
-  public onesided: boolean;
+  x: number;
+  y: number;
+  z: number;
+  w: number;
+  h: number;
+  hw: number;
+  hh: number;
+  angRad: number;
+  xo: number;
+  yo: number;
+  xf: boolean;
+  yf: boolean;
+  ztop: number;
+  zbottom: number;
+  onesided: boolean;
+  hscale: number;
+  wscale: number;
 }
 
-export function spriteInfo(board: Board, spriteId: number, infos: ArtInfoProvider): SpriteInfo {
+function scale(x: number, scale: number) {
+  return (x * scale) >> 2
+}
+
+export function spriteInfo(board: Board, spriteId: number, infos: Map<number, ArtInfo>): SpriteInfo {
   const spr = board.sprites[spriteId];
   const x = spr.x;
   const y = spr.y;
   const z = spr.z / ZSCALE;
-  const info = infos.getInfo(spr.picnum);
-  const w = (info.w * spr.xrepeat) >> 2;
+  const info = infos.get(spr.picnum);
+  const wscale = scale(1, spr.xrepeat);
+  const w = scale(info.w, spr.xrepeat);
   const hw = w >> 1;
-  const h = (info.h * spr.yrepeat) >> 2;
+  const hscale = scale(1, spr.xrepeat);
+  const h = scale(info.h, spr.yrepeat);
   const hh = h >> 1;
-  const ang = spriteAngle(spr.ang);
-  const xo = ((info.attrs.xoff + spr.xoffset) * spr.xrepeat) >> 2;
-  const yo = (((info.attrs.yoff + spr.yoffset) * spr.yrepeat) >> 2) + (spr.cstat.realCenter == 1 ? 0 : hh);
-  const xf = spr.cstat.xflip == 1;
-  const yf = spr.cstat.yflip == 1;
-  const ztop = spr.cstat.type == FLOOR_SPRITE ? 0 : hh + yo;
-  const zbottom = spr.cstat.type == FLOOR_SPRITE ? 0 : -hh + yo;
-  const onesided = spr.cstat.onesided == 1;
-  return { x, y, z, w, h, hw, hh, ang, xo, yo, xf, yf, zbottom, ztop, onesided } as SpriteInfo;
+  const angRad = spriteAngleRad(spr.ang);
+  const xf = spr.cstat.xflip === 1;
+  const yf = spr.cstat.yflip === 1;
+  const xoff = info.attrs.xoff + spr.xoffset;
+  const yoff = info.attrs.yoff + spr.yoffset;
+  const xo = scale(xoff, spr.xrepeat) * (xf ? -1 : 1);
+  const yo = scale(yoff, spr.yrepeat) * (yf ? -1 : 1);
+  const ztop = (spr.cstat.realCenter === 1 ? hh : h);
+  const zbottom = (spr.cstat.realCenter === 1 ? -hh : 0);
+  const onesided = spr.cstat.onesided === 1;
+  return { x, y, z, w, h, hw, hh, angRad, xo, yo, xf, yf, zbottom, ztop, onesided, wscale, hscale };
 }
 
 export function wallSprite(info: SpriteInfo): WallSprite {
-  const n = ang2vec(info.ang);
-  const mat = posOffRotate(info.x, info.y, info.xo, 0, info.ang);
-  const [x1, y1] = vec2.transformMat2d(vec2.create(), [info.hw, 0], mat);
-  const [x2, y2] = vec2.transformMat2d(vec2.create(), [-info.hw, 0], mat);
-  return new WallSprite(n, info.z + info.ztop, info.z + info.zbottom, x1, y1, x2, y2);
+  const n = ang2vec(info.angRad);
+  const [vx, vy] = orto2d(n[0], n[1]);
+  const x1 = info.x + vx * (info.hw + info.xo);
+  const y1 = info.y + vy * (info.hw + info.xo);
+  const x2 = info.x + vx * (-info.hw + info.xo);
+  const y2 = info.y + vy * (-info.hw + info.xo);
+  const top = info.z + info.ztop + info.yo;
+  const bottom = info.z + info.zbottom + info.yo;
+  return new WallSprite(n, top, bottom, x1, y1, x2, y2);
+}
+
+function floorSpriteMatrix(x: number, y: number, xo: number, yo: number, ang: number): mat2d {
+  const mat = mat2d.create();
+  mat2d.translate(mat, mat, [x, y]);
+  mat2d.rotate(mat, mat, ang);
+  mat2d.scale(mat, mat, [1, -1]);
+  mat2d.rotate(mat, mat, deg2rad(-90));
+  mat2d.translate(mat, mat, [-xo, -yo]);
+  return mat;
 }
 
 export function floorSprite(info: SpriteInfo): FloorSprite {
-  const mat = posOffRotate(info.x, info.y, info.xo, info.yo, info.ang);
+  const mat = floorSpriteMatrix(info.x, info.y, info.xo, -info.yo, info.angRad);
   const [x1, y1] = vec2.transformMat2d(vec2.create(), [-info.hw, info.hh], mat);
   const [x2, y2] = vec2.transformMat2d(vec2.create(), [info.hw, info.hh], mat);
   const [x3, y3] = vec2.transformMat2d(vec2.create(), [info.hw, -info.hh], mat);
@@ -117,5 +156,9 @@ export function floorSprite(info: SpriteInfo): FloorSprite {
 }
 
 export function faceSprite(info: SpriteInfo): FaceSprite {
-
+  const left = -info.hw - info.xo;
+  const right = info.hw - info.xo;
+  const top = info.ztop + info.yo * (info.yf ? -1 : 1);
+  const bottom = info.zbottom + info.yo * (info.yf ? -1 : 1);
+  return new FaceSprite(left, right, top, bottom);
 }

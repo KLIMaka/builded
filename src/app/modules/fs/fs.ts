@@ -187,12 +187,12 @@ abstract class BaseFS implements FileSystem {
   constructor(
     readonly type: SerializedFileSystemHandle['type'],
     private handlers = new Set<FileSystemHandler>()) {
-
   }
   abstract info(name: string): Promise<Optional<FileInfo>>;
   abstract read(name: string): Promise<Optional<ArrayBuffer>>;
   abstract list(): Promise<FileInfo[]>;
   abstract writable(): Promise<Optional<WritableFileSystem>>;
+
 
   subscribe(handler: FileSystemHandler): Disconnector {
     GLOBAL_FS_HANDLERS++;
@@ -214,7 +214,6 @@ abstract class BaseFS implements FileSystem {
   }
 
   async dispose(): Promise<void> { }
-
   protected firstSubscribed() { }
   protected lastDisconnected() { }
 }

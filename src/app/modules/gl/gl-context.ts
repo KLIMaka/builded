@@ -1,23 +1,26 @@
 import { Disposable, Source, createContainer } from "@utils/callbacks";
 import { getOrCreate, getOrDefault, range, rect } from "@utils/collections";
-import { Texture } from "@utils/gl/drawstruct";
+import { DisposableResource, GlContext, Texture } from "@utils/gl/drawstruct";
 import { createTexture } from "@utils/gl/textures";
-import { Dependency } from "@utils/injector";
 import { iter } from "@utils/iter";
-import { identity, pair, second, seq } from "@utils/types";
-import { SubtaskHandle } from "app/apis/app1";
+import { Consumer, identity, pair, second } from "@utils/types";
 import { ArtInfoExtended, EMPTY_INFO_EXTENDED, EngineContext } from "app/apis/engine";
-
-export type GlContext = {
-  offscreen: OffscreenCanvas,
-  gl: WebGL2RenderingContext,
-}
-export const GL_CONTEXT = new Dependency<GlContext>('Gl Context');
 
 export function createGlContext(): GlContext {
   const offscreen = new OffscreenCanvas(0, 0);
   const gl = offscreen.getContext('webgl2', { antialias: true, stencil: true, desynchronized: false, alpha: false });
-  return { offscreen, gl }
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+  gl.enable(gl.CULL_FACE);
+  gl.enable(gl.DEPTH_TEST);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  const resources = new Map<string, Set<any>>();
+  const resource = <T>(tag: string, value: T, disposer: Consumer<T>): DisposableResource<T> => {
+    const res = getOrCreate(resources, tag, _ => new Set<T>());
+    res.add(value);
+    return { value, dispose: async () => { res.delete(value); disposer(value) } }
+  }
+  const info = () => iter(resources.entries()).map(([n, s]) => `${n}:${s.size}`).join(',').reduce((l, r) => l + r, '');
+  return { offscreen, gl, resource, info }
 }
 
 export type EngineTextures = {
@@ -46,34 +49,30 @@ function mergeParallax(w: number, h: number, arrs: Uint8Array[]): Uint8Array {
   return result;
 }
 
-export async function createEngineTextures(engine: EngineContext, glCtx: GlContext, handle: SubtaskHandle): Promise<EngineTextures> {
+export async function createEngineTextures(engine: EngineContext, glCtx: GlContext): Promise<EngineTextures> {
   const { gl } = glCtx;
-  function waitFor<T>(p: Promise<T>, s: string, dt: number): Promise<T> { return handle ? handle.waitFor(p, s, dt) : p }
-  return createContainer('engine-textures').initializeAsync(async values => {
-    const art = await waitFor(engine.artMap, 'Getting Art Map...', 1);
-    const rawPal = await waitFor(engine.pal, 'Getting Palette...', 1);
-    const shadowsteps = await waitFor(engine.shadowsteps, 'Getting Shadowsteps...', 1);
-    const rawPlus = await waitFor(engine.plus, 'Getting Pal Lookups...', 1);
-    const rawTrans = await waitFor(engine.trans, 'Getting Trans Table...', 1);
-    const texDisposer = { disposer: (tex: Texture) => tex.destroy(gl) };
-    const pal = values.transformed('palTexture', rawPal, pal => createTexture(256, 1, gl, { filter: gl.NEAREST }, pal, gl.RGB, 3), texDisposer);
-    const plu = values.transformedTuple('pluTexture', [shadowsteps, rawPlus], ([steps, plus]) => {
-      const plusLength = iter(plus).map(p => p.id).reduce(Math.max, 0) + 1;
+  return createContainer('engine-textures').initialize(values => {
+    const art = engine.artMap;
+    const texDisposer = { disposer: (tex: Texture) => tex.dispose() };
+    const pal = values.transformed('palTexture', engine.pal, pal => createTexture(glCtx, 256, 1, pal, gl.RGB, 3), texDisposer);
+    const plu = values.transformedTuple('pluTexture', [engine.shadowsteps, engine.plus, engine.maxPluId], ([steps, plus, maxPluId]) => {
+      const plusLength = maxPluId + 1;
       const pluMap = iter(plus).toMap(p => p.id, identity());
       const tex = new Uint8Array(256 * steps * plusLength);
-      for (const i of range(0, plusLength)) tex.set(getOrDefault(pluMap, i, pluMap.get(0)).plu, 256 * steps * i);
+      const defPlu = pluMap.get(0);
+      for (const i of range(0, plusLength)) tex.set(getOrDefault(pluMap, i, defPlu).plu, 256 * steps * i);
       for (let i = 0; i < steps * plusLength; i++) tex[256 * i - 1] = 255;
-      return createTexture(256, steps * plusLength, gl, { filter: gl.NEAREST }, tex, gl.LUMINANCE);
+      return createTexture(glCtx, 256, steps * plusLength, tex, gl.LUMINANCE);
     }, texDisposer);
-    const trans = values.transformed('transTexture', rawTrans, trans => createTexture(256, 256, gl, { filter: gl.NEAREST }, trans, gl.LUMINANCE), texDisposer);
-    const defaultTexture = createTexture(1, 1, gl, { filter: gl.NEAREST, repeat: gl.CLAMP_TO_EDGE }, new Uint8Array([0]), gl.LUMINANCE)
-    const textureDisposer = { disposer: (tex: Texture) => { if (tex !== defaultTexture) tex.destroy(gl) } };
+    const trans = values.transformed('transTexture', engine.trans, trans => createTexture(glCtx, 256, 256, trans, gl.LUMINANCE), texDisposer);
+    const defaultTexture = createTexture(glCtx, 1, 1, new Uint8Array([0]), gl.LUMINANCE)
+    const textureDisposer = { disposer: (tex: Texture) => { if (tex !== defaultTexture) tex.dispose() } };
     const textures = new Map<number, Source<Texture>>();
     const get = (picnum: number) => getOrCreate(textures, picnum, _ => values.transformed(`texture_${picnum}`, art, arts => {
       const info = getOrDefault(arts, picnum, EMPTY_INFO_EXTENDED);
       if (info.h <= 0 || info.w <= 0) return defaultTexture;
       const arr = axisSwap(info.img, info.h, info.w);
-      return createTexture(info.w, info.h, gl, { filter: gl.NEAREST, repeat: gl.CLAMP_TO_EDGE }, arr, gl.LUMINANCE)
+      return createTexture(glCtx, info.w, info.h, arr, gl.LUMINANCE)
     }, textureDisposer))
     const parallaxTextures = new Map<string, Source<Texture>>();
     const formatParallaxTextureId = (pics: number[]) => iter(pics).map(i => i.toString()).join(',').reduce((l, r) => l + r, '');
@@ -82,12 +81,12 @@ export async function createEngineTextures(engine: EngineContext, glCtx: GlConte
       const count = infos.length;
       const [{ w, h }, axisSwapped] = iter(infos).first().get();
       if (!iter(infos).all(([i, _]) => i.w === w && i.h === h))
-        return createTexture(w, h, gl, { filter: gl.NEAREST, repeat: gl.CLAMP_TO_EDGE }, axisSwapped, gl.LUMINANCE);
+        return createTexture(glCtx, w, h, axisSwapped, gl.LUMINANCE);
       const merged = mergeParallax(w, h, iter(infos).map(second).collect());
-      return createTexture(w * count, h, gl, { filter: gl.NEAREST, repeat: gl.CLAMP_TO_EDGE }, merged, gl.LUMINANCE);
+      return createTexture(glCtx, w * count, h, merged, gl.LUMINANCE);
     }, textureDisposer));
-    const dispose = async () => seq(() => values.dispose(), () => defaultTexture.destroy(gl))();
 
+    const dispose = async () => { await values.dispose(); defaultTexture.dispose() }
     return { pal, plu, trans, art, get, getParallaxTexture, dispose };
   });
 }

@@ -6,6 +6,7 @@ import { Buffer, BufferBuilder, Pointer } from '../../../utils/gl/buffergl';
 import { IndexBuffer, VertexBuffer } from '../../../utils/gl/drawstruct';
 import { GlContext } from './gl-context';
 import { Sprite } from 'build/board/structs';
+import { Disposable } from '@utils/callbacks';
 
 export interface GenericBuildBuffer {
   get(): Pointer;
@@ -29,7 +30,7 @@ export interface BuildBuffer extends GenericBuildBuffer {
   getLightmapBuffer(): VertexBuffer;
 }
 
-export interface BuildBufferFactory {
+export interface BuildBufferFactory extends Disposable {
   get(hint: string): BuildBuffer;
 }
 
@@ -245,7 +246,7 @@ const LIGHTMAP = 3;
 class BuildBufferFactoryImpl implements BuildBufferFactory {
   private buffers = new Map<string, Buffer[]>();
 
-  constructor(private gl: WebGLRenderingContext) { }
+  constructor(private gl: WebGL2RenderingContext) { }
 
   private getBuffers(hint: string): Buffer[] {
     return getOrCreate(this.buffers, hint, _ => [])
@@ -272,6 +273,10 @@ class BuildBufferFactoryImpl implements BuildBufferFactory {
       if (ptr != null) return ptr;
     }
     return this.addNewBuffer(hint).allocate(vtxSize, idxSize);
+  }
+
+  async dispose(): Promise<void> {
+    this.buffers.values().forEach(b => b.forEach(b => b.destroy(this.gl)));
   }
 }
 

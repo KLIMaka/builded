@@ -153,7 +153,6 @@ export function ArtEditorUiImpl({ artEditor: model }: { artEditor: ArtEditorImpl
             <Workplane builders={[
               model.rasterWorkplaneRenderer(),
               model.gridRenderer(),
-              model.centerRenderer(),
               model.imageInfoRenderer(),
               workplaneController(model.ctx),
             ]} />

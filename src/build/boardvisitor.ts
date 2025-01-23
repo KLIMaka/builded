@@ -1,7 +1,7 @@
 import { BoardUtils } from 'app/apis/app';
 import { vec3 } from 'gl-matrix';
 import { Deck } from '../utils/collections';
-import { PI2, RadialSegment, RadialSegments, createSegment, dot2d, len2d, monoatan2 } from '../utils/mathutils';
+import { TWO_PI, RadialSegment, RadialSegments, createSegment, dot2d, len2d, monoatan2 } from '../utils/mathutils';
 import { inSector } from './board/query';
 import { Board, Sector } from './board/structs';
 import { MoveStruct, ZSCALE, slope, wallVisible } from './utils';
@@ -213,8 +213,8 @@ function calcSegment(board: Board, wallId: number, ms: MoveStruct, ismin: boolea
   const l1 = len2d(tw1x, tw1y);
   const l2 = len2d(tw2x, tw2y);
   const value = ismin ? Math.min(l1, l2) : Math.max(l1, l2);
-  const start = monoatan2(tw1y, tw1x) / PI2;
-  const end = monoatan2(tw2y, tw2x) / PI2;
+  const start = monoatan2(tw1y, tw1x) / TWO_PI;
+  const end = monoatan2(tw2y, tw2x) / TWO_PI;
   return createSegment(start, end, value);
 }
 
@@ -223,7 +223,7 @@ function calcSegmentSprite(board: Board, spriteId: number, ms: MoveStruct): Radi
   const dx = spr.x - ms.x;
   const dy = spr.y - ms.y;
   const l = len2d(dx, dy);
-  const start = monoatan2(dy, dx) / PI2;
+  const start = monoatan2(dy, dx) / TWO_PI;
   return createSegment(start, start, l);
 }
 

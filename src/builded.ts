@@ -7,7 +7,6 @@ import { InputController } from "app/input/keymap";
 import { DefaultActionsConstructor } from "app/modules/default/app/actions";
 import { createEngines } from "app/modules/engine-context/ui/engine-context";
 import { FS_MANAGER, FileSystemsManagerModule as FileSystemsManagerConstructor } from "app/modules/fs/ui/fs-model";
-import { GL_CONTEXT, createGlContext } from "app/modules/gl/gl-context";
 import { createRectifier } from "app/modules/rectifier/ui/rectifier";
 import { ReactUiModule } from "app/modules/ui/react-ui";
 import { enableMapSet } from "immer";
@@ -16,6 +15,8 @@ import { FS } from "./app/apis/fs";
 import { DefaultApp } from "./app/modules/default/app/app";
 import { DefaultLifecycleListener } from "./app/modules/default/lifecycle-listener";
 import { DefaultFileSystemsConstructor, GLOBAL_FS_HANDLERS } from "./app/modules/fs/fs";
+import { GL_CONTEXT } from "@utils/gl/drawstruct";
+import { createGlContext } from "app/modules/gl/gl-context";
 
 const app = DefaultApp("App");
 const injector = new AppInjector(new DefaultLifecycleListener(app.timer, app.logger));
@@ -42,11 +43,11 @@ app.scheduler.exec(async handler => {
   injector.install(ReactUiModule);
 
   injector.bind(new Dependency<void>("", true), provider(async i => {
-    const [ui, actions, fsManager] = await getInstances(i, UI, ACTION_DESCRIPTORS, FS_MANAGER);
+    const [ui, actions, fsManager, glCtx] = await getInstances(i, UI, ACTION_DESCRIPTORS, FS_MANAGER, GL_CONTEXT);
 
     let rectWindow: Window;
     ui.globalActions().add(
-      actions.bindSync('test1', () => console.log(`FS_HANDLERS=${GLOBAL_FS_HANDLERS} VALUE_CONTAINERS=${iter(CONTAINERS.values()).map(v => v.name).collect()} TOTAL_VALUES=${iter(CONTAINERS.values()).map(c => c.size()).reduceFirst((l, r) => l + r).orElse(0)}`)),
+      actions.bindSync('test1', () => console.log(`FS_HANDLERS=${GLOBAL_FS_HANDLERS} VALUE_CONTAINERS=${iter(CONTAINERS.values()).map(v => v.name).collect()} TOTAL_VALUES=${iter(CONTAINERS.values()).map(c => c.size()).reduceFirst((l, r) => l + r).orElse(0)} GL_RESOURCES=${glCtx.info()}`)),
       actions.bind('test', async () => { ui.addWindow(await fsManager.newWindow()) }),
       actions.bind('rectifier', async () => { rectWindow = await createRectifier(i); ui.addWindow(rectWindow) }),
       actions.bind('engines-context', async () => { rectWindow = await createEngines(i); ui.addWindow(rectWindow) }),

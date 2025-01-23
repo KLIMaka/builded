@@ -36,8 +36,7 @@ export class RectifierRenderer implements Disposable {
     buffer.writeVertex(ptr, 0, 2, [1, 0, 1]);
     buffer.writeVertex(ptr, 0, 3, [1, 0, 0]);
     buffer.writeQuad(ptr, 0, 3, 2, 1, 0);
-    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-    this.shader = await createShader(gl, 'resources/shaders/rectifier');
+    this.shader = await createShader(this.glCtx, 'resources/shaders/rectifier');
     this.stateGl.registerShader('rectifier', this.shader);
     this.stateGl.setIndexBuffer(buffer.getIndexBuffer());
     this.stateGl.setVertexBuffer('aPos', buffer.getVertexBuffer(0));
@@ -54,7 +53,7 @@ export class RectifierRenderer implements Disposable {
 
     this.ctl.setSize(w, h);
     this.ctl.setUnitsPerPixel(scale);
-    this.ctl.setPosition((w / 2 - ctx.xoff) * scale, (h / 2 - ctx.yoff) * scale, 0);
+    this.ctl.setPosition((w / 2 - ctx.xoff1) * scale, (h / 2 - ctx.yoff1) * scale, 0);
 
     const { gl, offscreen } = this.glCtx;
     const stateGl = this.stateGl;

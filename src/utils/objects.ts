@@ -1,6 +1,6 @@
 import Optional from "optional-js";
 import { cyclic } from "./mathutils";
-import { Function, Supplier } from "./types";
+import { Consumer, Function, Supplier } from "./types";
 import { Disposable } from "./callbacks";
 import { iter } from "./iter";
 
@@ -77,6 +77,10 @@ export function objectKeys<T>(obj: T): (keyof T)[] {
 
 export function applyDefaults<T>(value: T, def: T) {
   return { ...def, ...value };
+}
+
+export function applyNotNull<T>(value: T, f: Consumer<T>) {
+  if (value !== null) f(value);
 }
 
 export function field<T, K extends keyof T>(field: K): Function<T, T[K]> {

@@ -372,6 +372,7 @@ export function* slidingWindow<T>(i: Iterable<T>, size: number): Generator<T[]> 
 export function* join<T>(i: Iterable<T>, delim: T): Generator<T> {
   const iter = i[Symbol.iterator]();
   let item = iter.next();
+  if (item.done) return;
   for (; ;) {
     yield item.value;
     item = iter.next();

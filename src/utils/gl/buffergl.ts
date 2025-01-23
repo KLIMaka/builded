@@ -1,4 +1,4 @@
-import { VertexBufferDynamic, createVertexBuffer, DynamicIndexBuffer, createIndexBuffer, Updatable } from './bufferimpl';
+import { VertexBufferDynamic, createVertexBuffer, IndexBufferDynamic, createIndexBuffer, Updatable } from './bufferimpl';
 import { Place, BagController, createController } from '../bag';
 
 export interface Pointer {
@@ -32,7 +32,7 @@ export class Buffer {
   private vtxBag: BagController;
   private idxBag: BagController;
   public vtxBuffers: VertexBufferDynamic[];
-  private idxBuffer: DynamicIndexBuffer;
+  private idxBuffer: IndexBufferDynamic;
   private vtxRegions: Region[][] = [];
   private idxRegions: Region[] = [];
   private needUpdate = true;
@@ -72,7 +72,7 @@ export class Buffer {
     return this.vtxBuffers[idx];
   }
 
-  getIndexBuffer(): DynamicIndexBuffer {
+  getIndexBuffer(): IndexBufferDynamic {
     return this.idxBuffer;
   }
 

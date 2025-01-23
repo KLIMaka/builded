@@ -113,7 +113,35 @@ test('tuple1', () => {
   tr1.subscribe(a => log.push(a));
 
   a.set(42);
-  expect(log).toStrictEqual(["42,43"]);
+  expect(tr1.get()).toStrictEqual('42,43');
+  expect(log).toStrictEqual(['42,43']);
+
+  a.set(11);
+  expect(tr1.get()).toStrictEqual('11,12');
+  expect(log).toStrictEqual(["42,43", "11,12"]);
+
+  const values1 = createContainer('container1');
+  const values2 = createContainer('container2');
+  const a1 = values1.value('a', 42);
+  const tra = values1.transformed('tra', a1, x => x * 2);
+  const tt = values2.transformedTuple('tt', [a1, tra], x => x.toString());
+  const tt1 = values2.transformed('tt1', tra, x => x.toString());
+
+  const log1: string[] = [];
+  tt.subscribe(a => log1.push(a));
+
+  a1.set(11);
+  expect(tt.get()).toStrictEqual('11,22');
+  expect(log1).toStrictEqual(["11,22"]);
+  expect(tt.depends(a1)).toBeTruthy();
+  expect(tt.depends(tra)).toBeTruthy();
+  expect(tra.depends(a1)).toBeTruthy();
+  expect(a1.depends(tra)).toBeFalsy();
+  expect(a1.depends(tt)).toBeFalsy();
+  expect(tt1.depends(a1)).toBeTruthy();
+  expect([a1, tra, tt, tt1].toSorted((l, r) => l.depends(r) ? -1 : 1)).toEqual([tt, tt1, tra, a1]);
+  expect([tra, a1, tt, tt1].toSorted((l, r) => l.depends(r) ? -1 : 1)).toEqual([tt, tt1, tra, a1]);
+  expect([tt1, tra, a1, tt].toSorted((l, r) => l.depends(r) ? -1 : 1)).toEqual([tt1, tt, tra, a1]);
 });
 
 test('transformedTuple', () => {
@@ -154,12 +182,12 @@ test('values container', async () => {
 
   await cont.dispose();
   expect(log).toStrictEqual([
-    "42 disposed",
+    `${42} disposed`,
     `${42 * 42} disposed`,
     `${42 * 42 + 42} disposed`,
     `${11 * 11 + 11} disposed`,
     `${11 * 11} disposed`,
-    "11 disposed",
+    `${11} disposed`,
   ]);
 });
 

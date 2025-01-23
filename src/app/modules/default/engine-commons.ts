@@ -1,9 +1,9 @@
 import { Source, Value, ValuesContainer } from "@utils/callbacks";
 import { iter } from "@utils/iter";
-import { asyncMapOptional } from "@utils/objects";
+import { asyncMapOptional, field } from "@utils/objects";
 import { Function, first, second } from "@utils/types";
 import { NOOP_TASK_HANDLE } from "app/apis/app1";
-import { ArtInfoExtended, NamedArtFile } from "app/apis/engine";
+import { ArtInfoExtended, NamedArtFile, Palette } from "app/apis/engine";
 import { FileSystem } from "app/apis/fs";
 import { readArtFile } from "build/formats/art";
 import Optional from "optional-js";
@@ -77,4 +77,8 @@ export function loadArtMap(values: ValuesContainer, arts: Source<NamedArtFile[]>
       .flatten()
       .toMap(first, second)
   );
+}
+
+export function loadMaxPluId(values: ValuesContainer, plus: Source<Palette[]>) {
+  return values.transformed('maxPluId', plus, plus => iter(plus).map(field('id')).reduce(Math.max, 0));
 }

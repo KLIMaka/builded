@@ -13,7 +13,6 @@ import { APP } from "app/apis/app1";
 import { ArtInfoExtended, BoardContext } from "app/apis/engine";
 import { Window } from "app/apis/ui1";
 import { BuildGlEngineContext } from "app/modules/gl/buildgl";
-import { GL_CONTEXT } from "app/modules/gl/gl-context";
 import { BloodBoard } from "build/blood/structs";
 import { findSector } from "build/board/query";
 import { Board } from "build/board/structs";
@@ -26,6 +25,7 @@ import { match } from "ts-pattern";
 import { createRenderer3D } from "../boardrenderer3d";
 import { ViewPosition } from "../view";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
+import { GL_CONTEXT } from "@utils/gl/drawstruct";
 
 function InfoRow(props: { label: string, value: any }) {
   return <Row className='form-row'>
@@ -159,11 +159,12 @@ export async function createBoardView(injector: Injector, ctx: BuildGlEngineCont
 
     const mousemove = (e: MouseEvent) => ctl.track(e.offsetX, e.offsetY, e.buttons === 1);
     const canvasValue = values.valueBuilder<HTMLCanvasElement>({ name: 'canvasValue', value: undefined, disposer: c => c?.removeEventListener('mousemove', mousemove) });
-    values.addSubscribed(canvasValue, c => c.subscribe(c => { if (c) ctl.setSize(c.clientWidth, c.clientHeight) }));
-    values.addSubscribed(canvasValue, c => c.subscribe(canvas => canvas?.addEventListener('mousemove', mousemove)));
+    values.addSubscribed(canvasValue, c => { if (c) ctl.setSize(c.clientWidth, c.clientHeight) });
+    values.addSubscribed(canvasValue, c => c?.addEventListener('mousemove', mousemove));
 
     const vis = values.value('vis', (board as BloodBoard).visibility ?? 512);
-    values.addSubscribed(vis, v => v.subscribe(v => console.log(`vis = ${v}`)));
+    const shadowOff = values.value('shadow-mod', 0);
+    values.addSubscribed(vis, v => console.log(`vis = ${v}`));
 
     const actionsCtx = actionDescriptors.sub('board-view');
     const bind = (name: string) => actionsCtx.get(name).bind().get();
@@ -188,6 +189,7 @@ export async function createBoardView(injector: Injector, ctx: BuildGlEngineCont
       offscreen.width = width;
       offscreen.height = height;
       bgl.setVisibility(vis.get());
+      bgl.setShadowOffset(shadowOff.get());
       bgl.newFrame(width, height);
       renderer.draw({
         viewPosition: viewPosition.get(),
@@ -227,6 +229,8 @@ export async function createBoardView(injector: Injector, ctx: BuildGlEngineCont
       .minSize(400, 400)
       .action('vis_inc', () => vis.mod(v => v * 2))
       .action('vis_dec', () => vis.mod(v => v / 2))
+      .action('shadow_off_dec', () => shadowOff.mod(o => o - 1))
+      .action('shadow_off_inc', () => shadowOff.mod(o => o + 1))
       .states(states)
       .disposable(redrawTask)
       .disposable(values)

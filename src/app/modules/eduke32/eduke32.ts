@@ -15,7 +15,7 @@ import { VoxelData, readKvx } from "build/formats/kvx";
 import { cloneBoard, cloneSector, cloneSprite, cloneWall, loadBuildMap, newBoard, newSector, newSprite, newWall } from "build/maploader";
 import Optional from "optional-js";
 import { match } from "ts-pattern";
-import { loadArtMap, loadArtWork, openFile, openFileOptional } from "../default/engine-commons";
+import { loadArtMap, loadArtWork, loadMaxPluId, openFile, openFileOptional } from "../default/engine-commons";
 import { EMPTY, createGrpOrZipFsArrayBuffeer as createGrpOrZipFsArrayBuffer, stack, trackFiles, trackFilesSingle } from "../fs/fs";
 import { Work, begin, tuple as tupleWork } from "../scheduler/work";
 
@@ -348,8 +348,9 @@ export function createEngineContextEduke32(): Work<[Source<FileSystem>, Eduke32M
           const settings = defaultEngineSettings();
           const artMap = loadArtMap(values, art);
           const shadowsteps = values.const('shadowsteps', 32);
+          const maxPluId = loadMaxPluId(values, plus);
           const dispose = () => values.dispose();
-          return { name, resources, api, settings, pal, trans, picTags, plus, art, artMap, shadowsteps, aliases, spriteVoxelSwap, loadBoard, dispose }
+          return { name, resources, api, settings, pal, trans, picTags, plus, maxPluId, art, artMap, shadowsteps, aliases, spriteVoxelSwap, loadBoard, dispose }
         }).finish()(handle)
       )).finish()
 }

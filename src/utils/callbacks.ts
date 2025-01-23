@@ -39,6 +39,7 @@ export interface Source<T> {
   get(): T,
   mods(): number,
   subscribe(cb: ChangeCallback<T>, lastMods?: number): Disconnector,
+  depends(value: any): boolean;
 }
 
 export interface Destenation<T> {
@@ -49,6 +50,11 @@ export interface Destenation<T> {
 }
 
 export type Disposable = { dispose(): Promise<void> };
+
+export function disposable(disconnector: Disconnector): Disposable {
+  return { dispose: async () => disconnector() }
+}
+
 export function dispose(...disp: Disposable[]): void {
   disp.forEach(d => d.dispose())
 }
@@ -77,6 +83,7 @@ abstract class BaseSource<T> implements Source<T> {
 
   abstract get(): T;
   abstract mods(): number;
+  abstract depends(value: any): boolean;
 }
 
 export function throttled<T>(cb: ChangeCallback<T>, minDelayMs: number, timer: Timer): ChangeCallback<T> {
@@ -97,10 +104,10 @@ class ConstSource<T> implements Source<T>, Disposable {
     readonly name: string = '',
     private value: T,
     private disposer: Consumer<T>
-
   ) { }
   get(): T { return this.value }
   mods(): number { return 0 }
+  depends(value: any): boolean { return false }
   subscribe(_: ChangeCallback<T>): Disconnector { return nil() }
   async dispose(): Promise<void> { this.disposer(this.value) }
 }
@@ -124,16 +131,32 @@ export class BaseValue<T> extends BaseSource<T> implements Disposable {
     private disposer = builder.disposer ?? nil(),
     private eq = builder.eq ?? ((x, y) => x === y),
     private settter = builder.setter ?? ((dst, src) => src),
-    private modsCount = 0
+    private modsCount = 0,
   ) { super(builder.name) }
 
   set(newValue: T) {
-    if (this.value !== newValue && !this.eq(this.value, newValue)) {
+    if (!this.isSameValue(newValue)) {
       this.disposeValue(this.value);
       this.value = this.settter(this.value, newValue);
       this.modsCount++;
       this.notify(this.value, this.modsCount);
     }
+  }
+
+  protected setOrDispose(newValue: T) {
+    if (this.value === newValue) return;
+    else if (this.eq(this.value, newValue)) {
+      this.disposeValue(newValue);
+    } else {
+      this.disposeValue(this.value);
+      this.value = this.settter(this.value, newValue);
+      this.modsCount++;
+      this.notify(this.value, this.modsCount);
+    }
+  }
+
+  protected isSameValue(value: T) {
+    return this.value === value || this.eq(this.value, value);
   }
 
   setPromise(mod: Function<T, Promise<T>>): void {
@@ -145,7 +168,8 @@ export class BaseValue<T> extends BaseSource<T> implements Disposable {
   }
 
   async dispose() {
-    if (this.hasSubscriptions()) throw new Error(`Value '${this.name}' has subscriptions`);
+    if (this.hasSubscriptions())
+      throw new Error(`Value '${this.name}' has subscriptions`);
     this.disposeValue(this.value);
     this.value = null;
   }
@@ -154,6 +178,7 @@ export class BaseValue<T> extends BaseSource<T> implements Disposable {
   modImmer(mod: Consumer<Draft<T>>) { this.set(produce<T>(this.value, draft => { mod(draft) })); }
   mod(mod: Transform<T>) { this.set(mod(this.value)) }
   mods(): number { return this.modsCount }
+  depends(value: any): boolean { return false }
   protected disposeValue(value: T) { this.disposer(value) }
 
 }
@@ -165,7 +190,6 @@ export class ValuesMap<T> {
   get<K extends keyof T>(key: K): Value<T[K]> { return this.map.get(key) as Value<T[K]> }
   getObject(): T { return iter(this.map.keys()).toObject<T>(identity(), k => this.map.get(k).get()) }
   set(values: T) { iter(this.map.entries()).forEach(([k, v]) => v.set(values[k])) }
-  dispose() { this.map.values().forEach(v => v.dispose()) }
   handle(values: ValuesContainer, handler: Consumer<T>) {
     iter(this.map.values()).forEach(v => values.handleStandalone([v], _ => handler(this.getObject())))
   }
@@ -268,6 +292,7 @@ export class TransformValue<S extends any[], D> extends BaseValue<D> {
   }
 
   firstSubscribe(): void {
+    this.actualize();
     this.srcValueDisconnector = this.srcValueConnector(this.source.get(), this);
     this.disconnector = this.source.subscribe((v, mods) => this.transform(v, mods), this.lastSrcMods);
   }
@@ -282,6 +307,11 @@ export class TransformValue<S extends any[], D> extends BaseValue<D> {
     else super.set(newValue);
   }
 
+  protected setOrDispose(newValue: D): void {
+    if (this.value === TRANSFORM_PLACEHOLDER) this.value = newValue;
+    else super.setOrDispose(newValue);
+  }
+
   protected disposeValue(value: D): void {
     if (value === TRANSFORM_PLACEHOLDER) return;
     super.disposeValue(value);
@@ -293,7 +323,7 @@ export class TransformValue<S extends any[], D> extends BaseValue<D> {
       this.srcValueDisconnector = this.srcValueConnector(value, this);
     }
     const nvalue = this.transformer(value, this.value);
-    this.set(nvalue);
+    this.setOrDispose(nvalue);
     this.lastSrcMods = mods;
     return super.get();
   }
@@ -313,6 +343,10 @@ export class TransformValue<S extends any[], D> extends BaseValue<D> {
   get(): D {
     this.actualize();
     return super.get()
+  }
+
+  depends(value: any): boolean {
+    return this.source === value || this.source.depends(value);
   }
 }
 
@@ -352,6 +386,7 @@ export class TransformValueAsync<S extends any[], D> extends BaseValue<D> {
   }
 
   firstSubscribe(): void {
+    this.actualize();
     this.srcValueDisconnector = this.srcValueConnector(this.source.get(), this);
     this.disconnector = this.source.subscribe((v, mods) => this.reloadImpl(v, mods), this.lastSrcMods);
   }
@@ -378,11 +413,8 @@ export class TransformValueAsync<S extends any[], D> extends BaseValue<D> {
     const id = ++this.currentId;
     this.lastSrcMods = mods;
     const nvalue = await this.transformer(value);
-    if (id !== this.currentId) {
-      this.disposeValue(nvalue);
-    } else {
-      this.set(nvalue);
-    }
+    if (id !== this.currentId) this.disposeValue(nvalue);
+    else this.setOrDispose(nvalue);
   }
 
   private actualize() {
@@ -401,9 +433,18 @@ export class TransformValueAsync<S extends any[], D> extends BaseValue<D> {
     return super.get()
   }
 
+  depends(value: any): boolean {
+    return this.source === value || this.source.depends(value);
+  }
+
   set(newValue: D): void {
     if (this.value === TRANSFORM_PLACEHOLDER) this.value = newValue;
     else super.set(newValue);
+  }
+
+  protected setOrDispose(newValue: D): void {
+    if (this.value === TRANSFORM_PLACEHOLDER) this.value = newValue;
+    else super.setOrDispose(newValue);
   }
 
   protected disposeValue(value: D): void {
@@ -440,7 +481,7 @@ export function transformedAsyncImmediate<S, D>(
 
 type SourcefyArray<T> = { [P in keyof T]: Source<T[P]> };
 export interface TupleBuilder<Args extends any[]> extends Omit<ValueBuilder<Args>, 'value'> {
-  sources: SourcefyArray<Args>
+  sources: SourcefyArray<Args>,
 }
 
 const TUPLE_PLACEHOLDER = []
@@ -449,24 +490,25 @@ class Tuple<Args extends any[]> extends BaseValue<Args> {
   private sources: SourcefyArray<Args>;
   private lastSrcMods: number[];
   private disconnectors: Disconnector[];
+  private order: Source<any>[];
 
   constructor(builder: TupleBuilder<Args>) {
     super({ ...builder, value: TUPLE_PLACEHOLDER as Args });
     this.sources = builder.sources;
+    this.order = builder.sources.toSorted((l, r) => l.depends(r) ? -1 : 1);
     this.lastSrcMods = new Array<number>(builder.sources.length).fill(-1);
   }
 
   firstSubscribe(): void {
-    this.disconnectors = iter(this.sources).enumerate().map(([s, i]) => {
-      return s.subscribe((v, mods) => {
-        this.lastSrcMods[i] = mods;
-        this.modImmer(draft => draft[i] = v);
-      }, this.lastSrcMods[i])
-    }).collect();
+    this.actualize();
+    this.disconnectors = iter(this.order)
+      .enumerate()
+      .map(([s, i]) => s.subscribe((v, mods) => this.actualize(true), this.lastSrcMods[i]))
+      .collect();
   }
 
-  private actualize() {
-    if (this.hasSubscriptions() && this.value !== TUPLE_PLACEHOLDER) return;
+  private actualize(forse = false) {
+    if (!forse && this.hasSubscriptions() && this.value !== TUPLE_PLACEHOLDER) return;
     this.modImmer(draft => {
       iter(this.sources).enumerate()
         .forEach(([src, i]) => {
@@ -485,6 +527,11 @@ class Tuple<Args extends any[]> extends BaseValue<Args> {
     else super.set(newValue);
   }
 
+  protected setOrDispose(newValue: Args): void {
+    if (this.value === TUPLE_PLACEHOLDER) this.value = newValue;
+    else super.setOrDispose(newValue);
+  }
+
   get(): Args {
     this.actualize();
     return super.get();
@@ -495,32 +542,36 @@ class Tuple<Args extends any[]> extends BaseValue<Args> {
     return super.mods();
   }
 
+  depends(value: any): boolean {
+    return iter(this.sources).any(s => s === value || s.depends(value))
+  }
+
   lastDisconnect(): void { this.disconnectors.forEach(d => d()) }
 }
 
 export function tuple<Args extends any[]>(...sources: SourcefyArray<Args>): Tuple<Args> {
-  return new Tuple<Args>({ sources: [...sources] });
+  return new Tuple<Args>({ sources });
 }
 
 export const CONTAINERS = new Set<ValuesContainer>();
 export function createContainer(name: string): ValuesContainer {
   const values = new ValuesContainer(name);
   CONTAINERS.add(values);
-  values.add(() => CONTAINERS.delete(values));
+  values.addDisconnector(() => CONTAINERS.delete(values));
   return values;
 }
 
-function checkTuple<Tuple extends any[]>(tuple: Tuple): boolean {
+function uniqueValues<Tuple extends any[]>(tuple: Tuple): boolean {
   const set = new Set(tuple);
   return tuple.length === set.size;
 }
 
-function compareTuples(tuple1: any[], tuple2: any[]): boolean {
+function exactContent(tuple1: any[], tuple2: any[]): boolean {
   if (tuple1.length !== tuple2.length) return false;
   return tuple1.every(x => tuple2.includes(x));
 }
 
-function compareTuplesExactly(tuple1: any[], tuple2: any[]): boolean {
+function exactContentAndOrder(tuple1: any[], tuple2: any[]): boolean {
   if (tuple1.length !== tuple2.length) return false;
   return tuple1.every((x, i) => tuple2[i] === x);
 }
@@ -533,13 +584,13 @@ export class ValuesContainer implements Disposable {
   constructor(readonly name: string) { }
 
   public tuple<Tuple extends any[]>(srcs: SourcefyArray<Tuple>): Source<SingleTuple<Tuple>> {
-    if (!checkTuple(srcs)) throw new Error(`Duplicate sources`);
+    if (!uniqueValues(srcs)) throw new Error(`Duplicate sources`);
     const cached = iter(this.tupleCache.entries())
-      .filter(([k, _]) => compareTuplesExactly(k, srcs))
+      .filter(([k, _]) => exactContentAndOrder(k, srcs))
       .map(second)
       .first();
     if (cached.isPresent()) return cached.get();
-    if (iter(this.tupleCache.keys()).any(t => compareTuples(t, srcs)))
+    if (iter(this.tupleCache.keys()).any(t => exactContent(t, srcs)))
       throw new Error(`Tuple with different order already exist`);
     const result = srcs.length === 1 ? srcs[0] : tuple(...srcs);
     this.tupleCache.set(srcs, result);
@@ -554,7 +605,7 @@ export class ValuesContainer implements Disposable {
 
   size() { return this.graph.nodes.size }
 
-  add(disconnector: Disconnector): void {
+  addDisconnector(disconnector: Disconnector): void {
     this.addDisposable({ dispose: async () => disconnector() });
   }
 
@@ -571,9 +622,9 @@ export class ValuesContainer implements Disposable {
     return newContainer;
   }
 
-  addSubscribed<T extends Disposable>(value: T, f: Function<T, Disconnector>): void {
-    const dispose = f(value);
-    this.graph.add({ dispose: async () => dispose() }, value);
+  addSubscribed<T>(value: Source<T>, cb: ChangeCallback<T>): void {
+    const dispose = disposable(value.subscribe(cb));
+    this.find(value).ifPresentOrElse(d => this.graph.add(dispose, d), () => this.addDisposable(dispose));
   }
 
   const<T>(name: string, v: T, disposer?: Consumer<T>): Source<T> {
@@ -702,9 +753,8 @@ export class ValuesContainer implements Disposable {
   }
 
   handleStandalone<Srcs extends any[]>(srcs: SourcefyArray<Srcs>, handler: Consumer<SingleTuple<Srcs>>): void {
-    const srcDisposables = srcs.map(s => this.find(s));
-    const dispose = this.handle(srcs, handler);
-    srcDisposables.forEach(d => d.ifPresent(d => this.graph.add({ dispose: async () => dispose() }, d)));
+    const dispose = disposable(this.handle(srcs, handler));
+    srcs.map(s => this.find(s)).forEach(d => d.ifPresentOrElse(d => this.graph.add(dispose, d), () => this.addDisposable(dispose)));
   }
 
   signal<Args extends any[]>(): Signal<Args> {
@@ -712,7 +762,7 @@ export class ValuesContainer implements Disposable {
     const subscribe = (handler: Consumer<Args>) => { handlers.add(handler); return () => handlers.delete(handler) }
     const call = (...args: Args) => handlers.forEach(h => h(args));
 
-    this.add(() => { if (handlers.size !== 0) throw new Error('Signal has subscriptions') })
+    this.addDisconnector(() => { if (handlers.size !== 0) throw new Error('Signal has subscriptions') })
     return { subscribe, call }
   }
 
@@ -736,7 +786,7 @@ export class ValuesContainer implements Disposable {
       result
         .onOk(resolve)
         .onErr(reject)
-    })
+    });
     return promise;
   }
 }

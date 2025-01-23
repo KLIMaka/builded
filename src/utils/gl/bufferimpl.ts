@@ -1,4 +1,3 @@
-import { TypedTableCellProps } from "@ui/table";
 import { IndexBuffer, VertexBuffer } from "./drawstruct";
 
 export class VertexBufferImpl implements VertexBuffer {
@@ -113,7 +112,7 @@ export class VertexBufferDynamic extends VertexBufferImpl implements Updatable {
   }
 }
 
-export class DynamicIndexBuffer extends IndexBufferImpl implements Updatable {
+export class IndexBufferDynamic extends IndexBufferImpl implements Updatable {
   private data: ArrayBufferView;
 
   constructor(
@@ -154,13 +153,13 @@ export function wrap(gl: WebGLRenderingContext, data: ArrayBufferView, spacing: 
 }
 
 
-export function createIndexBuffer(gl: WebGLRenderingContext, type: number, data: any, usage: number = WebGLRenderingContext.STREAM_DRAW): DynamicIndexBuffer {
+export function createIndexBuffer(gl: WebGLRenderingContext, type: number, data: any, usage: number = WebGLRenderingContext.STREAM_DRAW): IndexBufferDynamic {
   const arrtype = GlType2ArrayType(type);
   if (typeof data == 'number') data = new arrtype(data);
   else if (arrtype !== data.constructor) throw new Error('GL Type and ArrayBuffer is incompatible')
-  return new DynamicIndexBuffer(gl, data, type, usage);
+  return new IndexBufferDynamic(gl, data, type, usage);
 }
 
-export function wrapIndexBuffer(gl: WebGLRenderingContext, data: ArrayBufferView, usage: number = WebGLRenderingContext.STREAM_DRAW): DynamicIndexBuffer {
-  return new DynamicIndexBuffer(gl, data, ArrayType2GlType(data.constructor), usage);
+export function wrapIndexBuffer(gl: WebGLRenderingContext, data: ArrayBufferView, usage: number = WebGLRenderingContext.STREAM_DRAW): IndexBufferDynamic {
+  return new IndexBufferDynamic(gl, data, ArrayType2GlType(data.constructor), usage);
 }  

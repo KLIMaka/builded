@@ -1,10 +1,10 @@
 import { mat4, vec3, vec4 } from 'gl-matrix';
-import { Deck, getOrCreate, isEmpty } from '../collections';
+import { Deck, isEmpty } from '../collections';
 import { Buffer } from './buffergl';
+import { GlType2ArrayType } from './bufferimpl';
 import { Definition, IndexBuffer, Shader, Texture, VertexBuffer } from './drawstruct';
 import * as SHADER from './shaders';
-import { StateValueMatrix, StateValueGeneric, StateValue } from './statevalue';
-import { GlType2ArrayType } from './bufferimpl';
+import { StateValue, StateValueGeneric, StateValueMatrix } from './statevalue';
 
 function createStateValue(type: string, changecb: () => void): StateValue<any> {
   switch (type) {
@@ -59,63 +59,6 @@ class ShaderConfig {
     readonly attribs: number[],
     readonly samplers: [number, number][]
   ) { }
-}
-
-function isGlobalName(name: string): boolean {
-  return name.startsWith('g_');
-}
-
-class ShaderContext {
-  shader: Shader
-
-  bind(gl: WebGL2RenderingContext) {
-    gl.useProgram(this.shader.getProgram());
-    const samplers = this.shader.getSamplers();
-    for (let s = 0; s < samplers.length; s++) {
-      const sampler = samplers[s];
-      SHADER.setUniform(gl, this.shader, sampler, s);
-    }
-
-  }
-}
-
-class State1 {
-  private globalSamplers: StateValue<Texture>[] = [];
-  private globalSamplersIndex = new Map<string, number>();
-  private globalUniforms: StateValue<any>[] = [];
-  private globalUniformsIndex = new Map<string, number>();
-
-  constructor(private gl: WebGL2RenderingContext) { }
-
-  private newGlobalSampler(name: string): number {
-    const idx = this.globalSamplers.length;
-    this.globalSamplers.push(new StateValueGeneric<Texture>(null, null))
-    return idx;
-  }
-
-  private getGlobalSampler(name: string): number {
-    return getOrCreate(this.globalSamplersIndex, name, _ => this.newGlobalSampler(name));
-  }
-
-  registerShader(name: string, shader: Shader) {
-    const globalSamplers = new Set<string>();
-    const localSamplers = new Set<string>();
-    shader.getSamplers().forEach(s => {
-      if (isGlobalName(s.name)) {
-        const samplerId = this.getGlobalSampler(s.name);
-
-      } else {
-
-      }
-    });
-  }
-
-  useShader(name: string): boolean {
-    const ctx: ShaderConfig = null;
-
-    this.gl.useProgram(ctx.shader.getProgram());
-
-  }
 }
 
 export class State {
@@ -371,7 +314,7 @@ export class State {
       const idx = vertexBufferIdxs.get(a);
       const buf = this.attribs[idx];
       const vbuf = buf.get();
-      const location = shader.getAttributeLocation(this.attribNames[idx], gl);
+      const location = shader.getAttributeLocation(this.attribNames[idx]);
       if (location === -1) continue;
       gl.bindBuffer(gl.ARRAY_BUFFER, vbuf.getBuffer());
       gl.enableVertexAttribArray(location);

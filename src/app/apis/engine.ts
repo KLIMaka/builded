@@ -63,6 +63,7 @@ export interface EngineContext<B extends Board = Board> extends Disposable {
   readonly artMap: Source<Map<number, ArtInfoExtended>>,
   readonly pal: Source<Uint8Array>,
   readonly plus: Source<Palette[]>,
+  readonly maxPluId: Source<number>,
   readonly trans: Source<Uint8Array>,
   readonly picTags: Source<PicTags>,
   readonly shadowsteps: Source<number>,

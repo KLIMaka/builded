@@ -1,6 +1,6 @@
 import { Source, Value, ValuesContainer, arrayEq } from '@utils/callbacks';
 import { mat4, vec3 } from 'gl-matrix';
-import { deg2rad } from '../mathutils';
+import { deg2rad, monoatan2, rad2deg } from '../mathutils';
 
 export class Camera {
   readonly transform: Source<mat4>;
@@ -37,5 +37,13 @@ export class Camera {
 
   setAngles(ax: number, ay: number): void {
     this.angle.set([Math.max(-90, Math.min(90, ax)), ay]);
+  }
+
+  lookTo(x: number, y: number, z: number) {
+    const v = vec3.sub(vec3.create(), vec3.fromValues(x, y, z), this.position.get());
+    const l = vec3.len(v);
+    const ax = rad2deg(Math.asin(v[1] / l));
+    const ay = rad2deg(monoatan2(v[2], v[0]));
+    this.setAngles(ax, ay);
   }
 }

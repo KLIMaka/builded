@@ -13,7 +13,7 @@ import { readKvx, VoxelData } from "build/formats/kvx";
 import { RffFile } from "build/formats/rff";
 import Optional from "optional-js";
 import { cloneBoard, cloneSector, cloneSprite, cloneWall, loadBloodMap, newBoard, newSector, newSprite, newWall } from '../../../build/blood/maploader';
-import { loadArtMap, loadArtWork, loadRaw, openFile, openFileOptional, packegeFs } from "../default/engine-commons";
+import { loadArtMap, loadArtWork, loadMaxPluId, loadRaw, openFile, openFileOptional, packegeFs } from "../default/engine-commons";
 import { createRffFsArrayBuffer, stack, watchFile } from "../fs/fs";
 import { begin } from "../scheduler/work";
 
@@ -132,7 +132,8 @@ export const createEngineContextWork = begin()
         const artMap = loadArtMap(values, art);
         const shadowsteps = values.const('shadowsteps', 64);
         const aliases = values.const('aliases', EMPTY_ALIASES);
+        const maxPluId = loadMaxPluId(values, plus);
         const dispose = () => values.dispose();
-        return { name, resources, api, settings, pal, trans, picTags, plus, art, artMap, shadowsteps, aliases, spriteVoxelSwap, loadBoard, dispose }
+        return { name, resources, api, settings, pal, trans, picTags, plus, maxPluId, art, artMap, shadowsteps, aliases, spriteVoxelSwap, loadBoard, dispose }
       }).finish()(handle, fs)))
   .finish();

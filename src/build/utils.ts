@@ -1,6 +1,6 @@
 import { mat2d, vec2, vec3 } from 'gl-matrix';
 import { cyclicPairs, loopPairs } from '../utils/collections';
-import { cross2d, cyclic, deg2rad, int, len2d, monoatan2, PI2 } from '../utils/mathutils';
+import { cross2d, cyclic, deg2rad, int, len2d, monoatan2, TWO_PI } from '../utils/mathutils';
 import { normal2d } from '../utils/vecmath';
 import { Board, Sprite } from './board/structs';
 import { Entity, EntityType } from './hitscan';
@@ -251,11 +251,11 @@ export function ang2vec(rad: number): vec2 {
 }
 
 export function spriteAngleRad(ang: number): number {
-  return ang * ANGSCALE * 2 * PI2;
+  return ang * ANGSCALE * 2 * TWO_PI;
 }
 
 export function vec2ang(x: number, y: number) {
-  return int((monoatan2(y, x) / PI2) / ANGSCALE / 2);
+  return int((monoatan2(y, x) / TWO_PI) / ANGSCALE / 2);
 }
 
 export function clockwise(polygon: Iterable<[number, number]>): boolean {

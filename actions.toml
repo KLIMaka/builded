@@ -142,6 +142,8 @@ strife-right = { bind = 'd' }
 print = { bind = ' ' }
 'vis_inc' = { bind = 'o' }
 'vis_dec' = { bind = 'p' }
+'shadow_off_dec' = { bind = 'j' }
+'shadow_off_inc' = { bind = 'k' }
 
 [rectifier]
 label = "Rectifier"

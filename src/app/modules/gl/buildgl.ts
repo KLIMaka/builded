@@ -1,3 +1,4 @@
+import { Disposable } from '@utils/callbacks';
 import { BoardContext, EngineContext } from 'app/apis/engine';
 import { mat4, vec3, vec4 } from 'gl-matrix';
 import { createShader } from '../../../utils/gl/shaders';
@@ -5,22 +6,28 @@ import { State } from '../../../utils/gl/stategl';
 import { Renderable } from '../../apis/renderable';
 import { createRenderablesCache, RenderablesCache } from './geometry/cache';
 import { BuildersFactory, createBuildersFactory } from './geometry/common';
-import { createEngineTextures, EngineTextures, GlContext } from './gl-context';
-import { iter } from '@utils/iter';
+import { createEngineTextures, EngineTextures } from './gl-context';
+import { GlContext } from '@utils/gl/drawstruct';
 
-export class BuildGlEngineContext {
+export class BuildGlEngineContext implements Disposable {
   private textures_: Promise<EngineTextures>;
   private bgl_: Promise<BuildGl>;
   private builders_: Promise<BuildersFactory>;
+  private toDispose = new Set<Disposable>();
 
   constructor(
     readonly engine: EngineContext,
     readonly glContext: GlContext
   ) { }
 
+  private addToDispose<T extends Disposable>(value: T): T {
+    this.toDispose.add(value);
+    return value;
+  }
+
   textures(): Promise<EngineTextures> {
     if (this.textures_) return this.textures_;
-    this.textures_ = createEngineTextures(this.engine, this.glContext, null);
+    this.textures_ = createEngineTextures(this.engine, this.glContext).then(t => this.addToDispose(t));
     return this.textures_;
   }
 
@@ -32,32 +39,36 @@ export class BuildGlEngineContext {
 
   builders(): Promise<BuildersFactory> {
     if (this.builders_) return this.builders_;
-    this.builders_ = this.bgl().then(bgl => createBuildersFactory(bgl, this.glContext));
+    this.builders_ = this.bgl().then(bgl => createBuildersFactory(bgl, this.glContext)).then(t => this.addToDispose(t));
     return this.builders_;
   }
 
   async cache(ctx: BoardContext): Promise<RenderablesCache> {
     return Promise.all([this.textures(), this.builders(), this.engine.spriteVoxelSwap])
-      .then(([textures, builders, voxels]) => createRenderablesCache(ctx, textures, builders, this.engine.settings, voxels));
+      .then(([textures, builders, voxels]) => createRenderablesCache(ctx, textures, builders, this.engine.settings, voxels)).then(t => this.addToDispose(t));
+  }
+
+  async dispose() {
+    await Promise.all(this.toDispose.values().map(d => d.dispose()));
   }
 }
 
 export async function createBuildGl(engine: EngineContext<any>, textures: EngineTextures, glCtx: GlContext): Promise<BuildGl> {
-  const palswaps = iter((await engine.plus).get()).map(p => p.id).reduce(Math.max, 0) + 1;
-  const shadowsteps = (await engine.shadowsteps).get();
+  const palswaps = engine.maxPluId.get() + 1;
+  const shadowsteps = engine.shadowsteps.get();
   const defs = ['PALSWAPS (' + palswaps + '.0)', 'SHADOWSTEPS (' + shadowsteps + '.0)', 'PAL_LIGHTING'];
   const SHADER_NAME = 'resources/shaders/build';
   const state = new State()
   const { gl } = glCtx;
-  state.registerShader('baseShader', await createShader(gl, SHADER_NAME, [...defs]));
-  state.registerShader('baseNonrepeatShader', await createShader(gl, SHADER_NAME, [...defs, 'NONREPEAT', 'ADD_DEPTH']));
-  state.registerShader('spriteShader', await createShader(gl, SHADER_NAME, [...defs, 'SPRITE', 'ADD_DEPTH']));
-  state.registerShader('baseFlatShader', await createShader(gl, SHADER_NAME, [...defs, 'FLAT']));
-  state.registerShader('spriteFlatShader', await createShader(gl, SHADER_NAME, [...defs, 'SPRITE', 'FLAT']));
-  state.registerShader('parallax', await createShader(gl, SHADER_NAME, [...defs, 'PARALLAX']));
-  state.registerShader('grid', await createShader(gl, SHADER_NAME, [...defs, 'GRID']));
-  state.registerShader('spriteFaceShader', await createShader(gl, SHADER_NAME, [...defs, 'SPRITE_FACE']));
-  state.registerShader('voxelShader', await createShader(gl, SHADER_NAME, [...defs, 'VOXEL']));
+  state.registerShader('baseShader', await createShader(glCtx, SHADER_NAME, [...defs]));
+  state.registerShader('baseNonrepeatShader', await createShader(glCtx, SHADER_NAME, [...defs, 'NONREPEAT', 'ADD_DEPTH']));
+  state.registerShader('spriteShader', await createShader(glCtx, SHADER_NAME, [...defs, 'SPRITE', 'ADD_DEPTH']));
+  state.registerShader('baseFlatShader', await createShader(glCtx, SHADER_NAME, [...defs, 'FLAT']));
+  state.registerShader('spriteFlatShader', await createShader(glCtx, SHADER_NAME, [...defs, 'SPRITE', 'FLAT']));
+  state.registerShader('parallax', await createShader(glCtx, SHADER_NAME, [...defs, 'PARALLAX']));
+  state.registerShader('grid', await createShader(glCtx, SHADER_NAME, [...defs, 'GRID']));
+  state.registerShader('spriteFaceShader', await createShader(glCtx, SHADER_NAME, [...defs, 'SPRITE_FACE']));
+  state.registerShader('voxelShader', await createShader(glCtx, SHADER_NAME, [...defs, 'VOXEL']));
   state.setTexture('pal', textures.pal.get());
   state.setTexture('plu', textures.plu.get());
   if (state.isTextureEnabled('trans')) state.setTexture('trans', textures.trans.get());
@@ -72,12 +83,9 @@ export class BuildGl {
   constructor(
     readonly state: State,
     readonly gl: WebGL2RenderingContext,
-    private visibility = 512
+    private visibility = 512,
+    private shadowOffset = 0,
   ) {
-    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-    gl.enable(gl.CULL_FACE);
-    gl.enable(gl.DEPTH_TEST);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
   }
 
   public setProjectionMatrix(proj: mat4) { this.state.setUniform('P', proj) }
@@ -111,11 +119,16 @@ export class BuildGl {
     this.gl.clearDepth(1);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT | this.gl.STENCIL_BUFFER_BIT);
     this.state.setUniform('sys', [performance.now(), width, height, this.visibility]);
+    this.state.setUniform('sys1', [this.shadowOffset, 0, 0, 0]);
     this.modulation(1, 1, 1, 1);
   }
 
   public setVisibility(vis: number) {
     this.visibility = vis;
+  }
+
+  public setShadowOffset(off: number) {
+    this.shadowOffset = off;
   }
 
 

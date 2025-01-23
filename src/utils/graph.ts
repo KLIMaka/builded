@@ -76,10 +76,16 @@ export class DirectionalGraph<T> {
     const nodes = this.nodes;
     const collect: (node: T) => T[] = node => {
       if (visited.has(node)) return [];
-      const links = nodes.get(node);
+      const { to, from } = nodes.get(node);
       visited.add(node);
-      return [node, ...iter(chain(links.to, links.from)).map(collect).flatten()];
+      const links = iter(chain(to, from))
+        .map(collect)
+        .flatten();
+      return [node, ...links];
     }
-    return iter(nodes.keys()).filter(n => !visited.has(n)).map(collect).collect();
+    return iter(nodes.keys())
+      .map(collect)
+      .filter(a => a.length !== 0)
+      .collect();
   }
 }

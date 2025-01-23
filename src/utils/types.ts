@@ -23,6 +23,7 @@ export type Take<T extends readonly any[], IT extends any[], O extends any[] = [
 export type Get<T extends readonly any[], N extends number> = Last<Take<T, Iter<N>>>;
 export type Padd<T extends readonly any[], N extends number> = [...Iter<N>, ...T];
 export type PaddRight<T extends readonly any[], N extends number> = [...T, ...Iter<N>];
+export type TypedArray = Int8Array | Uint8Array | Int16Array | Uint16Array | Int32Array | Uint32Array | Uint8ClampedArray | Float32Array | Float64Array;
 
 
 export interface Result<T, E extends Error = Error> {

@@ -14,7 +14,7 @@ export type TextureProvider = (id: number) => Texture;
 export const TEXTURES_OVERRIDE = new Dependency<TextureProvider>('Textures Override');
 export const PARALLAX_TEXTURES = new Dependency<number>('Number of parallax textures');
 
-export function createIndexedTexture(gl: WebGLRenderingContext, w: number, h: number, arr: Uint8Array, mipmaps = true, lib: IndexedImgLib): Texture {
+export function createIndexedTexture(gl: WebGL2RenderingContext, w: number, h: number, arr: Uint8Array, mipmaps = true, lib: IndexedImgLib): Texture {
   const repeat = WebGLRenderingContext.CLAMP_TO_EDGE;
   const filter = mipmaps ? WebGLRenderingContext.NEAREST_MIPMAP_NEAREST : WebGLRenderingContext.NEAREST;
   const tex = createTexture(w, h, gl, { filter: filter, repeat: repeat }, arr, gl.LUMINANCE);

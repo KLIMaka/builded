@@ -49,7 +49,7 @@ export type ActionListProps = {
   stripped?: boolean,
 }
 
-export function ActionList(props: ActionListProps & React.HTMLProps<HTMLDivElement>) {
+export function ActionList(props: ActionListProps & HTMLProps<HTMLDivElement>) {
   const [active, setActive] = useState(-1);
   const actionDescriptors = useContext(ActionDescriptorsContext);
   const actionsChannel = useContext(ActionsChannelContext);
@@ -100,11 +100,14 @@ export function ActionList(props: ActionListProps & React.HTMLProps<HTMLDivEleme
           disabled={item.disabled}
           active={active}
           setActive={setActive}
-          stripped={stripped}
-        >
+          stripped={stripped}>
           {item.element}
         </ActionListItem>)
         .collect()}
     </div>
   )
+}
+
+export function ActionList1(props: ActionListProps & HTMLProps<HTMLDivElement>) {
+
 }

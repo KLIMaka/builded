@@ -1,40 +1,62 @@
+import { Disposable } from "@utils/callbacks";
+import { Dependency } from "@utils/injector";
+import { Consumer } from "@utils/types";
 
-export interface VertexBuffer {
+export type DisposableResource<T> = { readonly value: T } & Disposable;
+
+export type GlContext = {
+  offscreen: OffscreenCanvas,
+  gl: WebGL2RenderingContext,
+  resource<T>(tag: string, value: T, disposer: Consumer<T>): DisposableResource<T>;
+  info(): string,
+}
+export const GL_CONTEXT = new Dependency<GlContext>('Gl Context');
+
+
+export interface VertexBuffer extends Disposable {
   getBuffer(): WebGLBuffer;
   getType(): number;
   getSpacing(): number;
   getNormalized(): boolean;
   getStride(): number;
   getOffset(): number;
-  destroy(gl: WebGLRenderingContext): void;
 }
 
-export interface IndexBuffer {
+export interface IndexBuffer extends Disposable {
   getBuffer(): WebGLBuffer;
   getType(): number;
-  destroy(gl: WebGLRenderingContext): void;
 }
 
-export interface Texture {
+export interface Texture extends Disposable {
   get(): WebGLTexture;
   getWidth(): number;
   getHeight(): number;
-  getFormat(): number;
-  getType(): number;
-  destroy(gl: WebGLRenderingContext): void;
 }
 
-export interface Shader {
-  getUniformLocation(name: string, gl: WebGLRenderingContext): WebGLUniformLocation;
-  getAttributeLocation(name: string, gl: WebGLRenderingContext): number;
+export interface Shader extends Disposable {
+  readonly name: string;
+  getUniformLocation(name: string): WebGLUniformLocation;
+  getAttributeLocation(name: string): number;
   getProgram(): WebGLProgram;
-  getUniforms(): Definition[];
+  getUniformBlocks(): UniformBlockDefinition[];
+  getUniforms(): UniformDefinition[];
   getAttributes(): Definition[];
   getSamplers(): Definition[];
-  destroy(gl: WebGLRenderingContext): void;
+  getSamplers(): Definition[];
 }
 
-export interface Definition {
-  readonly name: string;
-  readonly type: string;
-}
+export type Definition = Readonly<{
+  name: string;
+  type: string;
+}>;
+
+export type UniformBlockDefinition = Readonly<{
+  name: string,
+  blockIndex: number,
+  uniforms: UniformDefinition[],
+  size: number,
+}>;
+
+export type UniformDefinition = Readonly<{
+  blockOffset: number,
+}> & Definition;

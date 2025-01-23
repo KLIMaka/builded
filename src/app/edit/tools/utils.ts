@@ -11,7 +11,7 @@ import { Board, WALL_SPRITE } from "../../../build/board/structs";
 import { EntityType } from "../../../build/hitscan";
 import { slope, vec2ang, wallNormal, ZSCALE } from "../../../build/utils";
 import { create, lifecycle, Module, plugin } from "../../../utils/injector";
-import { int, monoatan2, PI2, trz } from "../../../utils/mathutils";
+import { int, monoatan2, TWO_PI, trz } from "../../../utils/mathutils";
 import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, GRID, GridController, LOGGER, Logger, REFERENCE_TRACKER, SnapType, View, VIEW } from "../../apis/app";
 import { BUS, busDisconnector, MessageBus } from "../../apis/handler";
 import { Commit, INVALIDATE_ALL, NamedMessage, SetPicnum } from "../messages";

@@ -1,26 +1,32 @@
 precision highp float;
 
-uniform mat4 P;
-uniform mat4 V;
-uniform vec4 size;
-uniform vec4 options;
-
-#define SCALE (options.z)
-#define SIZE (size.xy)
-#define OFF (size.zw)
+uniform Matrices {
+  mat4 P;
+  mat4 V;
+  mat4 IV;
+};
 
 in vec3 aPos;
-in vec2 aTc;
+in vec3 aTc;
+in float aParams;
 
-out vec2 tc;
-
-vec4 toXZ(vec2 vec,float w) {
-  return vec4(vec.x, 0.0, vec.y, w);
-}
+out vec3 tc;
+flat out ivec4 params;
 
 void main() {
-  vec2 halfoff = fract(SIZE / 2.0);
-  vec4 pos = vec4(aPos, 1.0) * toXZ(SIZE * SCALE, 1.0) - toXZ(OFF - halfoff, 0.0);
-  gl_Position = P * V * pos;
-  tc = aTc * vec2(SCALE);
+  tc = aTc;
+  int iParams = floatBitsToInt(aParams);
+  params.x = iParams & 0xff;
+  params.y = (iParams >> 8) & 0xff;
+  params.z = (iParams >> 16) & 0xff;
+  params.w = (iParams >> 24) & 0xff;
+#ifdef SPRITE
+  vec3 eyedir = (IV * vec4(0.0, 0.0, -1.0, 0.0)).xyz;
+  vec2 normal = normalize(eyedir.xz);
+  vec4 p = vec4(normal.x * aPos.z, aPos.y, normal.y * aPos.z, 1.0);
+  vec4 epos = V * p + vec4(aPos.x, 0.0, 0.0, 0.0);
+  gl_Position = P * epos;
+#else
+  gl_Position = P * V * vec4(aPos, 1.0);
+#endif
 }

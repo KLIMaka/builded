@@ -4,7 +4,9 @@ import { FastList } from "./list";
 
 export const radsInDeg = 180 / Math.PI;
 export const degInRad = Math.PI / 180;
-export const PI2 = Math.PI * 2;
+export const PI = Math.PI;
+export const TWO_PI = Math.PI * 2;
+export const HALF_PI = Math.PI / 2;
 export const EPS = 1e-9;
 export const HASH = (Math.sqrt(5) - 1) / 2;
 
@@ -141,6 +143,17 @@ export function cyclic(x: number, max: number): number {
 
 export function linear(min: number, max: number, t: number) {
   return min + (max - min) * t;
+}
+
+const buf = new ArrayBuffer(4);
+const int4 = new Int8Array(buf);
+const float = new Float32Array(buf);
+export function int4ToFloat(x: number, y: number, z: number, w: number): number {
+  int4[0] = x;
+  int4[1] = y;
+  int4[2] = z;
+  int4[3] = w;
+  return float[0];
 }
 
 export function cubic(x: number): number {

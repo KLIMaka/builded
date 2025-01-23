@@ -2,7 +2,7 @@ import { workplane, Workplane, WorkplaneContext, workplaneController } from "@ui
 import { WindowBuilder } from "@ui/windows-common";
 import { createContainer } from "@utils/callbacks";
 import { interpolate, range } from "@utils/collections";
-import { Texture } from "@utils/gl/drawstruct";
+import { GL_CONTEXT, Texture } from "@utils/gl/drawstruct";
 import { createTexture } from "@utils/gl/textures";
 import { homography } from "@utils/homography";
 import { loadImageFromBuffer } from "@utils/imgutils";
@@ -14,7 +14,6 @@ import { firstNot } from "@utils/objects";
 import { ACTION_DESCRIPTORS } from "app/apis/actions";
 import { APP } from "app/apis/app1";
 import { Window } from "app/apis/ui1";
-import { GL_CONTEXT } from "app/modules/gl/gl-context";
 import { mat3, vec3 } from "gl-matrix";
 import Optional from "optional-js";
 import React, { DragEvent } from "react";
@@ -131,10 +130,10 @@ export async function createRectifier(injector: Injector): Promise<Window> {
   const rectSize = values.transformed('rectSize', rectValue, rect => [
     (len2d(rect.x0 - rect.x1, rect.y0 - rect.y1) + len2d(rect.x2 - rect.x3, rect.y2 - rect.y3)) / 2,
     (len2d(rect.x0 - rect.x3, rect.y0 - rect.y3) + len2d(rect.x1 - rect.x2, rect.y1 - rect.y2)) / 2]);
-  const ctx = values.value('ctx', { xmouse: 0, ymouse: 0, xoff: 0, yoff: 0, scale: 1, dragging: false, disable: false, buttons: 0 } as WorkplaneContext);
+  const ctx = values.value('ctx', { xmouse: 0, ymouse: 0, xoff1: 0, yoff1: 0, scale: 1, dragging: false, disable: false, buttons: 0 } as WorkplaneContext);
   const mousePos = values.fields('mousePos', ctx, 'xmouse', 'ymouse');
   const offScale = values.fields('offScale', ctx, 'xoff', 'yoff', 'scale');
-  const transformedRect = values.transformedTuple('transformedRect', [rectValue, offScale], ([rect, { xoff, yoff, scale }]) => transformRect(rect, xoff, yoff, scale))
+  const transformedRect = values.transformedTuple('transformedRect', [rectValue, offScale], ([rect, { xoff1: xoff, yoff1: yoff, scale }]) => transformRect(rect, xoff, yoff, scale))
   const selectedVertex = values.transformedTuple('selectedVertex', [transformedRect, mousePos], ([rect, { xmouse, ymouse }]) => findVertex(rect, xmouse, ymouse, 10));
   const dragVertex = values.transformedSelfTuple('dragVertex', [transformedRect, ctx], -1, ([rect, { xmouse, ymouse, buttons, dragging }], prev) => {
     if (buttons === 0 || dragging) return -1;
@@ -146,7 +145,7 @@ export async function createRectifier(injector: Injector): Promise<Window> {
   values.handleStandalone([selectedVertex], vtx => ctx.modImmer(c => c.disable = vtx !== -1));
   values.handleStandalone([dragVertex, ctx], ([vertex, ctx]) => {
     if (vertex === -1) return;
-    rectValue.modImmer(rect => setVertex(rect, vertex, untransform(ctx.xmouse, ctx.xoff, ctx.scale), untransform(ctx.ymouse, ctx.yoff, ctx.scale)))
+    rectValue.modImmer(rect => setVertex(rect, vertex, untransform(ctx.xmouse, ctx.xoff1, ctx.scale), untransform(ctx.ymouse, ctx.yoff1, ctx.scale)))
   });
   values.handleStandalone([image], img => img.ifPresent(img => rectValue.modImmer(r => {
     r.x0 = 0; r.y0 = 0;
@@ -188,7 +187,7 @@ export async function createRectifier(injector: Injector): Promise<Window> {
     values.handle([homo, ctx, imageSize], ([homo, ctx, [iw, ih]]) => {
       const canvasCtx = canvas.getContext('2d');
       canvasCtx.clearRect(0, 0, w, h);
-      const { xmouse, ymouse, xoff, yoff, scale } = ctx;
+      const { xmouse, ymouse, xoff1: xoff, yoff1: yoff, scale } = ctx;
       const mpos = vec3.fromValues(untransform(xmouse, xoff, scale), untransform(ymouse, yoff, scale), 1);
       const homoInv = mat3.invert(mat3.create(), homo);
       const transVec = vec3.transformMat3(vec3.create(), mpos, homoInv);
@@ -204,10 +203,10 @@ export async function createRectifier(injector: Injector): Promise<Window> {
       vec3.scale(r, r, 1 / r[2]);
       canvasCtx.strokeStyle = 'white';
       canvasCtx.beginPath();
-      canvasCtx.moveTo(transform(u[0], ctx.xoff, ctx.scale), transform(u[1], ctx.yoff, ctx.scale));
-      canvasCtx.lineTo(transform(d[0], ctx.xoff, ctx.scale), transform(d[1], ctx.yoff, ctx.scale));
-      canvasCtx.moveTo(transform(r[0], ctx.xoff, ctx.scale), transform(r[1], ctx.yoff, ctx.scale));
-      canvasCtx.lineTo(transform(l[0], ctx.xoff, ctx.scale), transform(l[1], ctx.yoff, ctx.scale));
+      canvasCtx.moveTo(transform(u[0], ctx.xoff1, ctx.scale), transform(u[1], ctx.yoff1, ctx.scale));
+      canvasCtx.lineTo(transform(d[0], ctx.xoff1, ctx.scale), transform(d[1], ctx.yoff1, ctx.scale));
+      canvasCtx.moveTo(transform(r[0], ctx.xoff1, ctx.scale), transform(r[1], ctx.yoff1, ctx.scale));
+      canvasCtx.lineTo(transform(l[0], ctx.xoff1, ctx.scale), transform(l[1], ctx.yoff1, ctx.scale));
       canvasCtx.stroke();
     })
   );

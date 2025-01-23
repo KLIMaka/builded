@@ -98,11 +98,11 @@ export class Bag {
 export class BagController {
   private bag: Bag;
   private places = new Map<number, Place>();
-  private updater: (place: Place, noffset: number) => void;
+  // private updater: (place: Place, noffset: number) => void;
 
-  constructor(size: number, updater: (place: Place, noffset: number) => void) {
+  constructor(size: number/*, updater: (place: Place, noffset: number) => void*/) {
     this.bag = new Bag(size);
-    this.updater = updater;
+    // this.updater = updater;
   }
 
   public get(size: number): Place {
@@ -122,21 +122,21 @@ export class BagController {
     this.places.delete(place.offset);
   }
 
-  public optimize() {
-    const places = this.places;
-    this.places = new Map();
-    this.bag.reset();
-    let offset = 0;
-    for (const [_, place] of places) {
-      this.places[offset] = place;
-      if (place.offset !== offset) {
-        this.updater(place, offset);
-        place.offset = offset;
-      }
-      offset += place.size;
-    }
-    this.bag.get(offset);
-  }
+  // public optimize() {
+  //   const places = this.places;
+  //   this.places = new Map();
+  //   this.bag.reset();
+  //   let offset = 0;
+  //   for (const [_, place] of places) {
+  //     this.places[offset] = place;
+  //     if (place.offset !== offset) {
+  //       this.updater(place, offset);
+  //       place.offset = offset;
+  //     }
+  //     offset += place.size;
+  //   }
+  //   this.bag.get(offset);
+  // }
 
   public freeSpace(segments: number) {
     return this.bag.freeSpace(segments);
@@ -148,5 +148,5 @@ export function create(size: number): Bag {
 }
 
 export function createController(size: number, updater: (place: Place, noffset: number) => void): BagController {
-  return new BagController(size, updater);
+  return new BagController(size);
 }

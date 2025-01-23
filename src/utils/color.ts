@@ -125,15 +125,15 @@ export function resizeIndexed(dstw: number, dsth: number, srcw: number, srch: nu
   return dst;
 }
 
-export function convoluteIndexed(x: number, y: number, w: number, h: number, imgw: number, img: Uint8Array, pal: number[], labpal: number[]): number {
-  if (w == int(w) && h == int(h) && x == int(x) && y == int(y)) {
+export function convoluteIndexed(cx: number, cy: number, w: number, h: number, imgw: number, img: Uint8Array, pal: number[], labpal: number[]): number {
+  if (w === int(w) && h === int(h) && cx === int(cx) && cy === int(cy)) {
     const sum = [0, 0, 0];
     let trans = 0;
     const colors = new Set<number>();
     for (const [xx, yy] of rect(w, h)) {
-      const off = (yy + y) * imgw + xx + x;
+      const off = (yy + cy) * imgw + xx + cx;
       const color = img[off] * 3;
-      if (color == 255 * 3) {
+      if (color === 255 * 3) {
         trans++;
         if (trans > (w * h) / 2) return 255;
       } else {
@@ -144,14 +144,14 @@ export function convoluteIndexed(x: number, y: number, w: number, h: number, img
       }
     }
     const weight = 1 / (w * h - trans);
-    const xyz = rgb2xyz(sum[0] * weight, sum[1] * weight, sum[2] * weight);
-    const lab = xyz2lab(xyz[0], xyz[1], xyz[2]);
+    const [x, y, z] = rgb2xyz(sum[0] * weight, sum[1] * weight, sum[2] * weight);
+    const [l, a, b] = xyz2lab(x, y, z);
     let mindist = Number.MAX_VALUE;
     let mindist1 = Number.MAX_VALUE;
     let idx = 0;
     let idx1 = 0;
     for (const color of colors) {
-      const dist = labDist(labpal, color, lab[0], lab[1], lab[2]);
+      const dist = labDist(labpal, color, l, a, b);
       if (mindist > dist) {
         idx1 = idx;
         mindist1 = mindist;
@@ -160,12 +160,12 @@ export function convoluteIndexed(x: number, y: number, w: number, h: number, img
       }
     }
 
-    const [i, i1, t] = findLab(labpal, lab[0], lab[1], lab[2]);
-    const d = labDist(labpal, i, lab[0], lab[1], lab[2]);
+    const [i, i1, t] = findLab(labpal, l, a, b);
+    const d = labDist(labpal, i, l, a, b);
     // return dither(x, y, t, ditherMatrix) ? i : i1;
     return d / mindist < 0.2 ? i : dither(x, y, mindist / mindist1, ditherMatrix) ? idx : idx1;
   } else {
-    return img[int(y + h / 2) * imgw + int(x + w / 2)];
+    return img[int(cy + h / 2) * imgw + int(cx + w / 2)];
   }
 }
 

@@ -8,8 +8,9 @@ import { BuildGl } from "../buildgl";
 import { GlContext } from "../gl-context";
 import { BufferRenderable, BufferSetup, GridSetup, PointSpriteSetup, SolidSetup, WireframeSetup } from "./builders/setups";
 import { match } from "ts-pattern";
+import { disposable, Disposable } from "@utils/callbacks";
 
-export interface BuildersFactory {
+export interface BuildersFactory extends Disposable {
   solid(hint: string): SolidBuilder;
   grid(hint: string): GridBuilder;
   flat(hint: string): FlatBuilder;
@@ -30,7 +31,8 @@ export function createBuildersFactory(buildgl: BuildGl, glContext: GlContext): B
     grid: (hint: string) => new GridBuilder(gridSetup()),
     flat: (hint: string) => new FlatBuilder(bufferSetup()),
     pointSprite: (hint: string) => new PointSpriteBuilder(pointspriteSetup(), bufferFactory.get('pointsprite-' + hint)),
-    wireframe: (hint: string) => new WireframeBuilder(wireframeSetup(), bufferFactory.get('wireframe-' + hint))
+    wireframe: (hint: string) => new WireframeBuilder(wireframeSetup(), bufferFactory.get('wireframe-' + hint)),
+    ...disposable(() => bufferFactory.dispose())
   }
 }
 

@@ -303,7 +303,34 @@ export function addEventListener<K extends keyof HTMLElementEventMap>(elem: HTML
 }
 
 export type WorkplaneBuilder = MultiConsumer<[HTMLCanvasElement, number, number]>;
-export type WorkplaneContext = { xmouse: number, ymouse: number, xoff: number, yoff: number, scale: number, dragging: boolean, disable: boolean, buttons: number }
+export type WorkplaneContext = {
+  xmouse: number,
+  ymouse: number,
+  xoff1: number,
+  yoff1: number,
+  xoff2: number,
+  yoff2: number,
+  scale: number,
+  dragging: number,
+  disable: boolean,
+  buttons: number
+}
+
+export function defaultWorkplaneContext(def: Partial<WorkplaneContext>): WorkplaneContext {
+  return {
+    xmouse: 0,
+    ymouse: 0,
+    xoff1: 0,
+    yoff1: 0,
+    xoff2: 0,
+    yoff2: 0,
+    scale: 1,
+    dragging: 0,
+    disable: false,
+    buttons: 0,
+    ...def
+  }
+}
 
 export function workplane(f: MultiFunction<[HTMLCanvasElement, number, number], Disconnector>): WorkplaneBuilder {
   let disconnector: Disconnector;
@@ -315,34 +342,45 @@ export function workplane(f: MultiFunction<[HTMLCanvasElement, number, number], 
 
 export function workplaneController(ctx: Value<WorkplaneContext>): WorkplaneBuilder {
   function handleMouseMove(e: MouseEvent) {
+    const ctxValue = ctx.get();
     const x = e.offsetX;
     const y = e.offsetY;
-    if (ctx.get().dragging) {
-      const dx = x - ctx.get().xmouse;
-      const dy = y - ctx.get().ymouse;
-      ctx.modImmer(ctx => { ctx.xoff += dx; ctx.yoff += dy })
+    if (ctxValue.dragging === 1) {
+      const dx = x - ctxValue.xmouse;
+      const dy = y - ctxValue.ymouse;
+      ctx.modImmer(ctx => { ctx.xoff1 += dx; ctx.yoff1 += dy })
+    }
+    if (ctxValue.dragging === 2) {
+      const dx = x - ctxValue.xmouse;
+      const dy = y - ctxValue.ymouse;
+      ctx.modImmer(ctx => { ctx.xoff2 += dx; ctx.yoff2 += dy })
     }
     ctx.modImmer(ctx => { ctx.xmouse = x; ctx.ymouse = y })
   }
   function handleWheel(e: WheelEvent) {
     ctx.modImmer(ctx => {
       const ds = e.deltaY > 0 ? (1 / 1.1) : e.deltaY < 0 ? 1.1 : 1;
-      const x1 = ctx.xmouse / ctx.scale - ctx.xoff / ctx.scale;
-      const y1 = ctx.ymouse / ctx.scale - ctx.yoff / ctx.scale;
+      const x1 = ctx.xmouse / ctx.scale - ctx.xoff1 / ctx.scale;
+      const y1 = ctx.ymouse / ctx.scale - ctx.yoff1 / ctx.scale;
       ctx.scale *= ds;
-      const x2 = ctx.xmouse / ctx.scale - ctx.xoff / ctx.scale;
-      const y2 = ctx.ymouse / ctx.scale - ctx.yoff / ctx.scale;
-      ctx.xoff += (x2 - x1) * ctx.scale;
-      ctx.yoff += (y2 - y1) * ctx.scale;
+      const x2 = ctx.xmouse / ctx.scale - ctx.xoff1 / ctx.scale;
+      const y2 = ctx.ymouse / ctx.scale - ctx.yoff1 / ctx.scale;
+      ctx.xoff1 += (x2 - x1) * ctx.scale;
+      ctx.yoff1 += (y2 - y1) * ctx.scale;
     })
   }
-  function handleMouseButton(e: MouseEvent) { ctx.modImmer(c => c.buttons = e.buttons); if (!ctx.get().disable) ctx.modImmer(c => c.dragging = e.buttons === 1) }
+  function handleMouseButton(e: MouseEvent) {
+    ctx.modImmer(c => c.buttons = e.buttons);
+    if (!ctx.get().disable)
+      ctx.modImmer(c => c.dragging = e.buttons)
+  }
   return workplane((canvas, w, h) => {
     const moveD = addEventListener(canvas, 'mousemove', handleMouseMove);
     const wheelD = addEventListener(canvas, 'wheel', handleWheel);
     const mouseBtnDownD = addEventListener(canvas, 'mousedown', handleMouseButton);
     const mouseBtnUpD = addEventListener(canvas, 'mouseup', handleMouseButton);
-    return seq(moveD, wheelD, mouseBtnDownD, mouseBtnUpD);
+    const contextD = addEventListener(canvas, 'contextmenu', e => e.preventDefault());
+    return seq(moveD, wheelD, mouseBtnDownD, mouseBtnUpD, contextD);
   })
 }
 

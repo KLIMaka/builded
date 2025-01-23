@@ -1,8 +1,11 @@
-import { Definition, Shader } from "./drawstruct";
+import { Definition, DisposableResource, GlContext, Shader, UniformBlockDefinition, UniformDefinition } from "./drawstruct";
 import { loadString } from "../getter";
+import { range } from "@utils/collections";
+import { iter } from "@utils/iter";
 
 export class ShaderImpl implements Shader {
-  private program: WebGLProgram;
+  readonly name: string;
+  private program: DisposableResource<WebGLProgram>;
   private definitions: Definitions;
 
   readonly uniforms: WebGLUniformLocation[] = [];
@@ -10,7 +13,8 @@ export class ShaderImpl implements Shader {
   readonly uniformIndex = new Map<string, number>();
   readonly attributeIndex = new Map<string, number>();
 
-  public constructor(gl: WebGLRenderingContext, prog: WebGLProgram, defs: Definitions) {
+  constructor(name: string, gl: WebGLRenderingContext, prog: DisposableResource<WebGLProgram>, defs: Definitions) {
+    this.name = name;
     this.program = prog;
     this.definitions = defs;
     this.initUniformLocations(gl);
@@ -21,7 +25,7 @@ export class ShaderImpl implements Shader {
     for (let i = 0; i < this.definitions.uniforms.length; i++) {
       const uniform = this.definitions.uniforms[i];
       this.uniformIndex.set(uniform.name, i);
-      this.uniforms[i] = gl.getUniformLocation(this.program, uniform.name);
+      this.uniforms[i] = gl.getUniformLocation(this.program.value, uniform.name);
     }
   }
 
@@ -29,36 +33,40 @@ export class ShaderImpl implements Shader {
     for (let i = 0; i < this.definitions.attributes.length; i++) {
       const attrib = this.definitions.attributes[i];
       this.attributeIndex.set(attrib.name, i);
-      this.attribs[i] = gl.getAttribLocation(this.program, attrib.name);
+      this.attribs[i] = gl.getAttribLocation(this.program.value, attrib.name);
     }
   }
 
-  public getUniformLocation(name: string, gl: WebGLRenderingContext): WebGLUniformLocation {
+  getUniformLocation(name: string): WebGLUniformLocation {
     return this.uniforms[this.uniformIndex.get(name)];
   }
 
-  public getAttributeLocation(name: string, gl: WebGLRenderingContext): number {
+  getAttributeLocation(name: string): number {
     return this.attribs[this.attributeIndex.get(name)];
   }
 
-  public getProgram(): WebGLProgram {
-    return this.program;
+  getProgram(): WebGLProgram {
+    return this.program.value;
   }
 
-  public getUniforms(): Definition[] {
+  getUniformBlocks(): UniformBlockDefinition[] {
+    return this.definitions.uniformBlocks;
+  }
+
+  getUniforms(): UniformDefinition[] {
     return this.definitions.uniforms;
   }
 
-  public getAttributes(): Definition[] {
+  getAttributes(): Definition[] {
     return this.definitions.attributes;
   }
 
-  public getSamplers(): Definition[] {
+  getSamplers(): Definition[] {
     return this.definitions.samplers;
   }
 
-  public destroy(gl: WebGLRenderingContext): void {
-    gl.deleteProgram(this.program);
+  async dispose(): Promise<void> {
+    this.program.dispose();
   }
 }
 
@@ -68,28 +76,33 @@ function getBaseDir(name: string): string {
   return name.substring(0, idx + 1);
 }
 
-export async function createShader(gl: WebGLRenderingContext, name: string, defines: string[] = []): Promise<Shader> {
+export async function createShader({ gl, resource }: GlContext, name: string, defines: string[] = []): Promise<Shader> {
   const deftext = '#version 300 es\n' + defines.map(d => "#define " + d).join("\n") + "\n";
   const baseDir = getBaseDir(name);
   return Promise.all([loadString(name + '.vsh'), loadString(name + '.fsh')])
     .then(async ([vsh, fsh]) => {
       const [pvhs, pfsh] = await Promise.all([preprocess(vsh, baseDir), preprocess(fsh, baseDir)]);
       const program = compileProgram(gl, deftext + pvhs, deftext + pfsh);
+      const programRes = resource('shader', program, p => gl.deleteProgram(p));
       const defs = processShaders(gl, program);
-      return new ShaderImpl(gl, program, defs);
+      return new ShaderImpl(name, gl, programRes, defs);
     })
 }
 
-function compileProgram(gl: WebGLRenderingContext, vsh: string, fsh: string): WebGLProgram {
+function compileProgram(gl: WebGL2RenderingContext, vsh: string, fsh: string): WebGLProgram {
   const program = gl.createProgram();
-  gl.attachShader(program, compileSource(gl, gl.VERTEX_SHADER, vsh));
-  gl.attachShader(program, compileSource(gl, gl.FRAGMENT_SHADER, fsh));
+  const vertexShader = compileSource(gl, gl.VERTEX_SHADER, vsh);
+  const fragmentShader = compileSource(gl, gl.FRAGMENT_SHADER, fsh);
+  gl.attachShader(program, vertexShader);
+  gl.attachShader(program, fragmentShader);
   gl.linkProgram(program);
+  gl.deleteShader(vertexShader);
+  gl.deleteShader(fragmentShader);
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error('link error: ' + gl.getProgramInfoLog(program));
   return program;
 }
 
-function compileSource(gl: WebGLRenderingContext, type: number, source: string): WebGLShader {
+function compileSource(gl: WebGL2RenderingContext, type: number, source: string): WebGLShader {
   const shader = gl.createShader(type);
   gl.shaderSource(shader, source);
   gl.compileShader(shader);
@@ -97,40 +110,45 @@ function compileSource(gl: WebGLRenderingContext, type: number, source: string):
   return shader;
 }
 
-export class DefinitionImpl implements Definition {
-  constructor(
-    readonly type: string,
-    readonly name: string
-  ) { }
-}
-
 export class Definitions {
-  readonly uniforms: Definition[] = [];
+  readonly uniforms: UniformDefinition[] = [];
   readonly attributes: Definition[] = [];
   readonly samplers: Definition[] = [];
+  readonly uniformBlocks: UniformBlockDefinition[] = [];
 }
 
 
-function processShaders(gl: WebGLRenderingContext, program: WebGLProgram): Definitions {
+function processShaders(gl: WebGL2RenderingContext, program: WebGLProgram): Definitions {
   const defs = new Definitions();
   const attribs = gl.getProgramParameter(program, gl.ACTIVE_ATTRIBUTES) as number;
   for (let a = 0; a < attribs; a++) {
     const info = gl.getActiveAttrib(program, a);
+    if (info.name === 'gl_VertexID') continue;
     defs.attributes.push(convertToDefinition(info));
   }
   const uniforms = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS) as number;
+  const offsets = gl.getActiveUniforms(program, range(0, uniforms), gl.UNIFORM_OFFSET);
   for (let u = 0; u < uniforms; u++) {
     const info = gl.getActiveUniform(program, u);
     const def = convertToDefinition(info);
-    defs.uniforms.push(def);
+    defs.uniforms.push({ ...def, blockOffset: offsets[u] });
     if (def.type === 'sampler2D')
       defs.samplers.push(def);
   }
+  const blocks = gl.getProgramParameter(program, gl.ACTIVE_UNIFORM_BLOCKS) as number;
+  for (let b = 0; b < blocks; b++) {
+    const name = gl.getActiveUniformBlockName(program, b);
+    const blockIndex = b;
+    const uniforms = iter(gl.getActiveUniformBlockParameter(program, b, gl.UNIFORM_BLOCK_ACTIVE_UNIFORM_INDICES) as Uint32Array).map(u => defs.uniforms[u]).collect();
+    const size = gl.getActiveUniformBlockParameter(program, b, gl.UNIFORM_BLOCK_DATA_SIZE);
+    defs.uniformBlocks.push({ name, blockIndex, uniforms, size });
+  }
+
   return defs;
 }
 
-function convertToDefinition(info: WebGLActiveInfo): DefinitionImpl {
-  return new DefinitionImpl(type2String(info.type), info.name);
+function convertToDefinition(info: WebGLActiveInfo): Definition {
+  return { type: type2String(info.type), name: info.name };
 }
 
 function type2String(type: number): string {
@@ -175,7 +193,7 @@ const setters = {
 
 export function setUniform(gl: WebGLRenderingContext, shader: Shader, uniform: Definition, value: any) {
   if (uniform === undefined) return;
-  const loc = shader.getUniformLocation(uniform.name, gl);
+  const loc = shader.getUniformLocation(uniform.name);
   const setter = setters[uniform.type];
   if (setter === undefined) throw new Error('Invalid type: ' + uniform.type);
   setter(gl, loc, value);

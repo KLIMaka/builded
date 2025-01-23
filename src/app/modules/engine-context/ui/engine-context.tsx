@@ -1,7 +1,7 @@
 import { ActionItem, ActionList, createActionItem } from "@ui/action-list";
 import { ActionButton, ActionDescriptorsContext, Button, Column, Row, Tabs, useValue, useValuesContainer } from "@ui/commons";
 import { SizeType, WindowBuilder } from "@ui/windows-common";
-import { createContainer, Disposable, Source, Value, ValuesContainer, ValuesMap } from "@utils/callbacks";
+import { createContainer, disposable, Disposable, Source, Value, ValuesContainer, ValuesMap } from "@utils/callbacks";
 import { getInstances, Injector } from "@utils/injector";
 import { iter } from "@utils/iter";
 import { sum } from "@utils/mathutils";
@@ -17,13 +17,13 @@ import { createBoardView } from "app/modules/board-view/ui/board-view-model";
 import { createSavedState } from "app/modules/default/app/storage";
 import { stack } from "app/modules/fs/fs";
 import { BuildGlEngineContext } from "app/modules/gl/buildgl";
-import { GL_CONTEXT, GlContext } from "app/modules/gl/gl-context";
 import { begin } from "app/modules/scheduler/work";
 import Optional from "optional-js";
 import React, { useContext, useRef } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { EngineContextRecord, ENGINES } from "../engine-context-api";
 import { createEngine } from "./create-engine-context";
+import { GL_CONTEXT, GlContext } from "@utils/gl/drawstruct";
 
 const ID = 'engines-context';
 
@@ -87,7 +87,7 @@ class Editor {
     this.currentEngineId = values.value('selectedEngineId', -1);
     this.engineItems = this.createEngineItems('engineItems');
     this.actions = {};
-    this.values.addSubscribed(this.currentEngineId, v => v.subscribe(id => this.onIdChange(id)));
+    this.values.addSubscribed(this.currentEngineId, id => this.onIdChange(id));
   }
 
   async onIdChange(idx: number) {
@@ -120,8 +120,8 @@ class Editor {
               [] as FileInfo[],
               kvxLoader,
               (fs, maps) => fs.subscribe((name, deleted) => maps.setPromise(m => kvxLoader(fs))));
-            const dispose = async () => { ctx.dispose(); values.dispose(); }
-            return { name, arts, validArts, plus, shadowsteps, artFiles, mapFiles, kvxFiles, ctx, bglctx, dispose }
+            const dispose = async () => { await bglctx.dispose(); await ctx.dispose(); await values.dispose(); }
+            return { name, arts, validArts, plus, shadowsteps, artFiles, mapFiles, kvxFiles, ctx, bglctx, dispose, ...disposable(dispose) }
           }).finish()(handle)))
       .finishUntuple();
 

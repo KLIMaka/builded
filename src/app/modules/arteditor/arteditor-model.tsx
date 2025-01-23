@@ -1,5 +1,5 @@
 import { ActionItem } from "@ui/action-list";
-import { WorkplaneBuilder, WorkplaneContext, line, menuItemDescripted, workplane } from "@ui/commons";
+import { WorkplaneBuilder, WorkplaneContext, defaultWorkplaneContext, line, menuItemDescripted, workplane } from "@ui/commons";
 import { SizeType, WindowBuilder } from "@ui/windows-common";
 import { Disposable, Signal, Source, Value, ValuesContainer, ValuesMap, createContainer } from "@utils/callbacks";
 import { getOrCreate, getOrDefault, prefixNotEmpty, range, takeFirst } from "@utils/collections";
@@ -20,9 +20,9 @@ import Optional from "optional-js";
 import React, { useEffect, useRef } from "react";
 import { createSavedState } from "../default/app/storage";
 import { BuildGlEngineContext } from "../gl/buildgl";
-import { GL_CONTEXT } from "../gl/gl-context";
 import { ArtEditorUiImpl } from "./arteditor-view";
-import { PreviewRenderer } from "./preview-renderer";
+import { createPreviewRenderer, PreviewRenderer } from "./preview-renderer";
+import { GL_CONTEXT } from "@utils/gl/drawstruct";
 
 const GRID_SIZES = [0, 4, 8, 16, 32, 64, 128, 256];
 const PREVIEW_SIZES = [32, 64, 100, 128, 125, 200];
@@ -175,7 +175,7 @@ export class ArtEditorImpl {
 
   readonly actions: ArtEditorActions;
   readonly ctx: Value<WorkplaneContext>;
-  readonly ctxScaleOff: Value<Pick<WorkplaneContext, 'scale' | 'xoff' | 'yoff'>>;
+  readonly ctxScaleOff: Value<Pick<WorkplaneContext, 'scale' | 'xoff1' | 'yoff1' | 'xoff2' | 'yoff2'>>;
   readonly gridSizes: Source<ActionItem[]>;
   readonly previewSizes: Source<ActionItem[]>;
   readonly superSamples: Source<ActionItem[]>;
@@ -211,8 +211,8 @@ export class ArtEditorImpl {
     this.superSample = this.state.get('superSample');
     this.repeat = this.values.value('repeat', false);
     this.showEmpty = this.values.value('showEmpty', false);
-    this.ctx = this.values.value('ctx', { xoff: 0, yoff: 0, scale: 2, buttons: 0, disable: false, dragging: false } as WorkplaneContext);
-    this.ctxScaleOff = this.values.fields('ctxScaleOff', this.ctx, 'scale', 'xoff', 'yoff');
+    this.ctx = this.values.value('ctx', defaultWorkplaneContext({ scale: 2 }));
+    this.ctxScaleOff = this.values.fields('ctxScaleOff', this.ctx, 'scale', 'xoff1', 'yoff1', 'xoff2', 'yoff2');
     this.gridSize = state.get('grid');
     this.previewSize = state.get('previewSize');
     this.rasterizer = palRasterizer(pal.get());
@@ -223,7 +223,7 @@ export class ArtEditorImpl {
     this.currentFrameInfo = this.values.transformedTuple('currentFrameInfo', [this.artInfos, this.currentId, this.animationFrame, this.mainFrameInfo],
       ([art, id, frame, mainFrame]) => this.animate(art, id, frame, mainFrame));
     this.pluProvider = this.values.transformedTuple('pluProvider', [this.plus, this.currentShadow, this.currentPlu],
-      ([plus, shadow, plu]) => x => (x >= 255 || x < 0) ? 255 : plus[plu].plu[shadow * 256 + x]);
+      ([plus, shadow, plu]) => { const actualPlu = iter(plus).first(p => p.id === plu).orElse(plus[0]).plu; return x => (x >= 255 || x < 0) ? 255 : actualPlu[shadow * 256 + x] });
 
     this.previewGridSize = values.value('previewGridSize', Optional.empty());
     this.gridSizes = this.createGridItems();
@@ -245,13 +245,13 @@ export class ArtEditorImpl {
 
   private animateFrame() {
     const anim = this.app.timer.periodic(() => this.animationFrame.mod(f => f + 1))
-    this.values.addSubscribed(this.mainFrameInfo, i => i.subscribe(main => {
+    this.values.addSubscribed(this.mainFrameInfo, main => {
       this.animationFrame.set(0);
       anim.stop();
       if (main.attrs.frames === 0 && (main.attrs.type & 7) !== 1 && (main.attrs.type & 7) !== 2) return;
       const speed = ((main.attrs.type & 7) === 1) || ((main.attrs.type & 7) === 2) ? 150 : Math.pow(2, main.attrs.speed) * 10;
       anim.start(speed);
-    }));
+    });
     this.values.addDisposable(anim);
   }
 
@@ -307,8 +307,10 @@ export class ArtEditorImpl {
     const { info } = this.currentFrameInfo.get();
     this.ctx.modImmer(ctx => {
       const [w, h] = this.previewRect();
-      ctx.xoff = w / 2 + info.attrs.xoff * ctx.scale;
-      ctx.yoff = h / 2 + info.attrs.yoff * ctx.scale;
+      ctx.xoff1 = w / 2 + info.attrs.xoff * ctx.scale;
+      ctx.yoff1 = h / 2 + info.attrs.yoff * ctx.scale;
+      ctx.xoff2 = 0;
+      ctx.yoff2 = 0;
     })
   }
 
@@ -324,22 +326,22 @@ export class ArtEditorImpl {
 
   gridRenderer(): WorkplaneBuilder {
     return workplane(canvas => {
-      const render = (ctx: Pick<WorkplaneContext, 'xoff' | 'yoff' | 'scale'>, grid: number) => renderGrid(canvas, ctx.xoff, ctx.yoff, ctx.scale, grid, grid * grid);
+      const render = (ctx: Pick<WorkplaneContext, 'xoff1' | 'yoff1' | 'scale'>, grid: number) => renderGrid(canvas, ctx.xoff1, ctx.yoff1, ctx.scale, grid, grid * grid);
       return this.values.handle([this.ctxScaleOff, this.gridSize], ([ctx, grid]) => render(ctx, grid));
     })
   }
 
-  centerRenderer(): WorkplaneBuilder {
-    return workplane((canvas, w, h) => {
-      const render = (wctx: Pick<WorkplaneContext, 'xoff' | 'yoff'>) => {
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, w, h);
-        ctx.fillStyle = 'white';
-        ctx.fillRect(-2 + wctx.xoff, -2 + wctx.yoff, 4, 4);
-      }
-      return this.values.handle([this.ctxScaleOff], ctx => render(ctx));
-    })
-  }
+  // centerRenderer(): WorkplaneBuilder {
+  //   return workplane((canvas, w, h) => {
+  //     const render = (wctx: Pick<WorkplaneContext, 'xoff1' | 'yoff1'>) => {
+  //       const ctx = canvas.getContext('2d');
+  //       ctx.clearRect(0, 0, w, h);
+  //       ctx.fillStyle = 'white';
+  //       ctx.fillRect(-2 + wctx.xoff1, -2 + wctx.yoff1, 4, 4);
+  //     }
+  //     return this.values.handle([this.ctxScaleOff], ctx => render(ctx));
+  //   })
+  // }
 
   imageInfoRenderer(): WorkplaneBuilder {
     return workplane((canvas, w, h) => {
@@ -380,7 +382,7 @@ export class ArtEditorImpl {
     const renderPreview = (picnum: number, artFiles: Map<number, ArtInfoExtended>, plu: number, upscale: boolean, size: number) =>
       new Promise<string>(ok => this.batchRunner.run(() => {
         const info = getOrDefault(artFiles, picnum, EMPTY_INFO_EXTENDED);
-        const p = this.plus.get()[plu].plu;
+        const p = iter(this.plus.get()).first(p => p.id === plu).orElse(this.plus.get()[0]).plu;
         createCanvas(transform(fit(size - 2, size - 16, art(info), 255, upscale), c => c === 255 ? 255 : p[c]), this.rasterizer)
           .toBlob(blob => ok(URL.createObjectURL(blob)))
       }))
@@ -393,7 +395,7 @@ export class ArtEditorImpl {
 
   setCurrentId(picnum: number) {
     this.currentId.set(picnum);
-    this.centerPic();
+    // this.centerPic();
   }
 
   private updateSearchHistory(q: string, prevList: string[]): string[] {
@@ -520,17 +522,15 @@ export async function createArtEditor(injector: Injector, ctx: BuildGlEngineCont
     const [actionDescriptors, app, glCtx] = await getInstances(injector, ACTION_DESCRIPTORS, APP, GL_CONTEXT);
     const windowStates = await app.storages('ui.window-states');
     const state = await createSavedState(values, windowStates, 'art-editor', createDefaultState());
-    const art = await ctx.engine.art;
-    const artMap = await ctx.engine.artMap;
-    const pal = await ctx.engine.pal;
-    const plus = await ctx.engine.plus;
-    const tags = await ctx.engine.picTags;
-    const shadowsteps = await ctx.engine.shadowsteps;
+    const art = ctx.engine.art;
+    const artMap = ctx.engine.artMap;
+    const pal = ctx.engine.pal;
+    const plus = ctx.engine.plus;
+    const tags = ctx.engine.picTags;
+    const shadowsteps = ctx.engine.shadowsteps;
     const textures = await ctx.textures();
-    const aliases = await ctx.engine.aliases;
-    const previewRenderer = new PreviewRenderer(values, glCtx, textures, shadowsteps.get(), plus.get().length);
-    await previewRenderer.init();
-
+    const aliases = ctx.engine.aliases;
+    const previewRenderer = await createPreviewRenderer(values, glCtx, textures, ctx.engine.shadowsteps.get(), ctx.engine.maxPluId.get() + 1);
     const editor = new ArtEditorImpl(values, state, actionDescriptors, app, art, artMap, pal, plus, tags, shadowsteps, previewRenderer, aliases);
 
     return new WindowBuilder('art-editor', actionDescriptors, values)

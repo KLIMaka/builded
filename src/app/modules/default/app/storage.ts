@@ -109,10 +109,12 @@ export async function storageValue<T>(values: ValuesContainer, storage: Storage,
 }
 
 export async function createSavedState<T>(values: ValuesContainer, storage: Storage, id: string, def: T, debounce = 1000): Promise<ValuesMap<T>> {
-  const save = debounced(() => storage.set(id, state.getObject()), debounce);
+  let disposed = false;
+  const save = debounced(() => { if (!disposed) storage.set(id, state.getObject()) }, debounce);
   const loadedState = await storage.get<T>(id);
   const initialState = loadedState.map(s => applyDefaults(s, def)).orElse(def);
   const state = toValuesMap(initialState, values);
   state.handle(values, save);
+  values.addDisconnector(() => disposed = true);
   return state;
 }

@@ -1,16 +1,14 @@
 precision highp float;
 
-#include "inc.fsh"
-
 uniform sampler2D base;
 uniform sampler2D pal;
 uniform sampler2D plu;
-uniform sampler2D trans;
 
 uniform vec3 curpos;
 uniform vec3 eyepos;
 uniform vec4 clipPlane;
 uniform vec4 sys;
+uniform vec4 sys1;
 uniform vec4 grid;
 uniform vec4 color;
 uniform vec4 modulation;
@@ -25,109 +23,32 @@ in vec4 lm;
 
 out vec4 fragColor;
 
-const float TARANS_IDX = float(255.0/256.0);
-const float PI = 3.1415926538;
-const float PLU_LINES = SHADOWSTEPS * PALSWAPS;
-const float DEFAULT_VIS = 512.0;
-
 #define TC (tcps.xy)
 #define PAL (tcps.z >= PALSWAPS ? 0.0 : tcps.z)
-#define SHADOW (tcps.w)
 #define SCREEN (sys.yz)
-#define VISIBILITY (sys.w)
 #define TIME (sys.x)
 #define DETPH_OFF (wnormal.w)
 #define WRAP (tcwrap.xy)
 #define GRID_SIZE (grid.x)
 #define GRID_RANGE (grid.y)
-
-bool isTransIdx(float idx) {
-  return idx >= TARANS_IDX;
-}
-
-float lightOffset() {
+#define GLOBAL_SHADOW (sys1.x)
+#define LOCAL_SHADOW (tcps.w)
 #ifdef PARALLAX
-  return 0.0;
-#else
-  float z = 1.0 / gl_FragCoord.w ;
-  // float z = length(wpos - eyepos);
-  float atten = DEFAULT_VIS / (VISIBILITY * vis);
-  float shadowLevel =  z / (atten * 1024.0);
-  return SHADOW + shadowLevel;
+#define DEPTH_SHADOW_SCALE (9.0e27)
+#else 
+#define DEPTH_SHADOW_SCALE (1024.0)
 #endif
-}
+#define GLOBAL_VIS (sys.w)
+#define LOCAL_VIS (vis)
+#define PLU_TEXTURE (plu)
 
-float diffuse() {
-#ifdef DIFFUSE
-  vec3 toLight = normalize(curpos - wpos);
-  float dist = distance(wpos, curpos);
-  float ldot = dot(wnormal, toLight);
-  if (dist < 4096.0 && ldot >= -0.001) {
-    return -ldot * pow(1.0 - (dist / 4096.0), 1.0) * SHADOWSTEPS;
-  }
-#else
-  return 0.0;
-#endif
-}
-
-float specular() {
-#ifdef SPECULAR
-  vec3 toLight = normalize(curpos - wpos);
-  vec3 r = reflect(-toLight, wnormal);
-  float specular = pow(dot(r, normalize(eyepos - wpos)), 100.0);
-  return -specular * SHADOWSTEPS;
-#else
-  return 0.0;
-#endif
-}
+#include "inc.fsh"
 
 float highlight() {
   float dist = distance(wpos.xz, curpos.xz);
   if (dist < 16.0)
     return 2.0 + (sin(TIME / 100.0) + 1.0);
   return 1.0;
-}
-
-float palLightOffset(float lightLevel) {
-#ifdef PAL_LIGHTING
-  float base = PAL * SHADOWSTEPS;
-  return  (base + lightLevel) / PLU_LINES;
-#else
-  return (PAL + 0.5 / SHADOWSTEPS) / PALSWAPS ;
-#endif
-}
-
-float lightOffset(float lightLevel) {
-#if defined PAL_LIGHTING || defined PARALLAX
-  return 1.0;
-#else
-  return 1.0 - lightLevel;
-#endif
-}
-
-float samplePaletteIndex(float idx, float palShadowOffset) {
-  return texture(plu, vec2(idx, palShadowOffset)).r;
-}
-
-float transBlend(vec2 idxs) {
-  return any(greaterThanEqual(idxs, vec2(TARANS_IDX)))
-    ? ditherColors(gl_FragCoord.xy, idxs, 0.5)
-    : texture(trans, idxs).r;
-}
-
-vec3 sampleColor(vec3 palSamples, float lightLevel, float overbright) {
-  float off = palLightOffset(lightLevel + 0.5);
-  vec3 idxs = vec3(
-    samplePaletteIndex(palSamples.r, off),
-    samplePaletteIndex(palSamples.g, off),
-    samplePaletteIndex(palSamples.b, off)
-  );
-  float idx = abs(idxs.g-idxs.b) <= 4.0 / 255.0
-    ? transBlend(vec2(transBlend(idxs.gb), idxs.r))
-    : idxs.r;
-  if (isTransIdx(idx)) discard;
-  vec3 color = texture(pal, vec2(idx, 0.5)).rgb;
-  return color * overbright * lightOffset(lightLevel);
 }
 
 vec2 repeat(vec2 tc) {
@@ -138,36 +59,11 @@ vec2 repeat(vec2 tc) {
 #endif
 }
 
-vec3 scale2xSample1(vec2 tc) {
-  vec2 pixel = repeat(tc);
-  vec2 size = vec2(textureSize(base, 0));
-  vec2 frac = floor(2.0 * fract(tc * size));
-  float ORIG = texture(base, pixel).r;
-  float ADD1 = frac.x == 0.0
-    ? textureOffset(base, pixel, ivec2(-1, 0)).r
-    : textureOffset(base, pixel, ivec2(+1, 0)).r;
-  float ADD2 = frac.y == 0.0
-    ? textureOffset(base, pixel, ivec2(0, -1)).r
-    : textureOffset(base, pixel, ivec2(0, +1)).r;
-
-  return vec3(ORIG, ADD1, ADD2);
-}
-
-vec3 getPalSamples(vec2 tc) {
-  // return scale2xSample1(tc);
-  return vec3(texture(base, repeat(tc)).r);
-  // return mipLevel(tc, vec2(textureSize(base, 0))) > 0.0 
-  //   ? vec3(texture(base, repeat(tc)).r) 
-  //   : scale2xSample(tc);
-}
-
 vec3 palLookup(vec2 tc) {
-  vec3 palSamples = getPalSamples(tc);
-  float lterm = lightOffset() + diffuse() + specular();
-  int dither = fract(lterm) > ditherOffset(gl_FragCoord.xy) ? 1 : 0;
-  float lightLevel = clamp(float(int(lterm) + dither), 0.0, SHADOWSTEPS - 1.0);
-  float overbright = highlight();
-  return sampleColor(palSamples, lightLevel, overbright);
+  float colorIdx = texture(base, repeat(tc)).r;
+  float pluedIdx = samplePalIdx(colorIdx);
+  if (isTransIdx(pluedIdx)) discard;
+  return texture(pal, vec2(pluedIdx, 0.5)).rgb * highlight();
 }
 
 void clip() {
@@ -230,12 +126,9 @@ void main() {
 #elif defined SPRITE
   writeColor(palLookup(TC), color);
 #elif defined VOXEL
-  float lterm = lightOffset() + diffuse() + specular();
-  int dither = fract(lterm) > ditherOffset(gl_FragCoord.xy) ? 1 : 0;
-  float lightLevel = clamp(float(int(lterm) + dither), 0.0, SHADOWSTEPS - 1.0);
-  float off = palLightOffset(lightLevel + 0.5);
-  float idx = samplePaletteIndex(tcps.x, off);
-  writeColor(texture(pal, vec2(idx, 0.5)).rgb, color);
+  float idx = samplePalIdx(tcps.x);
+  vec3 palColor = texture(pal, vec2(idx, 0.5)).rgb;
+  writeColor(palColor, color);
 #else
   writeColor(palLookup(TC), color);
   // vec4 lm1 = fract(lm / 2.0);

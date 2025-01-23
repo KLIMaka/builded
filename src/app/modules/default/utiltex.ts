@@ -28,7 +28,7 @@ function createLexer(str: string) {
   }
 }
 
-async function loadTexture(gl: WebGLRenderingContext, name: string, options: any = {}, format = gl.RGBA, bpp = 4) {
+async function loadTexture(gl: WebGL2RenderingContext, name: string, options: any = {}, format = gl.RGBA, bpp = 4) {
   return loadImage(name).then(img => createTexture(img[0], img[1], gl, options, img[2], format, bpp))
 }
 
@@ -47,10 +47,10 @@ export const DefaultAdditionalTextures = lifecycle(async (injector, lifecycle) =
       const options = lexer.get<string>('ID');
       lexer.get('SEMICOLON');
 
-      if (options == 'plain') {
+      if (options === 'plain') {
         const opts = { filter: WebGLRenderingContext.NEAREST, repeat: WebGLRenderingContext.CLAMP_TO_EDGE };
         textures[id] = lifecycle(await loadTexture(gl, path, opts), async t => t.destroy(gl));
-      } else if (options == 'palletize') {
+      } else if (options === 'palletize') {
         const texture = await fs.get(path);
         const [w, h, buff] = await loadImageFromBuffer(texture);
         const indexed = lib.palettize(w, h, buff);

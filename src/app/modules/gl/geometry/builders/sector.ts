@@ -100,13 +100,13 @@ function compress(triangles: point2d[]): [point2d[], number[]] {
   return [vtxset, indexes];
 }
 
-type point2d = [number, number];
+export type point2d = [number, number];
 type point2dxy = { x: number, y: number };
 type zoid_t = { x: [number, number, number, number], y: [number, number], w: [Wall, Wall] };
 type trap_t = { x0: number, x1: number, w: Wall }
 const trapCmp = (lh: trap_t, rh: trap_t) => { return lh.x0 + lh.x1 - rh.x0 - rh.x1 }
 
-export function triangulate(board: Board, sectorId: number) {
+export function triangulate(board: Board, sectorId: number): point2d[] {
   const secy = [...new Set(iter(sectorWalls(board, sectorId))
     .map(w => board.walls[w].y)
     .collect()
@@ -166,7 +166,7 @@ export function triangulate(board: Board, sectorId: number) {
     }
   }
 
-  return compress(triangles);
+  return triangles;
 }
 
 function fillBuffersForSector(ceil: boolean, board: Board, s: number, builder: SectorBuilder, normal: vec3, t: mat4, lms: mat2d) {

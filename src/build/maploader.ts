@@ -2,7 +2,7 @@ import { struct, bits, ushort, int, short, byte, ubyte, uint, Stream, array, bit
 import { SectorStats, Sector, WallStats, Wall, SpriteStats, Sprite, Board, FACE_SPRITE } from './board/structs';
 import { ZSCALE } from './utils';
 
-const sectorStats = struct(SectorStats)
+export const sectorStats = struct(SectorStats)
   .field('parallaxing', bit())
   .field('slopped', bits(1))
   .field('swapXY', bits(1))

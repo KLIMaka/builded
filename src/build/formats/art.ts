@@ -48,7 +48,7 @@ export function animate(frame: number, info: ArtInfo) {
   else if (info.attrs.animType === AnimationType.ANIMATE_BACKWARD) return - frame % max;
 }
 
-const anumStruct = struct(Attributes)
+export const anumStruct = struct(Attributes)
   .field('frames', bits(6))
   .field('animType', bits(2))
   .field('xoff', byte)

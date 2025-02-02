@@ -6,7 +6,7 @@ import { innerSectors, innerSectorsOfLoop, isOuterLoop, loopWalls } from "../loo
 import { sectorOfWall } from "../query";
 import { Board, Wall } from "../structs";
 import { EngineApi } from "./api";
-import { createNewSector } from "./ceatesector";
+import { createNewSector } from "./createsector";
 import { deleteSector, moveWalls, resizeWalls } from "./internal";
 import { SectorBuilder } from "./sectorbuilder";
 import { fixxrepeat } from "./walls";

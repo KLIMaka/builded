@@ -1,7 +1,7 @@
 import { vec3 } from "gl-matrix";
 import { closestWallPointDist } from "../../../build/board/distances";
 import { EngineApi } from "../../../build/board/mutations/api";
-import { createNewSector } from "../../../build/board/mutations/ceatesector";
+import { createNewSector } from "../../../build/board/mutations/createsector";
 import { createInnerLoop } from "../../../build/board/mutations/sectors";
 import { splitSector } from "../../../build/board/mutations/splitsector";
 import { findContainingSectorMidPoints, sectorOfWall, wallInSector } from "../../../build/board/query";

@@ -1,6 +1,9 @@
-import { int } from '@utils/mathutils';
+import { Disposable } from '@utils/callbacks';
+import { range } from '@utils/collections';
+import { iter } from '@utils/iter';
+import { Packer, Rect } from '@utils/texcoordpacker';
+import { pair } from '@utils/types';
 import { DisposableResource, GlContext, Texture } from './drawstruct';
-import { resizeIndexed } from '@utils/color';
 
 export class TextureStub implements Texture {
   constructor(private w: number, private h: number) { }

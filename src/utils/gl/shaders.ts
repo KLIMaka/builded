@@ -77,7 +77,7 @@ function getBaseDir(name: string): string {
 }
 
 export async function createShader({ gl, resource }: GlContext, name: string, defines: string[] = []): Promise<Shader> {
-  const deftext = '#version 300 es\n' + defines.map(d => "#define " + d).join("\n") + "\n";
+  const deftext = '#version 300 es\n#pragma debug(on)\n' + defines.map(d => "#define " + d).join("\n") + "\n";
   const baseDir = getBaseDir(name);
   return Promise.all([loadString(name + '.vsh'), loadString(name + '.fsh')])
     .then(async ([vsh, fsh]) => {
@@ -132,7 +132,7 @@ function processShaders(gl: WebGL2RenderingContext, program: WebGLProgram): Defi
     const info = gl.getActiveUniform(program, u);
     const def = convertToDefinition(info);
     defs.uniforms.push({ ...def, blockOffset: offsets[u] });
-    if (def.type === 'sampler2D')
+    if (def.type === 'sampler2D' || def.type === 'sampler2DArray' || def.type === 'usampler2D')
       defs.samplers.push(def);
   }
   const blocks = gl.getProgramParameter(program, gl.ACTIVE_UNIFORM_BLOCKS) as number;
@@ -154,7 +154,10 @@ function convertToDefinition(info: WebGLActiveInfo): Definition {
 function type2String(type: number): string {
   switch (type) {
     case WebGLRenderingContext.SAMPLER_2D: return "sampler2D";
+    case WebGL2RenderingContext.SAMPLER_2D_ARRAY: return "sampler2DArray";
+    case WebGL2RenderingContext.UNSIGNED_INT_SAMPLER_2D: return "usampler2D";
     case WebGLRenderingContext.INT: return "int";
+    case WebGL2RenderingContext.UNSIGNED_INT: return "uint";
     case WebGLRenderingContext.FLOAT: return "float";
     case WebGLRenderingContext.FLOAT_MAT4: return "mat4";
     case WebGLRenderingContext.FLOAT_MAT3: return "mat3";
@@ -164,6 +167,9 @@ function type2String(type: number): string {
     case WebGLRenderingContext.INT_VEC2: return "ivec2";
     case WebGLRenderingContext.INT_VEC3: return "ivec3";
     case WebGLRenderingContext.INT_VEC4: return "ivec4";
+    case WebGL2RenderingContext.UNSIGNED_INT_VEC2: return "uvec2";
+    case WebGL2RenderingContext.UNSIGNED_INT_VEC3: return "uvec3";
+    case WebGL2RenderingContext.UNSIGNED_INT_VEC4: return "uvec4";
     default: throw new Error('Invalid type: ' + type);
   }
 }

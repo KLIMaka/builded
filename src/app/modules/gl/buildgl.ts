@@ -10,7 +10,7 @@ import { createEngineTextures, EngineTextures } from './gl-context';
 import { GlContext } from '@utils/gl/drawstruct';
 
 export class BuildGlEngineContext implements Disposable {
-  private textures_: Promise<EngineTextures>;
+  private textures_: EngineTextures;
   private bgl_: Promise<BuildGl>;
   private builders_: Promise<BuildersFactory>;
   private toDispose = new Set<Disposable>();
@@ -25,15 +25,15 @@ export class BuildGlEngineContext implements Disposable {
     return value;
   }
 
-  textures(): Promise<EngineTextures> {
+  textures(): EngineTextures {
     if (this.textures_) return this.textures_;
-    this.textures_ = createEngineTextures(this.engine, this.glContext).then(t => this.addToDispose(t));
+    this.textures_ = this.addToDispose(createEngineTextures(this.engine, this.glContext));
     return this.textures_;
   }
 
   bgl(): Promise<BuildGl> {
     if (this.bgl_) return this.bgl_;
-    this.bgl_ = this.textures().then(textures => createBuildGl(this.engine, textures, this.glContext));
+    this.bgl_ = createBuildGl(this.engine, this.textures(), this.glContext);
     return this.bgl_;
   }
 

@@ -1,36 +1,39 @@
 import { WorkplaneContext } from "@ui/commons";
 import { Disposable, Value, ValuesContainer } from "@utils/callbacks";
 import { Controller3D } from "@utils/camera/controller3d";
-import { GlContext, Texture } from "@utils/gl/drawstruct";
+import { range } from "@utils/collections";
+import { GlContext } from "@utils/gl/drawstruct";
 import { createShader } from "@utils/gl/shaders";
-import { AttribData, BufferAllocator, StateGl1 } from "@utils/gl/stategl1";
-import { clamp, HALF_PI, int4ToFloat, PI, rad2deg } from "@utils/mathutils";
-import { applyNotNull } from "@utils/objects";
-import { Consumer, MultiConsumer } from "@utils/types";
-import { ArtInfo } from "build/formats/art";
+import { AttribDataInstanced, BufferAllocator, StateGl1 } from "@utils/gl/stategl1";
+import { iter } from "@utils/iter";
+import { clamp, HALF_PI, PI, rad2deg } from "@utils/mathutils";
+import { Stream } from "@utils/stream";
+import { Consumer } from "@utils/types";
+import { BoardContext } from "app/apis/engine";
+import { mat4 } from "gl-matrix";
+import { BoardGlContext, createBoardGlContext } from "../gl/board-context";
+import { BuildGlEngineContext } from "../gl/buildgl";
 import { EngineTextures } from "../gl/gl-context";
 import { RenderInfo } from "./arteditor-model";
-import { mat4 } from "gl-matrix";
 
-export async function createPreviewRenderer(values: ValuesContainer, glCtx: GlContext, textures: EngineTextures, shadowsteps: number, palswaps: number): Promise<PreviewRenderer> {
+export async function createPreviewRenderer(values: ValuesContainer, glCtx: GlContext, ctx: BuildGlEngineContext): Promise<PreviewRenderer> {
   const state = new StateGl1(glCtx, s => new BufferAllocator(glCtx, s, 1024, 1024));
-  const defs = ['PALSWAPS (' + palswaps + '.0)', 'SHADOWSTEPS (' + shadowsteps + '.0)'];
-  state.register('art-preview', await createShader(glCtx, 'resources/shaders/art-preview', defs));
-  state.register('art-preview-sprite', await createShader(glCtx, 'resources/shaders/art-preview', [...defs, 'SPRITE', 'ADD_DEPTH']));
+  const defs = ['PALSWAPS (' + (ctx.engine.maxPluId.get() + 1) + '.0)', 'SHADOWSTEPS (' + ctx.engine.shadowsteps.get() + '.0)'];
   state.register('wall-instance', await createShader(glCtx, 'resources/shaders/wall-instance', [...defs]));
-  return new PreviewRenderer(values, glCtx, textures, state, shadowsteps);
+  state.register('sprite-instance', await createShader(glCtx, 'resources/shaders/sprite-instance', [...defs]));
+  state.register('wall-instance1', await createShader(glCtx, 'resources/shaders/wall-instance1', [...defs]));
+  const data = await ctx.engine.resources.get().read('test.map');
+  const board = await ctx.engine.loadBoard(new Stream(data.get()));
+  return new PreviewRenderer(values, ctx.glContext, ctx.textures(), state, ctx.engine.shadowsteps.get(), board);
 }
 
 export class PreviewRenderer implements Disposable {
   private ctl: Controller3D;
-  private item: MultiConsumer<[WebGL2RenderingContext, Texture]>;
-  private item1: MultiConsumer<[WebGL2RenderingContext, Texture]>;
-  private base: Consumer<void>;
   private walls: Consumer<void>;
+  private sprite: Consumer<void>;
   private infoValue: Value<RenderInfo>;
   private pluValue: Value<number>;
-  private itemValue: Value<AttribData>;
-  private itemValue1: Value<AttribData>;
+  private boardContext: BoardGlContext;
 
   constructor(
     private values: ValuesContainer,
@@ -38,207 +41,161 @@ export class PreviewRenderer implements Disposable {
     private textures: EngineTextures,
     private stateGl: StateGl1,
     private maxShadow: number,
+    private board: BoardContext
   ) {
     this.ctl = new Controller3D(values);
     this.infoValue = values.value('info', null);
     this.pluValue = values.value('plu', 0);
-    const infoValue = values.field('info.info', this.infoValue, 'info');
-    this.itemValue = values.transformedTuple('item', [infoValue, this.pluValue], ([info, plu]) => this.genItem(info, plu), { disposer: data => applyNotNull(data, d => d.bufferData.deallocate()) });
-    this.itemValue1 = values.transformedTuple('item1', [infoValue, this.pluValue], ([info, plu]) => this.genItem1(info, plu), { disposer: data => applyNotNull(data, d => d.bufferData.deallocate()) });
-    this.item = this.buildItem();
-    this.item1 = this.buildItem1();
-    this.base = this.buildBase(this.textures.get(0).get());
-    this.walls = this.buildWalls(this.textures.get(0).get());
+    this.walls = this.buildWalls(this.textures.get(0).get(), this.textures.get(10).get(), this.textures.get(540).get());
+    this.boardContext = this.buildBoard();
 
-    const itemShader = this.stateGl.getShader('art-preview');
-    const spriteShader = this.stateGl.getShader('art-preview-sprite');
-    const wallShader = this.stateGl.getShader('wall-instance');
-    const matrices = itemShader.uniformBlock('Matrices');
+    const spriteShader = this.stateGl.getShader('sprite-instance');
+    const wallShader = this.stateGl.getShader('wall-instance1');
+    const matrices = wallShader.uniformBlock('Matrices');
     const P = matrices.writer<[mat4]>('P');
     const V = matrices.writer<[mat4]>('V');
     const IV = matrices.writer<[mat4]>('IV');
-    const palSet = itemShader.texture('pal');
+    const palSet = wallShader.texture('pal');
     const palSet1 = spriteShader.texture('pal');
     const palSet2 = wallShader.texture('pal');
-    const pluSet = itemShader.texture('plu');
+    const pluSet = wallShader.texture('plu');
     const pluSet1 = spriteShader.texture('plu');
     const pluSet2 = wallShader.texture('plu');
+    const atlasSet1 = wallShader.texture('atlas');
+    const infosSet1 = wallShader.texture('infos');
+    const atlasSet2 = spriteShader.texture('atlas');
+    const infosSet2 = spriteShader.texture('infos');
+
+    wallShader.texture('walls')(this.boardContext.walls);
+    wallShader.texture('sectors')(this.boardContext.sectors);
+
     this.values.handleStandalone([this.ctl.projection], proj => P(proj));
     this.values.handleStandalone([this.ctl.camera.transform], view => { V(view); IV(mat4.invert(mat4.create(), view)) });
-    this.values.handleStandalone([this.textures.pal], pal => { palSet(pal); palSet1(pal); palSet2(pal) });
-    this.values.handleStandalone([this.textures.plu], plu => { pluSet(plu); pluSet1(plu); pluSet2(plu) });
+    this.values.handleStandalone([this.textures.pal], pal => { palSet(pal.get()); palSet1(pal.get()); palSet2(pal.get()) });
+    this.values.handleStandalone([this.textures.plu], plu => { pluSet(plu.get()); pluSet1(plu.get()); pluSet2(plu.get()) });
+    this.values.handleStandalone([this.textures.atlas], atlas => { atlasSet1(atlas); atlasSet2(atlas) });
+    this.values.handleStandalone([this.textures.infos], infos => { infosSet1(infos); infosSet2(infos) });
+
   }
 
-  private genItem(info: ArtInfo, plu: number): AttribData {
-    const shader = this.stateGl.getShader('art-preview');
+  private buildBoard(): BoardGlContext {
+    const ctx = createBoardGlContext(this.glCtx);
+    const board = this.board.board;
+    const { x, y, z } = board.sprites[0];
+    board.walls.forEach(w => {
+      w.x -= x;
+      w.y -= y;
+    });
+    board.sprites.forEach(s => {
+      s.x -= x;
+      s.y -= y;
+      s.z -= z;
+    });
+    board.sectors.forEach(s => {
+      s.ceilingz -= z;
+      s.floorz -= z;
+    });
+
+    board.sectors.forEach((s, i) => ctx.writeSector(i, s));
+    board.sprites.forEach((s, i) => ctx.writeSprite(i, s));
+    board.walls.forEach((w, i) => ctx.writeWall(i, w));
+    return ctx;
+  }
+
+  private buildSprite(p: number): AttribDataInstanced {
+    const shader = this.stateGl.getShader('sprite-instance');
     const builder = shader.builder();
-    const pos = builder.vec3('aPos');
-    const tc = builder.vec3('aTc');
-    const params = builder.float('aParams');
-    const vtx = (x: number, y: number, z: number, tc1: number, tc2: number, tc3 = 1) => {
-      pos(x, y, z);
-      tc(tc1, tc2, tc3);
-      builder.writeVertex();
-    }
-    const w = info.w;
-    const h = info.h;
-    const hw = w >> 1;
-    const wscale = 1 + (h / 64) * 0.3;
+    const pos = builder.vec3('aPos_i32');
+    const picnumAngCstat = builder.vec4('aPicnumAngCstat_u16');
+    const params = builder.vec4('aPluShadowVisTrans_i8');
 
     builder.start();
-    params(int4ToFloat(0, plu, 255, 0));
-    vtx(-hw, 0, 0, 1, 1);
-    vtx(-hw, h, 0, 1, 0);
-    vtx(hw, h, 0, 0, 0);
-    vtx(hw, 0, 0, 0, 1);
-    builder.writeIndex(0, [3, 1, 2, 3, 0, 1]);
+    params(0, 0, 255, 0);
+    pos(0, 0, 0);
+    picnumAngCstat(p, 256, 0, 0)
+    builder.writeVertex();
 
-    params(int4ToFloat(this.maxShadow / 3, plu, 255, 0));
-    vtx(-hw, 0, 0, 1, 1);
-    vtx(-hw, h, 0, 1, 0);
-    vtx(hw, h, 0, 0, 0);
-    vtx(hw, 0, 0, 0, 1);
-    builder.writeIndex(4, [1, 0, 3, 2, 1, 3]);
-
-    params(int4ToFloat(this.maxShadow, 0, 128, 0));
-    vtx(-hw, 0.1, 0, 1, 1);
-    vtx(wscale * -hw, 0.1, h * 0.5, wscale, 0, wscale);
-    vtx(wscale * hw, 0.1, h * 0.5, 0, 0, wscale);
-    vtx(hw, 0.1, 0, 0, 1);
-    builder.writeIndex(8, [3, 1, 2, 3, 0, 1]);
-
-    return builder.build(WebGL2RenderingContext.TRIANGLES);
+    params(2, 0, 255, 0);
+    pos(64, 64, 0);
+    picnumAngCstat(p, 256, 1 << 4, 0)
+    builder.writeVertex();
+    return builder.buildInstanced(WebGL2RenderingContext.TRIANGLES);
   }
 
-  private buildItem() {
-    const shader = this.stateGl.getShader('art-preview');
-    const tex = shader.texture('tex');
-
-    return (gl: WebGL2RenderingContext, pic: Texture) => {
-      tex(pic);
-      gl.enable(gl.BLEND);
-      this.stateGl.draw(shader, this.itemValue.get());
-      gl.disable(gl.BLEND);
-    }
-  }
-
-  private genItem1(info: ArtInfo, plu: number): AttribData {
-    const shader = this.stateGl.getShader('art-preview-sprite');
+  private buildWalls(t1: number, t2: number, t3: number) {
+    const shader = this.stateGl.getShader('wall-instance1');
     const builder = shader.builder();
-    const pos = builder.vec3('aPos');
-    const tc = builder.vec3('aTc');
-    const params = builder.float('aParams');
-    const vtx = (x: number, y: number, z: number, tc1: number, tc2: number, tc3 = 1) => {
-      pos(x, y, z);
-      tc(tc1, tc2, tc3);
-      builder.writeVertex();
-    }
-    const w = info.w;
-    const h = info.h;
-    const hw = w >> 1;
-    const wscale = 1 + (h / 64) * 0.3;
+    const wallSectorPart = builder.vec4('aWallSectorPart_u16')
+    const board = this.board.board;
 
     builder.start();
-    params(int4ToFloat(0, plu, 255, 1));
-    vtx(-hw, 0, 0, 0, 1);
-    vtx(-hw, h, 0, 0, 0);
-    vtx(hw, h, 0, 1, 0);
-    vtx(hw, 0, 0, 1, 1);
-    builder.writeIndex(0, [1, 0, 3, 2, 1, 3]);
-
-    params(int4ToFloat(this.maxShadow, 0, 128, 1));
-    vtx(-hw, 0, 0, 0, 1);
-    vtx(-hw * wscale, 0, h * 0.5, 0, 0, wscale);
-    vtx(hw * wscale, 0, h * 0.5, wscale, 0, wscale);
-    vtx(hw, 0, 0, 1, 1);
-    builder.writeIndex(4, [1, 0, 3, 2, 1, 3]);
-
-    return builder.build(WebGL2RenderingContext.TRIANGLES);
-  }
-
-  private buildItem1() {
-    const shader = this.stateGl.getShader('art-preview-sprite');
-    const tex = shader.texture('tex');
-
-    return (gl: WebGL2RenderingContext, pic: Texture) => {
-      tex(pic);
-      gl.enable(gl.BLEND);
-      this.stateGl.draw(shader, this.itemValue1.get());
-      gl.disable(gl.BLEND);
-    }
-  }
-
-  private buildBase(texture: Texture) {
-    const shader = this.stateGl.getShader('art-preview');
-    const builder = shader.builder();
-    const pos = builder.vec3('aPos');
-    const tc = builder.vec3('aTc');
-    const params = builder.float('aParams');
-    const vtx = (x: number, y: number, z: number, tc1: number, tc2: number, tc3 = 1) => {
-      pos(x, y, z);
-      tc(tc1, tc2, tc3);
-      builder.writeVertex();
-    }
-    const size = 128;
-    const tcScale = 2;
-    const w = texture.getWidth() / tcScale;
-    const h = texture.getHeight() / tcScale;
-    builder.start();
-    params(int4ToFloat(0, 0, 255, 0));
-    vtx(-size, 0, -size, size / w, size / h);
-    vtx(-size, 0, size, size / w, 0);
-    vtx(size, 0, size, 0, 0);
-    vtx(size, 0, -size, 0, size / h);
-    builder.writeIndex(0, [3, 1, 2, 3, 0, 1]);
-    const data = builder.build(WebGL2RenderingContext.TRIANGLES);
-    const tex = shader.texture('tex');
-
-    return () => {
-      tex(texture, 'REPEAT');
-      this.stateGl.draw(shader, data);
-    }
-  }
-
-  private buildWalls(texture: Texture) {
-    const shader = this.stateGl.getShader('wall-instance');
-    const builder = shader.builder();
-    const startEnd = builder.vec4('aStartEnd');
-    const firstWall = builder.vec4('aFirstWall');
-    const heinumZ = builder.vec4('aHeinumZ');
-    const params = builder.float('aPluShadowVisTrans');
-
-    builder.start();
-    firstWall(0, 0, 1, 0);
-    heinumZ(0, 128, 0, 0);
-    params(int4ToFloat(0, 0, 255, 0));
-
-    startEnd(128, -128, -128, -128);
-    builder.writeVertex();
-    startEnd(-128, -128, -128, 128);
-    builder.writeVertex();
-    startEnd(-128, 128, 128, 128);
-    builder.writeVertex();
-    startEnd(128, 128, 128, -128);
-    builder.writeVertex();
-
-
-    heinumZ(0, 256, 0, 0);
-
-    startEnd(-32, -32, 32, -32);
-    builder.writeVertex();
-    startEnd(32, -32, 32, 32);
-    builder.writeVertex();
-    startEnd(32, 32, -32, 32);
-    builder.writeVertex();
-    startEnd(-32, 32, -32, -32);
-    builder.writeVertex();
+    board.sectors.forEach((sec, s) => iter(range(sec.wallptr, sec.wallptr + sec.wallnum)).forEach(w => {
+      const wall = board.walls[w];
+      this.textures.get(wall.picnum).get();
+      this.textures.get(wall.overpicnum).get();
+      if (wall.nextsector === -1) {
+        wallSectorPart(w, s, 0, 0);
+        builder.writeVertex();
+      } else {
+        wallSectorPart(w, s, 1, 0);
+        builder.writeVertex();
+        wallSectorPart(w, s, 2, 0);
+        builder.writeVertex();
+        if (wall.cstat.masking || wall.cstat.oneWay) {
+          wallSectorPart(w, s, 3, 0);
+          builder.writeVertex();
+        }
+      }
+    }))
     const data = builder.buildInstanced(WebGL2RenderingContext.TRIANGLES);
-    const tex = shader.texture('tex');
 
     return () => {
-      tex(texture, 'REPEAT');
       this.stateGl.drawInstanced(shader, data);
     }
+
+    // const shader = this.stateGl.getShader('wall-instance');
+    // const spriteShader = this.stateGl.getShader('sprite-instance');
+    // const builder = shader.builder();
+    // const startEnd = builder.vec4('aStartEnd_i16');
+    // const firstWall = builder.vec4('aFirstWall_i16');
+    // const heinumZ = builder.vec4('aHeinumZ_i16');
+    // const params = builder.vec4('aPluShadowVisTrans_i8');
+    // const picnum = builder.float('aPicnum_u16');
+
+    // builder.start();
+    // firstWall(0, 0, 0, 1);
+    // heinumZ(0, 128, 0, 0);
+    // params(0, 0, 255, 0);
+    // picnum(t1);
+
+    // startEnd(128, -128, -128, -128);
+    // builder.writeVertex();
+    // startEnd(-128, -128, -128, 128);
+    // builder.writeVertex();
+    // startEnd(-128, 128, 128, 128);
+    // builder.writeVertex();
+    // startEnd(128, 128, 128, -128);
+    // builder.writeVertex();
+
+    // heinumZ(0, 256, 0, 0);
+    // params(0, 0, 255, 0);
+    // picnum(t2);
+
+    // startEnd(-32, -32, 32, -32);
+    // builder.writeVertex();
+    // startEnd(32, -32, 32, 32);
+    // builder.writeVertex();
+    // startEnd(32, 32, -32, 32);
+    // builder.writeVertex();
+    // startEnd(-32, 32, -32, -32);
+    // builder.writeVertex();
+    // const data = builder.buildInstanced(WebGL2RenderingContext.TRIANGLES);
+    // const spriteData = this.buildSprite(t3)
+
+    // return () => {
+    //   this.stateGl.drawInstanced(shader, data);
+    //   this.stateGl.drawInstanced(spriteShader, spriteData);
+    // }
   }
 
 
@@ -286,5 +243,6 @@ export class PreviewRenderer implements Disposable {
 
   async dispose(): Promise<void> {
     this.stateGl.dispose();
+    this.boardContext.dispose();
   }
 }

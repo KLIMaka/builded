@@ -15,10 +15,10 @@ import { Window } from "app/apis/ui1";
 import { BuildGlEngineContext } from "app/modules/gl/buildgl";
 import { BloodBoard } from "build/blood/structs";
 import { findSector } from "build/board/query";
-import { Board } from "build/board/structs";
+import { Board, SectorStats } from "build/board/structs";
 import { Entity, EntityType, Hitscan, Ray, hitscan } from "build/hitscan";
 import { ZSCALE, build2gl, getPlayerStart, gl2build } from "build/utils";
-import { vec3 } from "gl-matrix";
+import { mat4, vec3 } from "gl-matrix";
 import React from "react";
 import { AutoSizer } from "react-virtualized";
 import { match } from "ts-pattern";
@@ -26,6 +26,13 @@ import { createRenderer3D } from "../boardrenderer3d";
 import { ViewPosition } from "../view";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { GL_CONTEXT } from "@utils/gl/drawstruct";
+import { createBoardGlContext } from "app/modules/gl/board-context";
+import { BufferAllocator, StateGl1 } from "@utils/gl/stategl1";
+import { createShader } from "@utils/gl/shaders";
+import { iter } from "@utils/iter";
+import { groups, range } from "@utils/collections";
+import { triangulate } from "app/modules/gl/geometry/builders/sector";
+import { sectorStats } from "build/maploader";
 
 function InfoRow(props: { label: string, value: any }) {
   return <Row className='form-row'>
@@ -44,6 +51,10 @@ function View(props: { canvas: Consumer<HTMLCanvasElement>, }) {
 
 function Sector(props: { ent: Entity, board: Board }) {
   const sec = props.board.sectors[props.ent.id];
+  const buff = new ArrayBuffer(2);
+  const view = new Uint16Array(buff);
+  const stream = new Stream(buff);
+  const getStat = (s: SectorStats) => { stream.setOffset(0); sectorStats.write(stream, s); return view[0] }
   return <Column className="form-panel">
     <InfoRow label="Sector Id" value={props.ent.id} />
     <InfoRow label="Picnum" value={props.ent.type === EntityType.CEILING ? sec.ceilingpicnum : sec.floorpicnum} />
@@ -51,6 +62,7 @@ function Sector(props: { ent: Entity, board: Board }) {
     <InfoRow label="Pal" value={props.ent.type === EntityType.CEILING ? sec.ceilingpal : sec.floorpal} />
     <InfoRow label="Offset" value={props.ent.type === EntityType.CEILING ? `${sec.ceilingxpanning}, ${sec.ceilingypanning}` : `${sec.floorxpanning}, ${sec.floorypanning}`} />
     <InfoRow label="Z" value={props.ent.type === EntityType.CEILING ? sec.ceilingz : sec.floorz} />
+    <InfoRow label="Cstat" value={props.ent.type === EntityType.CEILING ? getStat(sec.ceilingstat) : getStat(sec.floorstat)} />
     <InfoRow label="Lo-Tag" value={sec.lotag} />
     <InfoRow label="Hi-Tag" value={sec.hitag} />
   </Column>
@@ -145,13 +157,85 @@ export async function createBoardView(injector: Injector, ctx: BuildGlEngineCont
       .then(o => ctx.engine.loadBoard(new Stream(o.orElseThrow(() => new Error(`Map ${mapName} not found`)))));
     const board = boardCtx.board;
 
+    const boardGl = createBoardGlContext(glContext);
+    board.sectors.forEach((s, i) => boardGl.writeSector(i, s));
+    board.sprites.forEach((s, i) => boardGl.writeSprite(i, s));
+    board.walls.forEach((w, i) => boardGl.writeWall(i, w));
+    const state = new StateGl1(glContext, s => new BufferAllocator(glContext, s, 128 * 1024, 128 * 1024));
+    const defs = ['PALSWAPS (' + (ctx.engine.maxPluId.get() + 1) + '.0)', 'SHADOWSTEPS (' + ctx.engine.shadowsteps.get() + '.0)'];
+    state.register('wall-instance1', await createShader(glContext, 'resources/shaders/wall-instance1', [...defs]));
+    state.register('sector-instance', await createShader(glContext, 'resources/shaders/sector-instance', [...defs]));
+    const wallShader = state.getShader('wall-instance1');
+    const sectorShader = state.getShader('sector-instance');
+    const matrices = wallShader.uniformBlock('Matrices');
+    const P = matrices.writer<[mat4]>('P');
+    const V = matrices.writer<[mat4]>('V');
+    const IV = matrices.writer<[mat4]>('IV');
+
+    wallShader.texture('pal')(ctx.textures().pal.get().get());
+    wallShader.texture('plu')(ctx.textures().plu.get().get());
+    wallShader.texture('atlas')(ctx.textures().atlas.get());
+    wallShader.texture('infos')(ctx.textures().infos.get());
+    wallShader.texture('walls')(boardGl.walls);
+    wallShader.texture('sectors')(boardGl.sectors);
+    sectorShader.texture('pal')(ctx.textures().pal.get().get());
+    sectorShader.texture('plu')(ctx.textures().plu.get().get());
+    sectorShader.texture('atlas')(ctx.textures().atlas.get());
+    sectorShader.texture('infos')(ctx.textures().infos.get());
+    sectorShader.texture('walls')(boardGl.walls);
+    sectorShader.texture('sectors')(boardGl.sectors);
+
+
+    const wallData = (() => {
+      const builder = wallShader.builder();
+      const wallSectorPart = builder.vec4('aWallSectorPart_u16');
+      builder.start();
+      board.sectors.forEach((sec, s) => iter(range(sec.wallptr, sec.wallptr + sec.wallnum)).forEach(w => {
+        const wall = board.walls[w];
+        ctx.textures().get(wall.picnum).get();
+        ctx.textures().get(wall.overpicnum).get();
+        if (wall.nextsector === -1) {
+          wallSectorPart(w, s, 0, 0);
+          builder.writeVertex();
+        } else {
+          wallSectorPart(w, s, 1, 0);
+          builder.writeVertex();
+          wallSectorPart(w, s, 2, 0);
+          builder.writeVertex();
+          if (wall.cstat.masking || wall.cstat.oneWay) {
+            wallSectorPart(w, s, 3, 0);
+            builder.writeVertex();
+          }
+        }
+      }));
+      return builder.buildInstanced(WebGL2RenderingContext.TRIANGLE_STRIP, 4);
+    })();
+
+    const sectorData = (() => {
+      const builder = sectorShader.builder();
+      const pos12 = builder.vec4('aPos12');
+      const pos3Sec = builder.vec4('aPos3Sec');
+      builder.start();
+      board.sectors.forEach((sec, s) => {
+        ctx.textures().get(sec.ceilingpicnum).get();
+        ctx.textures().get(sec.floorpicnum).get();
+        const points = triangulate(board, s);
+        for (const [p1, p2, p3] of groups(points, 3)) {
+          pos12(p1[0], p1[1], p2[0], p2[1]);
+          pos3Sec(p3[0], p3[1], s, 0);
+          builder.writeVertex();
+        }
+      });
+      return builder.buildInstanced(WebGL2RenderingContext.TRIANGLES, 6);
+    })();
+
     const art = ctx.engine.artMap;
-    const bgl = await ctx.bgl();
-    const cache = await ctx.cache(boardCtx);
-    const renderer = createRenderer3D(bgl, boardCtx, cache);
 
     const sprite = getPlayerStart(board);
     const ctl = new Controller3D(values);
+    values.handleStandalone([ctl.projection], proj => P(proj));
+    values.handleStandalone([ctl.camera.transform], view => { V(view); IV(mat4.invert(mat4.create(), view)) });
+
     const [posx, posy, posz] = build2gl(vec3.create(), vec3.fromValues(sprite.x, sprite.y, sprite.z + 1024 * ZSCALE));
     ctl.setPosition(posx, posy, posz);
     const viewPosition = createViewPosition(values, ctl, board);
@@ -180,6 +264,8 @@ export async function createBoardView(injector: Injector, ctx: BuildGlEngineCont
       { bind: bind('strife-right'), action: s => rightDamper.set(s ? 1 : 0) }
     ];
 
+    const gl = glContext.gl;
+
     const redraw = (dt: number) => {
       const canvas = canvasValue.get();
       if (!canvas) return;
@@ -188,29 +274,13 @@ export async function createBoardView(injector: Injector, ctx: BuildGlEngineCont
       const { offscreen } = glContext;
       offscreen.width = width;
       offscreen.height = height;
-      bgl.setVisibility(vis.get());
-      bgl.setShadowOffset(shadowOff.get());
-      bgl.newFrame(width, height);
-      renderer.draw({
-        viewPosition: viewPosition.get(),
-        forward: ctl.getForward(),
-        position: ctl.getPosition().get(),
-        transform: ctl.getTransformMatrix(),
-        projection: ctl.getProjectionMatrix()
-      });
 
-      const target = hitscan.get()
-      if (target !== null) {
-        const renderable = match(target.type)
-          .with(EntityType.SPRITE, () => [cache.helpers.sprite(target.id)])
-          .with(EntityType.MID_WALL, () => [cache.helpers.wall(target.id).mid])
-          .with(EntityType.LOWER_WALL, () => [cache.helpers.wall(target.id).bot])
-          .with(EntityType.UPPER_WALL, () => [cache.helpers.wall(target.id).top])
-          .with(EntityType.FLOOR, () => [cache.helpers.sector(target.id).floor])
-          .with(EntityType.CEILING, () => [cache.helpers.sector(target.id).ceiling])
-          .otherwise(() => []);
-        renderer.drawTools(renderable);
-      }
+      gl.viewport(0, 0, width, height);
+      gl.clearColor(0, 0, 0, 1.0);
+      gl.clearDepth(1);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      state.drawInstanced(wallShader, wallData);
+      state.drawInstanced(sectorShader, sectorData);
 
       canvas
         .getContext('bitmaprenderer')
@@ -234,7 +304,8 @@ export async function createBoardView(injector: Injector, ctx: BuildGlEngineCont
       .states(states)
       .disposable(redrawTask)
       .disposable(values)
-      .disposable(cache)
+      .disposable(state)
+      .disposable(boardGl)
       .build(<BoardViewWindow
         canvas={c => canvasValue.set(c)}
         states={states}

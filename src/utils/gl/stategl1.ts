@@ -1,4 +1,5 @@
 import { Bag } from "@utils/bag";
+import { Disposable } from "@utils/callbacks";
 import { getOrCreate } from "@utils/collections";
 import { iter } from "@utils/iter";
 import { Function, MultiConsumer, nil, TypedArray } from "@utils/types";
@@ -6,26 +7,57 @@ import { mat4 as gmlMat4 } from "gl-matrix";
 import Optional from "optional-js";
 import { match } from "ts-pattern";
 import { DisposableResource, GlContext, Shader, Texture, UniformBlockDefinition } from "./drawstruct";
-import { Disposable } from "@utils/callbacks";
+
+type AttribValueType = 'FLOAT' | 'INT';
+
+type AttrDataType = {
+  size: number,
+  byteSize: number,
+  byteOff: number,
+  type: number,
+  valueType: AttribValueType,
+  mapper(view: DataView, ...data: number[]): void
+};
 
 type AttribDef = {
   name: string,
-  size: number,
-  off: number,
+  type: AttrDataType,
   location: number,
 }
 
 type AttribScheme = {
   defs: AttribDef[],
-  size: number,
+  byteSize: number,
 }
 
-function getSize(type: string) {
+
+function getTypeDetails(name: string, byteOff: number): Pick<AttrDataType, 'byteSize' | 'mapper' | 'type'> {
+  return match(name)
+    .returnType<Pick<AttrDataType, 'byteSize' | 'mapper' | 'type'>>()
+    .when(n => n.endsWith('_i8'), () => ({ type: WebGL2RenderingContext.BYTE, byteSize: 1, mapper: (v, ...d) => d.forEach((d, i) => v.setInt8(byteOff + i, d)) }))
+    .when(n => n.endsWith('_u8'), () => ({ type: WebGL2RenderingContext.UNSIGNED_BYTE, byteSize: 1, mapper: (v, ...d) => d.forEach((d, i) => v.setUint8(byteOff + i, d)) }))
+    .when(n => n.endsWith('_i16'), () => ({ type: WebGL2RenderingContext.SHORT, byteSize: 2, mapper: (v, ...d) => d.forEach((d, i) => v.setInt16(byteOff + i * 2, d, true)) }))
+    .when(n => n.endsWith('_u16'), () => ({ type: WebGL2RenderingContext.UNSIGNED_SHORT, byteSize: 2, mapper: (v, ...d) => d.forEach((d, i) => v.setUint16(byteOff + i * 2, d, true)) }))
+    .when(n => n.endsWith('_i32'), () => ({ type: WebGL2RenderingContext.INT, byteSize: 4, mapper: (v, ...d) => d.forEach((d, i) => v.setInt32(byteOff + i * 4, d, true)) }))
+    .when(n => n.endsWith('_u32'), () => ({ type: WebGL2RenderingContext.UNSIGNED_INT, byteSize: 4, mapper: (v, ...d) => d.forEach((d, i) => v.setUint32(byteOff + i * 4, d, true)) }))
+    .otherwise(() => ({ type: WebGL2RenderingContext.FLOAT, byteSize: 4, mapper: (v, ...d) => d.forEach((d, i) => v.setFloat32(byteOff + i * 4, d, true)) }));
+}
+
+function getType(name: string, type: string, byteOff: number): AttrDataType {
   return match(type)
-    .with('float', () => 1)
-    .with('vec2', () => 2)
-    .with('vec3', () => 3)
-    .with('vec4', () => 4)
+    .returnType<AttrDataType>()
+    .with('float', () => ({ byteOff, valueType: 'FLOAT', size: 1, ...getTypeDetails(name, byteOff) }))
+    .with('vec2', () => ({ byteOff, valueType: 'FLOAT', size: 2, ...getTypeDetails(name, byteOff) }))
+    .with('vec3', () => ({ byteOff, valueType: 'FLOAT', size: 3, ...getTypeDetails(name, byteOff) }))
+    .with('vec4', () => ({ byteOff, valueType: 'FLOAT', size: 4, ...getTypeDetails(name, byteOff) }))
+    .with('int', () => ({ byteOff, valueType: 'INT', size: 1, ...getTypeDetails(name, byteOff) }))
+    .with('ivec2', () => ({ byteOff, valueType: 'INT', size: 2, ...getTypeDetails(name, byteOff) }))
+    .with('ivec3', () => ({ byteOff, valueType: 'INT', size: 3, ...getTypeDetails(name, byteOff) }))
+    .with('ivec4', () => ({ byteOff, valueType: 'INT', size: 4, ...getTypeDetails(name, byteOff) }))
+    .with('uint', () => ({ byteOff, valueType: 'INT', size: 1, ...getTypeDetails(name, byteOff) }))
+    .with('uvec2', () => ({ byteOff, valueType: 'INT', size: 2, ...getTypeDetails(name, byteOff) }))
+    .with('uvec3', () => ({ byteOff, valueType: 'INT', size: 3, ...getTypeDetails(name, byteOff) }))
+    .with('uvec4', () => ({ byteOff, valueType: 'INT', size: 4, ...getTypeDetails(name, byteOff) }))
     .otherwise(t => { throw new Error(`Invalid type ${t}`) });
 }
 
@@ -33,16 +65,16 @@ function getAttribScheme(shader: Shader): AttribScheme {
   const defs: AttribDef[] = []
   let off = 0;
   for (const d of shader.getAttributes()) {
-    const size = getSize(d.type);
+    const byteOff = off;
+    const type = getType(d.name, d.type, byteOff);
     defs.push({
+      type: { ...type, byteOff },
       name: d.name,
-      size,
-      off,
       location: shader.getAttributeLocation(d.name)
     });
-    off += size;
+    off += type.byteSize * type.size;
   }
-  return { defs, size: off }
+  return { defs, byteSize: off }
 }
 
 export type float = [number];
@@ -125,12 +157,11 @@ class Buffer<T extends TypedArray> implements Disposable {
 }
 
 export type BufferAllocatorFactory = Function<AttribScheme, BufferAllocator>;
-
 export class BufferAllocator implements Disposable {
   private idxBag: Bag;
   private vtxBag: Bag;
   private idxBuffer: Buffer<Uint32Array>;
-  private vtxBuffer: Buffer<Float32Array>;
+  private vtxBuffer: Buffer<Uint8Array>;
   private vao: DisposableResource<WebGLVertexArrayObject>;
 
   constructor(
@@ -143,13 +174,14 @@ export class BufferAllocator implements Disposable {
     this.idxBag = new Bag(maxIdxSize);
     this.vtxBag = new Bag(maxVtxSize);
     this.idxBuffer = new Buffer(glCxt, gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(maxIdxSize));
-    this.vtxBuffer = new Buffer(glCxt, gl.ARRAY_BUFFER, new Float32Array(maxVtxSize));
+    this.vtxBuffer = new Buffer(glCxt, gl.ARRAY_BUFFER, new Uint8Array(scheme.byteSize * maxVtxSize));
     this.vao = this.createVAO(glCxt, scheme);
   }
 
-  allocate(vtxData: Float32Array, idxData: Uint32Array): BufferData {
-    const vtxCount = vtxData.length / this.scheme.size;
-    if (!Number.isInteger(vtxCount)) throw new Error(`Invalid vertex data size ${vtxData.length} (attributesSize=${this.scheme.size})`);
+
+  allocate(vtxData: Uint8Array, idxData: Uint32Array): BufferData {
+    const vtxCount = vtxData.length / this.scheme.byteSize;
+    if (!Number.isInteger(vtxCount)) throw new Error(`Invalid vertex data size ${vtxData.length} (attributesSize=${this.scheme.byteSize})`);
     const maxIdx = idxData.reduce((l, r) => Math.max(l, r));
     if (maxIdx >= vtxCount) throw new Error(`Invalid index data. Referenced vertex id=${maxIdx}`);
 
@@ -160,7 +192,7 @@ export class BufferAllocator implements Disposable {
       this.vtxBag.put(vtxoff, vtxData.length);
       return null;
     }
-    const elemOff = vtxoff / this.scheme.size;
+    const elemOff = vtxoff / this.scheme.byteSize;
     this.vtxBuffer.set(vtxoff, vtxData);
     this.idxBuffer.set(idxoff, idxData.map(x => x + elemOff));
 
@@ -173,9 +205,9 @@ export class BufferAllocator implements Disposable {
     }
   }
 
-  allocateInstanced(vtxData: Float32Array): InstancedArrayData {
+  allocateInstanced(vtxData: Uint8Array): InstancedArrayData {
     const gl = this.glCxt.gl;
-    const count = vtxData.length / this.scheme.size;
+    const count = vtxData.length / this.scheme.byteSize;
     const buffer = new Buffer(this.glCxt, gl.ARRAY_BUFFER, vtxData);
     const vao = this.createVAOInstanced(this.glCxt, buffer.glBuffer.value).value;
     return { vao, count }
@@ -192,10 +224,13 @@ export class BufferAllocator implements Disposable {
     gl.bindVertexArray(vao.value);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.idxBuffer.glBuffer.value);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.vtxBuffer.glBuffer.value);
-    const stride = scheme.size * 4;
+    const stride = this.scheme.byteSize;
     for (const attr of scheme.defs) {
       gl.enableVertexAttribArray(attr.location);
-      gl.vertexAttribPointer(attr.location, attr.size, gl.FLOAT, false, stride, attr.off * 4);
+      if (attr.type.valueType === 'FLOAT')
+        gl.vertexAttribPointer(attr.location, attr.type.size, attr.type.type, false, stride, attr.type.byteOff);
+      else
+        gl.vertexAttribIPointer(attr.location, attr.type.size, attr.type.type, stride, attr.type.byteOff);
     }
     gl.bindVertexArray(null);
     return vao;
@@ -206,10 +241,11 @@ export class BufferAllocator implements Disposable {
     const vao = glCtx.resource('vao', gl.createVertexArray(), vao => gl.deleteVertexArray(vao));
     gl.bindVertexArray(vao.value);
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    const stride = this.scheme.size * 4;
+    const stride = this.scheme.byteSize;
     for (const attr of this.scheme.defs) {
       gl.enableVertexAttribArray(attr.location);
-      gl.vertexAttribPointer(attr.location, attr.size, gl.FLOAT, false, stride, attr.off * 4);
+      if (attr.type.valueType === 'FLOAT') gl.vertexAttribPointer(attr.location, attr.type.size, attr.type.type, false, stride, attr.type.byteOff);
+      else gl.vertexAttribIPointer(attr.location, attr.type.size, attr.type.type, stride, attr.type.byteOff);
       gl.vertexAttribDivisor(attr.location, 1);
     }
     gl.bindVertexArray(null);
@@ -236,18 +272,22 @@ export type AttribData = {
 export type AttribDataInstanced = {
   data: InstancedArrayData,
   mode: number,
+  count: number,
 }
 
 class AttribDataBuilder implements Disposable {
   constructor(
     private scheme: AttribScheme,
     private alloc: BufferAllocator,
-    private record = new Float32Array(scheme.size),
-    private vtxData = new Float32Array(scheme.size * 64),
+    private record = new ArrayBuffer(scheme.byteSize),
+    private recordArray = new Uint8Array(record),
+    private recordView = new DataView(record),
+    private vtxData = new Uint8Array(scheme.byteSize * 64),
     private idxData = new Uint32Array(64),
     private vtxOff = 0,
     private idxOff = 0,
-  ) { }
+  ) {
+  }
 
   float(name: string): MultiConsumer<float> { return this.writer(name, 1) }
   vec2(name: string): MultiConsumer<vec2> { return this.writer(name, 2) }
@@ -257,20 +297,20 @@ class AttribDataBuilder implements Disposable {
   private writer<T extends AttribType>(name: string, size: number): MultiConsumer<T> {
     const def = this.scheme.defs.find(d => d.name === name);
     if (def === undefined) throw new Error(`Invalid attribute name '${name}'`);
-    if (def.size !== size) throw new Error(`Invalid attribute size. Expected ${size} actual ${def.size}`);
-    return (...data: number[]) => this.record.set([...data], def.off);
+    if (def.type.size !== size) throw new Error(`Invalid attribute size. Expected ${size} actual ${def.type.size}`);
+    return (...data: number[]) => def.type.mapper(this.recordView, ...data);
   }
 
   start() {
     this.vtxOff = 0;
     this.idxOff = 0;
-    this.record.fill(0);
+    this.recordArray.fill(0);
   }
 
   writeVertex(): number {
     this.ensureVtxSize();
     const off = this.vtxOff;
-    this.vtxData.set(this.record, this.vtxOff * this.scheme.size);
+    this.vtxData.set(this.recordArray, this.vtxOff * this.scheme.byteSize);
     this.vtxOff++;
     return off;
   }
@@ -282,20 +322,20 @@ class AttribDataBuilder implements Disposable {
   }
 
   build(mode: number): AttribData {
-    const vtxSizeof = this.scheme.size;
+    const vtxSizeof = this.scheme.byteSize;
     const bufferData = this.alloc.allocate(this.vtxData.subarray(0, this.vtxOff * vtxSizeof), this.idxData.subarray(0, this.idxOff));
     return { mode, bufferData };
   }
 
-  buildInstanced(mode: number): AttribDataInstanced {
-    const vtxSizeof = this.scheme.size;
+  buildInstanced(mode: number, count: number): AttribDataInstanced {
+    const vtxSizeof = this.scheme.byteSize;
     const data = this.alloc.allocateInstanced(this.vtxData.subarray(0, this.vtxOff * vtxSizeof));
-    return { data, mode };
+    return { data, mode, count };
   }
 
   private ensureVtxSize() {
-    if (this.vtxOff >= this.vtxData.length) {
-      const ndata = new Float32Array(this.vtxData.length * 2);
+    if (this.vtxOff * this.scheme.byteSize >= this.vtxData.length) {
+      const ndata = new Uint8Array(this.vtxData.length * 2);
       ndata.set(this.vtxData);
       this.vtxData = ndata;
     }
@@ -332,9 +372,10 @@ function getWriter(type: string): MultiConsumer<[DataView, number, any]> {
 }
 
 type TextureAccessor = {
-  readonly name: string,
-  unit(): number,
-  texture(): Texture;
+  name: string,
+  target: number,
+  unit: number,
+  texture(): WebGLTexture;
   wrap(): Wrap;
   setTexture: TextureSetter,
 }
@@ -400,24 +441,33 @@ export class UniformBlocksRegistry {
   }
 }
 
+function getSamplerTarget(type: string): number {
+  return match(type)
+    .with('sampler2D', () => WebGL2RenderingContext.TEXTURE_2D)
+    .with('sampler2DArray', () => WebGL2RenderingContext.TEXTURE_2D_ARRAY)
+    .with('usampler2D', () => WebGL2RenderingContext.TEXTURE_2D)
+    .otherwise(() => { throw new Error(`Invalid sampler type ${type}`) })
+}
+
 function getTextures(gl: WebGL2RenderingContext, shader: Shader): TextureAccessor[] {
   gl.useProgram(shader.getProgram());
   return iter(shader.getSamplers()).enumerate().map(([s, i]) => {
     const location = shader.getUniformLocation(s.name);
     gl.uniform1i(location, i);
-    let currentTexture: Texture = null;
+    let currentTexture: WebGLTexture = null;
     let currentWrap: Wrap = 'CLAMP';
-    const unit = () => i;
+    const unit = i;
+    const target = getSamplerTarget(s.type);
     const texture = () => currentTexture;
     const wrap = () => currentWrap;
-    const setTexture = (tex: Texture, wrap?: Wrap) => { currentTexture = tex; currentWrap = wrap ?? 'CLAMP' }
+    const setTexture = (tex: WebGLTexture, wrap?: Wrap) => { currentTexture = tex; currentWrap = wrap ?? 'CLAMP' }
     const name = s.name;
-    return { name, unit, texture, setTexture, wrap };
+    return { name, unit, target, texture, setTexture, wrap };
   }).collect();
 }
 
 export type Wrap = 'CLAMP' | 'REPEAT';
-export type TextureSetter = (tex: Texture, wrap?: Wrap) => void;
+export type TextureSetter = (tex: WebGLTexture, wrap?: Wrap) => void;
 
 export class ShaderConfig implements Disposable {
   constructor(
@@ -446,7 +496,7 @@ export class ShaderConfig implements Disposable {
     return iter(this.textures)
       .first(t => t.name === name)
       .map(t => t.setTexture)
-      .orElse(nil());
+      .orElseThrow(() => new Error(`Invalid texture uniform '${name}'`));
   }
 
   draw(gl: WebGL2RenderingContext, attrs: AttribData) {
@@ -464,7 +514,7 @@ export class ShaderConfig implements Disposable {
     this.blocks.values().forEach(b => b.update(gl));
     this.bindTextures(gl);
     gl.bindVertexArray(data.data.vao);
-    gl.drawArraysInstanced(data.mode, 0, 6, data.data.count);
+    gl.drawArraysInstanced(data.mode, 0, data.count, data.data.count);
     gl.bindVertexArray(null);
   }
 
@@ -474,7 +524,7 @@ export class ShaderConfig implements Disposable {
 
   private bindTextures(gl: WebGL2RenderingContext) {
     for (const ta of this.textures) {
-      this.state.bindTexture(gl, ta.unit(), ta.texture(), ta.wrap());
+      this.state.bindTexture(gl, ta.unit, ta.texture(), ta.wrap(), ta.target);
     }
   }
 
@@ -541,9 +591,9 @@ export class StateGl1 implements Disposable {
     return this.clampWrap.value;
   }
 
-  bindTexture(gl: WebGL2RenderingContext, unit: number, tex: Texture, wrap?: Wrap) {
+  bindTexture(gl: WebGL2RenderingContext, unit: number, tex: WebGLTexture, wrap: Wrap, target: number) {
     gl.activeTexture(gl.TEXTURE0 + unit);
-    gl.bindTexture(gl.TEXTURE_2D, tex.get());
+    gl.bindTexture(target, tex);
     gl.bindSampler(unit, this.getSampler(wrap));
   }
 

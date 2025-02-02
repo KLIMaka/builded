@@ -3,11 +3,12 @@ import { Dependency } from "@utils/injector";
 import { Consumer } from "@utils/types";
 
 export type DisposableResource<T> = { readonly value: T } & Disposable;
+export type ResourceFactory = <T>(tag: string, value: T, disposer: Consumer<T>) => DisposableResource<T>;
 
 export type GlContext = {
   offscreen: OffscreenCanvas,
   gl: WebGL2RenderingContext,
-  resource<T>(tag: string, value: T, disposer: Consumer<T>): DisposableResource<T>;
+  resource: ResourceFactory,
   info(): string,
 }
 export const GL_CONTEXT = new Dependency<GlContext>('Gl Context');

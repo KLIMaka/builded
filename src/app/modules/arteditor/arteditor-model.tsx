@@ -528,9 +528,8 @@ export async function createArtEditor(injector: Injector, ctx: BuildGlEngineCont
     const plus = ctx.engine.plus;
     const tags = ctx.engine.picTags;
     const shadowsteps = ctx.engine.shadowsteps;
-    const textures = await ctx.textures();
     const aliases = ctx.engine.aliases;
-    const previewRenderer = await createPreviewRenderer(values, glCtx, textures, ctx.engine.shadowsteps.get(), ctx.engine.maxPluId.get() + 1);
+    const previewRenderer = await createPreviewRenderer(values, glCtx, ctx);
     const editor = new ArtEditorImpl(values, state, actionDescriptors, app, art, artMap, pal, plus, tags, shadowsteps, previewRenderer, aliases);
 
     return new WindowBuilder('art-editor', actionDescriptors, values)

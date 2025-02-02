@@ -8,7 +8,7 @@ import { sectorOfWall, lastwall, wallInSector, isValidWallId } from "../query";
 import { EngineApi } from "./api";
 import { cyclic, int } from "../../../utils/mathutils";
 import { setFirstWall } from "../mutations/sectors"
-import { createNewSector } from "./ceatesector";
+import { createNewSector } from "./createsector";
 import { splitWall } from "./walls";
 import { splitSector } from "../mutations/splitsector";
 import { closestWallSegmentInSector } from "../distances";

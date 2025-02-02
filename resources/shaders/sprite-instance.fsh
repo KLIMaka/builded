@@ -20,9 +20,9 @@ out vec4 fragColor;
 #define GLOBAL_VIS (512.0)
 #define DEPTH_SHADOW_SCALE (32.0)
 #define GLOBAL_SHADOW (0.0)
-#define LOCAL_SHADOW (float(params.x))
+#define LOCAL_SHADOW (float(params.y))
 #define PLU_TEXTURE (plu)
-#define PAL (float(params.y))
+#define PAL (float(params.x))
 #define TRANSPARENCY (float(params.z)/255.0)
 #define DETPH_OFF (float(params.w))
 #include "inc.fsh"
@@ -43,9 +43,9 @@ int ubyte2byte(uint x) { return int(x) <= 127 ? int(x) : int(x) - 256; }
 
 vec3 getTc() {
   vec2 projectedTc = tc.xy / tc.z;
-  vec2 off = vec2(ATLAS_X, ATLAS_Y) / vec2(textureSize(atlas, 0));
-  vec2 size = vec2(PIC_W, PIC_H) / vec2(textureSize(atlas, 0));
-  return vec3(off + size * fract(projectedTc), ATLAS_Z);
+  vec2 off = (vec2(ATLAS_X, ATLAS_Y) + vec2(0.01)) / vec2(textureSize(atlas, 0));
+  vec2 size = (vec2(PIC_W, PIC_H) - vec2(0.02)) / vec2(textureSize(atlas, 0));
+  return vec3(clamp(off + size * projectedTc, off, off + size), ATLAS_Z);
 }
 
 vec3 palLookup(vec3 tc) {
@@ -56,5 +56,6 @@ vec3 palLookup(vec3 tc) {
 }
 
 void main() {
-  fragColor = vec4(palLookup(getTc()), TRANSPARENCY);
+  vec3 tc = getTc();
+  fragColor = vec4(palLookup(tc), TRANSPARENCY);
 }

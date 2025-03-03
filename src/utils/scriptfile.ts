@@ -305,19 +305,19 @@ export function defaultDefine<C extends HasSymbols>(): Parser<C, any> {
 
 type isString<T, K> = T extends string ? K : never;
 type StringFields<T> = { [K in keyof Required<T>]: isString<T[K], K> }[keyof T];
-export function stringRule<C, K extends StringFields<C>>(field: K): Parser<C, [string]> {
+export function stringRule<C, K extends StringFields<C>>(field: K, ...aliases: string[]): Parser<C, [string]> {
   const processor = async (_sf: ScriptFile, ctx: C, value: string) => { (ctx[field] as string) = value };
-  return { tokenAliases: [field.toString()], argsParser: tuple(token), processor }
+  return { tokenAliases: [field.toString(), ...aliases], argsParser: tuple(token), processor }
 }
 
 type isNumber<T, K> = T extends number ? K : never;
 type NumberFields<T> = { [K in keyof Required<T>]: isNumber<T[K], K> }[keyof T];
-export function numberRule<C, K extends NumberFields<C>>(field: K): Parser<C, [number]> {
+export function numberRule<C, K extends NumberFields<C>>(field: K, ...aliases: string[]): Parser<C, [number]> {
   const processor = async (_sf: ScriptFile, ctx: C, value: number) => { (ctx[field] as number) = value };
-  return { tokenAliases: [field.toString()], argsParser: tuple(number), processor }
+  return { tokenAliases: [field.toString(), ...aliases], argsParser: tuple(number), processor }
 }
 
-export function boolRule<C, K extends BoolFields<C>>(field: K): Parser<C, []> {
+export function boolRule<C, K extends BoolFields<C>>(field: K, ...aliases: string[]): Parser<C, []> {
   const processor = async (_sf: ScriptFile, ctx: C) => { (ctx[field] as boolean) = true };
-  return { tokenAliases: [field.toString()], argsParser: tuple(), processor }
+  return { tokenAliases: [field.toString(), ...aliases], argsParser: tuple(), processor }
 }

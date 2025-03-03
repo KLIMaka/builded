@@ -1,7 +1,33 @@
 import { rect, Ring } from "@utils/collections";
-import { iter } from "@utils/iter";
 import { atomic_array, int, Stream, ubyte, uint, ushort } from "@utils/stream";
 
+export enum VoxelSide { ZM, ZP, XM, XP, YM, YP };
+export const VOXEL_SIDES = [VoxelSide.ZM, VoxelSide.ZP, VoxelSide.XM, VoxelSide.XP, VoxelSide.YM, VoxelSide.YP];
+
+function packVoxelSideImpl(zm: boolean, zp: boolean, xm: boolean, xp: boolean, ym: boolean, yp: boolean): number {
+  return (zm ? (1 << VoxelSide.ZM) : 0)
+    | (zp ? (1 << VoxelSide.ZP) : 0)
+    | (xm ? (1 << VoxelSide.XM) : 0)
+    | (xp ? (1 << VoxelSide.XP) : 0)
+    | (ym ? (1 << VoxelSide.YM) : 0)
+    | (yp ? (1 << VoxelSide.YP) : 0);
+}
+
+export function packVoxelSide(sides: VoxelSide[]): number {
+  return sides.reduce((acc, side) => acc | (1 << side), 0);
+}
+
+export function unpackVoxelSides(sides: number): VoxelSide[] {
+  return VOXEL_SIDES.filter(side => (sides & (1 << side)) !== 0);
+}
+
+export type VoxelListItem = {
+  x: number,
+  y: number,
+  z: number,
+  color: number,
+  sides: number,
+};
 
 export class VoxelData {
   private data: Uint8Array;
@@ -58,6 +84,28 @@ export class VoxelData {
         for (let x = 0; x < this.xsize; x++)
           if (this.getImpl(x, y, z, copy) === 0) this.set(x, y, z, 0)
   }
+
+  list(): VoxelListItem[] {
+    const voxels: VoxelListItem[] = [];
+    for (let z = 0; z < this.zsize; z++) {
+      for (let y = 0; y < this.ysize; y++) {
+        for (let x = 0; x < this.xsize; x++) {
+          const color = this.get(x, y, z);
+          if (color === 255) continue;
+          const sides = packVoxelSideImpl(
+            this.get(x, y, z - 1) === 255,
+            this.get(x, y, z + 1) === 255,
+            this.get(x - 1, y, z) === 255,
+            this.get(x + 1, y, z) === 255,
+            this.get(x, y - 1, z) === 255,
+            this.get(x, y + 1, z) === 255);
+          if (sides === 0) continue;
+          voxels.push({ x, y, z: this.zsize - z, color, sides });
+        }
+      }
+    }
+    return voxels;
+  }
 }
 
 export function readKvx(stream: Stream): VoxelData {
@@ -65,9 +113,9 @@ export function readKvx(stream: Stream): VoxelData {
   const xsize = uint.read(stream);
   const ysize = uint.read(stream);
   const zsize = uint.read(stream);
-  const xpivot = int.read(stream) / 256;
-  const ypivot = int.read(stream) / 256;
-  const zpivot = int.read(stream) / 256;
+  const xpivot = int.read(stream);
+  const ypivot = int.read(stream);
+  const zpivot = int.read(stream);
   const off = stream.mark();
   const xoffset = atomic_array(uint, xsize + 1).read(stream);
   const xyoffset = atomic_array(ushort, xsize * (ysize + 1)).read(stream);
@@ -81,7 +129,7 @@ export function readKvx(stream: Stream): VoxelData {
       const slabzleng = ubyte.read(stream);
       const backfaceInfo = ubyte.read(stream);
       const column = atomic_array(ubyte, slabzleng).read(stream);
-      iter(column).enumerate().forEach(([c, i]) => cube.set(x, y, slabztop + i, c));
+      column.forEach((c, i) => cube.set(x, y, slabztop + i, c));
     }
   }
   cube.fill();

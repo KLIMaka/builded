@@ -1,3 +1,4 @@
+import { rect } from "./collections";
 import { int } from "./mathutils";
 import { Raster, Rasterizer } from "./pixelprovider";
 
@@ -29,6 +30,12 @@ export function clearCanvas(canvas: HTMLCanvasElement, style: string) {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
 
+export function axisSwap(data: Uint8Array, w: number, h: number): Uint8Array {
+  const result = new Uint8Array(w * h);
+  for (const [x, y] of rect(w, h)) result[x * h + y] = data[y * w + x];
+  return result;
+}
+
 export function loadImageFromBuffer(buff: ArrayBuffer): Promise<[number, number, Uint8Array]> {
   return new Promise(resolve => {
     const blob = new Blob([buff]);
@@ -44,6 +51,7 @@ export function loadImageFromBuffer(buff: ArrayBuffer): Promise<[number, number,
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0);
       const data = new Uint8Array(ctx.getImageData(0, 0, img.width, img.height).data);
+      urlCreator.revokeObjectURL(imageUrl);
       resolve([img.width, img.height, data]);
     }
   });

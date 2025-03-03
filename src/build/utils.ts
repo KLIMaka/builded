@@ -19,25 +19,8 @@ export function convertVisibility(vis: number) {
   return ((vis + 16) & 0xff) / 16;
 }
 
-let fakePlayerStart_: Sprite;
-function fakePlayerStart() {
-  if (fakePlayerStart_ == null) {
-    fakePlayerStart_ = new Sprite();
-    fakePlayerStart_.x = 0
-    fakePlayerStart_.y = 0
-    fakePlayerStart_.z = 0
-    fakePlayerStart_.sectnum = -1;
-  }
-  return fakePlayerStart_;
-}
-
-export function getPlayerStart(board: Board): Sprite {
-  for (let i = 0; i < board.numsprites; i++) {
-    const sprite = board.sprites[i];
-    if (sprite.lotag === 1)
-      return sprite;
-  }
-  return fakePlayerStart();
+export function getPlayerStart(board: Board): { x: number, y: number, z: number, sec: number } {
+  return { x: board.posx, y: board.posy, z: board.posz, sec: board.cursectnum };
 }
 
 export interface MoveStruct {

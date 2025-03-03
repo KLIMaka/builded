@@ -4,13 +4,21 @@
 //  z's - z coordinate (height) of ceiling / floor at first point of sector
 //  stat's
 //  bit 0: 1 = parallaxing, 0 = not                                 "P"
-//  bit 1: 1 = sloped, 0 = not
+//  bit 1: 1 = groudraw, 0 = not
 //  bit 2: 1 = swap x&y, 0 = not                                    "F"
 //  bit 3: 1 = double smooshiness                                   "E"
 //  bit 4: 1 = x-flip                                               "F"
 //  bit 5: 1 = y-flip                                               "F"
 //  bit 6: 1 = Align texture to first wall of sector                "R"
-//  bits 7-15: reserved
+//  bits 8-7:                                                       "T"
+//         00 = normal floors
+//         01 = masked floors
+//         10 = transluscent masked floors
+//         11 = reverse transluscent masked floors
+//  bit 9: 1 = blocking ceiling/floor
+//  bit 10: 1 = YAX'ed ceiling/floor
+//  bit 11: 1 = hitscan-sensitive ceiling/floor
+//  bits 12-15: reserved
 //  picnum's - texture index into art file
 //  heinum's - slope value (rise/run) (0-parallel to floor, 4096-45 degrees)
 //  shade's - shade offset of ceiling/floor
@@ -28,7 +36,14 @@ export class SectorStats {
   public xflip: number;
   public yflip: number;
   public alignToFirstWall: number;
-  public unk: number;
+  public type: number;
+  public blocking: number;
+  public tror: number;
+  public hitscan: number;
+  public unk12: number;
+  public unk13: number;
+  public unk14: number;
+  public floorShade: number
 }
 
 export class Sector<Stats extends SectorStats = SectorStats> {
@@ -92,7 +107,12 @@ export class WallStats {
   public translucent: number;
   public yflip: number;
   public translucentReversed: number;
-  public unk: number;
+  public yaxUpWall: number;
+  public yaxDownWall: number;
+  public rotate90: number;
+  public unk13: number;
+  public unk14: number;
+  public unk15: number;
 }
 
 export class Wall {
@@ -161,7 +181,10 @@ export class SpriteStats {
   public noautoshading: number;
   public reserved: number;
   public invisible: number;
-  public unk: number;
+  public unk10: number;
+  public unk12: number;
+  public unk13: number;
+  public unk14: number;
 }
 
 export class Sprite {

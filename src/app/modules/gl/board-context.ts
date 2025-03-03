@@ -2,10 +2,8 @@ import { Disposable } from "@utils/callbacks";
 import { GlContext } from "@utils/gl/drawstruct";
 import { int } from "@utils/mathutils";
 import { Stream } from "@utils/stream";
-import { EngineContext } from "app/apis/engine";
 import { Sector, Sprite, Wall } from "build/board/structs";
 import { sectorStruct, spriteStruct, wallStruct } from "build/maploader";
-
 
 
 export type BoardGlContext = {
@@ -35,9 +33,10 @@ function writeData(gl: WebGL2RenderingContext, tex: WebGLTexture, data: Uint32Ar
 
 export function createBoardGlContext(glCtx: GlContext): BoardGlContext {
   const { gl, resource } = glCtx;
-  const walls = resource('texture', gl.createTexture(), t => gl.deleteTexture(t));
-  const sprites = resource('texture', gl.createTexture(), t => gl.deleteTexture(t));
-  const sectors = resource('texture', gl.createTexture(), t => gl.deleteTexture(t));
+  const disposer = (t: WebGLTexture): void => gl.deleteTexture(t);
+  const walls = resource('texture', gl.createTexture(), disposer);
+  const sprites = resource('texture', gl.createTexture(), disposer);
+  const sectors = resource('texture', gl.createTexture(), disposer);
   createTexture(gl, walls.value);
   createTexture(gl, sprites.value);
   createTexture(gl, sectors.value);

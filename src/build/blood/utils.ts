@@ -1,45 +1,51 @@
-import { getOrCreate } from "@utils/collections";
+import { iter } from "@utils/iter";
+import { second } from "@utils/types";
 import { RorLink, RorLinks } from "app/apis/engine";
+import { vec3 } from "gl-matrix";
 import { Sprite } from "../board/structs";
 import { BloodBoard } from "./structs";
+import { slope } from "build/utils";
 
 export const MIRROR_PIC = 504;
 
-function isUpperLink(spr: Sprite) {
-  return spr.lotag === 11 || spr.lotag === 7 || spr.lotag === 9 || spr.lotag === 13;
+function isUpperLink(spr: Sprite) { // floor
+  return spr.lotag === 11 || spr.lotag === 9 || spr.lotag === 13;
 }
 
-function isLowerLink(spr: Sprite) {
-  return spr.lotag === 12 || spr.lotag === 6 || spr.lotag === 10 || spr.lotag === 14;
+function isLowerLink(spr: Sprite) { // ceiling
+  return spr.lotag === 12 || spr.lotag === 10 || spr.lotag === 14;
 }
 
 export function loadRorLinks(board: BloodBoard): RorLinks {
-  const linkRegistry = new Map<number, number[]>();
-  for (let s = 0; s < board.numsprites; s++) {
-    const spr = board.sprites[s];
-    if (isUpperLink(spr) || isLowerLink(spr)) {
-      const id = spr.extraData.data1;
-      const links = getOrCreate(linkRegistry, id, _ => []);
-      links.push(s);
-    }
-  }
+  const linkRegistry = iter(board.sprites)
+    .enumerate()
+    .filter(([s, _]) => isUpperLink(s) || isLowerLink(s))
+    .group(([s, _]) => s.extraData.data1, second);
 
   const floorLinks = new Map<number, RorLink>();
   const ceilingLinks = new Map<number, RorLink>();
-  for (const [_, spriteIds] of linkRegistry.entries()) {
-    if (spriteIds.length !== 2)
-      throw new Error('Invalid link in sprites: ' + spriteIds);
+  for (const spriteIds of linkRegistry.values()) {
+    if (spriteIds.length !== 2) throw new Error('Invalid link in sprites: ' + spriteIds);
     let [s1, s2] = spriteIds;
     let spr1 = board.sprites[s1];
     let spr2 = board.sprites[s2];
-    if (!isUpperLink(spr1)) {
+    if (isUpperLink(spr1)) {
       [s1, s2] = [s2, s1];
       [spr1, spr2] = [spr2, spr1];
     }
-    if (board.sectors[spr1.sectnum].floorpicnum === MIRROR_PIC)
-      floorLinks.set(spr1.sectnum, new RorLink(s1, s2));
-    if (board.sectors[spr2.sectnum].ceilingpicnum === MIRROR_PIC)
-      ceilingLinks.set(spr2.sectnum, new RorLink(s2, s1));
+    if (spr1.lotag === 10 || spr1.lotag === 14) board.sectors[spr1.sectnum].ceilingstat.type = 3;
+    else board.sectors[spr1.sectnum].ceilingstat.tror = 1;
+    if (spr2.lotag === 9 || spr2.lotag === 13) board.sectors[spr2.sectnum].floorstat.type = 3;
+    else board.sectors[spr2.sectnum].floorstat.tror = 1;
+    const sec1 = board.sectors[spr1.sectnum];
+    const sec2 = board.sectors[spr2.sectnum];
+    const spr1z = slope(board, spr1.sectnum, spr1.x, spr1.y, sec1.ceilingheinum) + sec1.ceilingz;
+    const spr2z = slope(board, spr2.sectnum, spr2.x, spr2.y, sec2.floorheinum) + sec2.floorz;
+    const srcSpritePos = vec3.fromValues(spr1.x, spr1.y, spr1z);
+    const dstSpritePos = vec3.fromValues(spr2.x, spr2.y, spr2z);
+    const buildDiff = vec3.sub(vec3.create(), srcSpritePos, dstSpritePos);
+    ceilingLinks.set(spr1.sectnum, { buildDiff, dstSector: spr2.sectnum });
+    floorLinks.set(spr2.sectnum, { buildDiff: vec3.negate(vec3.create(), buildDiff), dstSector: spr1.sectnum });
   }
   const floorLink = (sectorId: number) => floorLinks.get(sectorId);
   const ceilLink = (sectorId: number) => ceilingLinks.get(sectorId);

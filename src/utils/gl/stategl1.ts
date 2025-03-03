@@ -95,7 +95,7 @@ type BufferData = {
 type InstancedArrayData = {
   vao: WebGLVertexArrayObject,
   count: number,
-}
+} & Disposable;
 
 
 type Region = [number, number];
@@ -209,8 +209,9 @@ export class BufferAllocator implements Disposable {
     const gl = this.glCxt.gl;
     const count = vtxData.length / this.scheme.byteSize;
     const buffer = new Buffer(this.glCxt, gl.ARRAY_BUFFER, vtxData);
-    const vao = this.createVAOInstanced(this.glCxt, buffer.glBuffer.value).value;
-    return { vao, count }
+    const vao = this.createVAOInstanced(this.glCxt, buffer.glBuffer.value);
+    const dispose = async () => { buffer.dispose(); vao.dispose() }
+    return { vao: vao.value, count, dispose }
   }
 
   private update(gl: WebGL2RenderingContext) {
@@ -273,7 +274,7 @@ export type AttribDataInstanced = {
   data: InstancedArrayData,
   mode: number,
   count: number,
-}
+};
 
 class AttribDataBuilder implements Disposable {
   constructor(
@@ -289,7 +290,7 @@ class AttribDataBuilder implements Disposable {
   ) {
   }
 
-  float(name: string): MultiConsumer<float> { return this.writer(name, 1) }
+  scalar(name: string): MultiConsumer<float> { return this.writer(name, 1) }
   vec2(name: string): MultiConsumer<vec2> { return this.writer(name, 2) }
   vec3(name: string): MultiConsumer<vec3> { return this.writer(name, 3) }
   vec4(name: string): MultiConsumer<vec4> { return this.writer(name, 4) }
@@ -361,12 +362,14 @@ export type UniformBlockElement = Readonly<{
 
 const float32Setter = (v: DataView, off: number, val: number) => v.setFloat32(off, val, true);
 const int32Setter = (v: DataView, off: number, val: number) => v.setInt32(off, val, true);
+const uint32Setter = (v: DataView, off: number, val: number) => v.setUint32(off, val, true);
 const mat4Setter = (v: DataView, off: number, val: gmlMat4) => new Float32Array(v.buffer).set(val, off / 4);
 
 function getWriter(type: string): MultiConsumer<[DataView, number, any]> {
   return match(type)
     .with('float', 'vec2', 'vec3', 'vec4', () => float32Setter)
     .with('int', 'ivec2', 'ivec3', 'ivec4', () => int32Setter)
+    .with('uint', 'uvec2', 'uvec3', 'uvec4', () => uint32Setter)
     .with('mat4', () => mat4Setter)
     .otherwise(() => { throw new Error(`Invalid type ${type}`) })
 }

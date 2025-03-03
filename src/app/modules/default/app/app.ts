@@ -13,14 +13,14 @@ function periodic(task: Consumer<void>): PeriodicTask {
   let id = -1;
   const start = (periodMs: number) => id = window.setInterval(task, periodMs);
   const stop = () => window.clearInterval(id);
-  const dispose = stop;
+  const dispose = async () => stop();
   return { start, stop, dispose }
 }
 
 function delayed(task: Consumer<void>, delayMs?: number): DelayedTask {
   const id = window.setTimeout(task, delayMs);
   const cancel = () => window.clearTimeout(id);
-  const dispose = cancel;
+  const dispose = async () => cancel();
   return { cancel, dispose };
 }
 
@@ -38,7 +38,7 @@ function onFrame(task: Consumer<number>): FrameTask {
   }
   const stop = () => cancelAnimationFrame(taskId);
   const start = (minDtMs = 0) => { minDtMsImpl = minDtMs; stop(); taskImpl() };
-  const dispose = stop;
+  const dispose = async () => stop();
   return { start, stop, dispose };
 }
 
@@ -69,7 +69,7 @@ function batchRunner(maxTimeMs = 10): BatchTaskRunner {
     if (timerId === undefined) window.setTimeout(execBatch);
     return () => tasks.delete(task);
   }
-  const dispose = () => { if (timerId !== undefined) window.clearTimeout(timerId) }
+  const dispose = async () => { if (timerId !== undefined) window.clearTimeout(timerId) }
   return { run, dispose };
 }
 

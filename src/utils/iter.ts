@@ -1,5 +1,5 @@
 import Optional from "optional-js";
-import { filter, map, reduce, forEach, all, enumerate, take, findFirst, chain, butLast, skip, any, iterIsEmpty, skipWhile, flatten, Deiterable, zip, join, length, toMap, reduceFirst, group, toObject } from "./collections";
+import { filter, map, reduce, forEach, all, enumerate, take, findFirst, chain, butLast, skip, any, iterIsEmpty, skipWhile, flatten, Deiterable, zip, join, length, toMap, reduceFirst, group, toObject, groupEntries } from "./collections";
 import { Function } from "./types";
 
 export class Iter<T> implements Iterable<T> {
@@ -32,6 +32,7 @@ export class Iter<T> implements Iterable<T> {
   toMap<K, V>(keyMapper: Function<T, K>, valueMapper: Function<T, V>): Map<K, V> { return toMap(this.iter, keyMapper, valueMapper) }
   toObject<U>(keyMapper: Function<T, keyof U>, valueMapper: Function<T, any>): U { return toObject(this.iter, keyMapper, valueMapper) }
   group<K, V>(keyMapper: Function<T, K>, valueMapper: Function<T, V>): Map<K, V[]> { return group(this.iter, keyMapper, valueMapper) }
+  groupEntries<K, V>(keyMapper: Function<T, K>, valueMapper: Function<T, V>): Iter<[K, V[]]> { return new Iter(groupEntries(this.iter, keyMapper, valueMapper)) }
   async await_(): Promise<Iter<Awaited<T>>> { return new Iter(await Promise.all([...this.iter])) }
 }
 

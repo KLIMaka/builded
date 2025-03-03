@@ -1,10 +1,10 @@
 import { range } from '@utils/collections';
 import { iter } from '@utils/iter';
-import { Accessor, Stream, array, atomic_array, bit, bits, bits_signed, byte, int, short, string, struct, ubyte, uint, ushort } from '@utils/stream';
+import { Accessor, Stream, array, atomic_array, bits, bits_signed, byte, int, short, string, struct, ubyte, uint, ushort } from '@utils/stream';
 import { buf } from "crc-32";
-import { Header1, SpriteStats, WallStats } from '../board/structs';
-import { fixSectorSlopes, initSector, initSprite, initWall, spriteStruct, wallStruct } from '../maploader';
-import { BloodBoard, BloodSector, BloodSectorStats, BloodSprite, BloodWall, SectorExtra, SpriteExtra, WallExtra } from './structs';
+import { Header1, SectorStats, SpriteStats, WallStats } from '../board/structs';
+import { fixSectorSlopes, initSector, initSprite, initWall, sectorStats, spriteStruct, wallStruct } from '../maploader';
+import { BloodBoard, BloodSector, BloodSprite, BloodWall, SectorExtra, SpriteExtra, WallExtra } from './structs';
 
 
 function decryptBuffer(buffer: Uint8Array, size: number, key: number) {
@@ -22,17 +22,6 @@ function createStream(arr: Uint8Array) {
 function crc(buff: ArrayBuffer) {
   return buf(new Uint8Array(buff, 0, buff.byteLength - 4));
 }
-
-const sectorStats = struct(BloodSectorStats)
-  .field('parallaxing', bit())
-  .field('slopped', bits(1))
-  .field('swapXY', bits(1))
-  .field('doubleSmooshiness', bits(1))
-  .field('xflip', bits(1))
-  .field('yflip', bits(1))
-  .field('alignToFirstWall', bits(1))
-  .field('unk', bits(8))
-  .field('floorShade', bit());
 
 const sectorStruct = struct(BloodSector)
   .field('wallptr', ushort)
@@ -516,8 +505,8 @@ export function newSprite() {
 export function cloneSector(sector: BloodSector): BloodSector {
   const sectorCopy = new BloodSector();
   Object.assign(sectorCopy, sector);
-  sectorCopy.floorstat = Object.assign(new BloodSectorStats(), sector.floorstat);
-  sectorCopy.ceilingstat = Object.assign(new BloodSectorStats(), sector.ceilingstat);
+  sectorCopy.floorstat = Object.assign(new SectorStats(), sector.floorstat);
+  sectorCopy.ceilingstat = Object.assign(new SectorStats(), sector.ceilingstat);
   if (sector.extraData) sectorCopy.extraData = Object.assign(new SectorExtra(), sector.extraData);
   return sectorCopy;
 }

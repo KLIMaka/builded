@@ -1,10 +1,8 @@
 precision highp float;
+precision highp int;
 
-uniform Matrices {
-  mat4 P;
-  mat4 V;
-  mat4 IV;
-};
+#include "engine-uniforms.fsh"
+#include "structs.vsh"
 
 // gl_VertexID mapping
 // 1----0 
@@ -15,107 +13,145 @@ uniform Matrices {
 // 3----2 
 
 uniform highp usampler2D infos;
+uniform highp usampler2D sprites;
+uniform highp usampler2D sectors;
 
-in vec3 aPos_i32;
-in uvec4 aPicnumAngCstat_u16; 
-in ivec4 aPluShadowVisTrans_i8;
+in uint aSpriteId_u16;
 
 out vec3 tc;
 flat out ivec4 params;
-flat out uvec4 picInfo;
+flat out pic_t picInfo;
+flat out float trans;
 
-int ubyte2byte(uint x) { return int(x) <= 0x7f ? int(x) : int(x) - 0xff; }
-int ushort2short(uint x) { return int(x) <= 0x7fff ? int(x) : int(x) - 0xffff; }
-int uint2int(uint x) { return int(x) <= 0x7fffffff ? int(x) : int(x) - 0xffffffff; }
+#define IS_RIGHT ((gl_VertexID & 0x1) == 0)
+#define IS_TOP (gl_VertexID < 2 || gl_VertexID > 3)
 
-#define PI (3.1415926535897932384626433832795)
-#define ATLAS_X (picInfo.y & uint(0xffff))
-#define ATLAS_Y ((picInfo.y >> 16) & uint(0xffff))
-#define ATLAS_Z (picInfo.z)
-#define PIC_W (picInfo.x & uint(0xffff))
-#define PIC_H ((picInfo.x >> 16) & uint(0xffff))
-#define PIC_FRAMES (picInfo.w & uint(0x3f))
-#define PIC_ANIM_TYPE ((picInfo.w >> 6) & uint(0x3))
-#define PIC_X (ubyte2byte((picInfo.w >> 8) & uint(0xff)))
-#define PIC_Y (ubyte2byte((picInfo.w >> 16) & uint(0xff)))
-#define PIC_ANIM_SPEED ((picInfo.w >> 24) & uint(0xf))
-#define PIC_TYPE ((picInfo.w >> 28) & uint(0xf))
+struct sprite_data_t {
+  vec2 size;
+  vec2 off;
+};
 
-#define TYPE ((aPicnumAngCstat_u16.z >> 4) & uint(0x3))
-#define IS_FACE (TYPE == uint(0))
-#define IS_WALL (TYPE == uint(1))
-#define IS_FLOOR (TYPE == uint(2))
-
-
-uvec4 loadPicInfo() {
-  uint lo = aPicnumAngCstat_u16.x & uint(0xff);
-  uint hi = (aPicnumAngCstat_u16.x >> 8) & uint(0xff);
-  return texelFetch(infos, ivec2(lo, hi), 0);
+sprite_data_t loadData(pic_t picInfo, sprite_t sprite) {
+  float xf = sprite_cstat_xflip(sprite) ? -1.0 : 1.0;
+  return sprite_data_t(
+    picInfo.sizeOff.xy,
+    (picInfo.sizeOff.zw + vec2(sprite.pan)) * vec2(xf, 1.0));
 }
 
-vec3 tcs[4] = vec3[](
-  vec3(1.0, 0.0, 1.0), 
-  vec3(0.0, 0.0, 1.0), 
-  vec3(1.0, 1.0, 1.0), 
-  vec3(0.0, 1.0, 1.0));
+const vec2 tcs[6] = vec2[](
+  vec2(1.0, 0.0), 
+  vec2(0.0, 0.0), 
+  vec2(1.0, 1.0), 
+  vec2(0.0, 1.0),
+  vec2(1.0, 0.0),
+  vec2(0.0, 0.0));
 
-vec3 getTc() { 
-  return tcs[gl_VertexID];
+float invert(float x, bool i) {
+  return i ? (x == 0.0 ? 1.0 : 0.0) : x;
 }
 
-vec2 wallPos[4] = vec2[](
-  vec2(-1.0, 1.0),
-  vec2(1.0, 1.0),
-  vec2(-1.0, -1.0),
-  vec2(1.0, -1.0));
+vec3 getTc(sprite_t sprite) {
+  bool xf = sprite_cstat_xflip(sprite);
+  bool yf = sprite_cstat_yflip(sprite);
+  vec2 tc = tcs[gl_VertexID];
+  return vec3(invert(tc.x, xf), invert(tc.y, yf), 1.0);
+}
 
-vec4 getWallPos(uvec4 picInfo) {
-  float radAng = -float(aPicnumAngCstat_u16.y) * PI / 1024.0;
+vec4 getWallPos(pic_t picInfo, sprite_t sprite) {
+  float radAng = -float(sprite.ang) * PI / 1024.0;
   vec2 angVec = vec2(sin(radAng), cos(radAng));
-  vec2 center = vec2(PIC_W >> 1, PIC_H >> 1);
-  vec2 off = vec2(PIC_X, PIC_Y);
-  vec2 c = wallPos[gl_VertexID] * center + off;
-  vec3 pos = vec3(angVec * c.x, c.y) + aPos_i32;
+
+  sprite_data_t data = loadData(picInfo, sprite);
+
+  float l = trunc(data.size.x / 2.0);
+  float r = data.size.x - l;
+  float x = (IS_RIGHT ? -r : l) + data.off.x;
+
+  float u = sprite_cstat_realCenter(sprite) ? trunc(data.size.y / 2.0) : data.size.y;
+  float d = data.size.y - u;
+  float y = (IS_TOP ? u : -d) + data.off.y;
+
+  vec2 scaled = scaleValue(vec2(x, y), vec2(sprite.repeat));
+
+  vec3 pos = vec3(angVec * scaled.x, scaled.y) + sprite.pos;
   return  P * V * vec4(pos.xzy, 1.0);
 }
 
-vec2 floorPos[4] = vec2[](
-  vec2(0.0, 0.0),
-  vec2(1.0, 0.0),
-  vec2(0.0, 1.0),
-  vec2(1.0, 1.0));
-
-vec4 getFloorPos(uvec4 picInfo) {
-  float radAng = float(aPicnumAngCstat_u16.y) * PI / 1024.0;
+vec4 getFloorPos(pic_t picInfo, sprite_t sprite) {
+  float radAng = float(sprite.ang) * PI / 1024.0;
   vec4 vec = vec4(cos(radAng), sin(radAng), -sin(radAng), cos(radAng));
-  vec2 center = vec2(int(PIC_W >> 1) + PIC_X, int(PIC_H >> 1) + PIC_Y);
-  vec2 size = vec2(PIC_W, PIC_H);
-  vec2 c = center - size * floorPos[gl_VertexID];
-  vec3 pos = vec3(vec.xy * c.y + vec.zw * c.x, 0.0) + aPos_i32;
+  
+  bool onesideFlipped = sprite_cstat_onesided(sprite) && sprite_cstat_yflip(sprite);
+  sprite_data_t data = loadData(picInfo, sprite);
+
+  float l = trunc(data.size.x / 2.0);
+  float r = data.size.x - l;
+  float x = (IS_RIGHT ? r : -l) - data.off.x;
+
+  float u = trunc(data.size.y / 2.0);
+  float d = data.size.y - u;
+  float y = (onesideFlipped ? (IS_TOP ? -d : u) : (IS_TOP ? u : -d)) + data.off.y;
+
+  vec2 scaled = scaleValue(vec2(x, y), vec2(sprite.repeat));
+
+  vec3 pos = vec3(vec.xy * scaled.y + vec.zw * scaled.x, 0.0) + sprite.pos;
   return P * V * vec4(pos.xzy, 1.0);
 }
 
-vec2 facePos[4] = vec2[](
-  vec2(1.0, 1.0),
-  vec2(-1.0, 1.0),
-  vec2(1.0, 0.0),
-  vec2(-1.0, 0.0));
+vec4 getFacePos(pic_t picInfo, sprite_t sprite) {
+  sprite_data_t data = loadData(picInfo, sprite);
 
-vec4 getFacePos(uvec4 picInfo) {
-  vec3 eyedir = (IV * vec4(0.0, 0.0, -1.0, 0.0)).xyz;
-  vec2 normal = normalize(eyedir.xz);
-  float hw = float(PIC_W >> 1);
-  float h = float(PIC_H);
-  vec2 c = facePos[gl_VertexID];
-  vec4 pos = vec4((aPos_i32 + vec3(0.0, 0.0, c.y * h)).xzy, 1.0);
-  return P * (V * pos + vec4(c.x * hw, 0.0, 0.0, 0.0));
+  float width = trunc(data.size.x);
+  float l = trunc(width / 2.0);
+  float r = width - l;
+  float x = (IS_RIGHT ? r : -l) - data.off.x;
+
+  float height = data.size.y;
+  float u = sprite_cstat_realCenter(sprite) ? trunc(height / 2.0) : height;
+  float d = height - u;
+  float y = (IS_TOP ? u : -d) + data.off.y;
+
+  vec2 scaled = scaleValue(vec2(x, y), vec2(sprite.repeat));
+
+  vec4 pos = vec4((sprite.pos + vec3(0.0, 0.0, scaled.y)).xzy, 1.0);
+  return P * (V * pos + vec4(scaled.x, 0.0, 0.0, 0.0));
 }
 
+// vec4 getFaceShadowPos(pic_t picInfo, sprite_t sprite) {
+// vec3 eyedir = (IV * vec4(0.0, 0.0, -1.0, 0.0)).xyz;
+// vec2 normal = normalize(eyedir.xz);
+// scaled_t scaled = scale(picInfo, sprite);
+// }
+
 void main() {
-  picInfo = loadPicInfo();
-  params = aPluShadowVisTrans_i8;
-  tc = getTc();
-  if (IS_FACE) gl_Position = getFacePos(picInfo);
-  else if (IS_WALL) gl_Position = getWallPos(picInfo);
-  else if (IS_FLOOR) gl_Position = getFloorPos(picInfo);
+  sprite_t sprite = loadSprite(sprites, aSpriteId_u16);
+  if ((sprite_cstat_type(sprite) == uint(0) || sprite_cstat_onesided(sprite)) && gl_VertexID > 3) {
+    gl_Position = vec4(0.0);
+    return;
+  }
+  sector_t sector = loadSector(sectors, sprite.sec);
+  picInfo = loadPicInfo(infos, sprite.picnum, float(aSpriteId_u16));
+#ifdef SPRITE_SHADOW_OFF
+  int shade = sprite.shade + (sector_cstat_floorShade(sector.ceilingFloorCstat.y) 
+    ? sector.ceilingFloorShade.y 
+    : sector_cstat_parallaxing(sector.ceilingFloorCstat.x) 
+      ? sector.ceilingFloorShade.x 
+      : sector.ceilingFloorShade.y);
+  int pal = int(sprite.pal);
+#else
+  int shade = sprite_cstat_type(sprite) == uint(1)
+    ? sprite.shade
+    : sector_cstat_parallaxing(sector.ceilingFloorCstat.x) 
+      ? sector.ceilingFloorShade.x 
+      : sector.ceilingFloorShade.y;
+  int pal = sector.ceilingFloorPal.y != uint(0) ? int(sector.ceilingFloorPal.y) : int(sprite.pal);
+#endif
+  bool noSectorShade = sprite_cstat_noshade(sprite);
+  shade = noSectorShade ? sprite.shade : shade;
+  trans = sprite_cstat_translucent(sprite) ? (sprite_cstat_translucentReversed(sprite) ? TRANS1 : TRANS2) : 1.0;
+  params = ivec4(shade, pal, int(sector.visibility), -uint(16) -(aSpriteId_u16 % uint(16)));
+  tc = getTc(sprite);
+  if (sprite_cstat_type(sprite) == uint(0)) gl_Position = getFacePos(picInfo, sprite);
+  else if (sprite_cstat_type(sprite) == uint(1)) gl_Position = getWallPos(picInfo, sprite);
+  else if (sprite_cstat_type(sprite) == uint(2)) gl_Position = getFloorPos(picInfo, sprite);
 }

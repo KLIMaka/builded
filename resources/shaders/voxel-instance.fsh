@@ -4,16 +4,11 @@ precision highp int;
 #include "engine-uniforms.fsh"
 #include "structs.vsh"
 
-uniform lowp sampler2DArray atlas;
 uniform sampler2D pal;
 uniform sampler2D plu;
-uniform highp usampler2D infos;
 
-in vec3 tc;
-in vec4 parallax;
 flat in ivec4 params;
-flat in pic_t picInfo;
-flat in float trans;
+flat in uint color;
 
 out vec4 fragColor;
 
@@ -24,11 +19,10 @@ out vec4 fragColor;
 #define LOCAL_SHADOW (float(params.x))
 #define PAL (float(params.y))
 #define DETPH_OFF (float(params.w))
-#define PARALLAX (parallax.w == 1.0)
+#define PARALLAX (false)
 #include "inc.fsh"
 
 void main() {
-  vec3 atlasTc =  getTc(tc, picInfo, infos, atlas, parallax, true, true);
-  vec3 color = palLookup(atlasTc, atlas, pal, plu);
-  fragColor = vec4(color, trans);
+  vec3 color = fetchColor(pal, samplePalIdx(plu, float(color) / 255.0));
+  fragColor = vec4(color, 1.0);
 }

@@ -1,3 +1,4 @@
+import { BuildTror } from "app/apis/engine";
 import { GridController } from "../../app/apis/app";
 import { any, findFirst, interpolate, intersect, range } from "../../utils/collections";
 import { LinearInterpolator } from "../../utils/interpolator";
@@ -6,6 +7,7 @@ import { clamp, cross2d, int, len2d } from "../../utils/mathutils";
 import { connectedWalls, sectorWalls } from "./loops";
 import { DEFAULT_REPEAT_RATE } from "./mutations/internal";
 import { Board } from "./structs";
+import { createSlopeCalculator, slope } from "build/utils";
 
 export function isValidWallId(board: Board, wallId: number): boolean {
   return wallId >= 0 && wallId < board.numwalls;
@@ -123,17 +125,30 @@ export function sectorOfWall(board: Board, wallId: number): number {
   }
 }
 
-export function findSector(board: Board, x: number, y: number, sectorId: number = -1): number {
+export function findSector(board: Board, tror: BuildTror, x: number, y: number, z: number, sectorId: number = -1): number {
   if (!isValidSectorId(board, sectorId)) return findSectorAll(board, x, y);
   const secs = new Set<number>();
   secs.add(sectorId);
   for (const s of secs) {
     const sec = board.sectors[s];
-    if (inSector(board, x, y, s)) return s;
+
+    if (inSector(board, x, y, s)) {
+      const trorCeilingSectors = tror.ceiling(s);
+      if (trorCeilingSectors.length !== 0) {
+        const cz = slope(board, s, x, y, sec.ceilingheinum) + sec.ceilingz;
+        if (z < cz) return findSector(board, tror, x, y, z, trorCeilingSectors[0]);
+      }
+      const trorFloorSectors = tror.floor(s);
+      if (trorFloorSectors.length !== 0) {
+        const fz = slope(board, s, x, y, sec.floorheinum) + sec.floorz;
+        if (z > fz) return findSector(board, tror, x, y, z, trorFloorSectors[0]);
+      }
+      return s;
+    }
     for (let w = 0; w < sec.wallnum; w++) {
       const wallidx = w + sec.wallptr;
       const wall = board.walls[wallidx];
-      if (wall.nextsector != -1) secs.add(wall.nextsector);
+      if (wall.nextsector !== -1) secs.add(wall.nextsector);
     }
   }
   return -1;

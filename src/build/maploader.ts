@@ -10,7 +10,14 @@ export const sectorStats = struct(SectorStats)
   .field('xflip', bits(1))
   .field('yflip', bits(1))
   .field('alignToFirstWall', bits(1))
-  .field('unk', bits(9));
+  .field('type', bits(2))
+  .field('blocking', bits(1))
+  .field('tror', bits(1))
+  .field('hitscan', bits(1))
+  .field('unk12', bits(1))
+  .field('unk13', bits(1))
+  .field('unk14', bits(1))
+  .field('floorShade', bits(1));
 
 export const sectorStruct = struct(Sector)
   .field('wallptr', ushort)
@@ -48,7 +55,13 @@ export const wallStats = struct(WallStats)
   .field('translucent', bits(1))
   .field('yflip', bits(1))
   .field('translucentReversed', bits(1))
-  .field('unk', bits(6));
+  .field('yaxUpWall', bits(1))
+  .field('yaxDownWall', bits(1))
+  .field('rotate90', bits(1))
+  .field('unk13', bits(1))
+  .field('unk14', bits(1))
+  .field('unk15', bits(1))
+  ;
 
 export const wallStruct = struct(Wall)
   .field('x', int)
@@ -69,7 +82,7 @@ export const wallStruct = struct(Wall)
   .field('hitag', ushort)
   .field('extra', ushort);
 
-const spriteStats = struct(SpriteStats)
+export const spriteStats = struct(SpriteStats)
   .field('blocking', bits(1))
   .field('translucent', bits(1))
   .field('xflip', bits(1))
@@ -79,8 +92,11 @@ const spriteStats = struct(SpriteStats)
   .field('realCenter', bits(1))
   .field('blocking2', bits(1))
   .field('tranclucentReversed', bits(1))
+  .field('unk10', bits(1))
   .field('noautoshading', bits(1))
-  .field('unk', bits(4))
+  .field('unk12', bits(1))
+  .field('unk13', bits(1))
+  .field('unk14', bits(1))
   .field('invisible', bits(1));
 
 export const spriteStruct = struct(Sprite)
@@ -164,7 +180,7 @@ export function initWallStats(stat: WallStats) {
   stat.translucentReversed = 0;
   stat.xflip = 0;
   stat.yflip = 0;
-  stat.unk = 0;
+  stat.unk13 = stat.unk14 = stat.unk15 = 0;
   return stat;
 }
 
@@ -201,7 +217,11 @@ export function initSectorStats(stat: SectorStats) {
   stat.swapXY = 0;
   stat.xflip = 0;
   stat.yflip = 0;
-  stat.unk = 0;
+  stat.tror = 0;
+  stat.type = 0;
+  stat.blocking = 0;
+  stat.hitscan = 0;
+  stat.unk12 = stat.unk13 = stat.unk14 = 0;
   return stat;
 }
 
@@ -248,7 +268,7 @@ export function initSpriteStats(stats: SpriteStats) {
   stats.type = FACE_SPRITE;
   stats.xflip = 0;
   stats.yflip = 0;
-  stats.unk = 0;
+  stats.unk10 = stats.unk12 = stats.unk13 = stats.unk14 = 0;
   return stats;
 }
 

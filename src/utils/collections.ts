@@ -508,6 +508,12 @@ export function group<T, K, V>(i: Iterable<T>, keyMapper: Function<T, K>, valueM
   return map;
 }
 
+export function* groupEntries<T, K, V>(i: Iterable<T>, keyMapper: Function<T, K>, valueMapper: Function<T, V>): Generator<[K, V[]]> {
+  const map = new Map<K, V[]>();
+  for (const item of i) getOrCreate(map, keyMapper(item), _ => []).push(valueMapper(item));
+  for (const e of map.entries()) yield e;
+}
+
 export function getOrCreate<K, V>(map: Map<K, V>, key: K, value: Function<K, V>) {
   let v = map.get(key);
   if (v === undefined) {

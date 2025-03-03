@@ -5,6 +5,7 @@ import { TWO_PI, RadialSegment, RadialSegments, createSegment, dot2d, len2d, mon
 import { inSector } from './board/query';
 import { Board, Sector } from './board/structs';
 import { MoveStruct, ZSCALE, slope, wallVisible } from './utils';
+import { BuildTror } from 'app/apis/engine';
 
 export function packWallSectorId(wallId: number, sectorId: number) {
   return wallId | (sectorId << 16)
@@ -27,7 +28,7 @@ export interface VisResult {
 
 export type SectorVisitor<T> = (ctx: T, sectorId: number) => void;
 export type SectorPredicate<T> = (ctx: T, sectorId: number) => boolean;
-export type WallVisitor<T> = (ctx: T, wallId: number, dist: number) => void;
+export type WallVisitor<T> = (ctx: T, wallId: number, sectorId: number, dist: number) => void;
 export type WallPredicate<T> = (ctx: T, wallId: number, dist: number) => boolean;
 export type SpriteVisitor<T> = (ctx: T, spriteId: number, dist: number) => void;
 export type SpritePredicate<T> = (ctx: T, spriteId: number, dist: number) => boolean;
@@ -118,7 +119,7 @@ export class AllBoardVisitorResult implements VisResult {
       for (let w = sec.wallptr; w < endwall; w++) {
         const wall = this.board.walls[w];
         const dist = len2d(wall.x - this.ms.x, wall.y - this.ms.y);
-        wallv(ctx, w, dist);
+        wallv(ctx, w, s, dist);
       }
     }
   }
@@ -229,58 +230,65 @@ function calcSegmentSprite(board: Board, spriteId: number, ms: MoveStruct): Radi
 
 export class PvsBoardVisitorResult implements VisResult {
   private sectors = new Deck<number>();
-  private walls = new Deck<number>();
+  private walls = new Deck<[number, number]>();
   private sprites = new Deck<number>();
-  private pvs = new Set<number>();
-  private nonvoidWalls = new Deck<number>();
+  private visitedSectors = new Set<number>();
   private rad = new RadialSegments();
   private ms: MoveStruct;
   private board: Board;
 
-  public visit(board: Board, boardUtils: BoardUtils, ms: MoveStruct, fwd: vec3): VisResult {
-    this.sectors.clear();
-    this.walls.clear();
-    this.sprites.clear();
-    this.rad.clear();
-    this.pvs.clear();
-    this.pvs.add(ms.sec);
-    this.ms = ms;
-    this.board = board;
+  private visitTrorBunch(board: Board, boardUtils: BoardUtils, tror: BuildTror, ms: MoveStruct, fwd: vec3, sectors: number[]) {
+    const rad = new RadialSegments();
+    const pvs = new Set<number>(sectors);
+    const nonvoidWalls = new Deck<number>();
 
-    for (const s of this.pvs) {
+    for (const s of pvs) {
+      if (this.visitedSectors.has(s)) continue;
+
       const sec = board.sectors[s];
       if (!sec) continue;
 
+      this.visitedSectors.add(s);
       this.sectors.push(s);
       const endwall = sec.wallptr + sec.wallnum;
-      this.nonvoidWalls.clear();
+      nonvoidWalls.clear();
       for (let w = sec.wallptr; w < endwall; w++) {
         if (!wallVisible(board, w, ms) || wallBehind(board, sec, w, ms, fwd)) continue;
         const wall = board.walls[w];
         if (wall.nextsector !== -1 && !wall.cstat.oneWay) {
-          this.nonvoidWalls.push(w);
+          nonvoidWalls.push(w);
         } else if (this.rad.scan(calcSegment(board, w, ms, true))) {
-          this.walls.push(w);
-          this.rad.add(calcSegment(board, w, ms, false));
+          this.walls.push([w, s]);
+          rad.add(calcSegment(board, w, ms, false));
         }
       }
 
-      for (const w of this.nonvoidWalls) {
+      for (const w of nonvoidWalls) {
         const wall = board.walls[w];
-        if (this.rad.scan(calcSegment(board, w, ms, true))) {
-          this.walls.push(w);
-          this.pvs.add(wall.nextsector);
+        if (rad.scan(calcSegment(board, w, ms, true))) {
+          this.walls.push([w, s]);
+          pvs.add(wall.nextsector);
         }
       }
 
       const sprs = boardUtils.spritesBySector(s);
-      if (sprs !== undefined) {
-        for (let i = 0; i < sprs.length; i++) {
-          const s = sprs[i];
-          this.sprites.push(s);
-        }
-      }
+      if (sprs !== undefined) this.sprites.pushAll(sprs);
+
+      const ceiling = tror.ceiling(s);
+      if (ceiling.length !== 0) this.visitTrorBunch(board, boardUtils, tror, ms, fwd, ceiling);
+      const floor = tror.floor(s);
+      if (floor.length !== 0) this.visitTrorBunch(board, boardUtils, tror, ms, fwd, floor);
     }
+  }
+
+  public visit(board: Board, boardUtils: BoardUtils, tror: BuildTror, ms: MoveStruct, fwd: vec3): VisResult {
+    this.sectors.clear();
+    this.walls.clear();
+    this.sprites.clear();
+    this.visitedSectors.clear();
+    this.ms = ms;
+    this.board = board;
+    this.visitTrorBunch(board, boardUtils, tror, ms, fwd, [ms.sec]);
     return this;
   }
 
@@ -291,10 +299,10 @@ export class PvsBoardVisitorResult implements VisResult {
 
   public forWall<T>(ctx: T, wallv: WallVisitor<T>) {
     for (let i = 0; i < this.walls.length(); i++) {
-      const w = this.walls.get(i);
+      const [w, s] = this.walls.get(i);
       const wall = this.board.walls[w];
       const dist = len2d(wall.x - this.ms.x, wall.y - this.ms.y);
-      wallv(ctx, w, dist);
+      wallv(ctx, w, s, dist);
     }
   }
 

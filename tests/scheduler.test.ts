@@ -1,5 +1,5 @@
 import { DefaultScheduler } from "../src/app/modules/scheduler/scheduler";
-import { WorkBuilder } from "../src/app/modules/scheduler/work";
+import { begin } from "../src/app/modules/scheduler/work";
 import { getOrCreate, range } from "../src/utils/collections";
 import { Consumer, pair } from "../src/utils/types";
 
@@ -218,7 +218,7 @@ test('Work', async () => {
   const s = DefaultScheduler(c => cb = c);
   const nextLoop = () => run(cb);
 
-  const work = new WorkBuilder()
+  const work = begin()
     .then('step1', async () => 42)
     .then('step2', async i => i + 10)
     .then('step3', async i => i.toString() + 'ff')
@@ -232,7 +232,7 @@ test('Work', async () => {
   expect(task.progress.get()).toBe(100);
   expect(task.task.get().result().getOk()).toStrictEqual(['52ff', ['52ff', 42], 42]);
 
-  const work1 = new WorkBuilder()
+  const work1 = begin()
     .then('step1', async () => 42)
     .thenPass('step2', async a => a + 11)
     .thenPass('step3', async (a, b) => a + b)
@@ -243,7 +243,7 @@ test('Work', async () => {
   await nextLoop();
   expect(task1.task.get().result().getOk()).toStrictEqual([42, 53, 95, 190]);
 
-  const work2 = new WorkBuilder()
+  const work2 = begin()
     .input<[number, number]>()
     .then('step1', async ([a, b]) => a + b)
     .finish();
@@ -252,7 +252,7 @@ test('Work', async () => {
   await nextLoop();
   expect(task2.task.get().result().getOk()).toStrictEqual([3]);
 
-  const work3 = new WorkBuilder()
+  const work3 = begin()
     .multiInput<[number, number]>()
     .then('step1', async (a, b) => a + b)
     .finish([1, 2]);
@@ -262,7 +262,7 @@ test('Work', async () => {
   await nextLoop();
   expect(task3.task.get().result().getOk()).toStrictEqual([3]);
 
-  const work4 = new WorkBuilder()
+  const work4 = begin()
     .then('step1', async () => 42)
     .thenPass('step2', async a => a.toString())
     .fork(p => p
@@ -275,7 +275,7 @@ test('Work', async () => {
   await nextLoop();
   expect(task4.task.get().result().getOk()).toStrictEqual([424.2, '42a42b']);
 
-  const work5 = new WorkBuilder()
+  const work5 = begin()
     .then('step1', async () => 5)
     .thenPass('step2', async n => [...range(1, n + 1)])
     .factory((w, a, is) =>
@@ -288,11 +288,11 @@ test('Work', async () => {
   await nextLoop();
   expect(task5.task.get().result().getOk()).toStrictEqual([['100', '200', '300', '400', '500']]);
 
-  const work61 = new WorkBuilder()
+  const work61 = begin()
     .multiInput<[number, [number, number]]>()
     .thenPass('step2', async (a, [b, c]) => [a, b, c])
     .finish();
-  const work6 = new WorkBuilder()
+  const work6 = begin()
     .then('step1', async () => 42)
     .forkPass(p => p
       .thread('p1', async i => i * 10)
@@ -305,7 +305,7 @@ test('Work', async () => {
   await nextLoop();
   expect(task6.task.get().result().getOk()).toStrictEqual([44, 422, 54]);
 
-  const work7 = new WorkBuilder()
+  const work7 = begin()
     .forkItems([1, 2, 3], i => i.toString(), async i => Promise.resolve(i))
     .then('step2', async is => is.map(i => i * 2))
     .finishUntuple();
@@ -314,11 +314,11 @@ test('Work', async () => {
   await nextLoop();
   expect(task7.task.get().result().getOk()).toStrictEqual([2, 4, 6]);
 
-  const work81 = new WorkBuilder()
+  const work81 = begin()
     .multiInput<[number, [number, number]]>()
     .then('step2', async (a, [b, c]) => [a, b, c])
     .finish();
-  const work8 = new WorkBuilder()
+  const work8 = begin()
     .then('step1', async () => 42)
     .forkPass(p => p
       .thread('p1', async i => i * 10)

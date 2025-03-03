@@ -448,17 +448,17 @@ class ZipFS extends BaseFS implements FileSystem {
   }
 
   async read(name: string): Promise<Optional<ArrayBuffer>> {
-    const file = this.zip.file(name);
-    if (file == null) return Optional.empty();
-    return file.async('arraybuffer').then(a => Optional.of(a));
+    const file = this.zip.file(new RegExp(name, 'i'));
+    if (file.length === 0) return Optional.empty();
+    return file[0].async('arraybuffer').then(a => Optional.of(a));
   }
 
   async info(name: string): Promise<Optional<FileInfo>> {
-    const file = this.zip.file(name);
-    if (file == null) return Optional.empty();
+    const file = this.zip.file(new RegExp(name, 'i'));
+    if (file.length === 0) return Optional.empty();
     return Optional.of({
-      name: file.name,
-      lastModified: +file.date,
+      name: file[0].name,
+      lastModified: +file[0].date,
       size: (file as any)._data.uncompressedSize,
     } as FileInfo)
   }

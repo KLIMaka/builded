@@ -1,6 +1,6 @@
 import { Disposable, Source } from "@utils/callbacks";
 import { Dependency } from "@utils/injector";
-import { Consumer, Function, Result, Union } from "@utils/types";
+import { Consumer, Result } from "@utils/types";
 import Optional from "optional-js";
 
 // General
@@ -63,20 +63,14 @@ export type Storages = (name: string) => Promise<Storage>;
 
 // Scheduler
 export class TaskInerruptedError extends Error {
-  constructor() {
-    super('Task Interrupted');
-  }
-};
+  constructor() { super('Task Interrupted') }
+}
 
 export type EventLoop = Consumer<Consumer<number>>;
 
 export type ProgressInfo = {
   readonly progress: Source<number>;
   readonly info: Source<string>;
-}
-
-export interface SubtaskHandle {
-  waitFor<T>(promise: Promise<T>, info: string, dp: number): Promise<T>;
 }
 
 export interface TaskHandle {

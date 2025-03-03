@@ -48,7 +48,7 @@ export function animate(frame: number, info: ArtInfo) {
   else if (info.attrs.animType === AnimationType.ANIMATE_BACKWARD) return - frame % max;
 }
 
-export const anumStruct = struct(Attributes)
+export const animStruct = struct(Attributes)
   .field('frames', bits(6))
   .field('animType', bits(2))
   .field('xoff', byte)
@@ -76,7 +76,7 @@ export function readArtFile(buffer: ArrayBuffer): ArtFile {
   const size = header.end - header.start + 1;
   const hs = array(ushort, size).read(stream);
   const ws = array(ushort, size).read(stream);
-  const attrs = array(anumStruct, size).read(stream);
+  const attrs = array(animStruct, size).read(stream);
   const arts = iter(range(0, size)).map(i => {
     const w = ws[i];
     const h = hs[i];

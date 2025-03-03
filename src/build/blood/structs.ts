@@ -1,4 +1,4 @@
-import { Sector, Wall, Sprite, Board, SectorStats } from "../board/structs";
+import { Board, Sector, Sprite, Wall } from "../board/structs";
 
 export class SectorExtra {
   public reference: number;
@@ -80,11 +80,7 @@ export class SectorExtra {
   public bobRotate: number;
 }
 
-export class BloodSectorStats extends SectorStats {
-  public floorShade: boolean;
-}
-
-export class BloodSector extends Sector<BloodSectorStats> {
+export class BloodSector extends Sector {
   public extraData: SectorExtra;
 }
 

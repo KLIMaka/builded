@@ -1,10 +1,10 @@
 import { createContainer, Source, ValuesContainer } from "@utils/callbacks";
-import { EMPTY_COLLECTION, getOrCreate, range } from "@utils/collections";
+import { EMPTY_COLLECTION, getOrCreate } from "@utils/collections";
 import { iter } from "@utils/iter";
 import { Stream } from "@utils/stream";
 import { first, Function, second } from "@utils/types";
 import { BoardUtils } from "app/apis/app";
-import { BoardContext, BuildRor, EMPTY_ALIASES, EMPTY_TAGS, EngineContext, EngineSettings, Palette, PicTags, VoxelSwap } from "app/apis/engine";
+import { BoardContext, BuildRor, BuildTror, EMPTY_ALIASES, EMPTY_TAGS, EngineContext, EngineSettings, GlBlend, Palette, PicTags, VoxelSwap } from "app/apis/engine";
 import { FileSystem } from "app/apis/fs";
 import { BloodBoard } from "build/blood/structs";
 import { loadRorLinks, MIRROR_PIC } from "build/blood/utils";
@@ -16,6 +16,7 @@ import { cloneBoard, cloneSector, cloneSprite, cloneWall, loadBloodMap, newBoard
 import { loadArtMap, loadArtWork, loadMaxPluId, loadRaw, openFile, openFileOptional, packegeFs } from "../default/engine-commons";
 import { createRffFsArrayBuffer, stack, watchFile } from "../fs/fs";
 import { begin } from "../scheduler/work";
+import { SECTOR_TAGS, SPRITE_TAGS, WALL_TAGS } from "./texts";
 
 function engineApi(): EngineApi<BloodBoard> {
   return { cloneBoard, cloneWall, cloneSprite, cloneSector, newWall, newSector, newSprite, newBoard };
@@ -58,20 +59,18 @@ async function loadBoard(stream: Stream): Promise<BoardContext<BloodBoard>> {
   const ror = { rorLinks, isMirrorPic: picnum => picnum === MIRROR_PIC } as BuildRor;
   const spritesBySector = iter(board.sprites).map(s => s.sectnum).enumerate().group(first, second);
   const utils = { spritesBySector: (sectorId) => spritesBySector.get(sectorId) } as BoardUtils;
-  const parallaxPicnums = (picnum: number): number[] => [...range(picnum, picnum + Math.pow(2, board.parallaxSize))]
-  return { board, ror, utils, parallaxPicnums }
+  const parallaxPicnums = Math.pow(2, board.parallaxSize);
+  const tror: BuildTror = { ceiling: (_: number) => [], floor: (_: number) => [] };
+  const lotagSectorText = (sectorId: number) => SECTOR_TAGS.get(board.sectors[sectorId].lotag) ?? '';
+  const lotagSpriteText = (spriteId: number) => SPRITE_TAGS.get(board.sprites[spriteId].lotag) ?? '';
+  const lotagWallText = (wallId: number) => WALL_TAGS.get(board.walls[wallId].lotag) ?? '';
+  return { board, ror, tror, utils, parallaxPicnums, lotagSectorText, lotagSpriteText, lotagWallText }
 }
 
-function engineSettings(): EngineSettings<BloodBoard> {
-  const spriteShadowOff = (board: BloodBoard, spriteId: number) => {
-    const spr = board.sprites[spriteId];
-    const sec = board.sectors[spr.sectnum];
-    if (sec.floorstat.floorShade) return sec.floorshade;
-    return sec.ceilingstat.parallaxing ? sec.ceilingshade : sec.floorshade;
-  }
+function engineSettings(): EngineSettings {
   const trans1 = 0.66;
   const trans2 = 0.33;
-  return { spriteShadowOff, trans1, trans2 };
+  return { spriteShadowOff: true, trans1, trans2 };
 }
 
 type FileById = (fid: number, ext: string) => Optional<ArrayBuffer>;
@@ -82,7 +81,7 @@ function loadFileById(values: ValuesContainer, bloodRff: Source<Optional<RffFile
 
 type VoxelInfo = (picnum: number) => number;
 
-async function createSpriteVoxelSwap(values: ValuesContainer, fs: Source<FileSystem>): Promise<Source<VoxelSwap<BloodBoard>>> {
+async function createSpriteVoxelSwap(values: ValuesContainer, fs: Source<FileSystem>): Promise<Source<VoxelSwap>> {
   const bloodRffFile = await openFileOptional(values, 'BLOOD.RFF', fs);
   const bloodRff = values.transformed('blood-rff', bloodRffFile, o => o.map(buff => new RffFile(buff)));
   const fileById = loadFileById(values, bloodRff);
@@ -93,9 +92,8 @@ async function createSpriteVoxelSwap(values: ValuesContainer, fs: Source<FileSys
   }
   const voxelInfo = values.transformed('voxel-info', voxelDat, buff => buff.map(loadVoxelInfo).orElse(_ => 0xffff));
   const cache = new Map<number, Optional<VoxelData>>();
-  return values.transformedTuple('sprite-swap', [fileById, voxelInfo], ([fileById, voxelInfo]) => (board, spriteId) => {
-    const spr = board.sprites[spriteId];
-    const fileId = voxelInfo(spr.picnum);
+  return values.transformedTuple('sprite-swap', [fileById, voxelInfo], ([fileById, voxelInfo]) => picnum => {
+    const fileId = voxelInfo(picnum);
     if (fileId === 0xffff) return Optional.empty();
     return getOrCreate(cache, fileId, fileId => {
       const voxelFile = fileById(fileId, 'kvx');
@@ -133,7 +131,9 @@ export const createEngineContextWork = begin()
         const shadowsteps = values.const('shadowsteps', 64);
         const aliases = values.const('aliases', EMPTY_ALIASES);
         const maxPluId = loadMaxPluId(values, plus);
+        const parallaxInfo = (_: number) => 0xffffff;
         const dispose = () => values.dispose();
-        return { name, resources, api, settings, pal, trans, picTags, plus, maxPluId, art, artMap, shadowsteps, aliases, spriteVoxelSwap, loadBoard, dispose }
+        const blends = values.const<Function<number, GlBlend>>('blend', _ => ({ src: WebGL2RenderingContext.SRC_ALPHA, dst: WebGL2RenderingContext.ONE_MINUS_SRC_ALPHA }));
+        return { name, resources, api, settings, pal, trans, picTags, plus, maxPluId, art, artMap, shadowsteps, aliases, spriteVoxelSwap, blends, parallaxInfo, loadBoard, dispose }
       }).finish()(handle, fs)))
   .finish();

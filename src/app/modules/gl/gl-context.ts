@@ -1,14 +1,17 @@
 import { createContainer, Disposable, Source } from "@utils/callbacks";
-import { getOrCreate, getOrDefault, range, rect } from "@utils/collections";
+import { getOrCreate, getOrDefault, range } from "@utils/collections";
 import { DisposableResource, GlContext, ResourceFactory, Texture } from "@utils/gl/drawstruct";
 import { createTexture } from "@utils/gl/textures";
+import { axisSwap } from "@utils/imgutils";
 import { iter } from "@utils/iter";
-import { int } from "@utils/mathutils";
+import { int, sum } from "@utils/mathutils";
 import { Stream } from "@utils/stream";
 import { Packer, Rect } from "@utils/texcoordpacker";
-import { Consumer, identity, pair, second } from "@utils/types";
-import { ArtInfoExtended, EngineContext } from "app/apis/engine";
-import { anumStruct, ArtInfo } from "build/formats/art";
+import { Consumer, Function, identity, pair } from "@utils/types";
+import { ArtInfoExtended, EngineContext, VoxelSwap } from "app/apis/engine";
+import { animStruct, ArtInfo } from "build/formats/art";
+import { unpackVoxelSides } from "build/formats/kvx";
+import Optional from "optional-js";
 
 export function createGlContext(): GlContext {
   const offscreen = new OffscreenCanvas(0, 0);
@@ -27,6 +30,11 @@ export function createGlContext(): GlContext {
   return { offscreen, gl, resource, info }
 }
 
+export type VoxelDrawData = {
+  size: number,
+  texture: WebGLTexture,
+}
+
 export type EngineTextures = {
   readonly pal: Source<Texture>,
   readonly plu: Source<Texture>,
@@ -34,26 +42,10 @@ export type EngineTextures = {
   readonly atlas: Source<WebGLTexture>,
   readonly infos: Source<WebGLTexture>,
   readonly art: Source<Map<number, ArtInfoExtended>>,
+  readonly voxels: Source<Function<number, Optional<VoxelDrawData>>>,
 
-  get(picnum: number): Source<number>,
-  getParallaxTexture(picnums: Iterable<number>): Source<number>
+  get(picnum: number, additional?: number): Source<number>,
 } & Disposable;
-
-function axisSwap(data: Uint8Array, w: number, h: number): Uint8Array {
-  const result = new Uint8Array(w * h);
-  for (const [x, y] of rect(w, h)) result[x * h + y] = data[y * w + x];
-  return result;
-}
-
-function mergeParallax(w: number, h: number, arrs: Uint8Array[]): Uint8Array {
-  const result = new Uint8Array(w * h * arrs.length);
-  for (let y = 0; y < h; y++) {
-    for (let i = 0; i < arrs.length; i++) {
-      for (let x = 0; x < w; x++) result[y * w * arrs.length + i * w + x] = arrs[i][y * w + x]
-    }
-  }
-  return result;
-}
 
 type AtlasRect = { rect: Rect, depth: number, uploaded: boolean }
 class ArtTexture implements Disposable {
@@ -67,6 +59,8 @@ class ArtTexture implements Disposable {
     private arts: Map<number, ArtInfoExtended>,
     private width: number,
     private height: number,
+    private parallaxInfo: Function<number, number>,
+    private voxelsSwaps: Source<VoxelSwap>,
   ) {
     const { gl, resource } = glCtx;
     const packers: Packer[] = [];
@@ -89,6 +83,7 @@ class ArtTexture implements Disposable {
     whs.sort(([id1, [w1, h1]], [id2, [w2, h2]]) => - w1 * h1 + w2 * h2);
     whs.forEach(([id, [w, h]]) => this.rects.set(id, pack(w, h)));
     this.depth = packers.length;
+    console.log(`Atlas created with ${this.depth} layers`);
     this.atlasId = this.initAtlasTexture(gl, resource);
     this.infoId = this.initInfoTexture(gl, resource);
   }
@@ -109,7 +104,7 @@ class ArtTexture implements Disposable {
     return infoId;
   }
 
-  get(picnum: number): number {
+  get(picnum: number, additional = 0): number {
     const atlasRect = this.rects.get(picnum);
     if (atlasRect?.uploaded ?? true) return picnum;
     const info = this.arts.get(picnum);
@@ -118,6 +113,8 @@ class ArtTexture implements Disposable {
     this.uploadToAtlas(this.glCtx.gl, atlasRect, arr);
     this.uploadToInfo(picnum, info, atlasRect);
     atlasRect.uploaded = true;
+    if (info.attrs.frames > 0) range(1, info.attrs.frames + 1).forEach(o => this.get(picnum + o));
+    if (additional > 0) range(1, additional).forEach(o => this.get(picnum + o));
     return picnum;
   }
 
@@ -128,8 +125,8 @@ class ArtTexture implements Disposable {
     stream.writeUShort(atlasRect.rect.h);
     stream.writeUShort(atlasRect.rect.xoff);
     stream.writeUShort(atlasRect.rect.yoff);
-    stream.writeUInt(atlasRect.depth);
-    anumStruct.write(stream, info.attrs);
+    stream.writeUInt((atlasRect.depth & 0xff) | (this.parallaxInfo(picnum) << 8));
+    animStruct.write(stream, info.attrs);
     const gl = this.glCtx.gl;
     const x = picnum % 256;
     const y = int(picnum / 256);
@@ -150,6 +147,32 @@ class ArtTexture implements Disposable {
   }
 }
 
+function getVoxel(picnum: number, cache: Map<number, [number, DisposableResource<WebGLTexture>]>, voxels: VoxelSwap, glCtx: GlContext): Optional<VoxelDrawData> {
+  const loaded = cache.get(picnum);
+  if (loaded !== undefined) return Optional.of({ texture: loaded[1].value, size: loaded[0] });
+  return voxels(picnum).map(data => {
+    const voxels = data.list();
+    const count = (x: number) => range(0, 6).map(i => (x >> i) & 1).reduce((l, r) => l + r);
+    const quads = voxels.map(v => count(v.sides)).reduce(sum);
+    const quadPixels = Math.ceil(quads / 4);
+    const WIDTH = 1024;
+    const w = WIDTH;
+    const h = Math.ceil((voxels.length + 1 + quadPixels) / WIDTH);
+    console.log(`Creating voxel texture for ${picnum} with ${quads} quads, ${voxels.length} voxels, ${quadPixels} pixels, ${w}x${h}`);
+    const texData = new Uint32Array(w * h * 4);
+    texData.set([data.xpivot, data.ypivot, data.zpivot, quadPixels + 1]);
+    voxels.map((v, i) => unpackVoxelSides(v.sides).map(s => i | (s << 28))).flat().forEach((v, i) => texData[4 + i] = v);
+    voxels.forEach((v, i) => texData.set([v.x, v.y, v.z, v.color], 4 + quadPixels * 4 + i * 4));
+    const { gl, resource } = glCtx;
+    const tex = resource('texture', gl.createTexture(), t => gl.deleteTexture(t));
+    gl.bindTexture(gl.TEXTURE_2D, tex.value);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32UI, w, h, 0, gl.RGBA_INTEGER, gl.UNSIGNED_INT, texData);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    cache.set(picnum, [quads, tex]);
+    return { texture: tex.value, size: quads };
+  });
+}
+
 export function createEngineTextures(engine: EngineContext, glCtx: GlContext): EngineTextures {
   const { gl } = glCtx;
   return createContainer('engine-textures').initialize(values => {
@@ -168,26 +191,13 @@ export function createEngineTextures(engine: EngineContext, glCtx: GlContext): E
     const trans = values.transformed('transTexture', engine.trans, trans => createTexture(glCtx, 256, 256, trans, gl.LUMINANCE), texDisposer);
     const textures = new Map<number, Source<number>>();
     const size = Math.min(4096, gl.getParameter(gl.MAX_TEXTURE_SIZE));
-    const artTexture = values.transformed(`atlas`, art, arts => new ArtTexture(glCtx, arts, size, size), { disposer: m => m.dispose() });
+    const artTexture = values.transformed(`atlas`, art, arts => new ArtTexture(glCtx, arts, size, size, engine.parallaxInfo, engine.spriteVoxelSwap), { disposer: m => m.dispose() });
     const atlas = values.transformed(`atlas-texture`, artTexture, t => t.atlasId.value);
     const infos = values.transformed(`infos-texture`, artTexture, t => t.infoId.value);
-    const get = (picnum: number) => getOrCreate(textures, picnum, _ => values.transformed(`texture_${picnum}`, artTexture, mega => mega.get(picnum)))
-    const parallaxTextures = new Map<string, Source<TextureRect>>();
-    const formatParallaxTextureId = (pics: number[]) => iter(pics).map(i => i.toString()).join(',').reduce((l, r) => l + r, '');
-    const getParallaxTexture = (pics: number[]) => getOrCreate(parallaxTextures, formatParallaxTextureId(pics), key => values.transformed(`parallaxTexture_${key}`, artTexture, ([arts, mega]) => {
-      const infos = iter(pics).map(p => arts.get(p)).map(i => pair(i, axisSwap(i.img, i.h, i.w))).collect();
-      const count = infos.length;
-      const [{ w, h }, axisSwapped] = iter(infos).first().get();
-      if (!iter(infos).all(([i, _]) => i.w === w && i.h === h)) {
-        const rect = mega.put(gl, w, h, axisSwapped);
-        return { texture: mega.atlasId.value, depth: rect.layer, ...rect.rect };
-      }
-      const merged = mergeParallax(w * count, h, iter(infos).map(second).collect());
-      const rect = mega.put(gl, w, h, merged);
-      return { texture: mega.atlasId.value, depth: rect.layer, ...rect.rect };
-    }));
-
-    const dispose = async () => { await values.dispose() }
-    return { pal, plu, trans, atlas, infos, art, get, getParallaxTexture, dispose };
+    const get = (picnum: number, additional = 0) => getOrCreate(textures, picnum, _ => values.transformed(`texture_${picnum}`, artTexture, mega => mega.get(picnum, additional)));
+    const voxelsCache = new Map<number, [number, DisposableResource<WebGLTexture>]>();
+    const voxels = values.transformed('voxels', engine.spriteVoxelSwap, voxels => (picnum: number) => getVoxel(picnum, voxelsCache, voxels, glCtx));
+    const dispose = async () => { await values.dispose(); voxelsCache.values().forEach(([_, t]) => t.dispose()) }
+    return { pal, plu, trans, atlas, infos, art, voxels, get, dispose };
   });
 }

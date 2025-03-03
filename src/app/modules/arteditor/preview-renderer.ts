@@ -19,9 +19,8 @@ import { RenderInfo } from "./arteditor-model";
 export async function createPreviewRenderer(values: ValuesContainer, glCtx: GlContext, ctx: BuildGlEngineContext): Promise<PreviewRenderer> {
   const state = new StateGl1(glCtx, s => new BufferAllocator(glCtx, s, 1024, 1024));
   const defs = ['PALSWAPS (' + (ctx.engine.maxPluId.get() + 1) + '.0)', 'SHADOWSTEPS (' + ctx.engine.shadowsteps.get() + '.0)'];
-  state.register('wall-instance', await createShader(glCtx, 'resources/shaders/wall-instance', [...defs]));
   state.register('sprite-instance', await createShader(glCtx, 'resources/shaders/sprite-instance', [...defs]));
-  state.register('wall-instance1', await createShader(glCtx, 'resources/shaders/wall-instance1', [...defs]));
+  state.register('wall-instance', await createShader(glCtx, 'resources/shaders/wall-instance', [...defs]));
   const data = await ctx.engine.resources.get().read('test.map');
   const board = await ctx.engine.loadBoard(new Stream(data.get()));
   return new PreviewRenderer(values, ctx.glContext, ctx.textures(), state, ctx.engine.shadowsteps.get(), board);
@@ -50,7 +49,7 @@ export class PreviewRenderer implements Disposable {
     this.boardContext = this.buildBoard();
 
     const spriteShader = this.stateGl.getShader('sprite-instance');
-    const wallShader = this.stateGl.getShader('wall-instance1');
+    const wallShader = this.stateGl.getShader('wall-instance');
     const matrices = wallShader.uniformBlock('Matrices');
     const P = matrices.writer<[mat4]>('P');
     const V = matrices.writer<[mat4]>('V');
@@ -123,7 +122,7 @@ export class PreviewRenderer implements Disposable {
   }
 
   private buildWalls(t1: number, t2: number, t3: number) {
-    const shader = this.stateGl.getShader('wall-instance1');
+    const shader = this.stateGl.getShader('wall-instance');
     const builder = shader.builder();
     const wallSectorPart = builder.vec4('aWallSectorPart_u16')
     const board = this.board.board;

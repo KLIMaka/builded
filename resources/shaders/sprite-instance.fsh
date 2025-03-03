@@ -1,61 +1,40 @@
 precision highp float;
+precision highp int;
 
-uniform Matrices {
-  mat4 P;
-  mat4 V;
-  mat4 IV;
-};
+#include "engine-uniforms.fsh"
+#include "structs.vsh"
 
 uniform lowp sampler2DArray atlas;
 uniform sampler2D pal;
 uniform sampler2D plu;
+uniform highp usampler2D infos;
 
 in vec3 tc;
 flat in ivec4 params;
-flat in uvec4 picInfo;
+flat in pic_t picInfo;
+flat in float trans;
 
 out vec4 fragColor;
 
-#define LOCAL_VIS (1.0)
-#define GLOBAL_VIS (512.0)
-#define DEPTH_SHADOW_SCALE (32.0)
-#define GLOBAL_SHADOW (0.0)
-#define LOCAL_SHADOW (float(params.y))
-#define PLU_TEXTURE (plu)
-#define PAL (float(params.x))
-#define TRANSPARENCY (float(params.z)/255.0)
+#define LOCAL_VIS (float((params.z + 16) & 0xff) / 16.0)
+#define GLOBAL_VIS (float(globalVis))
+#define DEPTH_SHADOW_SCALE (float(depthShadowScale))
+#define GLOBAL_SHADOW (float(globalShadow))
+#define LOCAL_SHADOW (float(params.x))
+#define PAL (float(params.y))
 #define DETPH_OFF (float(params.w))
+#define PARALLAX (false)
 #include "inc.fsh"
 
-int ubyte2byte(uint x) { return int(x) <= 127 ? int(x) : int(x) - 256; }
-
-#define ATLAS_X (picInfo.y & uint(0xffff))
-#define ATLAS_Y ((picInfo.y >> 16) & uint(0xffff))
-#define ATLAS_Z (picInfo.z)
-#define PIC_W (picInfo.x & uint(0xffff))
-#define PIC_H ((picInfo.x >> 16) & uint(0xffff))
-#define PIC_FRAMES (picInfo.w & uint(0x3f))
-#define PIC_ANIM_TYPE ((picInfo.w >> 6) & uint(0x3))
-#define PIC_X ((ubyte2byte(picInfo.w >> 8) & uint(0xff)))
-#define PIC_Y ((ubyte2byte(picInfo.w >> 16) & uint(0xff)))
-#define PIC_ANIM_SPEED ((picInfo.w >> 24) & uint(0xf))
-#define PIC_TYPE ((picInfo.w >> 28) & uint(0xf))
-
-vec3 getTc() {
-  vec2 projectedTc = tc.xy / tc.z;
-  vec2 off = (vec2(ATLAS_X, ATLAS_Y) + vec2(0.01)) / vec2(textureSize(atlas, 0));
-  vec2 size = (vec2(PIC_W, PIC_H) - vec2(0.02)) / vec2(textureSize(atlas, 0));
-  return vec3(clamp(off + size * projectedTc, off, off + size), ATLAS_Z);
-}
-
-vec3 palLookup(vec3 tc) {
-  float colorIdx = texture(atlas, tc).r;
-  float pluedIdx = samplePalIdx(colorIdx);
-  if (isTransIdx(pluedIdx)) discard;
-  return texture(pal, vec2(pluedIdx, 0.5)).rgb;
+void addDepth(float dd) {
+  float originalZ = 1.0 / gl_FragCoord.w;
+  float z = originalZ + dd * (1.0 + abs(originalZ) / 2048.0);
+  gl_FragDepth = 0.5 * ((z - 2.0) / z) + 0.5;
 }
 
 void main() {
-  vec3 tc = getTc();
-  fragColor = vec4(palLookup(tc), TRANSPARENCY);
+  vec3 atlasTc = getTc(tc, picInfo, infos, atlas, vec4(0.0), false, false);
+  vec3 color = palLookup(atlasTc, atlas, pal, plu);
+  fragColor = vec4(color, trans);
+  addDepth(DETPH_OFF);
 }

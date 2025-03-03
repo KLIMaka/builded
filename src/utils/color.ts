@@ -1,4 +1,5 @@
 import { rect } from "./collections";
+import { KDTree } from "./kdtree";
 import { int } from "./mathutils";
 
 export function rgb2hsl(r: number, g: number, b: number): [number, number, number] {
@@ -75,7 +76,7 @@ export function xyz2lab(x: number, y: number, z: number): [number, number, numbe
   ]
 }
 
-export function convertPal(srcPal: number[], conv: (a: number, b: number, c: number) => [number, number, number]): number[] {
+export function convertPal(srcPal: ArrayLike<number>, conv: (a: number, b: number, c: number) => [number, number, number]): number[] {
   const dst = new Array<number>(256 * 3);
   for (let i = 0; i < 256; i++) {
     const off = i * 3;
@@ -93,6 +94,30 @@ export function labDist(pal: number[], color: number, l: number, a: number, b: n
   const ds = a - pal[off + 1];
   const dl = b - pal[off + 2];
   return Math.sqrt(dh * dh + ds * ds + dl * dl);
+}
+
+export function palColorFinder(pal: ArrayLike<number>) {
+  // const dist = (l: [number, number, number], r: [number, number, number]) => Math.sqrt((l[0] - r[0]) ** 2 + (l[1] - r[1]) ** 2 + (l[2] - r[2]) ** 2);
+  // const inRange = (p: [number, number, number], min: [number, number, number], max: [number, number, number]) => p[0] >= min[0] && p[0] <= max[0] && p[1] >= min[1] && p[1] <= max[1] && p[2] >= min[2] && p[2] <= max[2];
+  // const kdtree = new KDTree(pal, 3, dist, inRange);
+  // return (r: number, g: number, b: number) => kdtree.closest([r, g, b]);
+  return (r: number, g: number, b: number) => {
+    let mindist = Number.MAX_VALUE;
+    let idx = 0;
+    for (let i = 0; i < 256; i++) {
+      const off = i * 3;
+      const dh = r - pal[off + 0];
+      const ds = g - pal[off + 1];
+      const dl = b - pal[off + 2];
+      const dist = Math.sqrt(dh * dh + ds * ds + dl * dl);
+      if (dist === 0) return i;
+      if (dist < mindist) {
+        mindist = dist;
+        idx = i;
+      }
+    }
+    return idx;
+  };
 }
 
 export function findLab(pal: number[], l: number, a: number, b: number): [number, number, number] {

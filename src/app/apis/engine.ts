@@ -8,6 +8,8 @@ import { VoxelData } from "build/formats/kvx";
 import Optional from "optional-js";
 import { BoardUtils } from "./app";
 import { FileSystem } from "./fs";
+import { Function } from "@utils/types";
+import { vec3 } from "gl-matrix";
 
 export interface PicTags {
   allTags(): Iterable<string>;
@@ -26,9 +28,10 @@ export type NamedArtFile = { readonly name: string, readonly art: ArtFile }
 export type ArtInfoExtended = ArtInfo & { readonly artFile: string }
 export const EMPTY_INFO_EXTENDED = { ...EMPTY_INFO, artFile: '' } as ArtInfoExtended;
 
-export class RorLink {
-  constructor(readonly srcSpriteId: number, readonly dstSpriteId: number) { }
-}
+export type RorLink = Readonly<{
+  dstSector: number,
+  buildDiff: vec3;
+}>;
 
 export interface RorLinks {
   ceilLink(sectorId: number): RorLink;
@@ -36,8 +39,8 @@ export interface RorLinks {
   hasRor(sectorId: number): boolean;
 }
 export const EMPTY_ROR_LINKS = {
-  ceilLink: _ => null,
-  floorLink: _ => null,
+  ceilLink: _ => undefined,
+  floorLink: _ => undefined,
   hasRor: _ => false,
 } as RorLinks;
 
@@ -46,18 +49,25 @@ export interface BuildRor {
   isMirrorPic(picnum: number): boolean;
 }
 
-export type EngineSettings<B extends Board = Board> = {
-  spriteShadowOff(board: B, spriteId: number): number;
+export interface BuildTror {
+  ceiling(sectorId: number): number[];
+  floor(sectorId: number): number[];
+}
+
+export type EngineSettings = {
+  readonly spriteShadowOff: boolean;
   readonly trans1: number;
   readonly trans2: number;
 }
 
-export type VoxelSwap<B extends Board> = (board: B, spriteId: number) => Optional<VoxelData>;
+export type VoxelSwap = (picnum: number) => Optional<VoxelData>;
+
+export type GlBlend = { src: number, dst: number };
 
 export interface EngineContext<B extends Board = Board> extends Disposable {
   readonly name: Source<string>,
   readonly api: EngineApi<B>,
-  readonly settings: EngineSettings<B>,
+  readonly settings: EngineSettings,
   readonly resources: Source<FileSystem>,
   readonly art: Source<NamedArtFile[]>,
   readonly artMap: Source<Map<number, ArtInfoExtended>>,
@@ -68,7 +78,9 @@ export interface EngineContext<B extends Board = Board> extends Disposable {
   readonly picTags: Source<PicTags>,
   readonly shadowsteps: Source<number>,
   readonly aliases: Source<Aliases>,
-  readonly spriteVoxelSwap: Source<VoxelSwap<B>>;
+  readonly spriteVoxelSwap: Source<VoxelSwap>,
+  readonly blends: Source<Function<number, GlBlend>>,
+  readonly parallaxInfo: Function<number, number>;
 
   // createBoardContext(): BoardContext<B>;
   loadBoard(stream: Stream): Promise<BoardContext<B>>;
@@ -77,8 +89,12 @@ export interface EngineContext<B extends Board = Board> extends Disposable {
 export interface BoardContext<B extends Board = Board> {
   readonly board: B,
   readonly ror: BuildRor,
+  readonly tror: BuildTror,
   readonly utils: BoardUtils,
-  parallaxPicnums(picnum: number): number[];
+  readonly lotagSectorText: (sectorId: number) => string;
+  readonly lotagWallText: (wallId: number) => string;
+  readonly lotagSpriteText: (spriteId: number) => string;
+  readonly parallaxPicnums: number;
 }
 
 export interface EngineContextFactory<B extends Board = Board> {

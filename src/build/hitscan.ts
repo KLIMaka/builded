@@ -286,7 +286,6 @@ function intersectFloorSprite(sprId: number, sinfo: SpriteInfo, hit: Hitscan) {
 
 function intersectSprite(board: Board, artInfo: Map<number, ArtInfo>, sprId: number, hit: Hitscan) {
   const spr = board.sprites[sprId];
-  if (/*spr.picnum === 0 ||*/ spr.cstat.invisible) return;
   const sinfo = spriteInfo(board, sprId, artInfo);
   if (spr.cstat.type === FACE_SPRITE) {
     intersectFaceSprite(sprId, sinfo, hit);

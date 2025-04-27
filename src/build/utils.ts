@@ -2,7 +2,7 @@ import { mat2d, vec2, vec3 } from 'gl-matrix';
 import { cyclicPairs, loopPairs } from '../utils/collections';
 import { cross2d, cyclic, deg2rad, int, len2d, monoatan2, TWO_PI } from '../utils/mathutils';
 import { normal2d } from '../utils/vecmath';
-import { Board, Sprite } from './board/structs';
+import { Board } from './board/structs';
 import { Entity, EntityType } from './hitscan';
 
 export const ZSCALE = -16;
@@ -20,7 +20,8 @@ export function convertVisibility(vis: number) {
 }
 
 export function getPlayerStart(board: Board): { x: number, y: number, z: number, sec: number } {
-  return { x: board.posx, y: board.posy, z: board.posz, sec: board.cursectnum };
+  const z = slope(board, board.cursectnum, board.posx, board.posy, false) + 1024 * ZSCALE;
+  return { x: board.posx, y: board.posy, z, sec: board.cursectnum };
 }
 
 export interface MoveStruct {
@@ -72,7 +73,14 @@ export function setSectorHeinum(board: Board, sectorEnt: Entity, h: number): boo
   const ph = sectorHeinum(board, sectorEnt);
   if (ph === h) return false;
   const sec = board.sectors[sectorEnt.id];
-  if (sectorEnt.type === EntityType.CEILING) sec.ceilingheinum = h; else sec.floorheinum = h;
+  if (sectorEnt.type === EntityType.CEILING) {
+    sec.ceilingheinum = h;
+    if (h !== 0) sec.ceilingstat.slopped = 1;
+  }
+  else {
+    sec.floorheinum = h;
+    if (h !== 0) sec.floorstat.slopped = 1;
+  }
   return true;
 }
 
@@ -90,27 +98,31 @@ export function setSectorPicnum(board: Board, sectorEnt: Entity, picnum: number)
 
 export const ANGSCALE = (1 / 4096);
 
-export function slope(board: Board, sectorId: number, x: number, y: number, heinum: number) {
-  return createSlopeCalculator(board, sectorId)(x, y, heinum);
+export function slope(board: Board, sectorId: number, x: number, y: number, ceiling: boolean) {
+  return createSlopeCalculator(board, sectorId, ceiling)(x, y);
 }
 
-export type SlopeCalculator = (x: number, y: number, heinum: number) => number;
+export type SlopeCalculator = (x: number, y: number) => number;
 
-export function createSlopeCalculator(board: Board, sectorId: number): SlopeCalculator {
+export function createSlopeCalculator(board: Board, sectorId: number, ceiling: boolean): SlopeCalculator {
   const sector = board.sectors[sectorId];
+  const stat = ceiling ? sector.ceilingstat : sector.floorstat;
+  const z = ceiling ? sector.ceilingz : sector.floorz;
+  const heinum = ceiling ? sector.ceilingheinum : sector.floorheinum;
+  if (stat.slopped === 0 || heinum === 0) return _ => z;
   const wall1 = board.walls[sector.wallptr];
   const wall2 = board.walls[wall1.point2];
   const dx = wall2.x - wall1.x;
   const dy = wall2.y - wall1.y;
   const ln = len2d(dx, dy);
-  if (ln === 0) return (x: number, y: number, heinum: number) => 0;
+  if (ln === 0) return _ => z;
   const dxn = dx / ln;
   const dyn = dy / ln;
-  return (x: number, y: number, heinum: number): number => {
+  return (x, y): number => {
     const dx1 = x - wall1.x;
     const dy1 = y - wall1.y;
     const k = -cross2d(dxn, dyn, dx1, dy1);
-    return int(heinum * ANGSCALE * k * ZSCALE);
+    return int(heinum * ANGSCALE * k * ZSCALE) + z;
   };
 }
 

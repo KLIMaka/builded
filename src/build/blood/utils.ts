@@ -9,11 +9,11 @@ import { slope } from "build/utils";
 export const MIRROR_PIC = 504;
 
 function isUpperLink(spr: Sprite) { // floor
-  return spr.lotag === 11 || spr.lotag === 9 || spr.lotag === 13;
+  return spr.lotag === 11 || spr.lotag === 9 || spr.lotag === 13 || spr.lotag === 7;
 }
 
 function isLowerLink(spr: Sprite) { // ceiling
-  return spr.lotag === 12 || spr.lotag === 10 || spr.lotag === 14;
+  return spr.lotag === 12 || spr.lotag === 10 || spr.lotag === 14 || spr.lotag === 6;
 }
 
 export function loadRorLinks(board: BloodBoard): RorLinks {
@@ -37,15 +37,15 @@ export function loadRorLinks(board: BloodBoard): RorLinks {
     else board.sectors[spr1.sectnum].ceilingstat.tror = 1;
     if (spr2.lotag === 9 || spr2.lotag === 13) board.sectors[spr2.sectnum].floorstat.type = 3;
     else board.sectors[spr2.sectnum].floorstat.tror = 1;
-    const sec1 = board.sectors[spr1.sectnum];
-    const sec2 = board.sectors[spr2.sectnum];
-    const spr1z = slope(board, spr1.sectnum, spr1.x, spr1.y, sec1.ceilingheinum) + sec1.ceilingz;
-    const spr2z = slope(board, spr2.sectnum, spr2.x, spr2.y, sec2.floorheinum) + sec2.floorz;
+    const spr1z = slope(board, spr1.sectnum, spr1.x, spr1.y, true);
+    const spr2z = slope(board, spr2.sectnum, spr2.x, spr2.y, false);
     const srcSpritePos = vec3.fromValues(spr1.x, spr1.y, spr1z);
     const dstSpritePos = vec3.fromValues(spr2.x, spr2.y, spr2z);
     const buildDiff = vec3.sub(vec3.create(), srcSpritePos, dstSpritePos);
-    ceilingLinks.set(spr1.sectnum, { buildDiff, dstSector: spr2.sectnum });
-    floorLinks.set(spr2.sectnum, { buildDiff: vec3.negate(vec3.create(), buildDiff), dstSector: spr1.sectnum });
+    const ceilingTeleport = spr1.lotag === 6 && board.sectors[spr1.sectnum].ceilingpicnum !== MIRROR_PIC;
+    const floorTeleport = spr2.lotag === 7 && board.sectors[spr2.sectnum].floorpicnum !== MIRROR_PIC;
+    ceilingLinks.set(spr1.sectnum, { buildDiff, dstSector: spr2.sectnum, transparent: !ceilingTeleport });
+    floorLinks.set(spr2.sectnum, { buildDiff: vec3.negate(vec3.create(), buildDiff), dstSector: spr1.sectnum, transparent: !floorTeleport });
   }
   const floorLink = (sectorId: number) => floorLinks.get(sectorId);
   const ceilLink = (sectorId: number) => ceilingLinks.get(sectorId);

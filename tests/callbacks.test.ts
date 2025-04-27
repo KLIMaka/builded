@@ -1,5 +1,5 @@
 import { enableMapSet } from "immer";
-import { createContainer, transformed, transformedBuilder, value } from "../src/utils/callbacks";
+import { createContainer, transformed, value } from "../src/utils/callbacks";
 
 test('value', () => {
   const a = value('a', 1);
@@ -58,7 +58,7 @@ test('set/map value', () => {
 
 test('transformed', () => {
   const src = value('src', 42);
-  const tsrc = transformedBuilder<[number], string>({ name: 'tsrc', source: src, value: '', transformer: v => v.toString() });
+  const tsrc = transformed(src, v => v.toString());
 
   expect(tsrc.get()).toBe('42');
 
@@ -98,6 +98,26 @@ test('transformed', () => {
   expect(tsrc.get()).toBe('2');
   expect(tsrc1.get()).toBe('3');
   expect(tsrc2.get()).toBe(2 * 2 + 1);
+});
+
+test('transformed count', () => {
+  const values = createContainer('container');
+  const src = values.value('src', 42);
+  let transforms = 0;
+  const trans = values.transformed('trans', src, x => { transforms++; return x * x });
+
+  src.set(11);
+  src.set(22);
+
+  expect(transforms).toBe(0);
+  expect(trans.get()).toBe(22 * 22);
+  expect(transforms).toBe(1);
+
+  src.set(1);
+  src.set(2);
+
+  expect(trans.get()).toBe(2 * 2);
+  expect(transforms).toBe(2);
 });
 
 test('tuple1', () => {

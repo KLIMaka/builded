@@ -2,7 +2,7 @@ import { Bag } from "@utils/bag";
 import { Disposable } from "@utils/callbacks";
 import { getOrCreate } from "@utils/collections";
 import { iter } from "@utils/iter";
-import { Function, MultiConsumer, nil, TypedArray } from "@utils/types";
+import { Function, MultiConsumer, TypedArray } from "@utils/types";
 import { mat4 as gmlMat4 } from "gl-matrix";
 import Optional from "optional-js";
 import { match } from "ts-pattern";
@@ -439,6 +439,10 @@ export class UniformBlocksRegistry {
       });
   }
 
+  uniformBlock(name: string): UniformBlock {
+    return this.registry.get(name)[1];
+  }
+
   private static checkBlocksSame(b1: UniformBlockDefinition, b2: UniformBlockDefinition): boolean {
     return b1.uniforms.length === b2.uniforms.length && iter(b1.uniforms).zip(b2.uniforms).all(([u1, u2]) => u1.type === u2.type)
   }
@@ -446,9 +450,8 @@ export class UniformBlocksRegistry {
 
 function getSamplerTarget(type: string): number {
   return match(type)
-    .with('sampler2D', () => WebGL2RenderingContext.TEXTURE_2D)
+    .with('sampler2D', 'usampler2D', () => WebGL2RenderingContext.TEXTURE_2D)
     .with('sampler2DArray', () => WebGL2RenderingContext.TEXTURE_2D_ARRAY)
-    .with('usampler2D', () => WebGL2RenderingContext.TEXTURE_2D)
     .otherwise(() => { throw new Error(`Invalid sampler type ${type}`) })
 }
 
@@ -563,6 +566,10 @@ export class StateGl1 implements Disposable {
     gl.samplerParameteri(this.repeatWrap.value, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.samplerParameteri(this.repeatWrap.value, gl.TEXTURE_WRAP_S, gl.REPEAT);
     gl.samplerParameteri(this.repeatWrap.value, gl.TEXTURE_WRAP_T, gl.REPEAT);
+  }
+
+  uniformBlock(name: string) {
+    return this.uniformBlocksRegistry.uniformBlock(name);
   }
 
   register(name: string, shader: Shader) {

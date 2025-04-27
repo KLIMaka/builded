@@ -1,303 +1,429 @@
-import { BoardContext, BuildRor, RorLink } from 'app/apis/engine';
-import { mat4, vec2, vec3 } from 'gl-matrix';
-import { Board } from '../../../build/board/structs';
-import { AllBoardVisitorResult, PvsBoardVisitorResult, VisResult, createSectorCollector, createWallCollector, unpackWallId } from '../../../build/boardvisitor';
-import { ZSCALE, wallVisible } from '../../../build/utils';
-import { Deck, getOrCreate } from '../../../utils/collections';
-import { dot2d } from '../../../utils/mathutils';
-import { mirrorBasis, normal2d, reflectPoint3d } from '../../../utils/vecmath';
-import { BoardProvider, BoardUtils } from '../../apis/app';
-import { BuildRenderableProvider, DrawCallConsumer, Renderable, Renderables, SortingRenderable } from '../../apis/renderable';
-import { BuildGl } from '../gl/buildgl';
-import { RenderablesCache } from '../gl/geometry/cache';
-import { SolidBuilder } from '../gl/geometry/common';
-import { ViewPosition } from './view';
-import { SortedList } from '@utils/list';
+import { Disconnector, Disposable, Source, ValuesContainer } from "@utils/callbacks";
+import { GlContext } from "@utils/gl/drawstruct";
+import { createShader } from "@utils/gl/shaders";
+import { BufferAllocator, StateGl1 } from "@utils/gl/stategl1";
+import { iter } from "@utils/iter";
+import { memoize } from "@utils/mathutils";
+import { field } from "@utils/objects";
+import { Consumer, first, Function, MultiConsumer, pair, second } from "@utils/types";
+import { BoardContext, EngineContext, EngineSettings } from "app/apis/engine";
+import { mat4 } from "gl-matrix";
+import { BoardGlContext, createBoardGlContext } from "../gl/board-context";
+import { point2d, triangulate } from "../gl/geometry/builders/sector";
+import { EngineTextures } from "../gl/gl-context";
+import { begin, tuple, Work } from "../scheduler/work";
+import { LineRecord, NOOP_RENDERABLE, Renderable, ScreenSpriteRecord, SectorRecord, SpriteRecord, VoxelRecord, WallRecord, WallType } from "./api";
+import { iterIsEmpty } from "@utils/collections";
+import { NOOP_TASK_HANDLE } from "app/apis/app1";
 
+export function createRenderer3d(values: ValuesContainer, glContext: GlContext, ctx: EngineContext, textures: EngineTextures, boardCtx: BoardContext): Work<[], [Source<BoardRenderer3D>]> {
 
-export type View = Readonly<{
-  viewPosition: ViewPosition,
-  forward: vec3,
-  projection: mat4,
-  transform: mat4,
-  position: vec3,
-}>
+  const loadRendererWork = begin()
+    .input<string[]>()
+    .fork(p => p
+      .thread('Compiling wall shader', defs => createShader(glContext, 'resources/shaders/wall-instance', defs))
+      .thread('Compiling sector shader', defs => createShader(glContext, 'resources/shaders/sector-instance', defs))
+      .thread('Compiling sprite shader', defs => createShader(glContext, 'resources/shaders/sprite-instance', defs))
+      .thread('Compiling voxel shader', defs => createShader(glContext, 'resources/shaders/voxel-instance', defs))
+      .thread('Compiling screen-sprite shader', defs => createShader(glContext, 'resources/shaders/screen-sprite', defs))
+      .thread('Compiling wall select shader', defs => createShader(glContext, 'resources/shaders/wall-select', defs))
+      .thread('Compiling sector select shader', defs => createShader(glContext, 'resources/shaders/sector-select', defs))
+      .thread('Compiling line shader', defs => createShader(glContext, 'resources/shaders/line', defs)))
+    .then('Creating renderer', async (wall, sector, sprite, voxel, screenSprite, wallSelect, sectorSelect, line) => {
+      const state = new StateGl1(glContext, s => new BufferAllocator(glContext, s, 128 * 1024, 128 * 1024));
+      state.register('wall-instance', wall);
+      state.register('wall-select', wallSelect);
+      state.register('sector-instance', sector);
+      state.register('sector-select', sectorSelect);
+      state.register('sprite-instance', sprite);
+      state.register('voxel-instance', voxel);
+      state.register('screen-sprite', screenSprite);
+      state.register('line', line);
+      return new BoardRenderer3D(values, glContext, ctx, textures, boardCtx, state);
+    }).finishUntuple();
 
-const visible = new PvsBoardVisitorResult();
-const all = new AllBoardVisitorResult();
-const rorViss = new Map<RorLink, PvsBoardVisitorResult>();
-const diff = vec3.create();
-const stackTransform = mat4.create();
-const srcPos = vec3.create();
-const dstPos = vec3.create();
-const npos = vec3.create();
-const mstmp = { sec: 0, x: 0, y: 0, z: 0 };
-const mirrorVis = new PvsBoardVisitorResult();
-const wallNormal = vec2.create();
-const mirrorNormal = vec3.create();
-const mirroredTransform = mat4.create();
-const mpos = vec3.create();
-const transOn = (bgl: BuildGl) => { bgl.gl.enable(WebGLRenderingContext.BLEND); depthOff(bgl) };
-const transOff = (bgl: BuildGl) => { bgl.gl.disable(WebGLRenderingContext.BLEND); depthOn(bgl) };
-const depthOff = (bgl: BuildGl) => { bgl.gl.depthMask(false) };
-const depthOn = (bgl: BuildGl) => { bgl.gl.depthMask(true) };
-
-function list() {
-  const list = new Deck<Renderable>();
-  const renderable = new SortingRenderable(list);
-  return {
-    add: (r: Renderable) => { list.push(r) },
-    clear: () => list.clear(),
-    drawCall: (consumer: DrawCallConsumer) => { renderable.drawCall(consumer) }
+  let loadHandle = NOOP_TASK_HANDLE;
+  async function loadRenderer(settings: EngineSettings, maxPluId: number, shadowsteps: number): Promise<BoardRenderer3D> {
+    const defs = [
+      `PALSWAPS (float(${maxPluId + 1}))`,
+      `SHADOWSTEPS (float(${shadowsteps}))`,
+      `TRANS1 (${settings.trans1})`,
+      `TRANS2 (${settings.trans2})`,
+      ...(settings.spriteShadowOff ? ['SPRITE_SHADOW_OFF'] : [])
+    ];
+    return await loadRendererWork(loadHandle, defs);
   }
+
+  return begin()
+    .thenWork(tuple(async handle => {
+      loadHandle = handle;
+      const result = await values.transformedAsyncTuple('rendeer',
+        [ctx.settings, ctx.maxPluId, ctx.shadowsteps],
+        ([settings, maxPluId, shadowsteps]) => loadRenderer(settings, maxPluId, shadowsteps),
+        r => r.dispose());
+      loadHandle = NOOP_TASK_HANDLE;
+      return result;
+    })).finish()
 }
 
-function sortedList() {
-  const list = new SortedList<Renderable>();
-  const renderable = new Renderables(list);
-  return {
-    add: (r: Renderable, z: number) => { list.add(r, z) },
-    clear: () => list.clear(),
-    drawCall: (consumer: DrawCallConsumer) => { renderable.drawCall(consumer) }
-  }
-}
+export class BoardRenderer3D implements Disposable {
+  private boardGl: BoardGlContext;
+  private sectorPoints: Source<(t: number) => point2d[]>;
 
-export function createRenderer3D(bgl: BuildGl, boardCtx: BoardContext, cache: RenderablesCache): Boardrenderer3D {
-  const board = () => boardCtx.board;
-  return new Boardrenderer3D(boardCtx.ror, bgl, board, boardCtx.utils, cache.geometry);
-}
+  writeWalls: (recs: Iterable<WallRecord>) => Renderable;
+  writeSectors: (recs: Iterable<SectorRecord>) => Renderable;
+  writeSprites: (recs: Iterable<SpriteRecord>) => Renderable;
+  writeVoxels: (recs: Iterable<SpriteRecord>) => Renderable;
+  writeScreenSprites: (recs: Iterable<ScreenSpriteRecord>) => Renderable;
+  writeWallSelect: (recs: Iterable<WallRecord>) => Renderable;
+  writeSectorSelect: (recs: Iterable<SectorRecord>) => Renderable;
+  writeLines: (recs: Iterable<LineRecord>) => Renderable;
 
-export class Boardrenderer3D {
+  view: Consumer<mat4>;
+  projection: Consumer<mat4>;
+  globalVis: Consumer<number>;
+  globalShadow: Consumer<number>;
+  depthShadowScale: Consumer<number>;
+  time: Consumer<number>;
+  parallaxPics: Consumer<number>;
+  screenSize: MultiConsumer<[number, number]>;
+  grid: Consumer<number>;
+
+  onSectorsDisconnector: Disconnector;
+  onWallsDisconnector: Disconnector;
+  onSpritesDisconnector: Disconnector;
+
+
   constructor(
-    private ror: BuildRor,
-    private bgl: BuildGl,
-    private board: BoardProvider,
-    private boardUtils: BoardUtils,
-    private renderables: BuildRenderableProvider
-  ) { }
+    values: ValuesContainer,
+    glCtx: GlContext,
+    private ctx: EngineContext,
+    private textures: EngineTextures,
+    private boardCtx: BoardContext,
+    private state: StateGl1
+  ) {
+    this.boardGl = createBoardGlContext(glCtx);
+    const board = this.boardCtx.board.get();
+    board.sectors.forEach((s, i) => this.updateSector(i));
+    board.sprites.forEach((s, i) => this.updateSprite(i));
+    board.walls.forEach((w, i) => this.updateWall(i));
+    this.onSectorsDisconnector = this.boardCtx.onSectorsChange(s => s.forEach(s => this.updateSector(s)));
+    this.onWallsDisconnector = this.boardCtx.onWallsChange(w => w.forEach(w => this.updateWall(w)));
+    this.onSpritesDisconnector = this.boardCtx.onSpritesChange(s => s.forEach(s => this.updateSprite(s)));
 
-  public drawTools(p: Iterable<Renderable>) {
-    this.bgl.gl.disable(WebGLRenderingContext.DEPTH_TEST);
-    this.bgl.gl.enable(WebGLRenderingContext.BLEND);
-    this.surfaces.clear().pushAll(p);
-    this.bgl.modulation(0.984, 0.78, 0.118, 1);
-    this.bgl.draw(this.surfaces);
-    this.bgl.flush();
-    this.bgl.gl.disable(WebGLRenderingContext.BLEND);
-    this.bgl.gl.enable(WebGLRenderingContext.DEPTH_TEST);
+    const matrices = this.state.uniformBlock('Matrices');
+    const V = matrices.writer<[mat4]>('V');
+    const IV = matrices.writer<[mat4]>('IV');
+    this.view = (view: mat4) => { V(view); IV(mat4.invert(mat4.create(), view)); };
+    this.projection = matrices.writer<[mat4]>('P');
+
+    const engineParams = this.state.uniformBlock('Engine');
+    this.globalVis = engineParams.writer<[number]>('globalVis');
+    this.globalShadow = engineParams.writer<[number]>('globalShadow');
+    this.depthShadowScale = engineParams.writer<[number]>('depthShadowScale');
+    this.time = engineParams.writer<[number]>('time');
+    this.parallaxPics = engineParams.writer<[number]>('parallaxPics');
+    this.screenSize = engineParams.writer<[number, number]>('screenSize');
+    this.grid = engineParams.writer<[number]>('grid');
+
+    this.writeSectors = this.createSectorWriter();
+    this.writeWalls = this.createWallWriter();
+    this.writeSprites = this.createSpriteWriter();
+    this.writeVoxels = this.createVoxelWriter();
+    this.writeScreenSprites = this.createScreenSpriteWriter();
+    this.writeWallSelect = this.createWallSelectWriter();
+    this.writeSectorSelect = this.createSectorSelectWriter();
+    this.writeLines = this.createLineWriter();
+
+    this.sectorPoints = values.transformed('sector-points', boardCtx.board, board => memoize((s: number) => triangulate(board, s)));
   }
 
-  public draw(view: View) {
-    this.drawGeometry(view);
+  async dispose() {
+    this.boardGl.dispose();
+    this.state.dispose();
+    this.onSectorsDisconnector();
+    this.onWallsDisconnector();
+    this.onSpritesDisconnector();
   }
 
-  private writeStencilOnly(value: number) {
-    this.bgl.gl.stencilFunc(WebGLRenderingContext.ALWAYS, value, 0xff);
-    this.bgl.gl.stencilOp(WebGLRenderingContext.KEEP, WebGLRenderingContext.KEEP, WebGLRenderingContext.REPLACE);
-    this.bgl.gl.stencilMask(0xff);
-    this.bgl.gl.depthMask(false);
-    this.bgl.gl.colorMask(false, false, false, false);
+  updateWall(wallId: number) {
+    const wall = this.boardCtx.board.get().walls[wallId];
+    if (wall === null) return;
+    this.boardGl.writeWall(wallId, wall);
+    this.textures.get(wall.picnum).get();
+    this.textures.get(wall.overpicnum).get();
   }
 
-  private writeStenciledOnly(value: number) {
-    this.bgl.gl.stencilFunc(WebGLRenderingContext.EQUAL, value, 0xff);
-    this.bgl.gl.stencilMask(0x0);
-    this.bgl.gl.depthMask(true);
-    this.bgl.gl.colorMask(true, true, true, true);
+  updateSector(sectorId: number) {
+    const sector = this.boardCtx.board.get().sectors[sectorId]
+    if (sector === null) return;
+    this.boardGl.writeSector(sectorId, sector);
+    this.textures.get(sector.ceilingpicnum, sector.ceilingstat.parallaxing ? this.boardCtx.parallaxPicnums : 1).get();
+    this.textures.get(sector.floorpicnum, sector.floorstat.parallaxing ? this.boardCtx.parallaxPicnums : 1).get();
   }
 
-  private writeDepthOnly() {
-    this.bgl.gl.colorMask(false, false, false, false);
+  updateSprite(spriteId: number) {
+    const sprite = this.boardCtx.board.get().sprites[spriteId]
+    if (sprite === null) return;
+    this.boardGl.writeSprite(spriteId, sprite);
+    this.textures.get(sprite.picnum).get();
   }
 
-  private writeAll() {
-    this.bgl.gl.depthMask(true);
-    this.bgl.gl.colorMask(true, true, true, true);
+  private createWallWriter(): Function<Iterable<WallRecord>, Renderable> {
+    const shader = this.state.getShader('wall-instance');
+    shader.texture('pal')(this.textures.pal.get());
+    shader.texture('plu')(this.textures.plu.get());
+    shader.texture('atlas')(this.textures.atlas.get());
+    shader.texture('infos')(this.textures.infos.get());
+    shader.texture('walls')(this.boardGl.walls);
+    shader.texture('sectors')(this.boardGl.sectors);
+
+    const builder = shader.builder();
+    const wallSectorPart = builder.vec4('aWallSectorPart_u16');
+    return recs => {
+      if (iterIsEmpty(recs)) return NOOP_RENDERABLE;
+      builder.start();
+      iter(recs).forEach(({ wallId, sectorId, type }) => {
+        if (type === WallType.VOID) {
+          wallSectorPart(wallId, sectorId, 0, 0);
+          builder.writeVertex();
+        } else if (type === WallType.NONMASKED) {
+          wallSectorPart(wallId, sectorId, 1, 0);
+          builder.writeVertex();
+          wallSectorPart(wallId, sectorId, 2, 0);
+          builder.writeVertex();
+        } else if (type === WallType.MASKED) {
+          wallSectorPart(wallId, sectorId, 1, 0);
+          builder.writeVertex();
+          wallSectorPart(wallId, sectorId, 2, 0);
+          builder.writeVertex();
+          wallSectorPart(wallId, sectorId, 3, 0);
+          builder.writeVertex();
+        } else if (type === WallType.ONLY_MASKED) {
+          wallSectorPart(wallId, sectorId, 3, 0);
+          builder.writeVertex();
+        }
+      });
+      const data = builder.buildInstanced(WebGL2RenderingContext.TRIANGLE_STRIP, 4);
+      const render = _ => this.state.drawInstanced(shader, data);
+      const dispose = async () => data.data.dispose();
+      return { render, dispose };
+    };
   }
 
-  private drawGeometry(view: View) {
-    const board = this.board();
-    const viewPos = view.viewPosition;
-    const result = viewPos.sec === -1
-      ? all.visit(board, viewPos)
-      : visible.visit(board, this.boardUtils, viewPos, view.forward);
+  private createWallSelectWriter(): Function<Iterable<WallRecord>, Renderable> {
+    const shader = this.state.getShader('wall-select');
+    shader.texture('walls')(this.boardGl.walls);
+    shader.texture('sectors')(this.boardGl.sectors);
+    shader.texture('infos')(this.textures.infos.get());
 
-    this.bgl.setProjectionMatrix(view.projection);
-    this.drawMirrors(result, view);
-    this.drawRor(result, view);
-
-    this.bgl.setViewMatrix(view.transform);
-    this.bgl.setPosition(view.position);
-    this.drawRooms(result);
+    const builder = shader.builder();
+    const part = builder.vec4('aWallSectorPart_u16');
+    return recs => {
+      if (iterIsEmpty(recs)) return NOOP_RENDERABLE;
+      builder.start();
+      iter(recs).forEach(({ wallId, sectorId, type }) => {
+        if (type === WallType.VOID) {
+          part(wallId, sectorId, 0, 0);
+          builder.writeVertex();
+        } else if (type === WallType.NONMASKED) {
+          part(wallId, sectorId, 1, 0);
+          builder.writeVertex();
+          part(wallId, sectorId, 2, 0);
+          builder.writeVertex();
+        } else if (type === WallType.MASKED) {
+          part(wallId, sectorId, 1, 0);
+          builder.writeVertex();
+          part(wallId, sectorId, 2, 0);
+          builder.writeVertex();
+          part(wallId, sectorId, 3, 0);
+          builder.writeVertex();
+        } else if (type === WallType.ONLY_MASKED) {
+          part(wallId, sectorId, 3, 0);
+          builder.writeVertex();
+        }
+      });
+      const data = builder.buildInstanced(WebGL2RenderingContext.TRIANGLE_STRIP, 4);
+      const render = _ => this.state.drawInstanced(shader, data);
+      const dispose = async () => data.data.dispose();
+      return { render, dispose };
+    };
   }
 
+  private createSectorWriter(): Function<Iterable<SectorRecord>, Renderable> {
+    const shader = this.state.getShader('sector-instance');
+    shader.texture('pal')(this.textures.pal.get());
+    shader.texture('plu')(this.textures.plu.get());
+    shader.texture('atlas')(this.textures.atlas.get());
+    shader.texture('infos')(this.textures.infos.get());
+    shader.texture('walls')(this.boardGl.walls);
+    shader.texture('sectors')(this.boardGl.sectors);
 
-  private getLinkVis(link: RorLink) {
-    return getOrCreate(rorViss, link, _ => new PvsBoardVisitorResult());
+    const builder = shader.builder();
+    const pos12 = builder.vec4('aPos12');
+    const pos3Sec = builder.vec4('aPos3SecPart');
+    return recs => {
+      if (iterIsEmpty(recs)) return NOOP_RENDERABLE;
+      builder.start();
+      iter(recs).forEach(({ sectorId, ceiling, floor }) => {
+        const points = this.sectorPoints.get()(sectorId);
+        for (let i = 0; i < points.length; i += 3) {
+          const p1 = points[i];
+          const p2 = points[i + 1];
+          const p3 = points[i + 2];
+          if (ceiling) {
+            pos12(p1[0], p1[1], p2[0], p2[1]);
+            pos3Sec(p3[0], p3[1], sectorId, 0);
+            builder.writeVertex();
+          }
+          if (floor) {
+            pos12(p1[0], p1[1], p2[0], p2[1]);
+            pos3Sec(p3[0], p3[1], sectorId, 1);
+            builder.writeVertex();
+          }
+        }
+      });
+      const data = builder.buildInstanced(WebGL2RenderingContext.TRIANGLES, 3);
+      const render = _ => this.state.drawInstanced(shader, data);
+      const dispose = async () => data.data.dispose();
+      return { render, dispose };
+    };
   }
 
-  private drawStack(view: View, link: RorLink, surface: Renderable, stencilValue: number) {
-    if (!link) return;
-    this.bgl.setViewMatrix(view.transform);
-    this.bgl.setPosition(view.position);
-    this.writeStencilOnly(stencilValue);
-    this.bgl.draw(surface);
-    this.bgl.flush();
+  private createSectorSelectWriter(): Function<Iterable<SectorRecord>, Renderable> {
+    const shader = this.state.getShader('sector-select');
+    shader.texture('infos')(this.textures.infos.get());
+    shader.texture('walls')(this.boardGl.walls);
+    shader.texture('sectors')(this.boardGl.sectors);
 
-    const board = this.board();
-    const src = board.sprites[link.srcSpriteId];
-    const dst = board.sprites[link.dstSpriteId];
-    vec3.set(srcPos, src.x, src.z / ZSCALE, src.y);
-    vec3.set(dstPos, dst.x, dst.z / ZSCALE, dst.y);
-    vec3.sub(diff, srcPos, dstPos);
-    mat4.copy(stackTransform, view.transform);
-    mat4.translate(stackTransform, stackTransform, diff);
-    vec3.sub(npos, view.position, diff);
-
-    mstmp.sec = dst.sectnum; mstmp.x = npos[0]; mstmp.y = npos[2]; mstmp.z = npos[1] * ZSCALE;
-    this.bgl.setViewMatrix(stackTransform);
-    this.bgl.setPosition(npos);
-    this.writeStenciledOnly(stencilValue);
-    this.drawRooms(this.getLinkVis(link).visit(this.board(), this.boardUtils, mstmp, view.forward));
-
-    this.bgl.setViewMatrix(view.transform);
-    this.bgl.setPosition(view.position);
-    this.writeDepthOnly();
-    this.bgl.draw(surface);
-    this.bgl.flush();
+    const builder = shader.builder();
+    const pos12 = builder.vec4('aPos12');
+    const pos3Sec = builder.vec4('aPos3SecPart');
+    return recs => {
+      if (iterIsEmpty(recs)) return NOOP_RENDERABLE;
+      builder.start();
+      iter(recs).forEach(({ sectorId, ceiling, floor }) => {
+        const points = this.sectorPoints.get()(sectorId);
+        for (let i = 0; i < points.length; i += 3) {
+          const p1 = points[i];
+          const p2 = points[i + 1];
+          const p3 = points[i + 2];
+          if (ceiling) {
+            pos12(p1[0], p1[1], p2[0], p2[1]);
+            pos3Sec(p3[0], p3[1], sectorId, 0);
+            builder.writeVertex();
+          }
+          if (floor) {
+            pos12(p1[0], p1[1], p2[0], p2[1]);
+            pos3Sec(p3[0], p3[1], sectorId, 1);
+            builder.writeVertex();
+          }
+        }
+      });
+      const data = builder.buildInstanced(WebGL2RenderingContext.TRIANGLES, 3);
+      const render = _ => this.state.drawInstanced(shader, data);
+      const dispose = async () => data.data.dispose();
+      return { render, dispose };
+    };
   }
 
-  private rorSectorCollector = createSectorCollector((board: Board, sectorId: number) => this.ror.rorLinks.hasRor(sectorId));
-  private drawRor(result: VisResult, view: View) {
-    result.forSector(this.board(), this.rorSectorCollector.visit());
-    if (this.rorSectorCollector.sectors.length() === 0) return;
+  private createSpriteWriter(): Function<Iterable<SpriteRecord>, Renderable> {
+    const spriteShader = this.state.getShader('sprite-instance');
+    spriteShader.texture('pal')(this.textures.pal.get());
+    spriteShader.texture('plu')(this.textures.plu.get());
+    spriteShader.texture('atlas')(this.textures.atlas.get());
+    spriteShader.texture('infos')(this.textures.infos.get());
+    spriteShader.texture('sectors')(this.boardGl.sectors);
+    spriteShader.texture('sprites')(this.boardGl.sprites);
 
-    this.bgl.gl.enable(WebGLRenderingContext.STENCIL_TEST);
-    for (let i = 0; i < this.rorSectorCollector.sectors.length(); i++) {
-      const s = this.rorSectorCollector.sectors.get(i);
-      const r = this.renderables.sector(s);
-      this.drawStack(view, this.ror.rorLinks.ceilLink(s), r.ceiling, i + 1);
-      this.drawStack(view, this.ror.rorLinks.floorLink(s), r.floor, i + 1);
+    const spriteBuilder = spriteShader.builder();
+    const spriteIdWriter = spriteBuilder.scalar('aSpriteId_u16');
+    return recs => {
+      if (iterIsEmpty(recs)) return NOOP_RENDERABLE;
+      spriteBuilder.start();
+      iter(recs).forEach(({ spriteId }) => {
+        spriteIdWriter(spriteId);
+        spriteBuilder.writeVertex();
+      });
+      const data = spriteBuilder.buildInstanced(WebGL2RenderingContext.TRIANGLE_STRIP, 6);
+      const render = _ => this.state.drawInstanced(spriteShader, data);
+      const dispose = async () => data.data.dispose();
+      return { render, dispose };
+    };
+  }
+
+  private createVoxelWriter(): Function<Iterable<VoxelRecord>, Renderable> {
+    const voxelShader = this.state.getShader('voxel-instance');
+    voxelShader.texture('pal')(this.textures.pal.get());
+    voxelShader.texture('plu')(this.textures.plu.get());
+    voxelShader.texture('infos')(this.textures.infos.get());
+    voxelShader.texture('sectors')(this.boardGl.sectors);
+    voxelShader.texture('sprites')(this.boardGl.sprites);
+    const voxelTexture = voxelShader.texture('voxel');
+
+    const voxelBuilder = voxelShader.builder();
+    const voxelSpriteId = voxelBuilder.scalar('aSpriteId_u16');
+    return recs => {
+      if (iterIsEmpty(recs)) return NOOP_RENDERABLE;
+      const data = iter(recs).groupEntries(field('voxelPicnum'), field('spriteId')).map(([picnum, spriteIds]) => {
+        voxelBuilder.start();
+        spriteIds.forEach(s => { voxelSpriteId(s); voxelBuilder.writeVertex(); });
+        const voxel = this.textures.voxels.get()(picnum).get();
+        return pair(voxel.texture, voxelBuilder.buildInstanced(WebGL2RenderingContext.TRIANGLES, 6 * voxel.size));
+      }).toMap(first, second);
+      const render = _ => data.forEach((data, texture) => { voxelTexture(texture); this.state.drawInstanced(voxelShader, data); });
+      const dispose = async () => data.values().forEach(d => d.data.dispose());
+      return { render, dispose };
+    };
+  }
+
+  private createScreenSpriteWriter(): Function<Iterable<ScreenSpriteRecord>, Renderable> {
+    const shader = this.state.getShader('screen-sprite');
+    shader.texture('pal')(this.textures.pal.get());
+    shader.texture('plu')(this.textures.plu.get());
+    shader.texture('infos')(this.textures.infos.get());
+    shader.texture('atlas')(this.textures.atlas.get());
+
+    const builder = shader.builder();
+    const posWriter = builder.vec3('aPos');
+    const offSizeWriter = builder.vec4('aOffSize_i16');
+    const picnumWriter = builder.vec4('aPicnum_u16');
+
+    return recs => {
+      if (iterIsEmpty(recs)) return NOOP_RENDERABLE;
+
+      builder.start();
+      iter(recs).forEach(({ pos, off, size, picnum }) => {
+        posWriter(pos[0], pos[1], pos[2]);
+        offSizeWriter(off[0], off[1], size[0], size[1]);
+        picnumWriter(picnum, 0, 0, 0);
+        builder.writeVertex();
+      });
+      const data = builder.buildInstanced(WebGL2RenderingContext.TRIANGLES, 6);
+      const render = _ => this.state.drawInstanced(shader, data);
+      const dispose = async () => data.data.dispose();
+      return { render, dispose };
     }
-    this.bgl.gl.disable(WebGLRenderingContext.STENCIL_TEST);
-    this.writeAll();
   }
 
-  private mirrorWallsCollector = createWallCollector((board: Board, wallId: number, sectorId: number) => this.ror.isMirrorPic(board.walls[wallId].picnum));
-  private drawMirrors(result: VisResult, view: View) {
-    const board = this.board();
-    const viewPos = view.viewPosition;
-    result.forWall(board, this.mirrorWallsCollector.visit());
-    if (this.mirrorWallsCollector.walls.length() === 0) return;
+  private createLineWriter(): Function<Iterable<LineRecord>, Renderable> {
+    const shader = this.state.getShader('line');
+    const builder = shader.builder();
+    const startWriter = builder.vec3('aStart');
+    const endWriter = builder.vec3('aEnd');
 
-    this.bgl.gl.enable(WebGLRenderingContext.STENCIL_TEST);
-    for (let i = 0; i < this.mirrorWallsCollector.walls.length(); i++) {
-      const w = unpackWallId(this.mirrorWallsCollector.walls.get(i));
-      if (!wallVisible(board, w, viewPos)) continue;
-
-      // draw mirror surface into stencil
-      const r = this.renderables.wall(w);
-      this.bgl.setViewMatrix(view.transform);
-      this.bgl.setPosition(view.position);
-      this.writeStencilOnly(i + 127);
-      this.bgl.draw(r);
-      this.bgl.flush();
-
-      // draw reflections in stenciled area
-      const w1 = board.walls[w]; const w2 = board.walls[w1.point2];
-      vec2.set(wallNormal, w2.x - w1.x, w2.y - w1.y);
-      normal2d(wallNormal, wallNormal);
-      vec3.set(mirrorNormal, wallNormal[0], 0, wallNormal[1]);
-      const mirrorrD = -dot2d(wallNormal[0], wallNormal[1], w1.x, w1.y);
-      mirrorBasis(mirroredTransform, view.transform, view.position, mirrorNormal, mirrorrD);
-
-      this.bgl.setViewMatrix(mirroredTransform);
-      this.bgl.setClipPlane(mirrorNormal[0], mirrorNormal[1], mirrorNormal[2], mirrorrD);
-      this.bgl.gl.cullFace(WebGLRenderingContext.FRONT);
-      vec3.copy(mpos, view.position);
-      reflectPoint3d(mpos, mirrorNormal, mirrorrD, mpos);
-      mstmp.sec = viewPos.sec; mstmp.x = mpos[0]; mstmp.y = mpos[2]; mstmp.z = mpos[1];
-      this.writeStenciledOnly(i + 127);
-      this.drawRooms(mirrorVis.visit(board, this.boardUtils, mstmp, view.forward));
-      this.bgl.gl.cullFace(WebGLRenderingContext.BACK);
-
-      // seal reflections by writing depth of mirror surface
-      this.bgl.setViewMatrix(view.transform);
-      this.writeDepthOnly();
-      this.bgl.setClipPlane(0, 0, 0, 0);
-      this.bgl.draw(r);
-      this.bgl.flush();
+    return recs => {
+      if (iterIsEmpty(recs)) return NOOP_RENDERABLE;
+      builder.start();
+      iter(recs).forEach(({ start, end }) => {
+        startWriter(start[0], start[1], start[2]);
+        endWriter(end[0], end[1], end[2]);
+        builder.writeVertex();
+      });
+      const data = builder.buildInstanced(WebGL2RenderingContext.LINES, 2);
+      const render = _ => this.state.drawInstanced(shader, data);
+      const dispose = async () => data.data.dispose();
+      return { render, dispose };
     }
-    this.bgl.gl.disable(WebGLRenderingContext.STENCIL_TEST);
-    this.writeAll();
-  }
-
-  private skybox = list();
-  private surfaces = list();
-  private sprites = list();
-  private trans = sortedList();
-
-  private clearDrawLists() {
-    this.skybox.clear();
-    this.surfaces.clear();
-    this.sprites.clear();
-    this.trans.clear();
-  }
-
-  private _sectorVisitor = (board: Board, sectorId: number) => this.sectorVisitor(board, sectorId);
-  private sectorVisitor(board: Board, sectorId: number) {
-    const sector = this.renderables.sector(sectorId);
-    // if (this.impl.rorLinks().floorLinks[sectorId] == undefined)
-    //   this.surfaces.add(sector.floor);
-    // if (this.impl.rorLinks().ceilLinks[sectorId] == undefined)
-    //   this.surfaces.add(sector.ceiling);
-    ((sector.ceiling as SolidBuilder).parallax ? this.skybox : this.surfaces).add(sector.ceiling);
-    ((sector.floor as SolidBuilder).parallax ? this.skybox : this.surfaces).add(sector.floor);
-  }
-
-  private _wallVisitor = (board: Board, wallId: number, sectorId: number) => this.wallVisitor(board, wallId, sectorId);
-  private wallVisitor(board: Board, wallId: number, dist: number) {
-    if (this.ror.isMirrorPic(board.walls[wallId].picnum)) return;
-    const wall = board.walls[wallId];
-    const wallr = this.renderables.wall(wallId);
-    if ((wallr.mid as SolidBuilder).trans !== 1) this.trans.add(wallr.mid, 1 / dist);
-    else this.surfaces.add(wallr.mid);
-    if (wall.nextsector !== -1) {
-      ((wallr.top as SolidBuilder).parallax ? this.skybox : this.surfaces).add(wallr.top);
-      ((wallr.bot as SolidBuilder).parallax ? this.skybox : this.surfaces).add(wallr.bot);
-    }
-  }
-
-  private _spriteVisitor = (board: Board, spriteId: number, dist: number) => this.spriteVisitor(board, spriteId, dist);
-  private spriteVisitor(board: Board, spriteId: number, dist: number) {
-    const spriter = this.renderables.sprite(spriteId);
-    const sprite = board.sprites[spriteId];
-    const trans = sprite.cstat.translucent === 1 || sprite.cstat.tranclucentReversed === 1;
-    if (trans) this.trans.add(spriter, 1 / dist);
-    else this.sprites.add(spriter);
-  }
-
-  private drawRooms(result: VisResult) {
-    this.clearDrawLists();
-    const board = this.board();
-    result.forSector(board, this._sectorVisitor);
-    result.forWall(board, this._wallVisitor);
-    result.forSprite(board, this._spriteVisitor);
-
-    this.drawImpl();
-  }
-
-  private drawImpl() {
-    depthOff(this.bgl);
-    this.bgl.draw(this.skybox);
-    this.bgl.flush();
-    depthOn(this.bgl);
-    this.bgl.draw(this.surfaces);
-    this.bgl.draw(this.sprites);
-    this.bgl.flush();
-    transOn(this.bgl);
-    this.bgl.draw(this.trans);
-    this.bgl.flush();
-    transOff(this.bgl);
   }
 }

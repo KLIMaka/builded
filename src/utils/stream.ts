@@ -1,3 +1,5 @@
+import { Supplier } from "./types";
+
 export class Stream {
   private view: DataView;
   private offset: number;
@@ -6,7 +8,7 @@ export class Stream {
   private currentBit = 0;
   private currentByte = 0;
 
-  constructor(buf: ArrayBuffer, isLE = true) {
+  constructor(buf: ArrayBufferLike, isLE = true) {
     this.view = new DataView(buf);
     this.offset = 0;
     this.littleEndian = isLE;
@@ -17,7 +19,7 @@ export class Stream {
       throw new Error(`Unaligned offset: ${this.offset}:${this.currentBit}`);
   }
 
-  public buffer(): ArrayBuffer {
+  public buffer(): ArrayBufferLike {
     return this.view.buffer;
   }
 
@@ -153,14 +155,14 @@ export class Stream {
     return ret;
   }
 
-  public readArrayBuffer(bytes: number): ArrayBuffer {
+  public readArrayBuffer(bytes: number): ArrayBufferLike {
     this.checkBitAlignment();
     const slice = this.view.buffer.slice(this.offset, this.offset + bytes);
     this.offset += bytes;
     return slice;
   }
 
-  public writeArrayBuffer(buffer: ArrayBuffer, len: number): void {
+  public writeArrayBuffer(buffer: ArrayBufferLike, len: number): void {
     const dst = new Uint8Array(this.view.buffer, this.offset);
     dst.set(new Uint8Array(buffer, 0, len));
     this.offset += len;
@@ -228,7 +230,7 @@ export interface Accessor<T> {
   readonly size: number;
 }
 
-type AtomicArrayConstructor<T> = { new(buffer: ArrayBuffer, byteOffset: number, length: number): T };
+type AtomicArrayConstructor<T> = { new(buffer: ArrayBufferLike, byteOffset: number, length: number): T };
 
 export interface AtomicReader<T, AT> extends Accessor<T> {
   readonly atomicArrayConstructor: AtomicArrayConstructor<AT>;
@@ -255,7 +257,7 @@ export const bits_signed = (len: number) => accessor(s => s.readBitsSigned(len),
 export const bit = () => accessor(s => s.readBits(1) === 1, (s, v) => s.writeBits(1, v ? 1 : 0), 1 / 8);
 export const array = <T>(type: Accessor<T>, len: number) => accessor(s => readArray(s, type, len), (s, v) => writeArray(s, type, len, v), type.size * len);
 export const atomic_array = <T>(type: AtomicReader<any, T>, len: number) => accessor(s => readAtomicArray(s, type, len), (s, v) => writeAtomicArray(s, type, len, v), type.size * len);
-export const struct = <T>(type: Constructor<T>) => new StructBuilder(type);
+export const struct = <T>(type?: Supplier<T>) => new StructBuilder(type);
 
 const readArray = <T>(s: Stream, type: Accessor<T>, len: number): Array<T> => {
   const arr = new Array<T>();
@@ -278,13 +280,12 @@ const writeAtomicArray = <T>(s: Stream, type: AtomicReader<any, T>, len: number,
   s.writeArrayBuffer((value as any).buffer, len);
 }
 
-type Constructor<T> = { new(): T };
 type Field<T> = [keyof T, Accessor<T[keyof T]>];
 
 class StructBuilder<T> implements Accessor<T> {
   private fields: Field<T>[] = [];
   public size = 0;
-  constructor(private ctr: Constructor<T>) { }
+  constructor(private ctr: Supplier<T>) { }
 
   field<V extends keyof T>(f: V, r: Accessor<T[V]>) {
     this.fields.push([f, r]);
@@ -293,7 +294,7 @@ class StructBuilder<T> implements Accessor<T> {
   }
 
   read(s: Stream) {
-    const struct = new this.ctr();
+    const struct = this.ctr?.() ?? {} as T;
     for (let i = 0; i < this.fields.length; i++) {
       const [name, reader] = this.fields[i];
       struct[name] = reader.read(s);

@@ -34,10 +34,15 @@ export type DelayedTask = {
 export type FrameTask = {
   start(minDtMs?: number): void;
   stop(): void;
+  onError(consumer: Consumer<Error>): void;
 } & Disposable;
 
-export type BatchTaskRunner = {
-  run(task: Consumer<void>): Disconnector
+
+export type BatchTask = {
+  stop(): void;
+  pause(): void;
+  unpause(): void;
+  end(): Promise<void>;
 } & Disposable;
 
 export type Timer = {
@@ -46,7 +51,7 @@ export type Timer = {
   delayed(task: Consumer<void>, delayMs?: number): DelayedTask;
   onFrame(task: Consumer<number>): FrameTask;
   microtask(task: Consumer<void>): void;
-  batchRunner(maxTimeMs?: number): BatchTaskRunner;
+  batchRunner(batch: Consumer<void>[], maxTimeMs?: number): BatchTask;
 }
 
 // Storage
@@ -78,6 +83,7 @@ export interface TaskHandle {
   incProgress(inc: number): void;
   wait(info?: string, count?: number): Promise<void>;
   waitFor<T>(promise: Promise<T>, info?: string, count?: number): Promise<T>;
+  waitForBatchTask(batch: Consumer<void>[], info?: string, time?: number): Promise<void>;
 }
 
 export const NOOP_TASK_HANDLE: TaskHandle = {
@@ -85,6 +91,7 @@ export const NOOP_TASK_HANDLE: TaskHandle = {
   incProgress: (count: number) => { },
   wait: (info?: string, count?: number) => Promise.resolve(),
   waitFor: <T>(promise: Promise<T>, info?: string, count?: number) => promise,
+  waitForBatchTask: async (batch: Consumer<void>[], info?: string, time?: number) => batch.forEach(b => b()),
 }
 
 export type TaskValue<T> = {

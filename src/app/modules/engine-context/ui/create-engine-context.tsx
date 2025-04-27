@@ -7,18 +7,18 @@ import { iter } from "@utils/iter";
 import { sum } from "@utils/mathutils";
 import { asyncMapOptional } from "@utils/objects";
 import { size } from "@utils/size";
-import { Consumer, first, pair, Result } from "@utils/types";
+import { Consumer, first, Ok, pair, Result } from "@utils/types";
 import { ActionDescriptors, Actionify } from "app/apis/actions";
 import { App } from "app/apis/app1";
 import { FileInfo, FileSystem, FileSystemHandle, FileSystems, SerializedFileSystemHandle } from "app/apis/fs";
 import { Ui } from "app/apis/ui1";
+import { httpFs, stack } from "app/modules/fs/fs";
 import { fsIcon } from "app/modules/fs/ui/fs-ui-utils";
+import { begin } from "app/modules/scheduler/work";
 import Optional from "optional-js";
 import React from "react";
 import { match } from "ts-pattern";
 import { EngineContextRecord, EngineContextType, ENGINES } from "../engine-context-api";
-import { WorkBuilder } from "app/modules/scheduler/work";
-import { stack } from "app/modules/fs/fs";
 
 const ID = 'engines-context-create';
 
@@ -119,7 +119,7 @@ function createActions(actionDescriptors: ActionDescriptors, fs: FileSystems, fi
   const register = (id: string, action: Consumer<void>, enabled?: Source<boolean>) => ctx.bindSync(id, action, enabled);
   const addStorage = async (type: SerializedFileSystemHandle['type']) => {
     fs.pickHandle(type).then(o => o.ifPresent(h => {
-      fileSystems.setPromise(async fss => [h,
+      fileSystems.setPromiseOrDispose(async fss => [h,
         ...await iter(fss)
           .map(async fs => pair(fs, await fs.isSameEntry(h)))
           .await_()
@@ -206,7 +206,7 @@ function createResultHandler(
       };
       const values = createContainer('tmp-values-create-engine-context');
       const createEngine = iter(ENGINES).first(e => e.id === record.type).map(e => e.factory).orElseThrow(() => new Error(`Unknown engine type: '${record.type}' `));
-      const work = new WorkBuilder()
+      const work = begin()
         .forkItems(record.fileSystems, f => `Opening File System...`, f => fs.deserialize(f).open())
         .then('Building FS Stack...', async fss => values.value('', iter(fss).map(r => r.unwrap()).reduceFirst(stack).get()))
         .thenWork((handle, fs) => createEngine(handle, fs, record.mods))

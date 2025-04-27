@@ -2,7 +2,7 @@ import { struct, bits, ushort, int, short, byte, ubyte, uint, Stream, array, bit
 import { SectorStats, Sector, WallStats, Wall, SpriteStats, Sprite, Board, FACE_SPRITE } from './board/structs';
 import { ZSCALE } from './utils';
 
-export const sectorStats = struct(SectorStats)
+export const sectorStats = struct<SectorStats>()
   .field('parallaxing', bit())
   .field('slopped', bits(1))
   .field('swapXY', bits(1))
@@ -19,7 +19,7 @@ export const sectorStats = struct(SectorStats)
   .field('unk14', bits(1))
   .field('floorShade', bits(1));
 
-export const sectorStruct = struct(Sector)
+export const sectorStruct = struct<Sector>()
   .field('wallptr', ushort)
   .field('wallnum', ushort)
   .field('ceilingz', int)
@@ -44,7 +44,7 @@ export const sectorStruct = struct(Sector)
   .field('hitag', ushort)
   .field('extra', ushort);
 
-export const wallStats = struct(WallStats)
+export const wallStats = struct<WallStats>()
   .field('blocking', bits(1))
   .field('swapBottoms', bits(1))
   .field('alignBottom', bits(1))
@@ -63,7 +63,7 @@ export const wallStats = struct(WallStats)
   .field('unk15', bits(1))
   ;
 
-export const wallStruct = struct(Wall)
+export const wallStruct = struct<Wall>()
   .field('x', int)
   .field('y', int)
   .field('point2', ushort)
@@ -82,7 +82,7 @@ export const wallStruct = struct(Wall)
   .field('hitag', ushort)
   .field('extra', ushort);
 
-export const spriteStats = struct(SpriteStats)
+export const spriteStats = struct<SpriteStats>()
   .field('blocking', bits(1))
   .field('translucent', bits(1))
   .field('xflip', bits(1))
@@ -99,7 +99,7 @@ export const spriteStats = struct(SpriteStats)
   .field('unk14', bits(1))
   .field('invisible', bits(1));
 
-export const spriteStruct = struct(Sprite)
+export const spriteStruct = struct<Sprite>()
   .field('x', int)
   .field('y', int)
   .field('z', int)
@@ -124,7 +124,7 @@ export const spriteStruct = struct(Sprite)
   .field('hitag', ushort)
   .field('extra', ushort);
 
-export const boardStruct = struct(Board)
+export const boardStruct = struct<Board>()
   .field('version', uint)
   .field('posx', int)
   .field('posy', int)
@@ -169,7 +169,8 @@ export function fixSectorSlopes(board: Board) {
   }
 }
 
-export function initWallStats(stat: WallStats) {
+export function initWallStats() {
+  const stat = {} as WallStats;
   stat.alignBottom = 0;
   stat.blocking = 0;
   stat.blocking2 = 0;
@@ -184,13 +185,14 @@ export function initWallStats(stat: WallStats) {
   return stat;
 }
 
-export function initWall(wall: Wall) {
+export function initWall() {
+  const wall = {} as Wall;
   wall.x = 0;
   wall.y = 0;
   wall.point2 = -1;
   wall.nextwall = -1;
   wall.nextsector = -1;
-  wall.cstat = initWallStats(new WallStats());
+  wall.cstat = initWallStats();
   wall.picnum = 0;
   wall.overpicnum = 0;
   wall.shade = 0;
@@ -206,10 +208,11 @@ export function initWall(wall: Wall) {
 }
 
 export function newWall() {
-  return initWall(new Wall())
+  return initWall()
 }
 
-export function initSectorStats(stat: SectorStats) {
+export function initSectorStats() {
+  const stat = {} as SectorStats;
   stat.alignToFirstWall = 0;
   stat.doubleSmooshiness = 0;
   stat.parallaxing = false;
@@ -225,12 +228,13 @@ export function initSectorStats(stat: SectorStats) {
   return stat;
 }
 
-export function initSector(sector: Sector) {
+export function initSector() {
+  const sector = {} as Sector;
   sector.ceilingheinum = 0;
   sector.ceilingpal = 0;
   sector.ceilingpicnum = 0;
   sector.ceilingshade = 0;
-  sector.ceilingstat = initSectorStats(new SectorStats());
+  sector.ceilingstat = initSectorStats();
   sector.ceilingxpanning = 0;
   sector.ceilingypanning = 0;
   sector.ceilingz = 2048 * ZSCALE;
@@ -239,7 +243,7 @@ export function initSector(sector: Sector) {
   sector.floorpal = 0;
   sector.floorpicnum = 0;
   sector.floorshade = 0;
-  sector.floorstat = initSectorStats(new SectorStats())
+  sector.floorstat = initSectorStats()
   sector.floorxpanning = 0;
   sector.floorypanning = 0;
   sector.floorz = 0;
@@ -253,10 +257,11 @@ export function initSector(sector: Sector) {
 }
 
 export function newSector() {
-  return initSector(new Sector())
+  return initSector()
 }
 
-export function initSpriteStats(stats: SpriteStats) {
+export function initSpriteStats() {
+  const stats = {} as SpriteStats;
   stats.blocking = 0;
   stats.blocking2 = 0;
   stats.invisible = 0;
@@ -272,10 +277,11 @@ export function initSpriteStats(stats: SpriteStats) {
   return stats;
 }
 
-export function initSprite(sprite: Sprite) {
+export function initSprite() {
+  const sprite = {} as Sprite;
   sprite.ang = 0;
   sprite.clipdist = 32;
-  sprite.cstat = initSpriteStats(new SpriteStats());
+  sprite.cstat = initSpriteStats();
   sprite.extra = 65535;
   sprite.hitag = 0;
   sprite.lotag = 0;
@@ -299,11 +305,11 @@ export function initSprite(sprite: Sprite) {
 }
 
 export function newSprite() {
-  return initSprite(new Sprite())
+  return initSprite()
 }
 
 export function newBoard() {
-  const board = new Board();
+  const board = {} as Board;
   board.walls = [];
   board.sectors = [];
   board.sprites = [];
@@ -316,29 +322,29 @@ export function newBoard() {
 }
 
 export function cloneSector(sector: Sector): Sector {
-  const sectorCopy = new Sector();
+  const sectorCopy = {} as Sector;
   Object.assign(sectorCopy, sector);
-  sectorCopy.floorstat = Object.assign(new SectorStats(), sector.floorstat);
-  sectorCopy.ceilingstat = Object.assign(new SectorStats(), sector.ceilingstat);
+  sectorCopy.floorstat = Object.assign({}, sector.floorstat);
+  sectorCopy.ceilingstat = Object.assign({}, sector.ceilingstat);
   return sectorCopy;
 }
 
 export function cloneWall(wall: Wall): Wall {
-  const wallCopy = new Wall();
+  const wallCopy = {} as Wall;
   Object.assign(wallCopy, wall);
-  wallCopy.cstat = Object.assign(new WallStats(), wall.cstat);
+  wallCopy.cstat = Object.assign({}, wall.cstat);
   return wallCopy;
 }
 
 export function cloneSprite(sprite: Sprite): Sprite {
-  const spriteCopy = new Sprite();
+  const spriteCopy = {} as Sprite;
   Object.assign(spriteCopy, sprite);
-  spriteCopy.cstat = Object.assign(new SpriteStats(), sprite.cstat);
+  spriteCopy.cstat = Object.assign({}, sprite.cstat);
   return spriteCopy;
 }
 
 export function cloneBoard(board: Board): Board {
-  const copy = new Board();
+  const copy = {} as Board;
   Object.assign(copy, board);
   copy.sectors = [];
   copy.walls = [];

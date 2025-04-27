@@ -28,48 +28,48 @@
 //  filler - useless byte to make structure aligned
 //  lotag, hitag, extra - These variables used by the game programmer only
 
-export class SectorStats {
-  public parallaxing: boolean;
-  public slopped: number;
-  public swapXY: number;
-  public doubleSmooshiness: number;
-  public xflip: number;
-  public yflip: number;
-  public alignToFirstWall: number;
-  public type: number;
-  public blocking: number;
-  public tror: number;
-  public hitscan: number;
-  public unk12: number;
-  public unk13: number;
-  public unk14: number;
-  public floorShade: number
+export type SectorStats = {
+  parallaxing: boolean;
+  slopped: number;
+  swapXY: number;
+  doubleSmooshiness: number;
+  xflip: number;
+  yflip: number;
+  alignToFirstWall: number;
+  type: number;
+  blocking: number;
+  tror: number;
+  hitscan: number;
+  unk12: number;
+  unk13: number;
+  unk14: number;
+  floorShade: number
 }
 
-export class Sector<Stats extends SectorStats = SectorStats> {
-  public wallptr: number;
-  public wallnum: number;
-  public ceilingz: number;
-  public floorz: number;
-  public ceilingstat: Stats;
-  public floorstat: Stats;
-  public ceilingpicnum: number;
-  public ceilingheinum: number;
-  public ceilingshade: number;
-  public ceilingpal: number;
-  public ceilingxpanning: number;
-  public ceilingypanning: number;
-  public floorpicnum: number;
-  public floorheinum: number;
-  public floorshade: number;
-  public floorpal: number;
-  public floorxpanning: number;
-  public floorypanning: number;
-  public visibility: number;
-  public filler: number;
-  public lotag: number;
-  public hitag: number;
-  public extra: number;
+export type Sector<Stats extends SectorStats = SectorStats> = {
+  wallptr: number;
+  wallnum: number;
+  ceilingz: number;
+  floorz: number;
+  ceilingstat: Stats;
+  floorstat: Stats;
+  ceilingpicnum: number;
+  ceilingheinum: number;
+  ceilingshade: number;
+  ceilingpal: number;
+  ceilingxpanning: number;
+  ceilingypanning: number;
+  floorpicnum: number;
+  floorheinum: number;
+  floorshade: number;
+  floorpal: number;
+  floorxpanning: number;
+  floorypanning: number;
+  visibility: number;
+  filler: number;
+  lotag: number;
+  hitag: number;
+  extra: number;
 }
 
 //  x, y: Coordinate of left side of wall, get right side from next wall's left side
@@ -96,43 +96,43 @@ export class Sector<Stats extends SectorStats = SectorStats> {
 //  pannings - used to align textures or to do texture panning
 //  lotag, hitag, extra - These variables used by the game programmer only
 
-export class WallStats {
-  public blocking: number;
-  public swapBottoms: number;
-  public alignBottom: number;
-  public xflip: number;
-  public masking: number;
-  public oneWay: number;
-  public blocking2: number;
-  public translucent: number;
-  public yflip: number;
-  public translucentReversed: number;
-  public yaxUpWall: number;
-  public yaxDownWall: number;
-  public rotate90: number;
-  public unk13: number;
-  public unk14: number;
-  public unk15: number;
+export type WallStats = {
+  blocking: number;
+  swapBottoms: number;
+  alignBottom: number;
+  xflip: number;
+  masking: number;
+  oneWay: number;
+  blocking2: number;
+  translucent: number;
+  yflip: number;
+  translucentReversed: number;
+  yaxUpWall: number;
+  yaxDownWall: number;
+  rotate90: number;
+  unk13: number;
+  unk14: number;
+  unk15: number;
 }
 
-export class Wall {
-  public x: number;
-  public y: number;
-  public point2: number;
-  public nextwall: number;
-  public nextsector: number;
-  public cstat: WallStats;
-  public picnum: number;
-  public overpicnum: number;
-  public shade: number;
-  public pal: number;
-  public xrepeat: number;
-  public yrepeat: number;
-  public xpanning: number;
-  public ypanning: number;
-  public lotag: number;
-  public hitag: number;
-  public extra: number;
+export type Wall = {
+  x: number;
+  y: number;
+  point2: number;
+  nextwall: number;
+  nextsector: number;
+  cstat: WallStats;
+  picnum: number;
+  overpicnum: number;
+  shade: number;
+  pal: number;
+  xrepeat: number;
+  yrepeat: number;
+  xpanning: number;
+  ypanning: number;
+  lotag: number;
+  hitag: number;
+  extra: number;
 }
 
 //  x, y, z - position of sprite - can be defined at center bottom or center
@@ -168,73 +168,73 @@ export const FACE_SPRITE = 0;
 export const WALL_SPRITE = 1;
 export const FLOOR_SPRITE = 2;
 
-export class SpriteStats {
-  public blocking: number;
-  public translucent: number;
-  public xflip: number;
-  public yflip: number;
-  public type: number; // 0 - FACE, 1 - WALL, 2 - FLOOR
-  public onesided: number;
-  public realCenter: number;
-  public blocking2: number;
-  public tranclucentReversed: number;
-  public noautoshading: number;
-  public reserved: number;
-  public invisible: number;
-  public unk10: number;
-  public unk12: number;
-  public unk13: number;
-  public unk14: number;
+export type SpriteStats = {
+  blocking: number;
+  translucent: number;
+  xflip: number;
+  yflip: number;
+  type: number; // 0 - FACE, 1 - WALL, 2 - FLOOR
+  onesided: number;
+  realCenter: number;
+  blocking2: number;
+  tranclucentReversed: number;
+  noautoshading: number;
+  reserved: number;
+  invisible: number;
+  unk10: number;
+  unk12: number;
+  unk13: number;
+  unk14: number;
 }
 
-export class Sprite {
-  public x: number;
-  public y: number;
-  public z: number;
-  public cstat: SpriteStats;
-  public picnum: number;
-  public shade: number;
-  public pal: number;
-  public clipdist: number;
-  public blend: number;
-  public xrepeat: number;
-  public yrepeat: number;
-  public xoffset: number;
-  public yoffset: number;
-  public sectnum: number;
-  public statnum: number;
-  public ang: number;
-  public owner: number;
-  public xvel: number;
-  public yvel: number;
-  public zvel: number;
-  public lotag: number;
-  public hitag: number;
-  public extra: number;
+export type Sprite = {
+  x: number;
+  y: number;
+  z: number;
+  cstat: SpriteStats;
+  picnum: number;
+  shade: number;
+  pal: number;
+  clipdist: number;
+  blend: number;
+  xrepeat: number;
+  yrepeat: number;
+  xoffset: number;
+  yoffset: number;
+  sectnum: number;
+  statnum: number;
+  ang: number;
+  owner: number;
+  xvel: number;
+  yvel: number;
+  zvel: number;
+  lotag: number;
+  hitag: number;
+  extra: number;
 }
 
-export class Board<W extends Wall = Wall, S extends Sector = Sector, SPR extends Sprite = Sprite> {
-  public version: number;
-  public posx: number;
-  public posy: number;
-  public posz: number;
-  public ang: number;
-  public cursectnum: number;
-  public numsectors: number;
-  public sectors: S[];
-  public numwalls: number;
-  public walls: W[];
-  public numsprites: number;
-  public sprites: SPR[];
+export type Board<W extends Wall = Wall, S extends Sector = Sector, SPR extends Sprite = Sprite> = {
+  version: number;
+  posx: number;
+  posy: number;
+  posz: number;
+  ang: number;
+  cursectnum: number;
+  numsectors: number;
+  sectors: S[];
+  numwalls: number;
+  walls: W[];
+  numsprites: number;
+  sprites: SPR[];
 }
 
 
-export class Header1 {
-  public startX: number;
-  public startY: number;
-  public startZ: number;
-  public startAng: number;
-  public startSec: number;
-  public parallaxSize: number;
+export type Header1 = {
+  startX: number;
+  startY: number;
+  startZ: number;
+  startAng: number;
+  startSec: number;
+  parallaxSize: number;
 }
 

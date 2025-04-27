@@ -1,148 +1,119 @@
-import { connectedWalls as connected } from "../../build/board/loops";
-import { splitWall, moveWall, mergePoints, deleteWall } from "../../build/board/mutations/walls";
-import { lastwall, sectorOfWall } from "../../build/board/query";
-import { Entity, EntityType } from "../../build/hitscan";
+import { BoardContext } from "app/apis/engine";
+import { BuildReferenceTrackerImpl } from "app/modules/default/reftracker";
 import { vec2 } from "gl-matrix";
-import { IndexedDeck } from "../../utils/collections";
-import { cyclic, tuple } from "../../utils/mathutils";
+import { deleteWall, mergePoints, moveWall } from "../../build/board/mutations/walls";
+import { cyclic } from "../../utils/mathutils";
 import { Message, MessageHandlerReflective } from "../apis/handler";
-import { EditContext } from "./context";
-import { invalidateSectorAndWalls } from "./editutils";
-import { BoardInvalidate, Commit, EndMove, Flip, Highlight, Move, NamedMessage, Palette, PanRepeat, SetPicnum, Shade, StartMove } from "./messages";
-import { MOVE_COPY } from "./tools/transform";
+import { BoardInvalidate, EndMove, Flip, Move, NamedMessage, Palette, PanRepeat, SetPicnum, Shade, StartMove } from "./messages";
 
 
 export class WallEnt extends MessageHandlerReflective {
-  private static invalidatedSectors = new IndexedDeck<number>();
 
   constructor(
-    public wallId: number,
-    private ctx: EditContext,
-    public origin = vec2.create(),
-    public active = false,
-    public connectedWalls = connected(ctx.board(), wallId),
+    private wallId: number,
+    private boardCtx: BoardContext,
+    private origin = vec2.create(),
+    private active = false,
     private valid = true) { super() }
 
-  public StartMove(msg: StartMove) {
-    const board = this.ctx.board();
+  StartMove(msg: StartMove) {
+    const board = this.boardCtx.board.get();
     const wall = board.walls[this.wallId];
-    if (this.ctx.state.get(MOVE_COPY)) {
-      this.wallId = splitWall(board, this.wallId, wall.x, wall.y, this.ctx.art, this.ctx.refs, this.ctx.api.cloneWall);
-      this.connectedWalls = connected(board, this.wallId);
-    }
+    // if (this.ctx.state.get(MOVE_COPY)) {
+    //   this.wallId = splitWall(board, this.wallId, wall.x, wall.y, this.ctx.art, this.ctx.refs, this.ctx.api.cloneWall);
+    // }
     vec2.set(this.origin, wall.x, wall.y);
     this.active = true;
   }
 
-  private invalidate() {
-    WallEnt.invalidatedSectors.clear();
-    const cwalls = this.connectedWalls;
-    const board = this.ctx.board();
-    for (let w of cwalls) {
-      let s = sectorOfWall(board, w);
-      if (WallEnt.invalidatedSectors.indexOf(s) == -1) {
-        invalidateSectorAndWalls(s, board, this.ctx.bus);
-        WallEnt.invalidatedSectors.push(s);
-      }
-    }
+  Move(msg: Move) {
+    let x = this.boardCtx.grid.snap(this.origin[0] + msg.dx);
+    let y = this.boardCtx.grid.snap(this.origin[1] + msg.dy);
+    this.boardCtx.modifyBoard(`Set Wall ${this.wallId} position`, board => moveWall(board, this.wallId, x, y));
   }
 
-  public Move(msg: Move) {
-    let x = this.ctx.gridController.snap(this.origin[0] + msg.dx);
-    let y = this.ctx.gridController.snap(this.origin[1] + msg.dy);
-    if (moveWall(this.ctx.board(), this.wallId, x, y)) {
-      this.invalidate();
-    }
-  }
-
-  public EndMove(msg: EndMove) {
+  EndMove(msg: EndMove) {
     this.active = false;
-    mergePoints(this.ctx.board(), this.wallId, this.ctx.refs);
+    this.boardCtx.modifyBoard(`Set Wall ${this.wallId} position`, board => mergePoints(board, this.wallId, new BuildReferenceTrackerImpl()));
   }
 
-  public Highlight(msg: Highlight) {
-    if (this.active) {
-      const board = this.ctx.board();
-      for (const w of this.connectedWalls) {
-        const p = lastwall(board, w);
-        msg.set.add(tuple(2, w));
-        msg.set.add(tuple(3, w));
-        msg.set.add(tuple(2, p));
+  // Highlight(msg: Highlight) {
+  //   if (this.active) {
+  //     const board = this.board;
+  //     for (const w of this.connectedWalls) {
+  //       const p = lastwall(board, w);
+  //       msg.set.add(tuple(2, w));
+  //       msg.set.add(tuple(3, w));
+  //       msg.set.add(tuple(2, p));
+  //     }
+  //   } else {
+  //     msg.set.add(tuple(3, this.wallId));
+  //   }
+  // }
+
+  SetPicnum(msg: SetPicnum) {
+    this.boardCtx.modifyBoard(`Set Wall ${this.wallId} Picnum`, board => {
+      let wall = board.walls[this.wallId];
+      wall.picnum = msg.picnum;
+    })
+  }
+
+  Shade(msg: Shade) {
+    this.boardCtx.modifyBoard(`Set Wall ${this.wallId} Shade`, board => {
+      let wall = board.walls[this.wallId];
+      if (msg.absolute) wall.shade = msg.value;
+      else wall.shade += msg.value;
+    });
+  }
+
+  PanRepeat(msg: PanRepeat) {
+    this.boardCtx.modifyBoard(`Set Wall ${this.wallId} PanRepeat`, board => {
+      const wall = board.walls[this.wallId];
+      if (msg.absolute) {
+        wall.xpanning = msg.xpan;
+        wall.ypanning = msg.ypan;
+        wall.xrepeat = msg.xrepeat;
+        wall.yrepeat = msg.yrepeat;
+      } else {
+        wall.xpanning += msg.xpan;
+        wall.ypanning += msg.ypan;
+        wall.xrepeat += msg.xrepeat;
+        wall.yrepeat += msg.yrepeat;
       }
-    } else {
-      msg.set.add(tuple(3, this.wallId));
+    })
+  }
+
+  Palette(msg: Palette) {
+    this.boardCtx.modifyBoard(`Set Wall ${this.wallId} Palette`, board => {
+      const wall = board.walls[this.wallId];
+      if (msg.absolute) wall.pal = msg.value;
+      else wall.pal = cyclic(wall.pal + msg.value, msg.max);
+    });
+  }
+
+  Flip(msg: Flip) {
+    this.boardCtx.modifyBoard(`Flip Wall ${this.wallId}`, board => {
+      const wall = board.walls[this.wallId];
+      const flip = wall.cstat.xflip + wall.cstat.yflip * 2;
+      const nflip = cyclic(flip + 1, 4);
+      wall.cstat.xflip = nflip & 1;
+      wall.cstat.yflip = (nflip & 2) >> 1;
+    })
+  }
+
+  NamedMessage(msg: NamedMessage) {
+    if (msg.name === 'delete') {
+      this.boardCtx.modifyBoard(`Delete Wall ${this.wallId}`, board => {
+        deleteWall(board, this.wallId, new BuildReferenceTrackerImpl());
+      })
     }
   }
 
-  public SetPicnum(msg: SetPicnum) {
-    let wall = this.ctx.board().walls[this.wallId];
-    wall.picnum = msg.picnum;
-    this.ctx.bus.handle(new Commit(`Set Wall ${this.wallId} Picnum`));
-    this.ctx.bus.handle(new BoardInvalidate(Entity.wallPoint(this.wallId)));
-  }
-
-  public Shade(msg: Shade) {
-    let wall = this.ctx.board().walls[this.wallId];
-    let shade = wall.shade;
-    if (msg.absolute && shade == msg.value) return;
-    if (msg.absolute) wall.shade = msg.value; else wall.shade += msg.value;
-    this.ctx.bus.handle(new Commit(`Set Wall ${this.wallId} Shade`, true));
-    this.ctx.bus.handle(new BoardInvalidate(Entity.wallPoint(this.wallId)));
-  }
-
-  public PanRepeat(msg: PanRepeat) {
-    let wall = this.ctx.board().walls[this.wallId];
-    if (msg.absolute) {
-      if (wall.xpanning == msg.xpan && wall.ypanning == msg.ypan && wall.xrepeat == msg.xrepeat && wall.yrepeat == msg.yrepeat) return;
-      wall.xpanning = msg.xpan;
-      wall.ypanning = msg.ypan;
-      wall.xrepeat = msg.xrepeat;
-      wall.yrepeat = msg.yrepeat;
-    } else {
-      wall.xpanning += msg.xpan;
-      wall.ypanning += msg.ypan;
-      wall.xrepeat += msg.xrepeat;
-      wall.yrepeat += msg.yrepeat;
-    }
-    this.ctx.bus.handle(new Commit(`Set Wall ${this.wallId} PanRepeat`, true));
-    this.ctx.bus.handle(new BoardInvalidate(Entity.wallPoint(this.wallId)));
-  }
-
-  public Palette(msg: Palette) {
-    let wall = this.ctx.board().walls[this.wallId];
-    if (msg.absolute) {
-      if (msg.value == wall.pal) return;
-      wall.pal = msg.value;
-    } else {
-      wall.pal = cyclic(wall.pal + msg.value, msg.max);
-    }
-    this.ctx.bus.handle(new Commit(`Set Wall ${this.wallId} Palette`, true));
-    this.ctx.bus.handle(new BoardInvalidate(Entity.wallPoint(this.wallId)));
-  }
-
-  public Flip(msg: Flip) {
-    let wall = this.ctx.board().walls[this.wallId];
-    let flip = wall.cstat.xflip + wall.cstat.yflip * 2;
-    let nflip = cyclic(flip + 1, 4);
-    wall.cstat.xflip = nflip & 1;
-    wall.cstat.yflip = (nflip & 2) >> 1;
-    this.ctx.bus.handle(new Commit(`Flip Wall ${this.wallId}`, true));
-    this.ctx.bus.handle(new BoardInvalidate(Entity.wallPoint(this.wallId)));
-  }
-
-  public NamedMessage(msg: NamedMessage) {
-    if (msg.name == 'delete') {
-      deleteWall(this.ctx.board(), this.wallId, this.ctx.refs);
-      this.ctx.bus.handle(new Commit(`Delete Wall ${this.wallId}`));
-      this.ctx.bus.handle(new BoardInvalidate(null));
-    }
-  }
-
-  public BoardInvalidate(msg: BoardInvalidate) {
+  BoardInvalidate(msg: BoardInvalidate) {
     if (msg.ent == null) this.valid = false;
   }
 
-  public handle(msg: Message) {
+  handle(msg: Message) {
     if (this.valid) super.handle(msg);
   }
 }

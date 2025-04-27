@@ -3,5 +3,8 @@ export async function loadBin(fname: string): Promise<ArrayBuffer> {
 }
 
 export async function loadString(fname: string): Promise<string> {
-  return await fetch(fname).then(r => r.ok ? r.text() : null).catch(r => null);
+  return await fetch(fname).then(r => {
+    if (r.ok) return r.text();
+    throw new Error(`Error while loading ${fname}`);
+  });
 }

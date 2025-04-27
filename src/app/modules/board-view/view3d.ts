@@ -12,7 +12,7 @@ import { Renderable } from "../../apis/renderable";
 import { NamedMessage } from "../../edit/messages";
 import { BuildGl } from "../gl/buildgl";
 import { GlContext } from "../gl/gl-context";
-import { Boardrenderer3D } from "./boardrenderer3d";
+import { Boardrenderer3D } from "./boardRenderer3d";
 import { ViewBase } from "./common";
 import { ViewPosition } from "./view";
 

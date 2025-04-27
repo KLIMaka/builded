@@ -6,14 +6,14 @@ export class ArtInfo {
   constructor(public w: number, public h: number, public attrs: Attributes, public img: Uint8Array) { }
 }
 
-export class Header {
+export type Header = {
   version: number;
   numtiles: number;
   start: number;
   end: number;
 }
 
-const headerStruct = struct(Header)
+const headerStruct = struct<Header>()
   .field('version', uint)
   .field('numtiles', uint)
   .field('start', uint)
@@ -48,7 +48,7 @@ export function animate(frame: number, info: ArtInfo) {
   else if (info.attrs.animType === AnimationType.ANIMATE_BACKWARD) return - frame % max;
 }
 
-export const animStruct = struct(Attributes)
+export const animStruct = struct<Attributes>()
   .field('frames', bits(6))
   .field('animType', bits(2))
   .field('xoff', byte)

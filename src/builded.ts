@@ -9,7 +9,7 @@ import { createEngines } from "app/modules/engine-context/ui/engine-context";
 import { FS_MANAGER, FileSystemsManagerModule as FileSystemsManagerConstructor } from "app/modules/fs/ui/fs-model";
 import { createRectifier } from "app/modules/rectifier/ui/rectifier";
 import { ReactUiModule } from "app/modules/ui/react-ui";
-import { enableMapSet } from "immer";
+import { enableMapSet, enablePatches } from "immer";
 import { APP } from "./app/apis/app1";
 import { FS } from "./app/apis/fs";
 import { DefaultApp } from "./app/modules/default/app/app";
@@ -21,6 +21,7 @@ import { createGlContext } from "app/modules/gl/gl-context";
 const app = DefaultApp("App");
 const injector = new AppInjector(new DefaultLifecycleListener(app.timer, app.logger));
 enableMapSet();
+enablePatches();
 
 function gtBind(l: Action, r: Action): Action {
   return l.descriptor.bind().map(b => b.length()).orElse(0) >= r.descriptor.bind().map(b => b.length()).orElse(0) ? l : r
@@ -74,10 +75,22 @@ app.scheduler.exec(async handler => {
         })
         .orElse(false);
     });
+    const mouseup = (e: MouseEvent) => {
+      ctl.update(`mouse${e.button}`, false);
+      iter(ui.states()).forEach(s => s.action(ctl.isPressed(s.bind)));
+    }
+    const mousedown = (e: MouseEvent) => {
+      ctl.update(`mouse${e.button}`, true);
+      iter(ui.states()).forEach(s => s.action(ctl.isPressed(s.bind)));
+    }
     window.addEventListener('blur', () => ctl.reset());
     document.body.addEventListener('keyup', keyup);
     document.body.addEventListener('keydown', keydown);
+    document.body.addEventListener('mousedown', mousedown);
+    document.body.addEventListener('mouseup', mouseup);
+    document.body.addEventListener('contextmenu', e => e.preventDefault());
+
   }));
 
-  await handler.waitFor(injector.start(), 'Starting', 100);
+  await handler.waitFor(injector.start());
 });

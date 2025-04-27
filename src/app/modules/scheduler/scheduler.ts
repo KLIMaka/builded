@@ -1,6 +1,6 @@
 import { transformedBuilder, tuple, value } from "@utils/callbacks";
-import { Consumer, Err, Ok, Result, second } from "@utils/types";
-import { done, EventLoop, progress, ProgressInfo, Scheduler, Task, TaskController, TaskHandle, TaskInerruptedError } from "../../apis/app1";
+import { Consumer, Err, Ok, Result, second, Supplier } from "@utils/types";
+import { done, EventLoop, Logger, progress, ProgressInfo, Scheduler, Task, TaskController, TaskHandle, TaskInerruptedError, Timer } from "../../apis/app1";
 
 const RESOLVED = Promise.resolve();
 
@@ -79,7 +79,10 @@ class TaskDescriptor<T> implements TaskController<T>, TaskHandle {
   readonly info = this.progressImpl.info;
   readonly progress = this.progressImpl.progress;
 
-  constructor(private scheduler: SchedulerImpl) { }
+  constructor(
+    private scheduler: Supplier<Promise<void>>,
+    private timer: Timer
+  ) { }
 
   private checkStopped() { if (this.stopped) throw new TaskInerruptedError() }
 
@@ -94,7 +97,7 @@ class TaskDescriptor<T> implements TaskController<T>, TaskHandle {
   async wait(info: string = '', count: number = 1): Promise<void> {
     this.checkStopped();
     this.progressImpl.info.set(info);
-    await this.scheduler.wait();
+    await this.scheduler();
     await this.pauseBarrier.wait();
     this.checkStopped();
     this.progressImpl.inc(count);
@@ -109,6 +112,28 @@ class TaskDescriptor<T> implements TaskController<T>, TaskHandle {
     await this.pauseBarrier.wait();
     this.checkStopped();
     return result;
+  }
+
+  async waitForBatchTask(batch: Consumer<void>[], info?: string, time = 10): Promise<void> {
+    this.checkStopped();
+    const infoId = this.progressImpl.beginTask(info);
+    this.plan(batch.length);
+    let start = this.timer.now();
+    for (const task of batch) {
+      task();
+      this.incProgress(1);
+
+      if (this.timer.now() - start < time) continue;
+      else {
+        await this.scheduler();
+        await this.pauseBarrier.wait();
+        this.checkStopped();
+        start = this.timer.now();
+      }
+    }
+    await this.pauseBarrier.wait();
+    this.checkStopped();
+    this.progressImpl.endTask(infoId);
   }
 
   pause() { this.paused.set(true); this.pauseBarrier.block() }
@@ -126,7 +151,11 @@ class TaskDescriptor<T> implements TaskController<T>, TaskHandle {
 export class SchedulerImpl implements Scheduler {
   private nextTick: Promise<void>;
 
-  constructor(private eventloop: EventLoop) {
+  constructor(
+    private eventloop: EventLoop,
+    private timer: Timer,
+    private logger: Logger
+  ) {
     this.nextTick = this.createNextTick();
   }
 
@@ -143,17 +172,16 @@ export class SchedulerImpl implements Scheduler {
   }
 
   exec<T>(task: Task<T>): TaskController<T> {
-    const descriptor = new TaskDescriptor<T>(this);
+    const descriptor = new TaskDescriptor<T>(() => this.nextTick, this.timer);
     const wrappedTask = task(descriptor)
       .then(result => { const ok = new Ok<T>(result); descriptor.task.set(done(ok)); return ok })
-      .catch(error => { const err = new Err(error); descriptor.task.set(done(err)); console.log(error); return err })
+      .catch(error => { const err = new Err(error); descriptor.task.set(done(err)); this.logger.log("ERROR", error); return err })
     descriptor.setTask(wrappedTask);
     return descriptor;
   }
 
-  wait(): Promise<void> { return this.nextTick }
 }
 
-export function DefaultScheduler(eventloop: EventLoop): Scheduler {
-  return new SchedulerImpl(eventloop);
+export function DefaultScheduler(eventloop: EventLoop, timer: Timer, logger: Logger): Scheduler {
+  return new SchedulerImpl(eventloop, timer, logger);
 }

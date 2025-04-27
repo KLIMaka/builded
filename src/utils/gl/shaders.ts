@@ -1,7 +1,8 @@
-import { Definition, DisposableResource, GlContext, Shader, UniformBlockDefinition, UniformDefinition } from "./drawstruct";
-import { loadString } from "../getter";
 import { range } from "@utils/collections";
 import { iter } from "@utils/iter";
+import { applyNotNullOr } from "@utils/objects";
+import { loadString } from "../getter";
+import { Definition, DisposableResource, GlContext, Shader, UniformBlockDefinition, UniformDefinition } from "./drawstruct";
 
 export class ShaderImpl implements Shader {
   readonly name: string;
@@ -175,14 +176,10 @@ function type2String(type: number): string {
 }
 
 async function preprocess(shader: string, baseDir: string): Promise<string> {
-  const lines = shader.split("\n");
-  const includes: Promise<string>[] = [];
-  for (let i = 0; i < lines.length; i++) {
-    const l = lines[i];
-    const m = l.match(/^#include +"([^"]+)"/);
-    includes.push(m != null ? loadString(baseDir + m[1]) : Promise.resolve(l));
-  }
-  return Promise.all(includes).then(lines => lines.join('\n'));
+  const matchInclude = (l: string) => l.match(/^#include +"([^"]+)"/);
+  const loadIncliude = (m: RegExpMatchArray) => loadString(baseDir + m[1]).then(s => preprocess(s, baseDir));
+  const lines = shader.split("\n").map(l => applyNotNullOr(matchInclude(l), loadIncliude, () => Promise.resolve(l)));
+  return Promise.all(lines).then(lines => lines.join('\n'));
 }
 
 const setters = {

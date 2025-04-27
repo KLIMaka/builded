@@ -63,13 +63,15 @@ void main() {
     : sector_cstat_parallaxing(sector.ceilingFloorCstat.x) 
       ? sector.ceilingFloorShade.x 
       : sector.ceilingFloorShade.y);
+  int pal = int(sprite.pal);
 #else
   int shade = sprite_cstat_type(sprite) == uint(1)
     ? sprite.shade
     : sector_cstat_parallaxing(sector.ceilingFloorCstat.x) 
       ? sector.ceilingFloorShade.x 
       : sector.ceilingFloorShade.y;
+  int pal = sector.ceilingFloorPal.y != uint(0) ? int(sector.ceilingFloorPal.y) : int(sprite.pal);
 #endif
   color = voxel.color;
-  params = ivec4(shade, int(sprite.pal), int(sector.visibility), 0);
+  params = ivec4(shade, pal, int(sector.visibility), 0);
 }

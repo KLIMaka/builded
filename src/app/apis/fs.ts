@@ -8,6 +8,7 @@ export type FileInfo = {
   name: string,
   size: number,
   lastModified: number,
+  src: FileSystem,
 }
 
 export interface WritableFileSystem {
@@ -30,7 +31,8 @@ export type StorageFileSystemHandle = { type: 'storage', name: string }
 export type DirectoryFileSystemHandle = { type: 'dir', handle: FileSystemDirectoryHandle }
 export type FileFileSystemHandle = { type: 'zip' | 'rff' | 'grp', handle: FileSystemFileHandle }
 export type StackFileSystemHandle = { type: 'stack', top: SerializedFileSystemHandle, bottom: SerializedFileSystemHandle }
-export type SerializedFileSystemHandle = MemoryFileSystemHandle | StorageFileSystemHandle | DirectoryFileSystemHandle | FileFileSystemHandle | StackFileSystemHandle
+export type HttpFileSystemHandle = { type: 'http', path: string };
+export type SerializedFileSystemHandle = MemoryFileSystemHandle | StorageFileSystemHandle | DirectoryFileSystemHandle | FileFileSystemHandle | StackFileSystemHandle | HttpFileSystemHandle;
 
 export type FileSystemHandle = {
   name: string,

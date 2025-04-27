@@ -2,7 +2,7 @@ import { range } from '@utils/collections';
 import { iter } from '@utils/iter';
 import { Accessor, Stream, array, atomic_array, bits, bits_signed, byte, int, short, string, struct, ubyte, uint, ushort } from '@utils/stream';
 import { buf } from "crc-32";
-import { Header1, SectorStats, SpriteStats, WallStats } from '../board/structs';
+import { Header1 } from '../board/structs';
 import { fixSectorSlopes, initSector, initSprite, initWall, sectorStats, spriteStruct, wallStruct } from '../maploader';
 import { BloodBoard, BloodSector, BloodSprite, BloodWall, SectorExtra, SpriteExtra, WallExtra } from './structs';
 
@@ -23,7 +23,7 @@ function crc(buff: ArrayBuffer) {
   return buf(new Uint8Array(buff, 0, buff.byteLength - 4));
 }
 
-const sectorStruct = struct(BloodSector)
+const sectorStruct = struct<BloodSector>()
   .field('wallptr', ushort)
   .field('wallnum', ushort)
   .field('ceilingz', int)
@@ -48,7 +48,7 @@ const sectorStruct = struct(BloodSector)
   .field('hitag', ushort)
   .field('extra', ushort);
 
-const header1Struct = struct(Header1)
+const header1Struct = struct<Header1>()
   .field('startX', int)
   .field('startY', int)
   .field('startZ', int)
@@ -56,46 +56,46 @@ const header1Struct = struct(Header1)
   .field('startSec', short)
   .field('parallaxSize', short);
 
-class Header2 {
-  public visibility: number;
-  public songId: number;
-  public parallaxtype: number;
+type Header2 = {
+  visibility: number;
+  songId: number;
+  parallaxtype: number;
 }
 
-const header2Struct = struct(Header2)
+const header2Struct = struct<Header2>()
   .field("visibility", int)
   .field("songId", int)
   .field("parallaxtype", ubyte);
 
-class Header3 {
-  public mapRevisions: number;
-  public numSectors: number;
-  public numWalls: number;
-  public numSprites: number;
+type Header3 = {
+  mapRevisions: number;
+  numSectors: number;
+  numWalls: number;
+  numSprites: number;
 }
 
-const header3Struct = struct(Header3)
+const header3Struct = struct<Header3>()
   .field('mapRevisions', int)
   .field('numSectors', short)
   .field('numWalls', short)
   .field('numSprites', short);
 
-class Copyright {
-  public text: string;
-  public padd: string;
-  public xsec: number;
-  public xwal: number;
-  public xspr: number;
+type Copyright = {
+  text: string;
+  padd: string;
+  xsec: number;
+  xwal: number;
+  xspr: number;
 }
 
-const copyrightStruct = struct(Copyright)
+const copyrightStruct = struct<Copyright>()
   .field('text', string(64))
   .field('xspr', uint)
   .field('xwal', uint)
   .field('xsec', uint)
   .field('padd', string(52));
 
-const sectorExtraStruct = struct(SectorExtra)
+const sectorExtraStruct = struct<SectorExtra>()
   .field('reference', bits_signed(14))
   .field('state', bits(1))
   .field('busy', bits(17))
@@ -174,7 +174,7 @@ const sectorExtraStruct = struct(SectorExtra)
   .field('bobCeiling', bits(1))
   .field('bobRotate', bits(1));
 
-const wallExtraStruct = struct(WallExtra)
+const wallExtraStruct = struct<WallExtra>()
   .field('reference', bits_signed(14))
   .field('state', bits(1))
   .field('busy', bits(17))
@@ -207,7 +207,7 @@ const wallExtraStruct = struct(WallExtra)
   .field('unk4', bits(4))
   .field('unk5', bits(32));
 
-const spriteExtraStruct = struct(SpriteExtra)
+const spriteExtraStruct = struct<SpriteExtra>()
   .field('reference', bits_signed(14))
   .field('state', bits(1))
   .field('busy', bits(17))
@@ -323,7 +323,7 @@ function readSprites(header3: Header3, stream: Stream): BloodSprite[] {
 }
 
 function createBoard(version: number, header1: Header1, header2: Header2, header3: Header3, sectors: BloodSector[], walls: BloodWall[], sprites: BloodSprite[]): BloodBoard {
-  const brd = new BloodBoard();
+  const brd = {} as BloodBoard;
   brd.version = version;
   brd.posx = header1.startX;
   brd.posy = header1.startY;
@@ -444,7 +444,7 @@ function writeSectors(board: BloodBoard, stream: Stream) {
 }
 
 function createHeader3(board: BloodBoard) {
-  const header3 = new Header3();
+  const header3 = {} as Header3;
   header3.mapRevisions = 1;
   header3.numSectors = board.numsectors;
   header3.numWalls = board.numwalls;
@@ -457,7 +457,7 @@ function createHeader2(board: BloodBoard): Header2 {
 }
 
 function createHeader1(board: BloodBoard) {
-  const header1 = new Header1();
+  const header1 = {} as Header1;
   header1.startAng = board.ang;
   header1.startSec = board.cursectnum;
   header1.startX = board.posx;
@@ -468,7 +468,7 @@ function createHeader1(board: BloodBoard) {
 }
 
 export function newBoard() {
-  const board = new BloodBoard();
+  const board = {} as BloodBoard;
   board.walls = [];
   board.sectors = [];
   board.sprites = [];
@@ -482,53 +482,50 @@ export function newBoard() {
 }
 
 export function newSector() {
-  const sector = new BloodSector();
-  initSector(sector);
+  const sector = initSector() as BloodSector;
   sector.extraData = null;
   return sector;
 }
 
 export function newWall() {
-  const wall = new BloodWall();
-  initWall(wall);
+  const wall = initWall() as BloodWall;
   wall.extraData = null;
   return wall;
 }
 
 export function newSprite() {
-  const sprite = new BloodSprite();
-  initSprite(sprite);
+  const sprite = initSprite() as BloodSprite;
   sprite.extraData = null;
   return sprite;
 }
 
 export function cloneSector(sector: BloodSector): BloodSector {
-  const sectorCopy = new BloodSector();
+  const sectorCopy = {} as BloodSector;
   Object.assign(sectorCopy, sector);
-  sectorCopy.floorstat = Object.assign(new SectorStats(), sector.floorstat);
-  sectorCopy.ceilingstat = Object.assign(new SectorStats(), sector.ceilingstat);
+  sectorCopy.floorstat = Object.assign({}, sector.floorstat);
+  sectorCopy.ceilingstat = Object.assign({}, sector.ceilingstat);
   if (sector.extraData) sectorCopy.extraData = Object.assign(new SectorExtra(), sector.extraData);
   return sectorCopy;
 }
 
 export function cloneWall(wall: BloodWall): BloodWall {
-  const wallCopy = new BloodWall();
+  const wallCopy = {} as BloodWall;
   Object.assign(wallCopy, wall);
-  wallCopy.cstat = Object.assign(new WallStats(), wall.cstat);
+  wallCopy.cstat = Object.assign({}, wall.cstat);
   if (wall.extraData) wallCopy.extraData = Object.assign(new WallExtra(), wall.extraData);
   return wallCopy;
 }
 
 export function cloneSprite(sprite: BloodSprite): BloodSprite {
-  const spriteCopy = new BloodSprite();
+  const spriteCopy = {} as BloodSprite;
   Object.assign(spriteCopy, sprite);
-  spriteCopy.cstat = Object.assign(new SpriteStats(), sprite.cstat);
+  spriteCopy.cstat = Object.assign({}, sprite.cstat);
   if (sprite.extraData) spriteCopy.extraData = Object.assign(new SpriteExtra(), sprite.extraData);
   return spriteCopy;
 }
 
 export function cloneBoard(board: BloodBoard): BloodBoard {
-  const copy = new BloodBoard();
+  const copy = {} as BloodBoard;
   Object.assign(copy, board);
   copy.sectors = [];
   copy.walls = [];

@@ -34,7 +34,7 @@ export function deleteSector(board: Board, sectorId: number, refs: BuildReferenc
   if (!isValidSectorId(board, sectorId)) throw new Error(`Invalid sectorId: ${sectorId}`);
   for (const w of sectorWalls(board, sectorId)) {
     const wall = board.walls[w];
-    if (wall.nextwall != -1) {
+    if (wall.nextwall !== -1) {
       const nextwall = board.walls[wall.nextwall];
       nextwall.nextsector = -1;
       nextwall.nextwall = -1;
@@ -48,27 +48,27 @@ export function deleteSector(board: Board, sectorId: number, refs: BuildReferenc
 function updateSpriteSector(board: Board, fromSector: number) {
   iter(range(0, board.numsprites))
     .map(s => board.sprites[s])
-    .filter(s => s.sectnum == fromSector)
+    .filter(s => s.sectnum === fromSector)
     .forEach(s => s.sectnum = -1);
 }
 
 function deleteSectorImpl(board: Board, sectorId: number, refs: BuildReferenceTracker) {
-  if (board.sectors[sectorId].wallnum != 0) throw new Error(`Error while deleting sector #${sectorId}. wallnum != 0`);
+  if (board.sectors[sectorId].wallnum !== 0) throw new Error(`Error while deleting sector #${sectorId}. wallnum != 0`);
 
   for (let w = 0; w < board.numwalls; w++) {
     const wall = board.walls[w];
-    if (wall.nextsector == sectorId) throw new Error(`Error while deleting sector #${sectorId}. Wall #${w} referencing sector`);
+    if (wall.nextsector === sectorId) throw new Error(`Error while deleting sector #${sectorId}. Wall #${w} referencing sector`);
     if (wall.nextsector > sectorId) wall.nextsector--;
   }
   for (let s = 0; s < board.numsprites; s++) {
     const spr = board.sprites[s];
-    if (spr.sectnum == sectorId) throw new Error(`Error while deleting sector #${sectorId}. Sprite #${s} referencing sector`);
+    if (spr.sectnum === sectorId) throw new Error(`Error while deleting sector #${sectorId}. Sprite #${s} referencing sector`);
     if (spr.sectnum > sectorId) spr.sectnum--;
   }
   for (let s = sectorId; s < board.numsectors - 1; s++) {
     board.sectors[s] = board.sectors[s + 1];
   }
-  refs.sectors.update(s => s == sectorId ? -1 : s > sectorId ? s - 1 : s);
+  refs.sectors.update(s => s === sectorId ? -1 : s > sectorId ? s - 1 : s);
   board.sectors[board.numsectors - 1] = null;
   board.numsectors--;
 }
@@ -82,7 +82,7 @@ function updateWallIds(afterWallId: number, size: number) {
 }
 
 export function moveWalls(board: Board, secId: number, afterWallId: number, size: number, refs: BuildReferenceTracker) {
-  if (size == 0) return;
+  if (size === 0) return;
   if (size < 0) forEach(range(afterWallId, afterWallId - size), w => board.walls[w] = null);
 
   for (let w = 0; w < board.numwalls; w++) {
@@ -108,17 +108,14 @@ export function moveWalls(board: Board, secId: number, afterWallId: number, size
   board.sectors[secId].wallnum += size;
   for (let i = 0; i < board.numsectors; i++) {
     const sec = board.sectors[i];
-    if (sec.wallptr >= afterWallId + 1 && i != secId) sec.wallptr += size;
+    if (sec.wallptr >= afterWallId + 1 && i !== secId) sec.wallptr += size;
   }
 }
 
 export function resizeWalls(board: Board, sectorId: number, newSize: number, refs: BuildReferenceTracker) {
   const sec = board.sectors[sectorId];
   const dw = newSize - sec.wallnum;
-  if (dw == 0) return;
-  if (dw > 0) {
-    moveWalls(board, sectorId, sec.wallptr + sec.wallnum - 1, dw, refs);
-  } else {
-    moveWalls(board, sectorId, sec.wallptr + newSize, dw, refs)
-  }
+  if (dw === 0) return;
+  if (dw > 0) moveWalls(board, sectorId, sec.wallptr + sec.wallnum - 1, dw, refs);
+  else moveWalls(board, sectorId, sec.wallptr + newSize, dw, refs)
 }

@@ -2,31 +2,31 @@ import { getOrCreate } from "@utils/collections";
 import { struct, string, uint, array, byte, ubyte, Stream, atomic_array } from "@utils/stream";
 import Optional from "optional-js";
 
-class Header {
-  public sign: string;
-  public version: number;
-  public offFat: number;
-  public numFiles: number;
+type Header = {
+  sign: string;
+  version: number;
+  offFat: number;
+  numFiles: number;
 }
 
-class FatRecord {
-  public unk1: number[];
-  public unk2: number;
-  public offset: number;
-  public size: number;
-  public time: number;
-  public flags: number;
-  public filename: string;
-  public fileId: number;
+type FatRecord = {
+  unk1: number[];
+  unk2: number;
+  offset: number;
+  size: number;
+  time: number;
+  flags: number;
+  filename: string;
+  fileId: number;
 }
 
-const headerStruct = struct(Header)
+const headerStruct = struct<Header>()
   .field('sign', string(4))
   .field('version', uint)
   .field('offFat', uint)
   .field('numFiles', uint);
 
-const fatRecord = struct(FatRecord)
+const fatRecord = struct<FatRecord>()
   .field('unk1', array(byte, 16))
   .field('offset', uint)
   .field('size', uint)

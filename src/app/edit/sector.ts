@@ -1,151 +1,141 @@
+import { BoardContext } from "app/apis/engine";
+import { BuildReferenceTrackerImpl } from "app/modules/default/reftracker";
 import { sectorWalls } from "../../build/board/loops";
 import { deleteSector } from "../../build/board/mutations/internal";
 import { Board } from "../../build/board/structs";
 import { Entity, EntityType } from "../../build/hitscan";
 import { sectorHeinum, sectorZ, setSectorHeinum, setSectorPicnum, setSectorZ, ZSCALE } from "../../build/utils";
-import { vec2 } from "gl-matrix";
-import { cyclic, tuple } from "../../utils/mathutils";
-import { Message, MessageHandlerReflective } from "../apis/handler";
-import { EditContext } from "./context";
-import { invalidateSectorAndWalls } from "./editutils";
-import { BoardInvalidate, Commit, Highlight, Move, NamedMessage, Palette, PanRepeat, ResetPanRepeat, Rotate, SetPicnum, SetSectorCstat, Shade, StartMove } from "./messages";
-import { MOVE_VERTICAL } from "./tools/transform";
+import { cyclic } from "../../utils/mathutils";
+import { MessageHandlerReflective } from "../apis/handler";
+import { Move, NamedMessage, Palette, PanRepeat, ResetPanRepeat, Rotate, SetPicnum, SetSectorCstat, Shade, StartMove } from "./messages";
+import { iter } from "@utils/iter";
+import { pair } from "@utils/types";
 
 const resetPanrepeat = new PanRepeat(0, 0, 0, 0, true);
 
 export type SectorEntFactory = (ent: Entity) => SectorEnt;
 
-
-
 export class SectorEnt extends MessageHandlerReflective {
   constructor(
-    public sectorEnt: Entity,
-    private ctx: EditContext,
-    public originz = 0,
-    public origin = vec2.create(),
-    private valid = true
+    private sectorEnt: Entity,
+    private boardCtx: BoardContext,
+    private originz = 0,
+    private zs: Set<number> = new Set(),
   ) { super() }
 
-  public StartMove(msg: StartMove) {
-    const [x, y] = this.ctx.view.target().coords;
+  StartMove(msg: StartMove) {
     // const sec = ctx.board.sectors[this.sectorId];
     // const slope = createSlopeCalculator(sec, ctx.board.walls);
     // this.originz = slope(x, y, this.type == HitType.CEILING ? sec.ceilingheinum : sec.floorheinum) + sectorZ(ctx.board, this.sectorId, this.type)) / ZSCALE;
-    this.originz = sectorZ(this.ctx.board(), this.sectorEnt) / ZSCALE;
-    vec2.set(this.origin, x, y);
+    const board = this.boardCtx.board.get()
+    this.originz = sectorZ(board, this.sectorEnt) / ZSCALE;
+    this.zs = iter(sectorWalls(board, this.sectorEnt.id))
+      .map(w => board.walls[w])
+      .filter(w => w.nextsector !== -1)
+      .map(w => [board.sectors[w.nextsector].ceilingz / ZSCALE, board.sectors[w.nextsector].floorz / ZSCALE])
+      .flatten()
+      .set();
   }
 
-  private setZ(z: number) {
-    if (setSectorZ(this.ctx.board(), this.sectorEnt, z))
-      invalidateSectorAndWalls(this.sectorEnt.id, this.ctx.board(), this.ctx.bus);
+  Move(msg: Move) {
+    // if (this.ctx.state.get(MOVE_VERTICAL)) {
+    //   const ent = this.ctx.view.target().entity;
+    //   const z = ent != null && ent.isSector() && ent.id != this.sectorEnt.id
+    //     ? sectorZ(this.ctx.board(), ent) / ZSCALE
+    //     : this.ctx.gridController.snap(this.originz + msg.dz);
+    //   this.setZ(z * ZSCALE);
+    // }
+    this.boardCtx.modifyBoard(`Set Sector ${this.sectorEnt.id}:${this.sectorEnt.type} Z`, board => {
+      console.log(`Move ${msg}`);
+      const newZ = this.boardCtx.grid.snap(this.originz + msg.dz, 0.25);
+      const z = iter(this.zs)
+        .map(z => pair(z, Math.abs(newZ - z)))
+        .filter(([_, dz]) => dz < (this.boardCtx.grid.size.get() * 0.25))
+        .reduceFirst((l, r) => l[1] < r[1] ? l : r)
+        .map(([z, _]) => z)
+        .orElse(newZ);
+      setSectorZ(board, this.sectorEnt, z * ZSCALE);
+    });
   }
 
-  public Move(msg: Move) {
-    if (this.ctx.state.get(MOVE_VERTICAL)) {
-      const ent = this.ctx.view.target().entity;
-      const z = ent != null && ent.isSector() && ent.id != this.sectorEnt.id
-        ? sectorZ(this.ctx.board(), ent) / ZSCALE
-        : this.ctx.gridController.snap(this.originz + msg.dz);
-      this.setZ(z * ZSCALE);
-    }
+  Rotate(msg: Rotate) {
+    this.boardCtx.modifyBoard(`Set Sector ${this.sectorEnt.id}:${this.sectorEnt.type} Angle`, board => {
+      const h = sectorHeinum(board, this.sectorEnt);
+      const newH = msg.absolute ? msg.da : h + msg.da;
+      setSectorHeinum(board, this.sectorEnt, newH);
+    });
   }
 
-  public Rotate(msg: Rotate) {
-    const board = this.ctx.board();
-    const h = sectorHeinum(board, this.sectorEnt);
-    const newH = msg.absolute ? msg.da : h + msg.da;
-    if (setSectorHeinum(board, this.sectorEnt, newH)) {
-      this.ctx.bus.handle(new Commit(`Set Sector ${this.sectorEnt.id}:${this.sectorEnt.type} Angle`, true));
-      invalidateSectorAndWalls(this.sectorEnt.id, board, this.ctx.bus);
-    }
+  SetPicnum(msg: SetPicnum) {
+    this.boardCtx.modifyBoard(`Set Sector ${this.sectorEnt.id}:${this.sectorEnt.type} Picnum`,
+      board => setSectorPicnum(board, this.sectorEnt, msg.picnum));
   }
 
-  public Highlight(msg: Highlight) {
-    msg.set.add(tuple(this.sectorEnt.type == EntityType.CEILING ? 0 : 1, this.sectorEnt.id));
+  Shade(msg: Shade) {
+    this.boardCtx.modifyBoard(`Set Sector ${this.sectorEnt.id}:${this.sectorEnt.type} Shade`, board => {
+      const sector = board.sectors[this.sectorEnt.id];
+      if (msg.absolute)
+        if (this.sectorEnt.type === EntityType.CEILING) sector.ceilingshade = msg.value;
+        else sector.floorshade = msg.value;
+      else
+        if (this.sectorEnt.type === EntityType.CEILING) sector.ceilingshade += msg.value;
+        else sector.floorshade += msg.value;
+    });
   }
 
-  public SetPicnum(msg: SetPicnum) {
-    if (setSectorPicnum(this.ctx.board(), this.sectorEnt, msg.picnum)) {
-      this.ctx.bus.handle(new BoardInvalidate(this.sectorEnt));
-      this.ctx.bus.handle(new Commit(`Set Sector ${this.sectorEnt.id}:${this.sectorEnt.type} Picnum`));
-    }
-  }
-
-  public Shade(msg: Shade) {
-    const sector = this.ctx.board().sectors[this.sectorEnt.id];
-    const shade = this.sectorEnt.type == EntityType.CEILING ? sector.ceilingshade : sector.floorshade;
-    if (msg.absolute && msg.value == shade) return;
-    if (msg.absolute) {
-      if (this.sectorEnt.type == EntityType.CEILING) sector.ceilingshade = msg.value; else sector.floorshade = msg.value;
-    } else {
-      if (this.sectorEnt.type == EntityType.CEILING) sector.ceilingshade += msg.value; else sector.floorshade += msg.value;
-    }
-    this.ctx.bus.handle(new Commit(`Set Sector ${this.sectorEnt.id}:${this.sectorEnt.type} Shade`, true));
-    this.ctx.bus.handle(new BoardInvalidate(this.sectorEnt));
-  }
-
-  public ResetPanRepeat(msg: ResetPanRepeat) {
+  ResetPanRepeat(msg: ResetPanRepeat) {
     this.PanRepeat(resetPanrepeat);
   }
 
-  public PanRepeat(msg: PanRepeat) {
-    const sector = this.ctx.board().sectors[this.sectorEnt.id];
-    if (msg.absolute) {
-      if (this.sectorEnt.type == EntityType.CEILING) {
-        if (sector.ceilingxpanning == msg.xpan && sector.ceilingypanning == msg.ypan) return;
-        sector.ceilingxpanning = msg.xpan;
-        sector.ceilingypanning = msg.ypan;
+  PanRepeat(msg: PanRepeat) {
+    this.boardCtx.modifyBoard(`Set Sector ${this.sectorEnt.id}:${this.sectorEnt.type} PanRepeat`, board => {
+      const sector = board.sectors[this.sectorEnt.id];
+      if (msg.absolute) {
+        if (this.sectorEnt.type === EntityType.CEILING) {
+          sector.ceilingxpanning = msg.xpan;
+          sector.ceilingypanning = msg.ypan;
+        } else {
+          sector.floorxpanning = msg.xpan;
+          sector.floorypanning = msg.ypan;
+        }
       } else {
-        if (sector.floorxpanning == msg.xpan && sector.floorypanning == msg.ypan) return;
-        sector.floorxpanning = msg.xpan;
-        sector.floorypanning = msg.ypan;
+        if (this.sectorEnt.type === EntityType.CEILING) {
+          sector.ceilingxpanning += msg.xpan;
+          sector.ceilingypanning += msg.ypan;
+        } else {
+          sector.floorxpanning += msg.xpan;
+          sector.floorypanning += msg.ypan;
+        }
       }
-    } else {
-      if (this.sectorEnt.type == EntityType.CEILING) {
-        sector.ceilingxpanning += msg.xpan;
-        sector.ceilingypanning += msg.ypan;
-      } else {
-        sector.floorxpanning += msg.xpan;
-        sector.floorypanning += msg.ypan;
-      }
-    }
-    this.ctx.bus.handle(new Commit(`Set Sector ${this.sectorEnt.id}:${this.sectorEnt.type} PanRepeat`, true));
-    this.ctx.bus.handle(new BoardInvalidate(this.sectorEnt));
+    });
   }
 
-  public Palette(msg: Palette) {
-    const sector = this.ctx.board().sectors[this.sectorEnt.id];
-    if (msg.absolute) {
-      if (this.sectorEnt.type == EntityType.CEILING) {
-        if (msg.value == sector.ceilingpal) return;
-        sector.ceilingpal = msg.value;
+  Palette(msg: Palette) {
+    this.boardCtx.modifyBoard(`Set Sector ${this.sectorEnt.id}:${this.sectorEnt.type} Palette`, board => {
+      const sector = board.sectors[this.sectorEnt.id];
+      if (msg.absolute) {
+        if (this.sectorEnt.type === EntityType.CEILING) sector.ceilingpal = msg.value;
+        else sector.floorpal = msg.value;
       } else {
-        if (msg.value == sector.floorpal) return;
-        sector.floorpal = msg.value;
+        if (this.sectorEnt.type === EntityType.CEILING) sector.ceilingpal = cyclic(sector.ceilingpal + msg.value, msg.max);
+        else sector.floorpal = cyclic(sector.floorpal + msg.value, msg.max);
       }
-    } else {
-      if (this.sectorEnt.type == EntityType.CEILING) {
-        sector.ceilingpal = cyclic(sector.ceilingpal + msg.value, msg.max);
-      } else {
-        sector.floorpal = cyclic(sector.floorpal + msg.value, msg.max);
-      }
-    }
-    this.ctx.bus.handle(new Commit(`Set Sector ${this.sectorEnt.id}:${this.sectorEnt.type} Palette`, true));
-    this.ctx.bus.handle(new BoardInvalidate(this.sectorEnt));
+    });
   }
 
-  public SetSectorCstat(msg: SetSectorCstat) {
-    const sector = this.ctx.board().sectors[this.sectorEnt.id];
-    const stat = this.sectorEnt.type == EntityType.CEILING ? sector.ceilingstat[msg.name] : sector.floorstat[msg.name];
-    if (msg.toggle) {
-      const nstat = stat ? 0 : 1;
-      if (this.sectorEnt.type == EntityType.CEILING) sector.ceilingstat[msg.name] = nstat; else sector.floorstat[msg.name] = nstat;
-    } else {
-      if (stat == msg.value) return;
-      if (this.sectorEnt.type == EntityType.CEILING) sector.ceilingstat[msg.name] = msg.value; else sector.floorstat[msg.name] = msg.value;
-    }
-    this.ctx.bus.handle(new Commit(`Set Sector ${this.sectorEnt.id} Cstat ${msg.name}`));
-    this.ctx.bus.handle(new BoardInvalidate(this.sectorEnt));
+  SetSectorCstat(msg: SetSectorCstat) {
+    this.boardCtx.modifyBoard(`Set Sector ${this.sectorEnt.id} Cstat ${msg.name}`, board => {
+      const sector = board.sectors[this.sectorEnt.id];
+      const stat = this.sectorEnt.type === EntityType.CEILING ? sector.ceilingstat[msg.name] : sector.floorstat[msg.name];
+      if (msg.toggle) {
+        const nstat = stat ? 0 : 1;
+        if (this.sectorEnt.type === EntityType.CEILING) sector.ceilingstat[msg.name] = nstat;
+        else sector.floorstat[msg.name] = nstat;
+      } else {
+        if (this.sectorEnt.type === EntityType.CEILING) sector.ceilingstat[msg.name] = msg.value;
+        else sector.floorstat[msg.name] = msg.value;
+      }
+    });
   }
 
   private collectZs(board: Board) {
@@ -154,7 +144,7 @@ export class SectorEnt extends MessageHandlerReflective {
     zs.add(board.sectors[this.sectorEnt.id].floorz);
     for (const w of sectorWalls(board, this.sectorEnt.id)) {
       const wall = board.walls[w];
-      if (wall.nextsector == -1) continue;
+      if (wall.nextsector === -1) continue;
       zs.add(board.sectors[wall.nextsector].ceilingz);
       zs.add(board.sectors[wall.nextsector].floorz);
     }
@@ -162,64 +152,65 @@ export class SectorEnt extends MessageHandlerReflective {
   }
 
   private fly() {
-    const board = this.ctx.board();
-    const refz = sectorZ(board, this.sectorEnt);
-    const zs = this.collectZs(board);
-    const idx = zs.indexOf(refz);
-    if (idx == 0) return;
-    this.setZ(zs[idx - 1]);
-    this.ctx.bus.handle(new Commit(`Fly Sector ${this.sectorEnt.id}:${this.sectorEnt.type}`));
+    this.boardCtx.modifyBoard(`Fly Sector ${this.sectorEnt.id}:${this.sectorEnt.type}`, board => {
+      const refz = sectorZ(board, this.sectorEnt);
+      const zs = this.collectZs(board);
+      const idx = zs.indexOf(refz);
+      if (idx === 0) return;
+      setSectorZ(board, this.sectorEnt, zs[idx - 1]);
+    });
   }
 
   private fall() {
-    const board = this.ctx.board();
-    const refz = sectorZ(board, this.sectorEnt);
-    const zs = this.collectZs(board);
-    const idx = zs.indexOf(refz);
-    if (idx == zs.length - 1) return;
-    this.setZ(zs[idx + 1]);
-    this.ctx.bus.handle(new Commit(`Fall Sector ${this.sectorEnt.id}:${this.sectorEnt.type}`));
+    this.boardCtx.modifyBoard(`Fall Sector ${this.sectorEnt.id}:${this.sectorEnt.type}`, board => {
+      const refz = sectorZ(board, this.sectorEnt);
+      const zs = this.collectZs(board);
+      const idx = zs.indexOf(refz);
+      if (idx === zs.length - 1) return;
+      setSectorZ(board, this.sectorEnt, zs[idx + 1]);
+    });
   }
 
   private delete() {
-    deleteSector(this.ctx.board(), this.sectorEnt.id, this.ctx.refs);
-    this.ctx.bus.handle(new Commit(`Delete Sector ${this.sectorEnt.id}`));
-    this.ctx.bus.handle(new BoardInvalidate(null));
+    this.boardCtx.modifyBoard(`Delete Sector ${this.sectorEnt.id}`,
+      board => deleteSector(board, this.sectorEnt.id, new BuildReferenceTrackerImpl()));
   }
 
-  private lotag(delta: number) {
-    const board = this.ctx.board();
-    const lotag = board.sectors[this.sectorEnt.id].lotag + delta;
-    board.sectors[this.sectorEnt.id].lotag = lotag;
-    this.ctx.bus.handle(new Commit(`Change Sector ${this.sectorEnt.id} Lo-Tag to ${delta}`));
-    this.ctx.bus.handle(new BoardInvalidate(this.sectorEnt));
+  private up() {
+    this.boardCtx.modifyBoard(`Up Sector ${this.sectorEnt.id}`, board => setSectorZ(board, this.sectorEnt, sectorZ(board, this.sectorEnt) - 32 * 16));
   }
 
-  private hitag(delta: number) {
-    const board = this.ctx.board();
-    const hitag = board.sectors[this.sectorEnt.id].hitag + delta;
-    board.sectors[this.sectorEnt.id].hitag = hitag;
-    this.ctx.bus.handle(new Commit(`Change Sector ${this.sectorEnt.id} Hi-Tag to ${delta}`));
-    this.ctx.bus.handle(new BoardInvalidate(this.sectorEnt));
+  private down() {
+    this.boardCtx.modifyBoard(`Down Sector ${this.sectorEnt.id}`, board => setSectorZ(board, this.sectorEnt, sectorZ(board, this.sectorEnt) + 32 * 16));
   }
 
-  public NamedMessage(msg: NamedMessage) {
+  // private lotag(delta: number) {
+  //   const board = this.ctx.board();
+  //   const lotag = board.sectors[this.sectorEnt.id].lotag + delta;
+  //   board.sectors[this.sectorEnt.id].lotag = lotag;
+  //   this.ctx.bus.handle(new Commit(`Change Sector ${this.sectorEnt.id} Lo-Tag to ${delta}`));
+  //   this.ctx.bus.handle(new BoardInvalidate(this.sectorEnt));
+  // }
+
+  // private hitag(delta: number) {
+  //   const board = this.ctx.board();
+  //   const hitag = board.sectors[this.sectorEnt.id].hitag + delta;
+  //   board.sectors[this.sectorEnt.id].hitag = hitag;
+  //   this.ctx.bus.handle(new Commit(`Change Sector ${this.sectorEnt.id} Hi-Tag to ${delta}`));
+  //   this.ctx.bus.handle(new BoardInvalidate(this.sectorEnt));
+  // }
+
+  NamedMessage(msg: NamedMessage) {
     switch (msg.name) {
       case 'delete': this.delete(); return;
       case 'fly': this.fly(); return;
       case 'fall': this.fall(); return;
-      case 'lotag+': this.lotag(1); return;
-      case 'lotag-': this.lotag(-1); return;
-      case 'hitag+': this.hitag(1); return;
-      case 'hitag-': this.hitag(-1); return;
+      case 'up': this.up(); return;
+      case 'down': this.down(); return;
+      // case 'lotag+': this.lotag(1); return;
+      // case 'lotag-': this.lotag(-1); return;
+      // case 'hitag+': this.hitag(1); return;
+      // case 'hitag-': this.hitag(-1); return;
     }
-  }
-
-  public BoardInvalidate(msg: BoardInvalidate) {
-    if (msg.ent == null) this.valid = false;
-  }
-
-  public handle(msg: Message) {
-    if (this.valid) super.handle(msg);
   }
 }

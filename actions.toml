@@ -135,6 +135,7 @@ blend = { bind = "b" }
 toggle-upscale-preview = { bind = "i" }
 
 [board-view]
+label = "Board View"
 forward = { bind = 'w' }
 back = { bind = 's' }
 strife-left = { bind = 'a' }
@@ -144,6 +145,22 @@ print = { bind = ' ' }
 'vis_dec' = { bind = 'p' }
 'shadow_off_dec' = { bind = 'j' }
 'shadow_off_inc' = { bind = 'k' }
+reset = { bind = '/' }
+undo = { bind = 'control+z' }
+lookaim = { bind = 'mouse2' }
+pan-up = { bind = "arrowup" }
+pan-down = { bind = "arrowdown" }
+flip = { bind = "f" }
+delete = { bind = "delete" }
+up = { bind = "pageup" }
+down = { bind = "pagedown" }
+rot-up = { bind = "." }
+rot-down = { bind = "," }
+move = { bind = "mouse0" }
+move-vertical = { bind = "alt" }
+move-parallel = { bind = "shift" }
+grid-inc = { bind = "]" }
+grid-dec = { bind = "[" }
 
 [rectifier]
 label = "Rectifier"

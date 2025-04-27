@@ -11,8 +11,8 @@ export type Consumer<T> = MultiConsumer<[T]>;
 export type BiConsumer<T1, T2> = MultiConsumer<[T1, T2]>;
 export type Transform<T> = Function<T, T>;
 export type SingleTuple<T> = T extends [infer Item] ? Item : T;
-export type First<T> = T extends [infer First, ...any] ? First : never;
-export type Second<T> = T extends [any, infer Second, ...any] ? Second : never;
+export type First<T> = T extends [infer First, ...any] ? First : T extends Array<infer Item> ? Item : never;
+export type Second<T> = T extends [any, infer Second, ...any] ? Second : T extends Array<infer Item> ? Item : never;
 export type Rest<T> = T extends [any, ...infer Rest] ? Rest : never;
 export type Last<T> = T extends [...any, infer Last] ? Last : never;
 export type Iter<N extends number, IT extends any[] = []> = Length<IT> extends N ? IT : Iter<N, [any, ...IT]>;
@@ -130,12 +130,30 @@ export function first<T extends any[]>(tuple: T): First<T> {
   return tuple[0]
 }
 
+export function firstArg<T1, T2>(): BiFunction<T1, T2, T1> {
+  return (first, _) => first;
+}
+
+export function secondArg<T1, T2>(): BiFunction<T1, T2, T2> {
+  return (_, second) => second;
+}
+
 export function second<T extends any[]>(tuple: T): Second<T> {
   return tuple[1]
 }
 
+export function tuple<T extends any[]>(...t: T): T {
+  return [...t] as T;
+}
+
 export function pair<T, U>(t: T, u: U): [T, U] {
-  return [t, u];
+  return tuple(t, u);
+}
+
+
+const eqImpl = (l: any, r: any): boolean => l === r;
+export function refEq<T>(): BiPredicate<T, T> {
+  return eqImpl as BiPredicate<T, T>;
 }
 
 export interface Union<T, U> {

@@ -3,7 +3,7 @@ import { Icon, actionsToActionItem, line } from "@ui/commons";
 import { confirm, info } from "@ui/message-box";
 import { Sort } from "@ui/table";
 import { SizeType, WindowBuilder } from "@ui/windows-common";
-import { Signal, Source, Value, ValuesContainer, ValuesMap, createContainer } from "@utils/callbacks";
+import { Signal, Source, Value, ValuesContainer, ValuesMap, createContainer, initial } from "@utils/callbacks";
 import { Dependency, Injector, getInstances, lifecycle } from "@utils/injector";
 import { iter } from "@utils/iter";
 import { UniqueIds, asyncMapOptional, zipOptional } from "@utils/objects";
@@ -16,7 +16,7 @@ import { FS, FileSystem, FileSystemHandle, FileSystems, SerializedFileSystemHand
 import { UI, Ui, Window } from "app/apis/ui1";
 import { createSavedState } from "app/modules/default/app/storage";
 import { waitFor } from "app/modules/scheduler/ui/task-propgress";
-import { WorkBuilder } from "app/modules/scheduler/work";
+import { begin, WorkBuilder } from "app/modules/scheduler/work";
 import Optional from "optional-js";
 import * as React from 'react';
 import { EMPTY } from "../fs";
@@ -89,7 +89,7 @@ class GlobalFileSystemsManagerImpl implements GlobalFileSystemsManager {
   }
 
   async addRecent(handle: FileSystemHandle) {
-    this.state.get('recent').setPromise(async recent => [
+    this.state.get('recent').setPromiseOrDispose(async recent => [
       handle.serialized,
       ...await iter(recent)
         .map(s => this.fs.deserialize(s))
@@ -174,9 +174,12 @@ export class FileSystemsManagerImpl {
   }
 
   private createSelectedFs(handle: Source<Optional<FileSystemHandle>>): Value<FileSystem> {
-    return this.values.transformedAsyncImmediate('selectedFs', handle, EMPTY,
-      h => asyncMapOptional(h, h => h.open().then(fs => fs.optional().orElse(EMPTY)))
-        .then(o => o.orElse(EMPTY)));
+    return this.values.transformedAsyncBuilder({
+      name: 'selectedFs',
+      source: handle,
+      initialValue: initial(EMPTY),
+      transformer: h => asyncMapOptional(h, h => h.open().then(fs => fs.optional().orElse(EMPTY))).then(o => o.orElse(EMPTY))
+    });
   }
 
   private createLoadedFiles(source: Source<FileSystem>): [Source<FileInfo[]>, Consumer<void>] {
@@ -187,8 +190,7 @@ export class FileSystemsManagerImpl {
     }
     const debouncedReload = debounced(() => loadedFiles.forceReload(), 100);
     const srcConnector = (fs: FileSystem, _: Value<FileInfo[]>) => fs.subscribe((name, deleted) => debouncedReload());
-    const value = [];
-    const loadedFiles = this.values.transformedAsyncBuilder({ name: 'loadedFiles', source, transformer, value, srcConnector });
+    const loadedFiles = this.values.transformedAsyncBuilder({ name: 'loadedFiles', source, transformer, initialValue: initial<FileInfo[]>([]), srcConnector });
     return [loadedFiles, () => loadedFiles.forceReload()];
   }
 
@@ -269,7 +271,7 @@ export class FileSystemsManagerImpl {
     if (!isOk.orElse(false)) return;
     await this.selectedFs.get().writable().then(w => w.ifPresent(async writable => {
       const scheduler = this.global.app.scheduler;
-      const task = scheduler.exec(new WorkBuilder()
+      const task = scheduler.exec(begin()
         .forkItems(selected, f => `Deleting ${f.name}...`, f => writable.delete(f.name))
         .finish()
       );
@@ -280,7 +282,7 @@ export class FileSystemsManagerImpl {
   async writeFiles(files: FileProvider[]) {
     await this.selectedFs.get().writable().then(w => w.ifPresent(async w => {
       const scheduler = this.global.app.scheduler;
-      const task = scheduler.exec(new WorkBuilder()
+      const task = scheduler.exec(begin()
         .then('Preparing...', async () => this.selectedFs.get().list())
         .factory((work, dstFiles) => {
           const filesMap = iter(dstFiles).toMap(f => f.name.toLowerCase(), identity());

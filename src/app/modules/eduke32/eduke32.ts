@@ -1,29 +1,29 @@
 import { Source, ValuesContainer, createContainer } from "@utils/callbacks";
 import { getOrCreate, getOrDefault, range, rect, reverseMap } from "@utils/collections";
 import { palColorFinder } from "@utils/color";
-import { loadImageFromBuffer } from "@utils/imgutils";
 import { LinearInterpolator, vector3 } from "@utils/interpolator";
 import { iter } from "@utils/iter";
-import { LazyValue, asyncMapOptional, field } from "@utils/objects";
+import { asyncMapOptional, field } from "@utils/objects";
 import { HasSymbols, ScriptFile, boolRule, createScripFile, defaultDefine, nestedRule, number, numberRule, pushField, rule, rules, rulesInclude, set, simpleRule, stringRule, symbols, token, tuple } from "@utils/scriptfile";
 import { Stream } from "@utils/stream";
-import { Function, first, identity, nil, pair, second } from "@utils/types";
-import { BoardUtils } from "app/apis/app";
+import { Function, tuple as asTuple, first, identity, nil, second } from "@utils/types";
 import { NOOP_TASK_HANDLE } from "app/apis/app1";
-import { Aliases, ArtInfoExtended, BoardContext, BuildRor, BuildTror, EMPTY_ALIASES, EMPTY_ROR_LINKS, EMPTY_TAGS, EngineContext, EngineSettings, GlBlend, NamedArtFile, Palette, PicTags, RorLink, VoxelSwap } from "app/apis/engine";
+import { Aliases, ArtInfoExtended, BoardContext, BuildRor, BuildTror, EMPTY_ALIASES, EMPTY_TAGS, EngineContext, EngineSettings, GlBlend, NamedArtFile, Palette, PicTags, RorLink, VoxelSwap } from "app/apis/engine";
 import { FileSystem } from "app/apis/fs";
 import { EngineApi } from "build/board/mutations/api";
-import { Board, Sector, Sprite } from "build/board/structs";
-import { AnimationType, Attributes } from "build/formats/art";
+import { Board, Sector, Sprite, Wall } from "build/board/structs";
+import { AnimationType } from "build/formats/art";
 import { VoxelData, readKvx } from "build/formats/kvx";
 import { cloneBoard, cloneSector, cloneSprite, cloneWall, loadBuildMap, newBoard, newSector, newSprite, newWall } from "build/maploader";
-import Optional from "optional-js";
-import { match } from "ts-pattern";
-import { loadArtWork, loadMaxPluId, openFile, openFileOptional } from "../default/engine-commons";
-import { EMPTY, createGrpOrZipFsArrayBuffeer as createGrpOrZipFsArrayBuffer, stack, trackFiles, trackFilesSingle } from "../fs/fs";
-import { Work, begin, tuple as tupleWork } from "../scheduler/work";
 import { slope } from "build/utils";
 import { vec3 } from "gl-matrix";
+import Optional from "optional-js";
+import { match } from "ts-pattern";
+import { createBoardModifier } from "../default/board-context-utils";
+import { loadArtWork, loadEditorPicAddons, loadMaxPluId, loadPicAddonsWork, openFile, openFileOptional } from "../default/engine-commons";
+import { DefaultGridController } from "../default/grid";
+import { EMPTY, createGrpOrZipFsArrayBuffeer as createGrpOrZipFsArrayBuffer, stack, trackFiles, trackFilesSingle } from "../fs/fs";
+import { Work, begin, tuple as tupleWork } from "../scheduler/work";
 
 function engineApi(): EngineApi<Board> {
   return { cloneBoard, cloneWall, cloneSprite, cloneSector, newWall, newSector, newSprite, newBoard };
@@ -45,7 +45,7 @@ async function loadAliases(values: ValuesContainer, fs: Source<FileSystem>, fn: 
       return { get: picnum => getOrDefault(map, picnum, ''), all: () => map }
     }).then(a => a.orElse(EMPTY_ALIASES))
   }
-  return values.transformedAsync('aliases', fs, load, trackFilesSingle(files, load));
+  return values.transformedAsync('aliases', fs, load, nil(), trackFilesSingle(files, load));
 }
 
 async function loadTags(values: ValuesContainer, fs: Source<FileSystem>, fn: string): Promise<Source<PicTags>> {
@@ -69,25 +69,18 @@ async function loadTags(values: ValuesContainer, fs: Source<FileSystem>, fn: str
       return { allTags: () => picTags.map(p => p.name), tags: picnum => iter(picTags).filter(p => p.tiles.has(picnum)).map(p => p.name).collect() };
     }).then(o => o.orElse(EMPTY_TAGS))
   }
-  return values.transformedAsync('tags', fs, load, trackFilesSingle(files, load));
+  return values.transformedAsync('tags', fs, load, nil(), trackFilesSingle(files, load));
 }
 
-function defaultEngineSettings(): EngineSettings {
-  const trans1 = 0.33;
-  const trans2 = 0.66;
-  return { spriteShadowOff: false, trans1, trans2 };
-}
-
-function packOffs(offs: number[]): number {
-  return iter(offs).enumerate().map(([o, i]) => (o & 0x7) << (i * 3)).reduce((a, b) => a | b, 0);
-}
-
-function defaultParallaxPicnums(picnum: number): number {
-  return match(picnum)
-    .with(80, () => packOffs([1, 0, 0, 2, 3, 0, 2]))
-    .with(84, () => packOffs([1, 2, 3, 0, 0, 4, 0]))
-    .with(89, () => packOffs([2, 3, 1, 2, 1, 2, 4]))
-    .otherwise(() => 0);
+function defaultEngineSettings(values: ValuesContainer, picnumOffset: Source<number>): Source<EngineSettings> {
+  return values.transformed('engine-settings', picnumOffset, off => {
+    const trans1 = 0.33;
+    const trans2 = 0.66;
+    const lotagSectorText = (sector: Sector) => sectorLotagText(sector.lotag);
+    const lotagSpriteText = (sprite: Sprite) => sprite.picnum === 1 ? SE_TAGS[sprite.lotag] ?? '' : '';
+    const lotagWallText = (wall: Wall) => '';
+    return { spriteShadowOff: false, trans1, trans2, lotagWallText, lotagSectorText, lotagSpriteText, pointPicnum: off, fontPicnum: off + 1 };
+  })
 }
 
 type FileDef = { file: string, offset?: number };
@@ -132,7 +125,7 @@ async function loadDefaultEngineDefs(values: ValuesContainer, root: Source<FileS
     const pals: PalDef[] = [];
     const blends: BlendDef[] = [];
     const addGrp = EMPTY;
-    const tiles = [];
+    const tiles: TileFromTexture[] = [];
     const animTileRanges = [];
     await fs.read('palette.dat').then(o => o.ifPresent(ab => {
       pals.push({ id: 0, file: 'palette.dat', shiftleft: 2 });
@@ -227,18 +220,21 @@ function loadEngineDefsWork(grpName: String, values: ValuesContainer): Work<[Sou
         .finish();
   }
 
+  let loadHandle = NOOP_TASK_HANDLE;
   async function load([defs, grpInfo]: [EngineDefs, GrpInfo]): Promise<EngineDefs> {
-    return first(await loadWork(grpInfo, defs)(NOOP_TASK_HANDLE))
+    return first(await loadWork(grpInfo, defs)(loadHandle))
   }
 
   return begin()
     .multiInput<[Source<FileSystem>, Source<GrpInfo>]>()
     .thenPass('Open Grp', async (fs, grpInfo) => openGrp(values, fs, grpName))
     .thenPass('Loading default defs', async (fs, grpInfo, mainGrp) => loadDefaultEngineDefs(values, fs, mainGrp))
-    .thenWorkPass(async (handle, fs, grpInfo, mainGrp, defs) => loadWork(grpInfo.get(), defs.get())(handle))
-    .then('Creating transformer', async (fs, grpInfo, mainGrp, defs, init) =>
-      values.transformedAsyncTupleImmediate('engine-defs', [defs, grpInfo], load, init, nil(), trackFiles(files, ([defs, _]) => defs.root, load)))
-    .finish()
+    .thenWork(tupleWork(async (handle, fs, grpInfo, mainGrp, defs) => {
+      loadHandle = handle;
+      const value = await values.transformedAsyncTuple('engine-defs', [defs, grpInfo], load, nil(), trackFiles(files, ([defs, _]) => defs.root, load));
+      loadHandle = NOOP_TASK_HANDLE;
+      return value;
+    })).finish()
 }
 
 export type GrpInfo = { name?: string, defname?: string }
@@ -287,7 +283,7 @@ async function loadPlus(values: ValuesContainer, defs: Source<EngineDefs>, fs: S
     const plus = await iter(defs.plus)
       .filter(d => d.file !== undefined)
       .groupEntries(field('file'), identity())
-      .map(async ([file, d]) => pair(d, await fs.read(file)))
+      .map(async ([file, d]) => asTuple(d, await fs.read(file)))
       .await_()
       .then(defs => defs
         .filter(([_, o]) => o.isPresent())
@@ -309,11 +305,11 @@ async function loadVoxels(values: ValuesContainer, defs: Source<EngineDefs>, fs:
   return values.transformedAsyncTuple('voxels', [defs, fs], async ([defs, fs]) => {
     cache.clear();
     const files = await iter(defs.voxels)
-      .map(async v => pair(v, await fs.read(v.file)))
+      .map(async v => asTuple(v, await fs.read(v.file)))
       .await_()
       .then(defs => defs
         .filter(([_, buff]) => buff.isPresent())
-        .map(([v, o]) => pair(v.picnum, o.get()))
+        .map(([v, o]) => asTuple(v.picnum, o.get()))
         .toMap(first, second)
       );
     return picnum => getOrCreate(cache, picnum, _ => Optional.ofNullable(files.get(picnum)).map(buff => readKvx(new Stream(buff))));
@@ -387,63 +383,41 @@ async function generateFogPals(values: ValuesContainer, pal: Source<Uint8Array>,
   });
 }
 
-async function loadArtMap(values: ValuesContainer, defs: Source<EngineDefs>, arts: Source<NamedArtFile[]>, fs: Source<FileSystem>, pal: Source<Uint8Array>) {
-  return values.transformedAsyncTuple('artMap', [arts, defs, fs, pal], async ([artFiles, defs, fs, pal]) => {
-    const toArtImg = new LazyValue(() => {
-      const finder = palColorFinder(pal);
-      return (w: number, h: number, img: Uint8Array, alphacut: number) => {
-        const dst = new Uint8Array(w * h);
-        for (const [xc, yc] of rect(w, h)) {
-          const idx = yc * w + xc;
-          if ((img[idx * 4 + 3] / 255) <= alphacut) {
-            dst[xc * h + yc] = 255;
-          } else {
-            const r_ = img[idx * 4];
-            const g_ = img[idx * 4 + 1];
-            const b_ = img[idx * 4 + 2];
-            dst[xc * h + yc] = finder(r_, g_, b_);
-          }
-        }
-        return dst;
-      }
-    });
+function loadArtMap(values: ValuesContainer, defs: Source<EngineDefs>, arts: Source<NamedArtFile[]>, fs: Source<FileSystem>, pal: Source<Uint8Array>): Work<[], [Source<Map<number, ArtInfoExtended>>]> {
+  return tupleWork(async handle => {
+    let loadHandle = NOOP_TASK_HANDLE;
+    const load = async ([artFiles, defs, fs, pal]: [NamedArtFile[], EngineDefs, FileSystem, Uint8Array]): Promise<Map<number, ArtInfoExtended>> => {
+      const map = iter(artFiles)
+        .map(file => iter(file.art.arts)
+          .enumerate()
+          .map(([info, i]) => asTuple(file.art.header.start + i, { ...info, artFile: file.name })))
+        .flatten()
+        .toMap(first, second);
 
-    const map = iter(artFiles)
-      .map(file => iter(file.art.arts)
-        .enumerate()
-        .map(([info, i]) => pair(file.art.header.start + i, { ...info, artFile: file.name })))
-      .flatten()
-      .toMap(first, second);
+      iter(defs.tiles)
+        .zip(first(await loadPicAddonsWork(fs, pal, defs.tiles)(loadHandle)))
+        .filter(([t, i]) => i.h !== 0 && i.w !== 0)
+        .forEach(([t, i]) => map.set(t.picnum, i))
 
-    await iter(defs.tiles)
-      .map(async t => pair(t, await fs.read(t.file)))
-      .await_()
-      .then(i => i
-        .filter(([_, o]) => o.isPresent())
-        .map(async ([t, o]) => pair(t, await loadImageFromBuffer(o.get())))
-        .await_())
-      .then(i => i
-        .forEach(([t, [w, h, img]]) => {
-          const attrs = new Attributes();
-          attrs.xoff = t.xoff ?? 0;
-          attrs.yoff = t.yoff ?? 0;
-          const info: ArtInfoExtended = { w, h, img: toArtImg.get()(w, h, img, t.alphacut ?? 0.32), artFile: t.file, attrs };
-          map.set(t.picnum, info);
-        }));
+      iter(defs.animTileRanges)
+        .forEach(({ start, end, speed, anim }) => {
+          const picnum = anim === AnimationType.ANIMATE_BACKWARD ? end : start;
+          const frames = Math.abs(start - end);
+          const info = map.get(picnum);
+          if (info === undefined) return;
+          info.attrs.frames = frames;
+          info.attrs.speed = speed;
+          info.attrs.animType = anim;
+        });
 
-    iter(defs.animTileRanges)
-      .forEach(({ start, end, speed, anim }) => {
-        const picnum = anim === AnimationType.ANIMATE_BACKWARD ? end : start;
-        const frames = Math.abs(start - end);
-        const info = map.get(picnum);
-        if (info === undefined) return;
-        info.attrs.frames = frames;
-        info.attrs.speed = speed;
-        info.attrs.animType = anim;
-      });
+      return map;
+    }
 
-    return map;
-  });
+    loadHandle = handle;
+    const value = await values.transformedAsyncTuple('artMap', [arts, defs, fs, pal], load);
+    loadHandle = NOOP_TASK_HANDLE;
+    return value;
+  })
 }
 
 function loadBlends(values: ValuesContainer, defs: Source<EngineDefs>): Source<Function<number, GlBlend>> {
@@ -549,14 +523,11 @@ function getRor(board: Board): BuildRor {
   const UNDERWATER_TAG = 2;
   const transportsByHitag = iter(board.sprites)
     .enumerate()
-    .map(([spr, s]) => [spr, s, board.sectors[spr.sectnum]] as [Sprite, number, Sector])
+    .map(([spr, s]) => asTuple(spr, s, board.sectors[spr.sectnum]))
     .filter(([spr, s, sec]) => spr.lotag === TRANSPORT_TAG && (sec.lotag === WATER_TAG || sec.lotag === UNDERWATER_TAG))
     .group(([spr, s, sec]) => spr.hitag, identity());
   const floorLinks = new Map<number, RorLink>();
   const ceilingLinks = new Map<number, RorLink>();
-  const floorLink = (sectorId: number) => floorLinks.get(sectorId);
-  const ceilLink = (sectorId: number) => ceilingLinks.get(sectorId);
-  const hasRor = (sectorId: number) => floorLinks.has(sectorId) || ceilingLinks.has(sectorId);
   for (const links of transportsByHitag.values()) {
     if (links.length !== 2) continue;
     let [spr1, s1, sec1] = links[0];
@@ -564,61 +535,90 @@ function getRor(board: Board): BuildRor {
     if (sec1.lotag === WATER_TAG) [spr1, spr2, s1, s2, sec1, sec2] = [spr2, spr1, s2, s1, sec2, sec1];
     board.sectors[spr1.sectnum].ceilingstat.type = 2;
     board.sectors[spr2.sectnum].floorstat.type = 2;
-    const spr1z = slope(board, spr1.sectnum, spr1.x, spr1.y, sec1.ceilingstat.slopped ? sec1.ceilingheinum : 0) + sec1.ceilingz;
-    const spr2z = slope(board, spr2.sectnum, spr2.x, spr2.y, sec2.floorstat.slopped ? sec2.floorheinum : 0) + sec2.floorz;
+    const spr1z = slope(board, spr1.sectnum, spr1.x, spr1.y, true);
+    const spr2z = slope(board, spr2.sectnum, spr2.x, spr2.y, false);
     const srcSpritePos = vec3.fromValues(spr1.x, spr1.y, spr1z);
     const dstSpritePos = vec3.fromValues(spr2.x, spr2.y, spr2z);
     const buildDiff = vec3.sub(vec3.create(), srcSpritePos, dstSpritePos);
-    ceilingLinks.set(spr1.sectnum, { buildDiff, dstSector: spr2.sectnum });
-    floorLinks.set(spr2.sectnum, { buildDiff: vec3.negate(vec3.create(), buildDiff), dstSector: spr1.sectnum });
+    ceilingLinks.set(spr1.sectnum, { buildDiff, dstSector: spr2.sectnum, transparent: true });
+    floorLinks.set(spr2.sectnum, { buildDiff: vec3.negate(vec3.create(), buildDiff), dstSector: spr1.sectnum, transparent: true });
   }
+  const floorLink = (sectorId: number) => floorLinks.get(sectorId);
+  const ceilLink = (sectorId: number) => ceilingLinks.get(sectorId);
+  const hasRor = (sectorId: number) => floorLinks.has(sectorId) || ceilingLinks.has(sectorId);
   return { rorLinks: { floorLink, ceilLink, hasRor }, isMirrorPic: _ => false } as BuildRor;
 }
 
-async function loadBoard(stream: Stream): Promise<BoardContext> {
-  const board = loadBuildMap(stream);
-  const ror = getRor(board);
-  const spritesBySector = iter(board.sprites).map(field('sectnum')).enumerate().group(first, second);
-  const tror = getTror(board);
-  const utils = { spritesBySector: (sectorId) => spritesBySector.get(sectorId) } as BoardUtils;
-  const lotagSectorText = (sectorId: number) => sectorLotagText(board.sectors[sectorId].lotag);
-  const lotagSpriteText = (spriteId: number) => { const spr = board.sprites[spriteId]; return spr.picnum === 1 ? SE_TAGS[spr.lotag] ?? '' : '' }
-  const lotagWallText = (wallId: number) => '';
-  return { board, ror, tror, utils, parallaxPicnums: 8, lotagSectorText, lotagSpriteText, lotagWallText };
+function packOffs(offs: number[]): number {
+  return iter(offs).enumerate().map(([o, i]) => (o & 0x7) << (i * 3)).reduce((a, b) => a | b, 0);
+}
+
+function defaultParallaxPicnums(picnum: number): number {
+  return match(picnum)
+    .with(80, () => packOffs([1, 0, 0, 2, 3, 0, 2]))
+    .with(84, () => packOffs([1, 2, 3, 0, 0, 4, 0]))
+    .with(89, () => packOffs([2, 3, 1, 2, 1, 2, 4]))
+    .otherwise(() => 0);
+}
+
+function createloadBoard(values: ValuesContainer): Function<Stream, Promise<BoardContext>> {
+  let boardId = 1;
+  return async (stream: Stream): Promise<BoardContext> => {
+    const boardValues = values.createChild(`board-${boardId++}`);
+    const board = boardValues.value('board', loadBuildMap(stream));
+    const ror = getRor(board.get());
+    const tror = getTror(board.get());
+    const spritesBySectorMap = iter(board.get().sprites).map(field('sectnum')).enumerate().group(first, second);
+    const spritesBySector = (sectorId: number) => getOrDefault(spritesBySectorMap, sectorId, []);
+    const grid = DefaultGridController(values);
+    const dispose = async () => boardValues.dispose();
+
+    return { board, ror, tror, parallaxPicnums: 8, spritesBySector, ...createBoardModifier<Board>(board), grid, dispose };
+  }
 }
 
 export type Eduke32ModsType = {
   grpName: string,
 }
 
-export function createEngineContextEduke32(): Work<[Source<FileSystem>, Eduke32ModsType], [EngineContext]> {
-  return begin()
-    .multiInput<[Source<FileSystem>, Eduke32ModsType]>()
-    .thenWork((handle, fs, { grpName }) =>
-      createContainer('eduke32-module').initializeAsync(values => begin()
-        .thenPass('Loading GrpInfo', () => loadGrpInfo(values, fs, grpName))
-        .thenWorkPass((handle, grpInfo) => loadEngineDefsWork(grpName, values)(handle, fs, grpInfo))
-        .thenPass('Loading Resources', async (_, defs) => values.transformed('resources', defs, defs => stack(defs.root, stack(defs.addGrp, defs.mainGrp))))
-        .forkPass(p => p
-          .thread('Loading Pal', (_, defs, res) => loadPal(values, defs, res))
-          .thread('Loading Trans', (_, defs, res) => loadTrans(values, defs, res))
-          .thread('Loading PLUs', (_, defs, res) => loadPlus(values, defs, res))
-          .thread('Loading voxels', (_, defs, res) => loadVoxels(values, defs, res))
-          .threadWork((handle, _, defs, res) => loadArtWork(handle, values, res))
-          .thread('Loading aliases', (_, defs, res) => loadAliases(values, res, 'NAMES.H'))
-          .thread('Loading tags', (_, defs, res) => loadTags(values, res, 'tiles.cfg')))
-        .thenPass('Loading additional Art Files', (grpInfo, defs, resources, [pal, trans, plus, spriteVoxelSwap, art, aliases, picTags]) => loadArtMap(values, defs, art, resources, pal))
-        .thenPass('Creating default Fog pals', (grpInfo, defs, resources, [pal, trans, plus, spriteVoxelSwap, art, aliases, picTags], artMap) => generateFogPals(values, pal, plus))
-        .then<EngineContext>('', async (grpInfo, defs, resources, [pal, trans, plus, spriteVoxelSwap, art, aliases, picTags], artMap, plusWithFog) => {
-          const api = engineApi();
-          const name = values.field('name', grpInfo, 'name');
-          const settings = defaultEngineSettings();
-          const shadowsteps = values.const('shadowsteps', 32);
-          const maxPluId = loadMaxPluId(values, plusWithFog);
-          const blends = loadBlends(values, defs);
-          const parallaxInfo = defaultParallaxPicnums;
-          const dispose = () => values.dispose();
-          return { name, resources, api, settings, pal, trans, picTags, plus: plusWithFog, maxPluId, art, artMap, shadowsteps, aliases, spriteVoxelSwap, blends, parallaxInfo, loadBoard, dispose }
-        }).finish()(handle)
-      )).finish()
-}
+export const createEngineContextEduke32 = begin()
+  .multiInput<[Source<FileSystem>, Eduke32ModsType]>()
+  .thenWork((handle, fs, { grpName }) =>
+    createContainer('eduke32-module').initializeAsync(values => begin()
+      .thenPass('Loading GrpInfo', () => loadGrpInfo(values, fs, grpName))
+      .thenWorkPass((handle, grpInfo) => loadEngineDefsWork(grpName, values)(handle, fs, grpInfo))
+      .thenPass('Loading Resources', async (_, defs) => values.transformed('resources', defs, defs => stack(stack(defs.addGrp, defs.mainGrp), defs.root)))
+      .forkPass(p => p
+        .thread('Loading Pal', (_, defs, res) => loadPal(values, defs, res))
+        .thread('Loading Trans', (_, defs, res) => loadTrans(values, defs, res))
+        .thread('Loading PLUs', (_, defs, res) => loadPlus(values, defs, res))
+        .thread('Loading voxels', (_, defs, res) => loadVoxels(values, defs, res))
+        .threadWork((handle, _, defs, res) => loadArtWork(handle, values, res))
+        .thread('Loading aliases', (_, defs, res) => loadAliases(values, res, 'NAMES.H'))
+        .thread('Loading tags', (_, defs, res) => loadTags(values, res, 'tiles.cfg')))
+      .thenWorkPass(async (handler, grpInfo, defs, resources, [pal, trans, plus, spriteVoxelSwap, art, aliases, picTags]) => loadArtMap(values, defs, art, resources, pal)(handler))
+      .thenWorkPass(async (handler, grpInfo, defs, resources, [pal, trans, plus, spriteVoxelSwap, art, aliases, picTags], artMap) => loadEditorPicAddons(values, artMap, resources, pal)(handle))
+      .thenPass('Creating default Fog pals', (grpInfo, defs, resources, [pal, trans, plus, spriteVoxelSwap, art, aliases, picTags], artMap, addonArtMap) => generateFogPals(values, pal, plus))
+      .then<EngineContext>('', async (grpInfo, defs, resources, [pal, trans, plus, spriteVoxelSwap, art, aliases, picTags], artMap, addonArtMap, plusWithFog) => {
+        return {
+          name: values.field('name', grpInfo, 'name'),
+          resources,
+          api: engineApi(),
+          settings: defaultEngineSettings(values, addonArtMap.offset),
+          pal,
+          trans,
+          picTags,
+          plus: plusWithFog,
+          maxPluId: loadMaxPluId(values, plusWithFog),
+          art,
+          artMap: addonArtMap.map,
+          shadowsteps: values.const('shadowsteps', 32),
+          aliases,
+          spriteVoxelSwap,
+          blends: loadBlends(values, defs),
+          parallaxInfo: defaultParallaxPicnums,
+          loadBoard: createloadBoard(values),
+          dispose: () => values.dispose()
+        }
+      }).finish()(handle)
+    )).finish();

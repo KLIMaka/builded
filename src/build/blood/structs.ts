@@ -80,9 +80,9 @@ export class SectorExtra {
   public bobRotate: number;
 }
 
-export class BloodSector extends Sector {
-  public extraData: SectorExtra;
-}
+export type BloodSector = {
+  extraData: SectorExtra;
+} & Sector;
 
 export class WallExtra {
   public reference: number;
@@ -118,9 +118,9 @@ export class WallExtra {
   public unk5: number;
 }
 
-export class BloodWall extends Wall {
-  public extraData: WallExtra;
-}
+export type BloodWall = {
+  extraData: WallExtra;
+} & Wall;
 
 export class SpriteExtra {
   public reference: number;
@@ -185,11 +185,11 @@ export class SpriteExtra {
   public ai: number;
 }
 
-export class BloodSprite extends Sprite {
-  public extraData: SpriteExtra;
-}
+export type BloodSprite = {
+  extraData: SpriteExtra;
+} & Sprite;
 
-export class BloodBoard extends Board<BloodWall, BloodSector, BloodSprite> {
-  public visibility: number;
-  public parallaxSize: number;
-}
+export type BloodBoard = {
+  visibility: number;
+  parallaxSize: number;
+} & Board<BloodWall, BloodSector, BloodSprite>;

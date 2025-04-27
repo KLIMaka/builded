@@ -1,4 +1,4 @@
-import { createContainer, Disposable, Source } from "@utils/callbacks";
+import { createContainer, Disposable, Source, ValuesContainer } from "@utils/callbacks";
 import { getOrCreate, getOrDefault, range } from "@utils/collections";
 import { DisposableResource, GlContext, ResourceFactory, Texture } from "@utils/gl/drawstruct";
 import { createTexture } from "@utils/gl/textures";
@@ -8,10 +8,12 @@ import { int, sum } from "@utils/mathutils";
 import { Stream } from "@utils/stream";
 import { Packer, Rect } from "@utils/texcoordpacker";
 import { Consumer, Function, identity, pair } from "@utils/types";
+import { NOOP_TASK_HANDLE } from "app/apis/app1";
 import { ArtInfoExtended, EngineContext, VoxelSwap } from "app/apis/engine";
 import { animStruct, ArtInfo } from "build/formats/art";
 import { unpackVoxelSides } from "build/formats/kvx";
 import Optional from "optional-js";
+import { begin, tuple, Work } from "../scheduler/work";
 
 export function createGlContext(): GlContext {
   const offscreen = new OffscreenCanvas(0, 0);
@@ -36,9 +38,9 @@ export type VoxelDrawData = {
 }
 
 export type EngineTextures = {
-  readonly pal: Source<Texture>,
-  readonly plu: Source<Texture>,
-  readonly trans: Source<Texture>,
+  readonly pal: Source<WebGLTexture>,
+  readonly plu: Source<WebGLTexture>,
+  readonly trans: Source<WebGLTexture>,
   readonly atlas: Source<WebGLTexture>,
   readonly infos: Source<WebGLTexture>,
   readonly art: Source<Map<number, ArtInfoExtended>>,
@@ -48,42 +50,60 @@ export type EngineTextures = {
 } & Disposable;
 
 type AtlasRect = { rect: Rect, depth: number, uploaded: boolean }
+
+function createArtTextureWork(values: ValuesContainer, glCtx: GlContext, arts: Source<Map<number, ArtInfoExtended>>, parallaxInfo: Function<number, number>): Work<[], [Source<ArtTexture>]> {
+  const size = Math.min(4096, glCtx.gl.getParameter(glCtx.gl.MAX_TEXTURE_SIZE));
+  let packers: Packer[] = [];
+  const pack = (w: number, h: number): AtlasRect => iter(packers)
+    .enumerate()
+    .map(([p, depth]) => ({ depth, rect: p.pack(w, h), uploaded: false }))
+    .first(({ rect }) => rect !== undefined)
+    .orElseGet(() => {
+      const packer = new Packer(size, size);
+      const rect = packer.pack(w, h);
+      const depth = packers.length;
+      const uploaded = false;
+      packers.push(packer);
+      return { depth, rect, uploaded };
+    });
+
+  let loadHandle = NOOP_TASK_HANDLE;
+  async function loadTextures(arts: Map<number, ArtInfoExtended>): Promise<ArtTexture> {
+    packers = [];
+    const whs = iter(arts)
+      .filter(([_, a]) => a.w > 0 && a.h > 0)
+      .map(([id, a]) => pair(id, pair(a.w, a.h)))
+      .collect();
+    whs.sort(([id1, [w1, h1]], [id2, [w2, h2]]) => - w1 * h1 + w2 * h2);
+    const rects = new Map<number, AtlasRect>();
+    const jobs = iter(whs).map(([id, [w, h]]) => () => { rects.set(id, pack(w, h)) }).collect();
+    await loadHandle.waitForBatchTask(jobs, 'Allocate Atlas');
+    return new ArtTexture(glCtx, arts, size, size, rects, packers.length, parallaxInfo);
+  }
+
+  return begin()
+    .thenWork(tuple(async handle => {
+      loadHandle = handle;
+      const result = await values.transformedAsync('atlas', arts, arts => loadTextures(arts), m => m.dispose())
+      loadHandle = NOOP_TASK_HANDLE;
+      return result;
+    })).finish();
+}
+
 class ArtTexture implements Disposable {
   readonly atlasId: DisposableResource<WebGLTexture>;
   readonly infoId: DisposableResource<WebGLTexture>;
-  private rects = new Map<number, AtlasRect>();
-  private depth: number;
 
   constructor(
     private glCtx: GlContext,
     private arts: Map<number, ArtInfoExtended>,
     private width: number,
     private height: number,
+    private rects: Map<number, AtlasRect>,
+    private depth: number,
     private parallaxInfo: Function<number, number>,
-    private voxelsSwaps: Source<VoxelSwap>,
   ) {
     const { gl, resource } = glCtx;
-    const packers: Packer[] = [];
-    const pack = (w: number, h: number): AtlasRect => iter(packers)
-      .enumerate()
-      .map(([p, depth]) => ({ depth, rect: p.pack(w, h), uploaded: false }))
-      .first(({ rect }) => rect !== undefined)
-      .orElseGet(() => {
-        const packer = new Packer(this.width, this.height);
-        const rect = packer.pack(w, h);
-        const depth = packers.length;
-        const uploaded = false;
-        packers.push(packer);
-        return { depth, rect, uploaded };
-      });
-    const whs = iter(this.arts)
-      .filter(([_, a]) => a.w > 0 && a.h > 0)
-      .map(([id, a]) => pair(id, pair(a.w, a.h)))
-      .collect();
-    whs.sort(([id1, [w1, h1]], [id2, [w2, h2]]) => - w1 * h1 + w2 * h2);
-    whs.forEach(([id, [w, h]]) => this.rects.set(id, pack(w, h)));
-    this.depth = packers.length;
-    console.log(`Atlas created with ${this.depth} layers`);
     this.atlasId = this.initAtlasTexture(gl, resource);
     this.infoId = this.initInfoTexture(gl, resource);
   }
@@ -173,31 +193,36 @@ function getVoxel(picnum: number, cache: Map<number, [number, DisposableResource
   });
 }
 
-export function createEngineTextures(engine: EngineContext, glCtx: GlContext): EngineTextures {
-  const { gl } = glCtx;
-  return createContainer('engine-textures').initialize(values => {
-    const art = engine.artMap;
-    const texDisposer = { disposer: (tex: Texture) => tex.dispose() };
-    const pal = values.transformed('palTexture', engine.pal, pal => createTexture(glCtx, 256, 1, pal, gl.RGB, 3), texDisposer);
-    const plu = values.transformedTuple('pluTexture', [engine.shadowsteps, engine.plus, engine.maxPluId], ([steps, plus, maxPluId]) => {
-      const plusLength = maxPluId + 1;
-      const pluMap = iter(plus).toMap(p => p.id, identity());
-      const tex = new Uint8Array(256 * steps * plusLength);
-      const defPlu = pluMap.get(0);
-      for (const i of range(0, plusLength)) tex.set(getOrDefault(pluMap, i, defPlu).plu, 256 * steps * i);
-      for (let i = 0; i < steps * plusLength; i++) tex[256 * i - 1] = 255;
-      return createTexture(glCtx, 256, steps * plusLength, tex, gl.LUMINANCE);
-    }, texDisposer);
-    const trans = values.transformed('transTexture', engine.trans, trans => createTexture(glCtx, 256, 256, trans, gl.LUMINANCE), texDisposer);
-    const textures = new Map<number, Source<number>>();
-    const size = Math.min(4096, gl.getParameter(gl.MAX_TEXTURE_SIZE));
-    const artTexture = values.transformed(`atlas`, art, arts => new ArtTexture(glCtx, arts, size, size, engine.parallaxInfo, engine.spriteVoxelSwap), { disposer: m => m.dispose() });
-    const atlas = values.transformed(`atlas-texture`, artTexture, t => t.atlasId.value);
-    const infos = values.transformed(`infos-texture`, artTexture, t => t.infoId.value);
-    const get = (picnum: number, additional = 0) => getOrCreate(textures, picnum, _ => values.transformed(`texture_${picnum}`, artTexture, mega => mega.get(picnum, additional)));
-    const voxelsCache = new Map<number, [number, DisposableResource<WebGLTexture>]>();
-    const voxels = values.transformed('voxels', engine.spriteVoxelSwap, voxels => (picnum: number) => getVoxel(picnum, voxelsCache, voxels, glCtx));
-    const dispose = async () => { await values.dispose(); voxelsCache.values().forEach(([_, t]) => t.dispose()) }
-    return { pal, plu, trans, atlas, infos, art, voxels, get, dispose };
-  });
-}
+export const createEngineTexturesWork = begin()
+  .multiInput<[EngineContext, GlContext]>()
+  .thenWork((handle, engine, glCtx) =>
+    createContainer('engine-textures').initializeAsync(async values => begin()
+      .thenWorkPass(createArtTextureWork(values, glCtx, engine.artMap, engine.parallaxInfo))
+      .then<EngineTextures>('Create Textures', async artTexture => {
+        const { gl } = glCtx;
+        const art = engine.artMap;
+        const texDisposer = { disposer: (tex: Texture) => tex.dispose() };
+        const palTexture = values.transformed('pal-texture-value', engine.pal, pal => createTexture(glCtx, 256, 1, pal, gl.RGB, 3), texDisposer);
+        const pal = values.transformed('pal-texture', palTexture, p => p.get());
+        const pluTexture = values.transformedTuple('plu-texture-value', [engine.shadowsteps, engine.plus, engine.maxPluId], ([steps, plus, maxPluId]) => {
+          const plusLength = maxPluId + 1;
+          const pluMap = iter(plus).toMap(p => p.id, identity());
+          const tex = new Uint8Array(256 * steps * plusLength);
+          const defPlu = pluMap.get(0);
+          for (const i of range(0, plusLength)) tex.set(getOrDefault(pluMap, i, defPlu).plu, 256 * steps * i);
+          for (let i = 0; i < steps * plusLength; i++) tex[256 * i - 1] = 255;
+          return createTexture(glCtx, 256, steps * plusLength, tex, gl.LUMINANCE);
+        }, texDisposer);
+        const plu = values.transformed('plu-texture', pluTexture, p => p.get());
+        const transTexture = values.transformed('trans-texture-value', engine.trans, trans => createTexture(glCtx, 256, 256, trans, gl.LUMINANCE), texDisposer);
+        const trans = values.transformed('trans-texture', transTexture, t => t.get());
+        const textures = new Map<number, Source<number>>();
+        const atlas = values.transformed(`atlas-texture`, artTexture, t => t.atlasId.value);
+        const infos = values.transformed(`infos-texture`, artTexture, t => t.infoId.value);
+        const get = (picnum: number, additional = 0) => getOrCreate(textures, picnum, _ => values.transformed(`texture_${picnum}`, artTexture, mega => mega.get(picnum, additional)));
+        const voxelsCache = new Map<number, [number, DisposableResource<WebGLTexture>]>();
+        const voxels = values.transformed('voxels', engine.spriteVoxelSwap, voxels => (picnum: number) => getVoxel(picnum, voxelsCache, voxels, glCtx));
+        const dispose = async () => { values.dispose(); voxelsCache.values().forEach(([_, t]) => t.dispose()) }
+        return { pal, plu, trans, atlas, infos, art, voxels, get, dispose };
+      }).finish()(handle)))
+  .finish();

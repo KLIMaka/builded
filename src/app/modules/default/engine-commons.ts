@@ -1,14 +1,17 @@
 import { Source, Value, ValuesContainer } from "@utils/callbacks";
+import { rect } from "@utils/collections";
+import { palColorFinder } from "@utils/color";
+import { loadImageFromBuffer } from "@utils/imgutils";
 import { iter } from "@utils/iter";
-import { asyncMapOptional, field } from "@utils/objects";
-import { Function, first, second } from "@utils/types";
+import { asyncMapOptional, asyncOptional, field } from "@utils/objects";
+import { first, Function, nil, pair, second } from "@utils/types";
 import { NOOP_TASK_HANDLE } from "app/apis/app1";
 import { ArtInfoExtended, NamedArtFile, Palette } from "app/apis/engine";
 import { FileSystem } from "app/apis/fs";
-import { readArtFile } from "build/formats/art";
+import { Attributes, readArtFile } from "build/formats/art";
 import Optional from "optional-js";
 import { EMPTY, watchFile } from "../fs/fs";
-import { begin } from "../scheduler/work";
+import { begin, tuple } from "../scheduler/work";
 
 export async function packegeFs(values: ValuesContainer, fs: Source<FileSystem>, name: string, factory: Function<ArrayBuffer, Promise<FileSystem>>): Promise<Source<FileSystem>> {
   return values.transformedAsync(`packegeFs-${name}`, await watchFile(values, name, fs), async buff => asyncMapOptional(buff, async b => factory(b)).then(o => o.orElse(EMPTY)));
@@ -55,17 +58,21 @@ export const loadArtWork = (function () {
         f => `Loading ${f.name}`,
         f => fs.read(f.name).then<NamedArtFile>(data => ({ name: f.name.toUpperCase(), art: readArtFile(data.get()) }))
       ).finish()(handle)
-    ).finish();
+    ).finishUntuple();
 
+  let loadHandle = NOOP_TASK_HANDLE;
   async function loadArts(fs: FileSystem): Promise<NamedArtFile[]> {
-    return first(await loadArtsWork(NOOP_TASK_HANDLE, fs));
+    return await loadArtsWork(loadHandle, fs);
   }
 
   return begin()
     .multiInput<[ValuesContainer, Source<FileSystem>]>()
-    .thenWorkPass(async (handle, values, res) => loadArtsWork(handle, res.get()))
-    .then('', async (values, res, init) => values.transformedAsyncImmediate('art', res, init, loadArts, subscriber))
-    .finishUntuple();
+    .thenWork(tuple(async (handle, values, res) => {
+      loadHandle = handle;
+      const result = await values.transformedAsync('art', res, loadArts, nil(), subscriber);
+      loadHandle = NOOP_TASK_HANDLE;
+      return result;
+    })).finishUntuple();
 })()
 
 export function loadArtMap(values: ValuesContainer, arts: Source<NamedArtFile[]>) {
@@ -73,7 +80,7 @@ export function loadArtMap(values: ValuesContainer, arts: Source<NamedArtFile[]>
     iter(artFiles)
       .map(file => iter(file.art.arts)
         .enumerate()
-        .map(([info, i]) => [file.art.header.start + i, { ...info, artFile: file.name }] as [number, ArtInfoExtended]))
+        .map(([info, i]) => pair(file.art.header.start + i, { ...info, artFile: file.name })))
       .flatten()
       .toMap(first, second)
   );
@@ -81,4 +88,83 @@ export function loadArtMap(values: ValuesContainer, arts: Source<NamedArtFile[]>
 
 export function loadMaxPluId(values: ValuesContainer, plus: Source<Palette[]>) {
   return values.transformed('maxPluId', plus, plus => iter(plus).map(field('id')).reduce(Math.max, 0));
+}
+
+export function loadToArtImg(pal: Uint8Array) {
+  const finder = palColorFinder(pal);
+  return (w: number, h: number, img: Uint8Array, alphacut: number) => {
+    const dst = new Uint8Array(w * h);
+    for (const [xc, yc] of rect(w, h)) {
+      const idx = yc * w + xc;
+      if ((img[idx * 4 + 3] / 255) <= alphacut) {
+        dst[xc * h + yc] = 255;
+      } else {
+        const r_ = img[idx * 4];
+        const g_ = img[idx * 4 + 1];
+        const b_ = img[idx * 4 + 2];
+        dst[xc * h + yc] = finder(r_, g_, b_);
+      }
+    }
+    return dst;
+  }
+}
+
+export type AddonImageDef = Readonly<{
+  file: string,
+  alpacut?: number,
+  xoff?: number,
+  yoff?: number
+}>;
+
+export function loadPicAddonsWork(fs: FileSystem, pal: Uint8Array, files: AddonImageDef[]) {
+  const toArtImg = loadToArtImg(pal);
+  return begin()
+    .forkItems(files,
+      f => `Loading ${f}`,
+      f => fs.read(f.file).then(async o => pair(f, await asyncOptional(o.map(loadImageFromBuffer)))))
+    .thenWork(async (handle, tuples) => {
+      const infos: ArtInfoExtended[] = [];
+      const tasks = iter(tuples)
+        .map(([f, o]) => () => {
+          const [w, h, srcImg] = o.orElse([0, 0, null]);
+          const attrs = new Attributes();
+          attrs.xoff = f.xoff ?? 0;
+          attrs.yoff = f.yoff ?? 0;
+          const img = toArtImg(w, h, srcImg, f.alpacut ?? 0.32);
+          const info: ArtInfoExtended = { w, h, img, artFile: f.file, attrs };
+          infos.push(info);
+        }).collect();
+      await handle.waitForBatchTask(tasks, 'Palletizing');
+      return [infos];
+    }).finish()
+}
+
+export type AddonArtMap = Readonly<{ map: Source<Map<number, ArtInfoExtended>>, offset: Source<number> }>;
+
+function addArts(values: ValuesContainer, artMap: Source<Map<number, ArtInfoExtended>>, addons: ArtInfoExtended[]): AddonArtMap {
+  const offset = values.transformed('add-art-ofset', artMap, map => {
+    const maxPicnum = map.keys().reduce(Math.max);
+    return maxPicnum + 1;
+  });
+
+  const map = values.transformedTuple('add-art', [artMap, offset], ([map, offset]) => {
+    const newMap = new Map(map);
+    iter(addons)
+      .enumerate()
+      .forEach(([info, i]) => newMap.set(offset + i, info));
+    return newMap;
+  });
+
+  return { map, offset };
+}
+
+const EDITOR_ADDONS: AddonImageDef[] = [
+  { file: 'resources/point1.png' },
+  { file: 'resources/img/font.png' }
+]
+export function loadEditorPicAddons(values: ValuesContainer, artMap: Source<Map<number, ArtInfoExtended>>, fs: Source<FileSystem>, pal: Source<Uint8Array>) {
+  return begin()
+    .thenWork(async handle => loadPicAddonsWork(fs.get(), pal.get(), EDITOR_ADDONS)(handle))
+    .then('Adding Pic Addons', async infos => addArts(values, artMap, infos))
+    .finish();
 }

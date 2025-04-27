@@ -1,3 +1,4 @@
+import { vec3 } from "gl-matrix";
 import { Board } from "../../build/board/structs";
 import { Entity } from "../../build/hitscan";
 import { Message, MessageHandler } from "../apis/handler";
@@ -5,7 +6,7 @@ import { Renderable } from "../apis/renderable";
 
 export class NamedMessage implements Message { constructor(public name: string) { } }
 export class LoadBoard implements Message { constructor(public board: Board) { } }
-export class StartMove implements Message { }
+export class StartMove implements Message { constructor(public origin: vec3) { } }
 export class Move implements Message { constructor(public dx: number, public dy: number, public dz: number) { } }
 export class EndMove implements Message { }
 export class Rotate implements Message { constructor(public da: number, public absolute = false) { } };

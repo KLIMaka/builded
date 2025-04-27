@@ -1,29 +1,30 @@
 import { ActionItem, ActionList, createActionItem } from "@ui/action-list";
 import { ActionButton, ActionDescriptorsContext, Button, Column, Row, Tabs, useValue, useValuesContainer } from "@ui/commons";
+import { info } from "@ui/message-box";
 import { SizeType, WindowBuilder } from "@ui/windows-common";
 import { createContainer, disposable, Disposable, Source, Value, ValuesContainer, ValuesMap } from "@utils/callbacks";
+import { GL_CONTEXT, GlContext } from "@utils/gl/drawstruct";
 import { getInstances, Injector } from "@utils/injector";
 import { iter } from "@utils/iter";
 import { sum } from "@utils/mathutils";
 import { size } from "@utils/size";
-import { nil, Result } from "@utils/types";
+import { nil, Ok } from "@utils/types";
 import { ACTION_DESCRIPTORS, ActionDescriptors } from "app/apis/actions";
 import { App, APP, ProgressInfo, TaskController, TaskValue } from "app/apis/app1";
 import { EngineContext, EngineContextFactory, NamedArtFile } from "app/apis/engine";
 import { FileInfo, FileSystem, FileSystems, FS } from "app/apis/fs";
 import { UI, Ui, Window } from "app/apis/ui1";
 import { createArtEditor } from "app/modules/arteditor/arteditor-model";
-import { createBoardView } from "app/modules/board-view/ui/board-view-model";
+import { createBoardView } from "app/modules/board-view/board-view-model";
 import { createSavedState } from "app/modules/default/app/storage";
-import { stack } from "app/modules/fs/fs";
-import { BuildGlEngineContext } from "app/modules/gl/buildgl";
+import { httpFs, stack } from "app/modules/fs/fs";
+import { createEngineTexturesWork, EngineTextures } from "app/modules/gl/gl-context";
 import { begin } from "app/modules/scheduler/work";
 import Optional from "optional-js";
 import React, { useContext, useRef } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { EngineContextRecord, ENGINES } from "../engine-context-api";
 import { createEngine } from "./create-engine-context";
-import { GL_CONTEXT, GlContext } from "@utils/gl/drawstruct";
 
 const ID = 'engines-context';
 
@@ -48,12 +49,12 @@ type EngineInfo = {
   mapFiles: Source<FileInfo[]>,
   kvxFiles: Source<FileInfo[]>,
   ctx: EngineContext;
-  bglctx: BuildGlEngineContext,
+  textures: EngineTextures;
 } & Disposable;
 
 function createDefaultState(): SavedState {
   return {
-    size: [600, 600],
+    size: [800, 800],
     position: ['center', 'center'],
     engines: [],
   };
@@ -68,8 +69,6 @@ class Editor {
   readonly currentEngineId: Value<number>;
   readonly currentEngine: Value<Optional<TaskController<EngineInfo>>>;
   readonly actions: EngineContextEditorActions;
-
-  private engineContextsCache = new Map<number, Source<Optional<Result<EngineInfo>>>>();
 
   constructor(
     private values: ValuesContainer,
@@ -92,36 +91,39 @@ class Editor {
 
   async onIdChange(idx: number) {
     const rec = this.engines.get()[idx];
-    const createEngine = iter(ENGINES).first(e => e.id === rec.type).map(e => e.factory).orElseThrow(() => new Error(`Unknown engine type: '${rec.type}' `));
+    const createEngine = iter(ENGINES)
+      .first(e => e.id === rec.type)
+      .map(e => e.factory)
+      .orElseThrow(() => new Error(`Unknown engine type: '${rec.type}' `));
     const work = begin()
       .thenWork(handle =>
         createContainer(`Engine-${rec.name}`).initializeAsync(values => begin()
           .forkItems(rec.fileSystems, f => `Opening File System...`, f => this.fs.deserialize(f).open())
-          .then('Building FS Stack...', async fss => values.value('', iter(fss).map(r => r.unwrap()).reduceFirst(stack).get()))
+          .then('Building FS Stack...', async fss => values.value('fs-stack', iter([...fss, new Ok(httpFs(''))]).map(r => r.unwrap()).reduceFirst(stack).get()))
           .thenWork((handle, fs) => createEngine(handle, fs, rec.mods))
-          .then<EngineInfo>('Constructing Engine Info...', async ctx => {
-            const bglctx = new BuildGlEngineContext(ctx, this.glCtx);
-            const name = ctx.name;
-            const artFiles = ctx.art;
-            const shadowsteps = ctx.shadowsteps;
-            const resources = ctx.resources;
+          .thenWorkPass((handle, engine) => createEngineTexturesWork(handle, engine, this.glCtx))
+          .then<EngineInfo>('Constructing Engine Info...', async (engine, textures) => {
+            const name = engine.name;
+            const artFiles = engine.art;
+            const shadowsteps = engine.shadowsteps;
+            const resources = engine.resources;
             const arts = values.transformed(`arts_${idx}`, artFiles, a => iter(a).map(a => a.art.arts.length).reduceFirst(sum).orElse(0));
             const validArts = values.transformed(`validArts_${idx}`, artFiles, a => iter(a).map(a => a.art.arts).flatten().filter(a => a.h !== 0 && a.w !== 0).length())
-            const plus = values.transformed(`plus_${idx}`, ctx.plus, p => p.length);
+            const plus = values.transformed(`plus_${idx}`, engine.plus, p => p.length);
             const mapsLoader = async (res: FileSystem) => res.list().then(l => iter(l).filter(i => i.name.toLowerCase().endsWith('.map')).collect());
-            const mapFiles = values.transformedAsyncImmediate(`maps_${idx}`,
+            const mapFiles = await values.transformedAsync(`maps_${idx}`,
               resources,
-              [] as FileInfo[],
               mapsLoader,
-              (fs, maps) => fs.subscribe((name, deleted) => { if (name.toLowerCase().endsWith('.map')) maps.setPromise(m => mapsLoader(fs)) }));
+              nil(),
+              (fs, maps) => fs.subscribe((name, deleted) => { if (name.toLowerCase().endsWith('.map')) maps.setPromiseOrDispose(m => mapsLoader(fs)) }));
             const kvxLoader = async (res: FileSystem) => res.list().then(l => iter(l).filter(i => i.name.toLowerCase().endsWith('.kvx')).collect());
-            const kvxFiles = values.transformedAsyncImmediate(`kvx_${idx}`,
+            const kvxFiles = await values.transformedAsync(`kvx_${idx}`,
               resources,
-              [] as FileInfo[],
               kvxLoader,
-              (fs, maps) => fs.subscribe((name, deleted) => maps.setPromise(m => kvxLoader(fs))));
-            const dispose = async () => { await bglctx.dispose(); await ctx.dispose(); await values.dispose(); }
-            return { name, arts, validArts, plus, shadowsteps, artFiles, mapFiles, kvxFiles, ctx, bglctx, dispose, ...disposable(dispose) }
+              nil(),
+              (fs, maps) => fs.subscribe((name, deleted) => maps.setPromiseOrDispose(m => kvxLoader(fs))));
+            const dispose = async () => { engine.dispose(); values.dispose(); textures.dispose() }
+            return { name, arts, validArts, plus, shadowsteps, artFiles, mapFiles, kvxFiles, ctx: engine, textures, dispose, ...disposable(dispose) }
           }).finish()(handle)))
       .finishUntuple();
 
@@ -148,12 +150,13 @@ class Editor {
       .collect())
   }
 
-  async openMap(ctx: BuildGlEngineContext, mapName: string): Promise<void> {
-    const window = await createBoardView(this.injector, ctx, mapName);
-    this.ui.addWindow(window);
+  async openMap(engine: EngineContext, textures: EngineTextures, mapName: string): Promise<void> {
+    (await createBoardView(this.injector, engine, textures, mapName))
+      .onErr(e => { this.app.logger.log('ERROR', e); info(this.ui, this.actionDescriptors, 'Error', e.message) })
+      .onOk(w => this.ui.addWindow(w));
   }
 
-  async openArtEditor(ctx: BuildGlEngineContext): Promise<void> {
+  async openArtEditor(ctx: EngineContext): Promise<void> {
     const window = await createArtEditor(this.injector, ctx);
     this.ui.addWindow(window);
   }
@@ -199,7 +202,7 @@ function ArtsInfoView({ info, editor }: { info: EngineInfo, editor: Editor }) {
   const artFiles = useValue(artFilesValue);
   const actionDescriptors = useContext(ActionDescriptorsContext);
   const ctx = actionDescriptors.sub(ID);
-  const artEditorAction = ctx.bind('art-editor', () => editor.openArtEditor(info.bglctx));
+  const artEditorAction = ctx.bind('art-editor', () => editor.openArtEditor(info.ctx));
 
   return <Column className='form-panel'>
     <Column className='form-panel-rows-container'>
@@ -247,7 +250,7 @@ function MapsInfoView({ info, selectedMapIdxValue, editor }: { info: EngineInfo,
   const actionDescriptors = useContext(ActionDescriptorsContext);
   const ctx = actionDescriptors.sub(ID);
   const openMapEnabled = values.transformedTuple('openMapEnabled', [selectedMapIdxValue, mapCountValue], ([selected, count]) => selected >= 0 && selected < count);
-  const openMapActionImpl = values.transformedTuple('openMapAction', [selectedMapIdxValue, info.mapFiles], ([selected, mapFiles]) => () => editor.openMap(info.bglctx, mapFiles[selected].name))
+  const openMapActionImpl = values.transformedTuple('openMapAction', [selectedMapIdxValue, info.mapFiles], ([selected, mapFiles]) => () => editor.openMap(info.ctx, info.textures, mapFiles[selected].name))
   const openMapAction = ctx.bind('open-map', async () => openMapActionImpl.get()(), openMapEnabled);
 
   return <Column className='form-panel'>

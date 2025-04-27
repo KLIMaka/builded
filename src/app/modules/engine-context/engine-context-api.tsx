@@ -1,7 +1,7 @@
 import { createActionItem } from "@ui/action-list";
 import { Row } from "@ui/commons";
 import { MenuButton } from "@ui/menu-button";
-import { Source, ValuesContainer, ValuesMap } from "@utils/callbacks";
+import { initial, Source, TRANSFORM_PLACEHOLDER, ValuesContainer, ValuesMap } from "@utils/callbacks";
 import { iter } from "@utils/iter";
 import { MultiFunction, pair } from "@utils/types";
 import { EngineContext } from "app/apis/engine";
@@ -50,8 +50,8 @@ function Eduke32Mods(mods: ValuesMap<Eduke32ModsType>, fsHandles: Source<FileSys
   const grpName = mods.get('grpName');
   const openGrpFiles = values.value('openEngineType', false);
   const grpNameLabel = values.transformed('grpNameLabel', mods.get('grpName'), e => <div className="flex-fill">{e}</div>);
-  const grpFiles = values.transformedAsyncImmediate('grpFiles', fsHandles, [], loadGrpFiles);
-  const grpFileItems = values.transformedTuple('grpNameItems', [grpFiles, grpName], ([files, current]) => iter(files)
+  const grpFiles = values.transformedAsyncBuilder({ name: 'grpFiles', source: fsHandles, transformer: loadGrpFiles, initialValue: initial<[string, Optional<GrpInfo>][]>([]) });
+  const grpFileItems = values.transformedTuple('grpNameItems', [grpFiles, grpName], ([files, current]) => iter(files === TRANSFORM_PLACEHOLDER ? [] : files)
     .map(([name, info]) => createActionItem(<div>{`${name} ${info.map(i => ' - ' + i.name).orElse('')}`}</div>, () => grpName.set(name), false, current === name))
     .collect());
   return <Row className='flex-auto baseline-aligned gap-10'>
@@ -62,5 +62,5 @@ function Eduke32Mods(mods: ValuesMap<Eduke32ModsType>, fsHandles: Source<FileSys
 
 export const ENGINES: EngineContextType<any>[] = [
   { id: 'blood', name: 'Blood', factory: createEngineBlood, defaultMods: {}, modsEditor: _ => <></> },
-  { id: 'eduke32', name: 'EDuke32', factory: createEngineContextEduke32(), defaultMods: { grpName: 'duke3d' }, modsEditor: Eduke32Mods } as EngineContextType<Eduke32ModsType>,
+  { id: 'eduke32', name: 'EDuke32', factory: createEngineContextEduke32, defaultMods: { grpName: 'duke3d' }, modsEditor: Eduke32Mods } as EngineContextType<Eduke32ModsType>,
 ]

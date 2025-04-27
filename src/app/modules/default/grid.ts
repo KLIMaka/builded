@@ -1,52 +1,43 @@
-import { Injector } from "../../../utils/injector";
-import { cyclic } from "../../../utils/mathutils";
-import { GridController } from "../../apis/app";
-import { BUS, Handle, MessageHandlerReflective } from "../../apis/handler";
-import { NamedMessage } from "../../edit/messages";
+import { Source, Value, ValuesContainer } from "@utils/callbacks";
+import { GridController } from "app/apis/engine";
+import { clamp, cyclic } from "../../../utils/mathutils";
 
-export class GridControllerImpl extends MessageHandlerReflective implements GridController {
-  private gridSizes = [16, 32, 64, 128, 256, 512, 1024];
-  private gridSizeIdx = 6;
+const GRID_SIZES = [16, 32, 64, 128, 256, 512, 1024];
+class GridControllerImpl implements GridController {
+  private gridSizeIdx: Value<number>;
+  public size: Source<number>;
 
-  public setGridSize(size: number) {
-    if (size <= this.gridSizes[0]) this.gridSizeIdx = 0;
-    else if (size >= this.gridSizes[this.gridSizes.length - 1]) this.gridSizeIdx = this.gridSizes.length - 1;
+  constructor(values: ValuesContainer) {
+    this.gridSizeIdx = values.value('grid-size-idx', 4);
+    this.size = values.transformed('grid-size', this.gridSizeIdx, idx => GRID_SIZES[clamp(idx, 0, GRID_SIZES.length - 1)]);
+  }
+
+  setGridSize(size: number) {
+    if (size <= GRID_SIZES[0]) this.gridSizeIdx.set(0);
+    else if (size >= GRID_SIZES[GRID_SIZES.length - 1]) this.gridSizeIdx.set(GRID_SIZES.length - 1);
     else {
-      for (let i = 0; i < this.gridSizes.length - 2; i++) {
+      for (let i = 0; i < GRID_SIZES.length - 2; i++) {
         const i1 = i + 1;
-        if (size > this.gridSizes[i1]) continue;
-        this.gridSizeIdx = (size - this.gridSizes[i]) < (this.gridSizes[i1] - size) ? i : i1;
+        if (size > GRID_SIZES[i1]) continue;
+        this.gridSizeIdx.set((size - GRID_SIZES[i]) < (GRID_SIZES[i1] - size) ? i : i1);
         break;
       }
     }
   }
 
-  private snapGrid(coord: number): number { const gridSize = this.getGridSize(); return Math.round(coord / gridSize) * gridSize }
-  public getGridSize(): number { return this.gridSizes[this.gridSizeIdx] }
-  public incGridSize() { this.gridSizeIdx = cyclic(this.gridSizeIdx + 1, this.gridSizes.length) }
-  public decGridSize() { this.gridSizeIdx = cyclic(this.gridSizeIdx - 1, this.gridSizes.length) }
-  public snap(x: number) { return this.snapGrid(x) }
+  private snapGrid(coord: number): number {
+    const gridSize = this.size.get();
+    return Math.round(coord / gridSize) * gridSize
+  }
 
-  NamedMessage(msg: NamedMessage) {
-    switch (msg.name) {
-      case 'grid+': this.incGridSize(); return;
-      case 'grid-': this.decGridSize(); return;
-    }
+  incGridSize() { this.gridSizeIdx.mod(i => cyclic(i + 1, GRID_SIZES.length)) }
+  decGridSize() { this.gridSizeIdx.mod(i => cyclic(i - 1, GRID_SIZES.length)) }
+  snap(x: number, mod = 1) {
+    const gridSize = this.size.get() * mod;
+    return Math.round(x / gridSize) * gridSize
   }
 }
 
-export const DefaultGridController = (() => {
-  let handle: Handle;
-  return {
-    start: async (injector: Injector) => {
-      const bus = await injector.getInstance(BUS);
-      const grid = new GridControllerImpl();
-      handle = bus.connect(grid);
-      return grid;
-    },
-    stop: async (injector: Injector) => {
-      const bus = await injector.getInstance(BUS);
-      bus.disconnect(handle);
-    },
-  }
-})();
+export function DefaultGridController(values: ValuesContainer): GridController {
+  return new GridControllerImpl(values);
+}

@@ -12,7 +12,7 @@ import { Rasterizer, array, fit, palRasterizer, transform } from "@utils/pixelpr
 import { Consumer, Function, Predicate, Supplier, first, second } from "@utils/types";
 import { ACTION_DESCRIPTORS, Action, ActionDescriptors } from "app/apis/actions";
 import { APP, App, BatchTaskRunner } from "app/apis/app1";
-import { Aliases, ArtInfoExtended, EMPTY_INFO_EXTENDED, NamedArtFile, Palette, PicTags } from "app/apis/engine";
+import { Aliases, ArtInfoExtended, EMPTY_INFO_EXTENDED, EngineContext, NamedArtFile, Palette, PicTags } from "app/apis/engine";
 import { Window } from "app/apis/ui1";
 import { art } from "build/artraster";
 import { ArtInfo, animate } from "build/formats/art";
@@ -517,18 +517,18 @@ export class ArtEditorImpl {
   }
 }
 
-export async function createArtEditor(injector: Injector, ctx: BuildGlEngineContext): Promise<Window> {
+export async function createArtEditor(injector: Injector, ctx: EngineContext): Promise<Window> {
   return createContainer('art-editor-model').initializeAsync(async values => {
     const [actionDescriptors, app, glCtx] = await getInstances(injector, ACTION_DESCRIPTORS, APP, GL_CONTEXT);
     const windowStates = await app.storages('ui.window-states');
     const state = await createSavedState(values, windowStates, 'art-editor', createDefaultState());
-    const art = ctx.engine.art;
-    const artMap = ctx.engine.artMap;
-    const pal = ctx.engine.pal;
-    const plus = ctx.engine.plus;
-    const tags = ctx.engine.picTags;
-    const shadowsteps = ctx.engine.shadowsteps;
-    const aliases = ctx.engine.aliases;
+    const art = ctx.art;
+    const artMap = ctx.artMap;
+    const pal = ctx.pal;
+    const plus = ctx.plus;
+    const tags = ctx.picTags;
+    const shadowsteps = ctx.shadowsteps;
+    const aliases = ctx.aliases;
     const previewRenderer = await createPreviewRenderer(values, glCtx, ctx);
     const editor = new ArtEditorImpl(values, state, actionDescriptors, app, art, artMap, pal, plus, tags, shadowsteps, previewRenderer, aliases);
 

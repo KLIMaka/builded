@@ -27,6 +27,14 @@ out vec4 fragColor;
 #define PARALLAX (parallax.w == 1.0)
 #include "inc.fsh"
 
+// vec3 barioOff() {
+//   vec2 barys = vec2(bariocentric.y, bariocentric.z);
+//   vec2 deltas = fwidth(barys);
+//   barys = smoothstep(vec2(0.0), 2.0 * deltas, barys);
+//   float minBary = min(barys.x, barys.y);
+//   return vec3(1.0 - minBary);
+// }
+
 void main() {
   vec3 atlasTc =  getTc(tc, picInfo, infos, atlas, parallax, true, true);
   vec3 color = palLookup(atlasTc, atlas, pal, plu);

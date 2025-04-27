@@ -1,4 +1,4 @@
-import { BuildTror } from "app/apis/engine";
+import { BuildRor, BuildTror } from "app/apis/engine";
 import { GridController } from "../../app/apis/app";
 import { any, findFirst, interpolate, intersect, range } from "../../utils/collections";
 import { LinearInterpolator } from "../../utils/interpolator";
@@ -7,7 +7,7 @@ import { clamp, cross2d, int, len2d } from "../../utils/mathutils";
 import { connectedWalls, sectorWalls } from "./loops";
 import { DEFAULT_REPEAT_RATE } from "./mutations/internal";
 import { Board } from "./structs";
-import { createSlopeCalculator, slope } from "build/utils";
+import { slope } from "build/utils";
 
 export function isValidWallId(board: Board, wallId: number): boolean {
   return wallId >= 0 && wallId < board.numwalls;
@@ -48,7 +48,7 @@ export function nextwall(board: Board, wallId: number): number {
 }
 
 export function isJoinedSectors(board: Board, sectorId1: number, sectorId2: number) {
-  return any(sectorWalls(board, sectorId1), w => board.walls[w].nextsector == sectorId2);
+  return any(sectorWalls(board, sectorId1), w => board.walls[w].nextsector === sectorId2);
 }
 
 export function isTJunction(board: Board, wallId: number) {
@@ -75,8 +75,8 @@ export function findContainingSector(board: Board, points: Iterable<[number, num
     .get()
 }
 
-function pointInterpolator(lh: [number, number], rh: [number, number], t: number) {
-  return <[number, number]>[LinearInterpolator(lh[0], rh[0], t), LinearInterpolator(lh[1], rh[1], t)]
+function pointInterpolator(lh: [number, number], rh: [number, number], t: number): [number, number] {
+  return [LinearInterpolator(lh[0], rh[0], t), LinearInterpolator(lh[1], rh[1], t)]
 }
 
 export function findContainingSectorMidPoints(board: Board, points: Iterable<[number, number]>): Set<number> {
@@ -96,15 +96,15 @@ export function inSector(board: Board, x: number, y: number, sectorId: number): 
     const dy2 = wall2.y - y;
     const dx1 = wall.x - x;
     const dx2 = wall2.x - x;
-    if (dx1 == 0 && dx2 == 0 && (dy1 == 0 || dy2 == 0 || (dy1 ^ dy2) < 0)) return true;
-    if (dy1 == 0 && dy2 == 0 && (dx1 == 0 || dx2 == 0 || (dx1 ^ dx2) < 0)) return true;
+    if (dx1 === 0 && dx2 === 0 && (dy1 === 0 || dy2 === 0 || (dy1 ^ dy2) < 0)) return true;
+    if (dy1 === 0 && dy2 === 0 && (dx1 === 0 || dx2 === 0 || (dx1 ^ dx2) < 0)) return true;
 
     if ((dy1 ^ dy2) < 0) {
       if ((dx1 ^ dx2) >= 0) inter ^= dx1;
       else inter ^= cross2d(dx1, dy1, dx2, dy2) ^ dy2;
     }
   }
-  return (inter >>> 31) == 1;
+  return (inter >>> 31) === 1;
 }
 
 export function sectorOfWall(board: Board, wallId: number): number {
@@ -125,37 +125,66 @@ export function sectorOfWall(board: Board, wallId: number): number {
   }
 }
 
-export function findSector(board: Board, tror: BuildTror, x: number, y: number, z: number, sectorId: number = -1): number {
-  if (!isValidSectorId(board, sectorId)) return findSectorAll(board, x, y);
+export type FindSectorResult = Readonly<{
+  x: number,
+  y: number,
+  z: number,
+  sec: number
+}>;
+
+export function findSector(board: Board, tror: BuildTror, ror: BuildRor, x: number, y: number, z: number, sectorId: number = -1): FindSectorResult {
+  if (!isValidSectorId(board, sectorId)) return findSectorAll(board, x, y, z);
   const secs = new Set<number>();
   secs.add(sectorId);
-  for (const s of secs) {
-    const sec = board.sectors[s];
+  for (const sec of secs) {
+    const sector = board.sectors[sec];
 
-    if (inSector(board, x, y, s)) {
-      const trorCeilingSectors = tror.ceiling(s);
+    if (inSector(board, x, y, sec)) {
+      const trorCeilingSectors = tror.ceiling(sec);
       if (trorCeilingSectors.length !== 0) {
-        const cz = slope(board, s, x, y, sec.ceilingheinum) + sec.ceilingz;
-        if (z < cz) return findSector(board, tror, x, y, z, trorCeilingSectors[0]);
+        const cz = slope(board, sec, x, y, true);
+        if (z < cz) return findSector(board, tror, ror, x, y, z, trorCeilingSectors[0]);
       }
-      const trorFloorSectors = tror.floor(s);
+      const trorFloorSectors = tror.floor(sec);
       if (trorFloorSectors.length !== 0) {
-        const fz = slope(board, s, x, y, sec.floorheinum) + sec.floorz;
-        if (z > fz) return findSector(board, tror, x, y, z, trorFloorSectors[0]);
+        const fz = slope(board, sec, x, y, false);
+        if (z > fz) return findSector(board, tror, ror, x, y, z, trorFloorSectors[0]);
       }
-      return s;
+
+      const ceilingLink = ror.rorLinks.ceilLink(sec);
+      if (ceilingLink !== undefined) {
+        const cz = slope(board, sec, x, y, true);
+        if (z < cz) {
+          const nx = x - ceilingLink.buildDiff[0];
+          const ny = y - ceilingLink.buildDiff[1];
+          const nz = z - ceilingLink.buildDiff[2];
+          return findSector(board, tror, ror, nx, ny, nz, ceilingLink.dstSector);
+        }
+      }
+
+      const floorLink = ror.rorLinks.floorLink(sec);
+      if (floorLink !== undefined) {
+        const fz = slope(board, sec, x, y, false);
+        if (z > fz) {
+          const nx = x - floorLink.buildDiff[0];
+          const ny = y - floorLink.buildDiff[1];
+          const nz = z - floorLink.buildDiff[2];
+          return findSector(board, tror, ror, nx, ny, nz, floorLink.dstSector);
+        }
+      }
+      return { sec, x, y, z };
     }
-    for (let w = 0; w < sec.wallnum; w++) {
-      const wallidx = w + sec.wallptr;
+    for (let w = 0; w < sector.wallnum; w++) {
+      const wallidx = w + sector.wallptr;
       const wall = board.walls[wallidx];
       if (wall.nextsector !== -1) secs.add(wall.nextsector);
     }
   }
-  return -1;
+  return { sec: -1, x, y, z };
 }
 
-function findSectorAll(board: Board, x: number, y: number) {
-  return findFirst(range(0, board.numsectors), s => inSector(board, x, y, s)).orElse(-1);
+function findSectorAll(board: Board, x: number, y: number, z: number): FindSectorResult {
+  return findFirst(range(0, board.numsectors), s => inSector(board, x, y, s)).map(sec => ({ x, y, z, sec })).orElse({ x, y, z, sec: -1 });
 }
 
 export function snapWall(board: Board, wallId: number, x: number, y: number, grid: GridController) {
@@ -181,7 +210,7 @@ export function getWallBaseZ(board: Board, wallId: number, sectorId = sectorOfWa
   const nextsectorId = wall.nextsector;
   const floorz = sector.floorz;
   const ceilingz = sector.ceilingz;
-  if (nextsectorId == -1) {
+  if (nextsectorId === -1) {
     return wall.cstat.alignBottom ? floorz : ceilingz;
   } else {
     const nextsector = board.sectors[nextsectorId];

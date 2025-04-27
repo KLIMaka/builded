@@ -12,7 +12,7 @@ import { OFFSCREEN } from "../buildartprovider";
 import { INPUT } from "../default/input";
 import { BUILD_GL, BuildGl } from "../gl/buildgl";
 import { BoardRenderer2D, Renderer2D } from "./boardrenderer2d";
-import { Boardrenderer3D, Renderer3D } from "./boardrenderer3d";
+import { Boardrenderer3D, Renderer3D } from "./boardRenderer3d";
 import { ViewCanvas } from "./common";
 import { View2d } from "./view2d";
 import { View3d } from "./view3d";

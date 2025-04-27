@@ -23,15 +23,13 @@ function ornamentWall(board: Board, wallId: number, x: number, y: number, grid: 
 }
 
 function selectOrnamentWall(board: Board, sectorId: number, wallId: number, x: number, y: number, z: number): [number, number] {
-  const sector = board.sectors[sectorId];
   const wall = board.walls[wallId];
-  if (wall.nextwall != -1) {
+  if (wall.nextwall !== -1) {
     const nextSectorId = wall.nextsector;
-    const nextSector = board.sectors[nextSectorId];
-    const f1z = slope(board, sectorId, x, y, sector.floorheinum) + sector.floorz;
-    const c1z = slope(board, sectorId, x, y, sector.ceilingheinum) + sector.ceilingz;
-    const f2z = slope(board, nextSectorId, x, y, nextSector.floorheinum) + nextSector.floorz;
-    const c2z = slope(board, nextSectorId, x, y, nextSector.ceilingheinum) + nextSector.ceilingz;
+    const f1z = slope(board, sectorId, x, y, false);
+    const c1z = slope(board, sectorId, x, y, true);
+    const f2z = slope(board, nextSectorId, x, y, false);
+    const c2z = slope(board, nextSectorId, x, y, true);
     if ((z > f1z || z < c1z) && z <= f2z && z >= c2z) return [wall.nextwall, wall.nextsector];
     if ((z > f2z || z < c2z) && z <= f1z && z >= c1z) return [wallId, sectorId];
     return [-1, -1];

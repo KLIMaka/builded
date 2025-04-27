@@ -83,6 +83,10 @@ export function applyNotNull<T>(value: T, f: Consumer<T>) {
   if (value !== null) f(value);
 }
 
+export function applyNotNullOr<T, U>(value: T, f: Function<T, U>, supplier: Supplier<U>) {
+  return value !== null ? f(value) : supplier();
+}
+
 export function field<T, K extends keyof T>(field: K): Function<T, T[K]> {
   return x => x[field];
 }
@@ -96,6 +100,11 @@ export function andOptional<T extends any[]>(...opts: Optionalify<T>): Optional<
 export async function asyncMapOptional<T, U>(src: Optional<T>, mapper: Function<T, Promise<U>>): Promise<Optional<U>> {
   if (!src.isPresent()) return Optional.empty();
   return Optional.of(await mapper(src.get()));
+}
+
+export async function asyncOptional<T>(src: Optional<Promise<T>>): Promise<Optional<T>> {
+  if (!src.isPresent()) return Optional.empty();
+  return Optional.of(await src.get());
 }
 
 export function zipOptional<T, U>(l: Optional<T>, r: Optional<U>): Optional<[T, U]> {

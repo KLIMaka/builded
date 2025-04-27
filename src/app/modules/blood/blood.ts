@@ -1,22 +1,25 @@
 import { createContainer, Source, ValuesContainer } from "@utils/callbacks";
-import { EMPTY_COLLECTION, getOrCreate } from "@utils/collections";
+import { EMPTY_COLLECTION, getOrCreate, getOrDefault } from "@utils/collections";
 import { iter } from "@utils/iter";
+import { field } from "@utils/objects";
 import { Stream } from "@utils/stream";
 import { first, Function, second } from "@utils/types";
-import { BoardUtils } from "app/apis/app";
 import { BoardContext, BuildRor, BuildTror, EMPTY_ALIASES, EMPTY_TAGS, EngineContext, EngineSettings, GlBlend, Palette, PicTags, VoxelSwap } from "app/apis/engine";
 import { FileSystem } from "app/apis/fs";
 import { BloodBoard } from "build/blood/structs";
 import { loadRorLinks, MIRROR_PIC } from "build/blood/utils";
 import { EngineApi } from "build/board/mutations/api";
+import { Sector, Sprite, Wall } from "build/board/structs";
 import { readKvx, VoxelData } from "build/formats/kvx";
 import { RffFile } from "build/formats/rff";
 import Optional from "optional-js";
 import { cloneBoard, cloneSector, cloneSprite, cloneWall, loadBloodMap, newBoard, newSector, newSprite, newWall } from '../../../build/blood/maploader';
-import { loadArtMap, loadArtWork, loadMaxPluId, loadRaw, openFile, openFileOptional, packegeFs } from "../default/engine-commons";
+import { createBoardModifier } from "../default/board-context-utils";
+import { loadArtMap, loadArtWork, loadEditorPicAddons, loadMaxPluId, loadRaw, openFile, openFileOptional, packegeFs } from "../default/engine-commons";
 import { createRffFsArrayBuffer, stack, watchFile } from "../fs/fs";
 import { begin } from "../scheduler/work";
 import { SECTOR_TAGS, SPRITE_TAGS, WALL_TAGS } from "./texts";
+import { DefaultGridController } from "../default/grid";
 
 function engineApi(): EngineApi<BloodBoard> {
   return { cloneBoard, cloneWall, cloneSprite, cloneSector, newWall, newSector, newSprite, newBoard };
@@ -53,24 +56,33 @@ function loadTags(surfaceDat: ArrayBuffer): PicTags {
   return { allTags: () => tags, tags: id => surface.length <= id ? EMPTY_COLLECTION : [tags[surface[id]]] };
 }
 
-async function loadBoard(stream: Stream): Promise<BoardContext<BloodBoard>> {
-  const board = loadBloodMap(stream);
-  const rorLinks = loadRorLinks(board);
-  const ror = { rorLinks, isMirrorPic: picnum => picnum === MIRROR_PIC } as BuildRor;
-  const spritesBySector = iter(board.sprites).map(s => s.sectnum).enumerate().group(first, second);
-  const utils = { spritesBySector: (sectorId) => spritesBySector.get(sectorId) } as BoardUtils;
-  const parallaxPicnums = Math.pow(2, board.parallaxSize);
-  const tror: BuildTror = { ceiling: (_: number) => [], floor: (_: number) => [] };
-  const lotagSectorText = (sectorId: number) => SECTOR_TAGS.get(board.sectors[sectorId].lotag) ?? '';
-  const lotagSpriteText = (spriteId: number) => SPRITE_TAGS.get(board.sprites[spriteId].lotag) ?? '';
-  const lotagWallText = (wallId: number) => WALL_TAGS.get(board.walls[wallId].lotag) ?? '';
-  return { board, ror, tror, utils, parallaxPicnums, lotagSectorText, lotagSpriteText, lotagWallText }
+function createloadBoard(values: ValuesContainer): Function<Stream, Promise<BoardContext<BloodBoard>>> {
+  let boardId = 1;
+  return async (stream: Stream): Promise<BoardContext<BloodBoard>> => {
+    const boardValues = values.createChild(`board-${boardId++}`);
+    const board = boardValues.value('board', loadBloodMap(stream));
+    const rorLinks = loadRorLinks(board.get());
+    const ror: BuildRor = { rorLinks, isMirrorPic: picnum => picnum === MIRROR_PIC };
+    const tror: BuildTror = { ceiling: (_: number) => [], floor: (_: number) => [] };
+    const spritesBySectorMap = iter(board.get().sprites).map(field('sectnum')).enumerate().group(first, second);
+    const spritesBySector = (sectorId: number) => getOrDefault(spritesBySectorMap, sectorId, []);
+    const parallaxPicnums = Math.pow(2, board.get().parallaxSize);
+    const grid = DefaultGridController(values);
+    const dispose = async () => boardValues.dispose();
+
+    return { board, ror, tror, parallaxPicnums, spritesBySector, ...createBoardModifier<BloodBoard>(board), grid, dispose };
+  }
 }
 
-function engineSettings(): EngineSettings {
-  const trans1 = 0.66;
-  const trans2 = 0.33;
-  return { spriteShadowOff: true, trans1, trans2 };
+function engineSettings(values: ValuesContainer, off: Source<number>): Source<EngineSettings> {
+  return values.transformed('settings', off, off => {
+    const trans1 = 0.66;
+    const trans2 = 0.33;
+    const lotagSectorText = (sector: Sector) => SECTOR_TAGS.get(sector.lotag) ?? '';
+    const lotagSpriteText = (sprite: Sprite) => SPRITE_TAGS.get(sprite.lotag) ?? '';
+    const lotagWallText = (wall: Wall) => WALL_TAGS.get(wall.lotag) ?? '';
+    return { spriteShadowOff: true, trans1, trans2, lotagSectorText, lotagSpriteText, lotagWallText, fontPicnum: off + 1, pointPicnum: off };
+  });
 }
 
 type FileById = (fid: number, ext: string) => Optional<ArrayBuffer>;
@@ -123,17 +135,19 @@ export const createEngineContextWork = begin()
         .thread('Loading Tags', (fs, res) => loadPicTags(values, res))
         .thread('Loading Voxels', (fs, res) => createSpriteVoxelSwap(values, fs))
         .threadWork((handle, fs, res) => loadArtWork(handle, values, res)))
-      .then<EngineContext<BloodBoard>>('', async (fs, resources, [pal, trans, plus, picTags, spriteVoxelSwap, art]) => {
+      .thenWorkPass(async (handle, fs, resources, [pal, trans, plus, picTags, spriteVoxelSwap, art]) => loadEditorPicAddons(values, loadArtMap(values, art), resources, pal)(handle))
+      .then<EngineContext<BloodBoard>>('', async (fs, resources, [pal, trans, plus, picTags, spriteVoxelSwap, art], artAddon) => {
         const api = engineApi();
-        const settings = engineSettings();
+        const settings = engineSettings(values, artAddon.offset);
         const name = values.const('', "Blood");
-        const artMap = loadArtMap(values, art);
+        const artMap = artAddon.map;
         const shadowsteps = values.const('shadowsteps', 64);
         const aliases = values.const('aliases', EMPTY_ALIASES);
         const maxPluId = loadMaxPluId(values, plus);
         const parallaxInfo = (_: number) => 0xffffff;
-        const dispose = () => values.dispose();
         const blends = values.const<Function<number, GlBlend>>('blend', _ => ({ src: WebGL2RenderingContext.SRC_ALPHA, dst: WebGL2RenderingContext.ONE_MINUS_SRC_ALPHA }));
+        const loadBoard = createloadBoard(values);
+        const dispose = () => values.dispose();
         return { name, resources, api, settings, pal, trans, picTags, plus, maxPluId, art, artMap, shadowsteps, aliases, spriteVoxelSwap, blends, parallaxInfo, loadBoard, dispose }
       }).finish()(handle, fs)))
   .finish();

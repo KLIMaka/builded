@@ -65,11 +65,6 @@ export const ENGINE_API = new Dependency<EngineApi>("Engine Api");
 export type BoardProvider = () => Board;
 export const BOARD = new Dependency<BoardProvider>('Borad');
 
-export interface BoardUtils {
-  spritesBySector(sectorId: number): number[];
-}
-export const BOARD_UTILS = new Dependency<BoardUtils>('BoardUtils');
-
 export interface LightmapHandle {
   texture(): Texture;
 }

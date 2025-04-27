@@ -1,6 +1,5 @@
-import { BoardUtils } from "app/apis/app";
+import { Function } from "@utils/types";
 import { vec3 } from "gl-matrix";
-import { range } from "../utils/collections";
 import { SortedList } from "../utils/list";
 import { cross2d, int, len2d, ortonorm2d, sign } from "../utils/mathutils";
 import { inSector } from "./board/query";
@@ -32,7 +31,12 @@ export class Entity {
   isSector() { return isSector(this.type) }
   isSprite() { return isSprite(this.type) }
   clone() { return new Entity(this.id, this.type) }
-  equals(ent: Entity) { return ent == null ? false : ent === this ? true : ent.id === this.id && ent.type === this.type }
+}
+
+export const EMPTY_ENTITY = new Entity(-1, 0);
+export function entityEq(lh: Entity, rh: Entity) {
+  if (lh === rh) return true;
+  return lh.id === rh.id && lh.type === rh.type;
 }
 
 export interface Target {
@@ -66,8 +70,10 @@ export function isSprite(type: EntityType) {
 }
 
 export class Ray {
-  public start = vec3.create();
-  public dir = vec3.create();
+  constructor(
+    public start = vec3.create(),
+    public dir = vec3.create()
+  ) { }
 }
 
 const SPRITE_OFF = 0.1;
@@ -79,7 +85,7 @@ export function pointOnRay(out: vec3, ray: Ray, t: number) {
   return out;
 }
 
-const EMPTY = { entity: null, coords: [0, 0, 0] } as Target;
+const EMPTY: Target = { entity: EMPTY_ENTITY, coords: [0, 0, 0] };
 
 export class Hitscan {
   constructor(
@@ -97,7 +103,7 @@ export class Hitscan {
   }
 
   public hit(t: number, id: number, type: EntityType, x: number, y: number, z: number) {
-    const target = { entity: new Entity(id, type), coords: [x, y, z] } as Target;
+    const target: Target = { entity: new Entity(id, type), coords: [x, y, z] };
     this.targetsList.add(target, t);
   }
 
@@ -189,11 +195,8 @@ function intersectWall(board: Board, wallId: number, hit: Hitscan): number {
     return -1;
   }
 
-  const nextsec = board.sectors[nextsecId];
-  const nextfloorheighnum = nextsec.floorstat.slopped ? nextsec.floorheinum : 0;
-  const nextceilingheighnum = nextsec.floorstat.slopped ? nextsec.floorheinum : 0;
-  const floorz = slope(board, nextsecId, ix, iy, nextfloorheighnum) + nextsec.floorz;
-  const ceilz = slope(board, nextsecId, ix, iy, nextceilingheighnum) + nextsec.ceilingz;
+  const floorz = slope(board, nextsecId, ix, iy, false);
+  const ceilz = slope(board, nextsecId, ix, iy, true);
   if (iz <= ceilz) {
     hit.hit(it, wallId, EntityType.UPPER_WALL, ix, iy, iz);
     return -1;
@@ -296,13 +299,8 @@ function intersectSprite(board: Board, artInfo: Map<number, ArtInfo>, sprId: num
   }
 }
 
-function resetStack(board: Board, sectorId: number): Set<number> {
-  if (sectorId === -1 || !board.sectors[sectorId]) return new Set(range(0, board.numsectors));
-  else return new Set([sectorId]);
-}
-
-export function hitscan(board: Board, boardUtils: BoardUtils, artInfo: Map<number, ArtInfo>, secId: number, hit: Hitscan, cliptype: number) {
-  const stack = resetStack(board, secId);
+export function hitscan(board: Board, spritesBySector: Function<number, number[]>, artInfo: Map<number, ArtInfo>, secId: number, hit: Hitscan, cliptype: number) {
+  const stack = new Set([secId]);
   for (const s of stack) {
     const sec = board.sectors[s];
     intersectSectorPlanes(board, sec, s, hit);
@@ -310,13 +308,11 @@ export function hitscan(board: Board, boardUtils: BoardUtils, artInfo: Map<numbe
     const endwall = sec.wallptr + sec.wallnum;
     for (let w = sec.wallptr; w < endwall; w++) {
       const nextsec = intersectWall(board, w, hit);
-      if (nextsec !== -1 && !stack.has(nextsec)) {
-        stack.add(nextsec);
-      }
+      if (nextsec !== -1 && !stack.has(nextsec)) stack.add(nextsec);
     }
 
     if (cliptype === 1) continue;
-    const sprs = boardUtils.spritesBySector(s);
+    const sprs = spritesBySector(s);
     if (sprs === undefined) continue;
     for (let j = 0; j < sprs.length; j++) {
       intersectSprite(board, artInfo, sprs[j], hit);

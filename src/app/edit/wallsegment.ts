@@ -1,127 +1,72 @@
-import { sectorZ, setSectorZ, ZSCALE } from "build/utils";
-import { canonicalWall, connectedWalls } from "../../build/board/loops";
+import { pair } from "@utils/types";
+import { BoardContext } from "app/apis/engine";
+import { BuildReferenceTrackerImpl } from "app/modules/default/reftracker";
+import { vec2, vec3 } from "gl-matrix";
+import { canonicalWall } from "../../build/board/loops";
 import { fixxrepeat, mergePoints, moveWall } from "../../build/board/mutations/walls";
-import { lastwall, sectorOfWall } from "../../build/board/query";
 import { Board, Wall } from "../../build/board/structs";
-import { Entity, EntityType, Target } from "../../build/hitscan";
-import { vec2 } from "gl-matrix";
-import { IndexedDeck, map, takeFirst } from "../../utils/collections";
+import { Entity, EntityType } from "../../build/hitscan";
 import { iter } from "../../utils/iter";
-import { cyclic, len2d, tuple } from "../../utils/mathutils";
+import { cyclic, len2d } from "../../utils/mathutils";
 import { Message, MessageHandlerReflective } from "../apis/handler";
-import { EditContext } from "./context";
-import { invalidateSectorAndWalls } from "./editutils";
-import { BoardInvalidate, Commit, EndMove, Flip, Highlight, Move, Palette, PanRepeat, ResetPanRepeat, Rotate, SetPicnum, SetWallCstat, Shade, StartMove } from "./messages";
-import { MOVE_VERTICAL } from "./tools/transform";
+import { BoardInvalidate, Commit, EndMove, Flip, Move, Palette, PanRepeat, ResetPanRepeat, Rotate, SetPicnum, SetWallCstat, Shade, StartMove } from "./messages";
 
-function getClosestWallByIds(board: Board, target: Target, ids: Iterable<number>): number {
-  let id = -1;
-  let mindist = Number.MAX_VALUE;
-  const [x, y] = target.coords;
-  for (const w of ids) {
-    const wall = board.walls[w];
-    const dist = len2d(wall.x - x, wall.y - y);
-    if (dist < mindist) {
-      id = w;
-      mindist = dist;
-    }
-  }
-  return id === -1 ? takeFirst(ids).orElse(-1) : id;
-}
-
-function collectConnectedWalls(board: Board, walls: Iterable<number>) {
-  const result = new Set<number>();
-  for (const w of walls) connectedWalls(board, w, result);
-  return result;
+function getClosestWallByIds(board: Board, origin: vec3, ids: Iterable<number>): number {
+  const [x, y] = origin;
+  return iter(ids)
+    .map(w => pair(w, board.walls[w]))
+    .map(([w, wall]) => pair(w, len2d(wall.x - x, wall.y - y)))
+    .reduceFirst((lh, rh) => lh[1] < rh[1] ? lh : rh)
+    .map(([w, _]) => w).orElse(-1);
 }
 
 export class WallSegmentsEnt extends MessageHandlerReflective {
-  private static invalidatedSectors = new IndexedDeck<number>();
 
   constructor(
     public walls: Iterable<Entity>,
-    public highlighted: Iterable<Entity>,
-    public ctx: EditContext,
+    public boardCtx: BoardContext,
     public origin = vec2.create(),
-    public originz = 0,
-    public sectorEnt: Entity = null,
     public refwall = -1,
     public active = false,
-    public connectedWalls = collectConnectedWalls(ctx.board(), map(walls, w => w.id)),
-    public canonicalWalls = iter(walls).map(w => canonicalWall(ctx.board(), w.id)).set(),
+    public canonicalWalls = iter(walls).map(w => canonicalWall(boardCtx.board.get(), w.id)).set(),
     private valid = true) { super() }
 
-  private invalidate() {
-    const invalidatedSectors = WallSegmentsEnt.invalidatedSectors.clear();
-    const board = this.ctx.board();
-    for (const w of this.connectedWalls) {
-      const s = sectorOfWall(board, w);
-      if (invalidatedSectors.indexOf(s) == -1) {
-        invalidateSectorAndWalls(s, board, this.ctx.bus);
-        invalidatedSectors.push(s);
-      }
-    }
-  }
 
-  private getWall(wallEnt: Entity): Wall {
-    const board = this.ctx.board();
+  private getWall(board: Board, wallEnt: Entity): Wall {
     const wall = board.walls[wallEnt.id];
-    return wall.cstat.swapBottoms && wallEnt.type == EntityType.LOWER_WALL && wall.nextwall != -1
+    return wall.cstat.swapBottoms && wallEnt.type === EntityType.LOWER_WALL && wall.nextwall !== -1
       ? board.walls[wall.nextwall]
       : wall;
   }
 
-  private invalidateWall(wallEnt: Entity) {
-    const board = this.ctx.board();
-    this.ctx.bus.handle(new BoardInvalidate(wallEnt));
-    const wall = board.walls[wallEnt.id];
-    if (wall.cstat.swapBottoms && wall.nextwall != -1 ||
-      wall.nextwall != -1 && board.walls[wall.nextwall].cstat.swapBottoms)
-      this.ctx.bus.handle(new BoardInvalidate(Entity.wallPoint(wall.nextwall)));
-  }
-
   public StartMove(msg: StartMove) {
-    const board = this.ctx.board();
-    this.refwall = getClosestWallByIds(board, this.ctx.view.target(), this.canonicalWalls);
+    const board = this.boardCtx.board.get();
+    this.refwall = getClosestWallByIds(board, msg.origin, this.canonicalWalls);
     const wall = board.walls[this.refwall];
     vec2.set(this.origin, wall.x, wall.y);
-
-    const sectorWallId = getClosestWallByIds(board, this.ctx.view.target(), map(this.highlighted, e => e.id));
-    const sectorWall = board.walls[sectorWallId];
-    const type = this.ctx.view.target().entity.type == EntityType.UPPER_WALL ? EntityType.CEILING : EntityType.FLOOR;
-    if (sectorWall.nextsector == -1) this.sectorEnt = Entity.of(sectorOfWall(board, this.refwall), type);
-    else this.sectorEnt = Entity.of(sectorWall.nextsector, type);
-    this.originz = sectorZ(board, this.sectorEnt) / ZSCALE;
     this.active = true;
   }
 
   public Move(msg: Move) {
-    const board = this.ctx.board();
-    if (this.ctx.state.get(MOVE_VERTICAL)) {
-      const z = this.ctx.gridController.snap(this.originz + msg.dz) * ZSCALE;
-      if (setSectorZ(this.ctx.board(), this.sectorEnt, z))
-        invalidateSectorAndWalls(this.sectorEnt.id, this.ctx.board(), this.ctx.bus);
-    } else {
-      const x = this.ctx.gridController.snap(this.origin[0] + msg.dx);
-      const y = this.ctx.gridController.snap(this.origin[1] + msg.dy);
+    this.boardCtx.modifyBoard(`Move Walls ${this.canonicalWalls}`, board => {
+      const x = this.boardCtx.grid.snap(this.origin[0] + msg.dx);
+      const y = this.boardCtx.grid.snap(this.origin[1] + msg.dy);
       const refwall = board.walls[this.refwall];
       const dx = x - refwall.x;
       const dy = y - refwall.y;
       if (moveWall(board, this.refwall, x, y)) {
         for (const w of this.canonicalWalls) {
-          if (w == this.refwall) continue;
+          if (w === this.refwall) continue;
           const wall = board.walls[w];
           moveWall(board, w, wall.x + dx, wall.y + dy);
         }
-        this.invalidate();
       }
-    }
-
+    })
   }
 
   public EndMove(msg: EndMove) {
     this.active = false;
-    for (const w of this.walls) mergePoints(this.ctx.board(), w.id, this.ctx.refs);
+    this.boardCtx.modifyBoard(`Move Walls ${this.canonicalWalls}`, board => iter(this.walls).forEach(w => mergePoints(board, w.id, new BuildReferenceTrackerImpl())));
   }
 
   public Rotate(msg: Rotate) {
@@ -141,24 +86,24 @@ export class WallSegmentsEnt extends MessageHandlerReflective {
     // this.invalidate();
   }
 
-  public Highlight(msg: Highlight) {
-    const board = this.ctx.board();
-    if (this.active) {
-      let cwalls = this.connectedWalls;
-      for (let w of cwalls) {
-        let s = sectorOfWall(board, w);
-        let p = lastwall(board, w);
-        msg.set.add(tuple(2, w));
-        // msg.set.add(tuple(3, w));
-        msg.set.add(tuple(2, p));
-        msg.set.add(tuple(0, s));
-        msg.set.add(tuple(1, s));
-      }
-    } else {
-      const hwalls = this.highlighted;
-      for (const w of hwalls) msg.set.add(tuple(2, w.id));
-    }
-  }
+  // public Highlight(msg: Highlight) {
+  //   const board = this.ctx.board();
+  //   if (this.active) {
+  //     let cwalls = this.connectedWalls;
+  //     for (let w of cwalls) {
+  //       let s = sectorOfWall(board, w);
+  //       let p = lastwall(board, w);
+  //       msg.set.add(tuple(2, w));
+  //       // msg.set.add(tuple(3, w));
+  //       msg.set.add(tuple(2, p));
+  //       msg.set.add(tuple(0, s));
+  //       msg.set.add(tuple(1, s));
+  //     }
+  //   } else {
+  //     const hwalls = this.highlighted;
+  //     for (const w of hwalls) msg.set.add(tuple(2, w.id));
+  //   }
+  // }
 
   public SetPicnum(msg: SetPicnum) {
     for (const w of this.highlighted) {

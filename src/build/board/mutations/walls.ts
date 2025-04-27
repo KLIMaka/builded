@@ -41,7 +41,7 @@ export function splitWall<B extends Board>(board: B, wallId: number, x: number, 
   if (!isValidWallId(board, wallId)) throw new Error('Invalid wall: ' + wallId);
   const wall = board.walls[wallId];
   insertWall(board, wallId, x, y, art, refs, cloneWall);
-  if (wall.nextwall != -1) {
+  if (wall.nextwall !== -1) {
     const nextwallId = wall.nextwall;
     insertWall(board, nextwallId, x, y, art, refs, cloneWall);
     const wallId = board.walls[nextwallId].nextwall;
@@ -63,7 +63,7 @@ function doMoveWall(board: Board, w: number, x: number, y: number) {
 
 export function moveWall(board: Board, wallId: number, x: number, y: number): boolean {
   const wall = board.walls[wallId];
-  if (wall.x == x && wall.y == y) return false;
+  if (wall.x === x && wall.y === y) return false;
   forEach(connectedWalls(board, wallId), w => doMoveWall(board, w, x, y));
   return true;
 }
@@ -71,7 +71,7 @@ export function moveWall(board: Board, wallId: number, x: number, y: number): bo
 
 const _wallNormal = vec3.create();
 export function pushWall<B extends Board>(board: B, wallId: number, len: number, art: ArtInfoProvider, alwaysNewPoints = false, refs: BuildReferenceTracker, api: EngineApi<B>) {
-  if (len == 0) return wallId;
+  if (len === 0) return wallId;
   let w1 = wallId;
   const wall1 = board.walls[w1];
   let w2 = wall1.point2;
@@ -94,8 +94,8 @@ export function pushWall<B extends Board>(board: B, wallId: number, len: number,
     return;
   }
 
-  const extent1 = cross2d(x1 - prev1.x, y1 - prev1.y, wall1.x - prev1.x, wall1.y - prev1.y) == 0;
-  const extent2 = cross2d(x2 - next2.x, y2 - next2.y, wall2.x - next2.x, wall2.y - next2.y) == 0;
+  const extent1 = cross2d(x1 - prev1.x, y1 - prev1.y, wall1.x - prev1.x, wall1.y - prev1.y) === 0;
+  const extent2 = cross2d(x2 - next2.x, y2 - next2.y, wall2.x - next2.x, wall2.y - next2.y) === 0;
 
   if (extent1 && extent2) {
     moveWall(board, w1, x1, y1);
@@ -122,7 +122,7 @@ export function deleteWall(board: Board, wallId: number, refs: BuildReferenceTra
   const wall = board.walls[wallId];
   track(refs.walls, wrefs => {
     const refwall = wrefs.ref(lastwall(board, wallId));
-    if (wall.nextsector != -1) {
+    if (wall.nextsector !== -1) {
       if (length(loopWalls(board, wall.nextwall)) < 4) throw new Error(`Loop of Wall ${wall.nextwall} need to have 3 walls minimum`);
       const refnextwall = wrefs.ref(lastwall(board, wall.nextwall));
       const nextwall = board.walls[wall.nextwall];
@@ -146,5 +146,5 @@ export function deleteWall(board: Board, wallId: number, refs: BuildReferenceTra
 export function mergePoints(board: Board, wallId: number, refs: BuildReferenceTracker) {
   const wall = board.walls[wallId];
   const wall2 = board.walls[wall.point2];
-  if (wall.x == wall2.x && wall.y == wall2.y) deleteWall(board, wallId, refs);
+  if (wall.x === wall2.x && wall.y === wall2.y) deleteWall(board, wallId, refs);
 }

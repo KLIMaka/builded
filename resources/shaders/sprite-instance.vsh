@@ -31,11 +31,12 @@ struct sprite_data_t {
   vec2 off;
 };
 
-sprite_data_t loadData(pic_t picInfo, sprite_t sprite) {
+sprite_data_t loadData(pic_t picInfo, sprite_t sprite, bool wallSprite) {
   float xf = sprite_cstat_xflip(sprite) ? -1.0 : 1.0;
+  float yf = wallSprite ? sprite_cstat_yflip(sprite) ? -1.0 : 1.0 : 1.0;
   return sprite_data_t(
     picInfo.sizeOff.xy,
-    (picInfo.sizeOff.zw + vec2(sprite.pan)) * vec2(xf, 1.0));
+    (picInfo.sizeOff.zw + vec2(sprite.pan)) * vec2(xf, yf));
 }
 
 const vec2 tcs[6] = vec2[](
@@ -61,7 +62,7 @@ vec4 getWallPos(pic_t picInfo, sprite_t sprite) {
   float radAng = -float(sprite.ang) * PI / 1024.0;
   vec2 angVec = vec2(sin(radAng), cos(radAng));
 
-  sprite_data_t data = loadData(picInfo, sprite);
+  sprite_data_t data = loadData(picInfo, sprite, true);
 
   float l = trunc(data.size.x / 2.0);
   float r = data.size.x - l;
@@ -82,7 +83,7 @@ vec4 getFloorPos(pic_t picInfo, sprite_t sprite) {
   vec4 vec = vec4(cos(radAng), sin(radAng), -sin(radAng), cos(radAng));
   
   bool onesideFlipped = sprite_cstat_onesided(sprite) && sprite_cstat_yflip(sprite);
-  sprite_data_t data = loadData(picInfo, sprite);
+  sprite_data_t data = loadData(picInfo, sprite, false);
 
   float l = trunc(data.size.x / 2.0);
   float r = data.size.x - l;
@@ -99,7 +100,7 @@ vec4 getFloorPos(pic_t picInfo, sprite_t sprite) {
 }
 
 vec4 getFacePos(pic_t picInfo, sprite_t sprite) {
-  sprite_data_t data = loadData(picInfo, sprite);
+  sprite_data_t data = loadData(picInfo, sprite, false);
 
   float width = trunc(data.size.x);
   float l = trunc(width / 2.0);

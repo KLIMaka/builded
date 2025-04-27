@@ -1,6 +1,6 @@
 import { Disposable, Source, Value, ValuesContainer } from "@utils/callbacks";
-import { Consumer, seq } from "@utils/types";
-import { Action, ActionDescriptors, StateChecker } from "app/apis/actions";
+import { Consumer, Function, seq } from "@utils/types";
+import { Action, ActionDescriptor, ActionDescriptors, StateChecker } from "app/apis/actions";
 import { Disconnector } from "app/apis/app1";
 import { Window } from "app/apis/ui1";
 import Optional from "optional-js";
@@ -124,6 +124,10 @@ export class WindowBuilder {
   actions(actions: Action[]): this {
     actions.forEach(a => this._actions.push(a));
     return this;
+  }
+
+  actionsFactory(factory: Function<ActionDescriptors, Action[]>): this {
+    return this.actions(factory(this.actionDescriptors.sub(this.id)));
   }
 
   states(states: StateChecker[]): this {

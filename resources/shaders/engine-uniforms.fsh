@@ -10,4 +10,7 @@ uniform Engine {
   int depthShadowScale;
   float time;
   uint parallaxPics;
+  uint grid;
+  vec2 screenSize;
+  vec3 curpos;
 };

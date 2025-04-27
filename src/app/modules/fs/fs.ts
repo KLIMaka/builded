@@ -11,7 +11,7 @@ import JSZip from "jszip";
 import Optional from "optional-js";
 import { match } from "ts-pattern";
 import { App, APP, Disconnector, Storage, Storages, Timer } from "../../apis/app1";
-import { DirectoryFileSystemHandle, FileFileSystemHandle, FileInfo, FileSystem, FileSystemHandle, FileSystemHandler, FileSystems, MemoryFileSystemHandle, SerializedFileSystemHandle, StackFileSystemHandle, StorageFileSystemHandle, WritableFileSystem } from "../../apis/fs";
+import { DirectoryFileSystemHandle, FileFileSystemHandle, FileInfo, FileSystem, FileSystemHandle, FileSystemHandler, FileSystems, HttpFileSystemHandle, MemoryFileSystemHandle, SerializedFileSystemHandle, StackFileSystemHandle, StorageFileSystemHandle, WritableFileSystem } from "../../apis/fs";
 import { selectStorageFs } from "./ui/select-storage";
 import { getOrCreate } from "@utils/collections";
 import { Stream } from "@utils/stream";
@@ -82,6 +82,7 @@ class FileSystemsImpl implements FileSystems {
       .with({ type: 'rff' }, s => this.createFile(s, createRffFs))
       .with({ type: 'grp' }, s => this.createFile(s, createGrpFs))
       .with({ type: 'stack' }, s => this.createStack(s))
+      .with({ type: 'http' }, s => this.createHttp(s))
       .exhaustive()
   }
 
@@ -94,6 +95,7 @@ class FileSystemsImpl implements FileSystems {
       .with('zip', async () => (await pickFile('zip')).map(d => this.deserialize(d)))
       .with('rff', async () => (await pickFile('rff')).map(d => this.deserialize(d)))
       .with('grp', async () => (await pickFile('grp')).map(d => this.deserialize(d)))
+      .with('http', async () => Optional.of(this.deserialize({ type: 'http', name: 'inMemory' })))
       .with('stack', async () => Optional.empty())
       .exhaustive();
   }
@@ -146,6 +148,15 @@ class FileSystemsImpl implements FileSystems {
       serialized,
       async h => stack((await topHandle.open()).unwrap(), (await bottomHandle.open()).unwrap()),
       async h => h.serialized.type === 'stack' && this.deserialize(h.serialized.top).isSameEntry(topHandle) && this.deserialize(h.serialized.bottom).isSameEntry(bottomHandle)
+    )
+  }
+
+  private createHttp(serialized: HttpFileSystemHandle): FileSystemHandle {
+    return new FileSystemHandleImpl(
+      serialized.path,
+      serialized,
+      async h => httpFs(serialized.path),
+      async h => h.serialized.type === 'http' && serialized.path === h.name
     )
   }
 }
@@ -354,7 +365,7 @@ class InMemoryFS extends BaseFS implements FileSystem {
   }
 
   async write(name: string, data: ArrayBuffer) {
-    this.data.set(name.toUpperCase(), { data, info: { size: data.byteLength, name, lastModified: this.timer.now() } })
+    this.data.set(name.toUpperCase(), { data, info: { size: data.byteLength, name, lastModified: this.timer.now(), src: this } })
     this.onChange(name);
   }
 
@@ -406,14 +417,14 @@ class LocalFS extends BaseFS implements FileSystem, WritableFileSystem {
     const file = await this.tryGetFile(name);
     if (!file.isPresent()) return Optional.empty();
     const fileInfo = file.get();
-    return Optional.of({ size: fileInfo.size, lastModified: fileInfo.lastModified, name: fileInfo.name });
+    return Optional.of({ size: fileInfo.size, lastModified: fileInfo.lastModified, name: fileInfo.name, src: this });
   }
 
   async list(): Promise<FileInfo[]> {
     const infos: Promise<FileInfo>[] = [];
     for await (const e of this.directoryHandle.values())
       if (e.kind === 'file')
-        infos.push(e.getFile().then(f => { return { size: f.size, lastModified: f.lastModified, name: f.name } }));
+        infos.push(e.getFile().then(f => { return { size: f.size, lastModified: f.lastModified, name: f.name, src: this } }));
     return Promise.all(infos)
   }
 
@@ -510,11 +521,11 @@ class RffFS extends BaseFS implements FileSystem {
   async info(name: string): Promise<Optional<FileInfo>> {
     const rec = this.rff.getRecord(name);
     if (!rec) return Optional.empty();
-    return Optional.of({ name: rec.filename, size: rec.size, lastModified: this.fileLastModified });
+    return Optional.of({ name: rec.filename, size: rec.size, lastModified: this.fileLastModified, src: this });
   }
 
   async list(): Promise<FileInfo[]> {
-    return this.rff.fat.map(r => { return { name: r.filename, size: r.size, lastModified: this.fileLastModified } });
+    return this.rff.fat.map(r => { return { name: r.filename, size: r.size, lastModified: this.fileLastModified, src: this } });
   }
 
   async writable(): Promise<Optional<WritableFileSystem>> {
@@ -544,11 +555,11 @@ class GrpFS extends BaseFS implements FileSystem {
   async info(name: string): Promise<Optional<FileInfo>> {
     const rec = this.grp.infos.get(name.toLowerCase());
     if (!rec) return Optional.empty();
-    return Optional.of({ name: name, size: rec.size, lastModified: this.fileLastModified });
+    return Optional.of({ name: name, size: rec.size, lastModified: this.fileLastModified, src: this });
   }
 
   async list(): Promise<FileInfo[]> {
-    return iter(this.grp.infos.entries()).map(([name, info]) => { return { name, size: info.size, lastModified: this.fileLastModified } }).collect();
+    return iter(this.grp.infos.entries()).map(([name, info]) => { return { name, size: info.size, lastModified: this.fileLastModified, src: this } }).collect();
   }
 
   async writable(): Promise<Optional<WritableFileSystem>> {
@@ -564,6 +575,35 @@ export function createGrpFsArrayBuffer(buffer: ArrayBuffer): FileSystem {
   return new GrpFS(new GrpFile(buffer));
 }
 
+class HttpFs extends BaseFS {
+  constructor(
+    private basePath: string,
+  ) {
+    super('http');
+  }
+
+  async info(name: string): Promise<Optional<FileInfo>> {
+    return Optional.empty();
+  }
+
+  async read(name: string): Promise<Optional<ArrayBuffer>> {
+    return fetch(`${this.basePath}/${name}`)
+      .then(async r => (!r.ok) ? Optional.empty() : Optional.of(await r.arrayBuffer()))
+  }
+
+  async list(): Promise<FileInfo[]> {
+    return [];
+  }
+
+  async writable(): Promise<Optional<WritableFileSystem>> {
+    return Optional.empty()
+  }
+}
+
+export function httpFs(path: string): FileSystem {
+  return new HttpFs(path);
+}
+
 export async function watchFile(values: ValuesContainer, name: string, fs: Source<FileSystem>): Promise<Source<Optional<ArrayBuffer>>> {
   const srcConnector = (fs: FileSystem, file: Value<Optional<ArrayBuffer>>): Disconnector => {
     return fs.subscribe(async (changed, deleted) => {
@@ -572,7 +612,7 @@ export async function watchFile(values: ValuesContainer, name: string, fs: Sourc
       else file.set(await fs.read(name));
     })
   }
-  return values.transformedAsync<FileSystem, Optional<ArrayBuffer>>(`watch file '${name}'`, fs, async fs => fs.read(name), srcConnector)
+  return values.transformedAsync<FileSystem, Optional<ArrayBuffer>>(`watch file '${name}'`, fs, async fs => fs.read(name), nil(), srcConnector)
 }
 
 export function trackFiles<Args extends any[], T>(
@@ -582,7 +622,7 @@ export function trackFiles<Args extends any[], T>(
 ): BiFunction<SingleTuple<Args>, BaseValue<T>, Disconnector> {
   return (fs, value) => selector(fs).subscribe((changed, _) => {
     if (iter(files).all(f => !streqci(f, changed))) return;
-    value.setPromise(_ => reloader(fs))
+    value.setPromiseOrDispose(_ => reloader(fs))
   })
 }
 

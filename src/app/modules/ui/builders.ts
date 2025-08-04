@@ -1,7 +1,7 @@
-import { Value } from "@utils/callbacks";
-import { EMPTY_COLLECTION, chain, getOrCreate, singleton } from "@utils/collections";
-import { iter } from "@utils/iter";
-import { Consumer, Function, Predicate, Supplier, Transform, nil } from "@utils/types";
+import { Value } from "ts-utils/callbacks";
+import { EMPTY_COLLECTION, chain, getOrCreate, singleton } from "ts-utils/collections";
+import { iter } from "ts-utils/iter";
+import { Consumer, Function, Predicate, Supplier, Transform, nil } from "ts-utils/types";
 import { Oracle } from "@utils/ui/controls/api";
 import { Action, ActionHandler, ActionsProvider } from "app/apis/actions";
 import { ActionsList, ActionsWidget, Block, BlockBuilder, ElemMod, GroupsModel, Menu, Selector, TableColumn, TableModel, Ui, Widget, WidgetRenderer, clazz } from "app/apis/ui";

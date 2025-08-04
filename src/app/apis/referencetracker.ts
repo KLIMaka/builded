@@ -1,5 +1,5 @@
-import { List, Node } from "../../utils/list";
-import { IndexedDeck } from "../../utils/collections";
+import { List, Node } from "ts-utils/list";
+import { IndexedDeck } from "ts-utils/collections";
 
 export type ReferenceUpdater<T> = (value: T) => T;
 
@@ -17,7 +17,7 @@ export function track<T, R>(refs: ReferenceTracker<T, R>, f: (refs: ReferenceTra
   crefs.stop();
 }
 
-export class ReferenceTrackerImpl<T> implements ReferenceTracker<T, number>{
+export class ReferenceTrackerImpl<T> implements ReferenceTracker<T, number> {
   constructor(
     private readonly nil: T,
     private readonly parent: ReferenceTrackerImpl<T> = null,
@@ -30,7 +30,7 @@ export class ReferenceTrackerImpl<T> implements ReferenceTracker<T, number>{
   ref(value: T): number {
     if (this.stopped) return -1;
     let ref = this.refs.indexOf(value);
-    if (ref == -1) {
+    if (ref === -1) {
       this.refs.push(value);
       ref = this.refs.length() - 1;
     }
@@ -38,16 +38,16 @@ export class ReferenceTrackerImpl<T> implements ReferenceTracker<T, number>{
   }
 
   val(ref: number): T {
-    if (this.stopped || ref == -1) return this.nil;
+    if (this.stopped || ref === -1) return this.nil;
     const val = this.refs.get(ref);
-    return val == undefined ? this.nil : val;
+    return val === undefined ? this.nil : val;
   }
 
   update(updater: ReferenceUpdater<T>): void {
     if (this.stopped) return;
     for (let i = 0; i < this.refs.length(); i++) {
       const r = this.refs.get(i);
-      if (r == this.nil) continue;
+      if (r === this.nil) continue;
       this.refs.set(i, updater(r));
     }
     for (const n of this.nested) n.update(updater);

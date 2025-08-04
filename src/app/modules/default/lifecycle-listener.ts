@@ -1,7 +1,7 @@
-import { map, range } from "../../../utils/collections";
-import { Dependency, DependencyError, LifecycleListener } from "../../../utils/injector";
-import { iter } from "../../../utils/iter";
-import { int } from "../../../utils/mathutils";
+import { map, range } from "ts-utils/collections";
+import { Dependency, DependencyError, LifecycleListener } from "ts-utils/injector";
+import { iter } from "ts-utils/iter";
+import { int } from "ts-utils/mathutils";
 import { Logger, Timer } from "../../apis/app1";
 
 type TimeStats = { start: number, end: number };

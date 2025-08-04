@@ -1,28 +1,29 @@
-import { BuildReferenceTracker } from "../../../app/apis/app";
+import { Function } from "ts-utils/types";
+import { ArtInfo } from "build/formats/art";
 import { vec3 } from "gl-matrix";
-import { forEach, length } from "../../../utils/collections";
-import { cross2d, int } from "../../../utils/mathutils";
-import { ArtInfoProvider } from "../../formats/art";
+import { BuildReferenceTracker } from "../../../app/apis/app";
+import { track } from "../../../app/apis/referencetracker";
+import { forEach, length } from "ts-utils/collections";
+import { cross2d, int } from "ts-utils/mathutils";
 import { wallNormal } from "../../utils";
 import { connectedWalls, loopWalls } from "../loops";
-import { walllen, sectorOfWall, lastwall, isValidWallId, nextwall, isTJunction } from "../query";
+import { isTJunction, isValidWallId, lastwall, nextwall, sectorOfWall, walllen } from "../query";
 import { Board, Wall } from "../structs";
-import { DEFAULT_REPEAT_RATE, moveWalls } from "./internal";
 import { BoardWall, EngineApi, WallCloner } from "./api";
-import { track } from "../../../app/apis/referencetracker";
+import { DEFAULT_REPEAT_RATE, moveWalls } from "./internal";
 
 export function fixxrepeat(board: Board, wallId: number, reprate: number = DEFAULT_REPEAT_RATE) {
   const wall = board.walls[wallId];
   wall.xrepeat = Math.min(255, Math.max(1, Math.round((walllen(board, wallId) + 0.5) / reprate)));
 }
 
-function fixpoint2xpan(board: Board, wallId: number, art: ArtInfoProvider) {
+function fixpoint2xpan(board: Board, wallId: number, art: Function<number, ArtInfo>) {
   const wall = board.walls[wallId];
   const wall2 = board.walls[wall.point2];
-  wall2.xpanning = ((wall.xpanning + (wall.xrepeat << 3)) % art.getInfo(wall.picnum).w) & 0xff;
+  wall2.xpanning = ((wall.xpanning + (wall.xrepeat << 3)) % art(wall.picnum).w) & 0xff;
 }
 
-function insertWall(board: Board, wallId: number, x: number, y: number, art: ArtInfoProvider, refs: BuildReferenceTracker, cloneWall: (w: Wall) => Wall) {
+function insertWall(board: Board, wallId: number, x: number, y: number, art: Function<number, ArtInfo>, refs: BuildReferenceTracker, cloneWall: (w: Wall) => Wall) {
   const secId = sectorOfWall(board, wallId);
   const wall = board.walls[wallId];
   const lenperrep = walllen(board, wallId) / Math.max(wall.xrepeat, 1);
@@ -37,7 +38,7 @@ function insertWall(board: Board, wallId: number, x: number, y: number, art: Art
   fixxrepeat(board, wallId + 1, lenperrep);
 }
 
-export function splitWall<B extends Board>(board: B, wallId: number, x: number, y: number, art: ArtInfoProvider, refs: BuildReferenceTracker, cloneWall: WallCloner<BoardWall<B>>): number {
+export function splitWall<B extends Board>(board: B, wallId: number, x: number, y: number, art: Function<number, ArtInfo>, refs: BuildReferenceTracker, cloneWall: WallCloner<BoardWall<B>>): number {
   if (!isValidWallId(board, wallId)) throw new Error('Invalid wall: ' + wallId);
   const wall = board.walls[wallId];
   insertWall(board, wallId, x, y, art, refs, cloneWall);
@@ -70,7 +71,7 @@ export function moveWall(board: Board, wallId: number, x: number, y: number): bo
 
 
 const _wallNormal = vec3.create();
-export function pushWall<B extends Board>(board: B, wallId: number, len: number, art: ArtInfoProvider, alwaysNewPoints = false, refs: BuildReferenceTracker, api: EngineApi<B>) {
+export function pushWall<B extends Board>(board: B, wallId: number, len: number, art: Function<number, ArtInfo>, alwaysNewPoints = false, refs: BuildReferenceTracker, api: EngineApi<B>) {
   if (len === 0) return wallId;
   let w1 = wallId;
   const wall1 = board.walls[w1];
@@ -81,6 +82,7 @@ export function pushWall<B extends Board>(board: B, wallId: number, len: number,
   const n2 = wall2.point2;
   const next2 = board.walls[n2];
   const normal = wallNormal(_wallNormal, board, wallId);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [nx, _, ny] = vec3.scale(normal, normal, len);
   const x1 = int(wall1.x + nx);
   const y1 = int(wall1.y + ny);

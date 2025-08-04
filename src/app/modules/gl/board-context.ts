@@ -1,20 +1,21 @@
-import { Disposable } from "@utils/callbacks";
+import { Disposable, Source, ValuesContainer } from "ts-utils/callbacks";
 import { GlContext } from "@utils/gl/drawstruct";
-import { int } from "@utils/mathutils";
-import { Stream } from "@utils/stream";
+import { int, memoize } from "ts-utils/mathutils";
+import { applyNotNullish } from "ts-utils/objects";
+import { Stream } from "ts-utils/stream";
+import { BoardContext } from "app/apis/engine";
 import { Sector, Sprite, Wall } from "build/board/structs";
 import { sectorStruct, spriteStruct, wallStruct } from "build/maploader";
+import { point2d, triangulate } from "./geometry/builders/sector";
+import { Function } from "ts-utils/types";
 
 
-export type BoardGlContext = {
-  readonly walls: WebGLTexture;
-  readonly sprites: WebGLTexture;
-  readonly sectors: WebGLTexture;
-
-  writeWall(id: number, wall: Wall): void;
-  writeSprite(id: number, sprite: Sprite): void;
-  writeSector(id: number, sector: Sector): void;
-} & Disposable;
+export type BoardGlContext = Readonly<{
+  walls: WebGLTexture;
+  sprites: WebGLTexture;
+  sectors: WebGLTexture;
+  sectorPoints: Source<Function<number, point2d[]>>
+}> & Disposable;
 
 function createTexture(gl: WebGL2RenderingContext, tex: WebGLTexture) {
   gl.bindTexture(gl.TEXTURE_2D, tex);
@@ -31,7 +32,7 @@ function writeData(gl: WebGL2RenderingContext, tex: WebGLTexture, data: Uint32Ar
   gl.bindTexture(gl.TEXTURE_2D, null);
 }
 
-export function createBoardGlContext(glCtx: GlContext): BoardGlContext {
+export function createBoardGlContext(values: ValuesContainer, glCtx: GlContext, boardCtx: BoardContext): BoardGlContext {
   const { gl, resource } = glCtx;
   const disposer = (t: WebGLTexture): void => gl.deleteTexture(t);
   const walls = resource('texture', gl.createTexture(), disposer);
@@ -65,6 +66,24 @@ export function createBoardGlContext(glCtx: GlContext): BoardGlContext {
     writeData(gl, sectors.value, data, id);
   }
 
-  const dispose = async () => { walls.dispose(); sprites.dispose(); sectors.dispose(); };
-  return { walls: walls.value, sprites: sprites.value, sectors: sectors.value, writeWall, writeSprite, writeSector, dispose };
+  const onSectorsDisconnector = boardCtx.onSectorsChange(s => s.forEach(s => applyNotNullish(boardCtx.board.get().sectors[s], sec => writeSector(s, sec))));
+  const onWallsDisconnector = boardCtx.onWallsChange(w => w.forEach(w => applyNotNullish(boardCtx.board.get().walls[w], wall => writeWall(w, wall))));
+  const onSpritesDisconnector = boardCtx.onSpritesChange(s => s.forEach(s => applyNotNullish(boardCtx.board.get().sprites[s], spr => writeSprite(s, spr))));
+  const board = boardCtx.board.get();
+  board.sectors.forEach((s, i) => writeSector(i, s));
+  board.sprites.forEach((s, i) => writeSprite(i, s));
+  board.walls.forEach((w, i) => writeWall(i, w));
+
+  const sectorPoints = values.transformed('sector-points', boardCtx.board, board => memoize((s: number) => triangulate(board, s)));
+
+  const dispose = async () => {
+    walls.dispose();
+    sprites.dispose();
+    sectors.dispose();
+    onSectorsDisconnector();
+    onWallsDisconnector();
+    onSpritesDisconnector();
+  };
+
+  return { walls: walls.value, sprites: sprites.value, sectors: sectors.value, sectorPoints, dispose };
 }

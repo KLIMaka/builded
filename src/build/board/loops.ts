@@ -1,11 +1,12 @@
-import { forEach, map } from "../../utils/collections";
-import { minValue } from "../../utils/mathutils";
+import { forEach, map } from "ts-utils/collections";
+import { minValue } from "ts-utils/mathutils";
 import { clockwise, slope } from "../utils";
 import { isValidSectorId, isValidWallId, lastwall, nextwall, sectorOfWall } from "./query";
 import { Board } from "./structs";
 
 export function* sectorWalls(board: Board, sectorId: number): Generator<number> {
-  if (!isValidSectorId(board, sectorId)) throw new Error(`Invalid sectorId: ${sectorId}`);
+  if (!isValidSectorId(board, sectorId))
+    throw new Error(`Invalid sectorId: ${sectorId}`);
   const sector = board.sectors[sectorId];
   const end = sector.wallnum + sector.wallptr;
   for (let w = sector.wallptr; w < end; w++) yield w;

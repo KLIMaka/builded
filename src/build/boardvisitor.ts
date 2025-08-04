@@ -1,8 +1,8 @@
-import { Function } from '@utils/types';
+import { Function } from 'ts-utils/types';
 import { BuildTror } from 'app/apis/engine';
 import { vec3 } from 'gl-matrix';
-import { Deck } from '../utils/collections';
-import { RadialSegment, RadialSegments, TWO_PI, createSegment, dot2d, len2d, monoatan2 } from '../utils/mathutils';
+import { Deck } from 'ts-utils/collections';
+import { RadialSegment, RadialSegments, TWO_PI, createSegment, dot2d, len2d, monoatan2 } from 'ts-utils/mathutils';
 import { inSector } from './board/query';
 import { Board, Sector } from './board/structs';
 import { MoveStruct, ZSCALE, wallVisible } from './utils';

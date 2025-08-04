@@ -1,8 +1,8 @@
-import { range } from "../../utils/collections";
-import { iter } from "../../utils/iter";
-import { len2d, lenPointToLine, lse } from "../../utils/mathutils";
+import { range } from "ts-utils/collections";
+import { iter } from "ts-utils/iter";
+import { len2d, lenPointToLine, lse } from "ts-utils/mathutils";
 import { sectorWalls } from "./loops";
-import { findSector } from "./query";
+import { findSectorBasic } from "./query";
 import { Board } from "./structs";
 
 export function distanceToWallSegment(board: Board, wallId: number, x: number, y: number): number {
@@ -49,12 +49,12 @@ export function closestWallSegmentInSectorDist(board: Board, sectorId: number, x
 
 export function closestSpriteInSectorDist(board: Board, secId: number, x: number, y: number): [number, number] {
   const sprites = board.sprites;
-  return distance(iter(range(0, board.numsprites)).filter(s => sprites[s].sectnum == secId), s => distanceToSprite(board, s, x, y));
+  return distance(iter(range(0, board.numsprites)).filter(s => sprites[s].sectnum === secId), s => distanceToSprite(board, s, x, y));
 }
 
 export function closestWallSegmentDist(board: Board, x: number, y: number): [number, number] {
-  const sectorId = findSector(board, x, y);
-  return sectorId == -1
+  const sectorId = findSectorBasic(board, x, y);
+  return sectorId === -1
     ? distance(range(0, board.numwalls), w => distanceToWallSegment(board, w, x, y))
     : closestWallSegmentInSectorDist(board, sectorId, x, y);
 }

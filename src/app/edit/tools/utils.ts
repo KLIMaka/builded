@@ -109,7 +109,7 @@ class Utils extends DefaultTool {
         const fnz = slope(board, nextsectorId, wall.x, wall.y, nextsector.floorheinum) + nextsector.floorz;
         if (cnz <= cz && fnz >= fz) return;
       }
-      if (wall.picnum != refPic) return;
+      if (wall.picnum !== refPic) return;
       const dz = getWallBaseZ(board, wallId) - refZ;
       const ypanOff = (dz * refYRepeat) / (info.h * 8);
       wall.yrepeat = refYRepeat;

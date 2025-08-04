@@ -1,8 +1,8 @@
 import { useValue } from "@ui/commons";
 import { WindowBuilder } from "@ui/windows-common";
-import { createContainer } from "@utils/callbacks";
+import { createContainer } from "ts-utils/callbacks";
+import { TaskController } from "ts-utils/scheduler";
 import { ActionDescriptors } from "app/apis/actions";
-import { TaskController } from "app/apis/app1";
 import { Ui } from "app/apis/ui1";
 import React from "react";
 

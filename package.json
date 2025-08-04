@@ -43,7 +43,8 @@
     "typescript": "~5.6.3",
     "webpack": "^5.96.1",
     "webpack-cli": "^5.1.4",
-    "webpack-dev-server": "^5.1.0"
+    "webpack-dev-server": "^5.1.0",
+    "ts-node": "10.9.2"
   },
   "dependencies": {
     "@floating-ui/react": "^0.26.27",
@@ -59,6 +60,7 @@
     "react-winbox": "^1.5.0",
     "toml": "3.0.0",
     "use-immer": "^0.10.0",
-    "ts-pattern": "5.5.0"
+    "ts-pattern": "5.5.0",
+    "ts-utils": "file:../ts-utils"
   }
 }

@@ -1,10 +1,10 @@
-import { ChangeCallback } from "@utils/callbacks";
-import { chain } from "@utils/collections";
-import { Module, Plugin, lifecycle } from "@utils/injector";
-import { iter } from "@utils/iter";
-import { List, Node } from "@utils/list";
-import { clamp } from "@utils/mathutils";
-import { Consumer, Supplier, Transform, nil } from "@utils/types";
+import { ChangeCallback } from "ts-utils/callbacks";
+import { chain } from "ts-utils/collections";
+import { Module, Plugin, lifecycle } from "ts-utils/injector";
+import { iter } from "ts-utils/iter";
+import { List, Node } from "ts-utils/list";
+import { clamp } from "ts-utils/mathutils";
+import { Consumer, Supplier, Transform, nil } from "ts-utils/types";
 import { DragConsumer, Element, center, div, dragElement } from "@utils/ui/ui";
 import { ACTION_DESCRIPTORS, Action, ActionDescriptors, ActionsProvider } from "app/apis/actions";
 import Optional from "optional-js";

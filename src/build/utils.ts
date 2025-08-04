@@ -1,6 +1,6 @@
 import { mat2d, vec2, vec3 } from 'gl-matrix';
-import { cyclicPairs, loopPairs } from '../utils/collections';
-import { cross2d, cyclic, deg2rad, int, len2d, monoatan2, TWO_PI } from '../utils/mathutils';
+import { cyclicPairs, loopPairs } from 'ts-utils/collections';
+import { cross2d, cyclic, deg2rad, int, len2d, monoatan2, TWO_PI } from 'ts-utils/mathutils';
 import { normal2d } from '../utils/vecmath';
 import { Board } from './board/structs';
 import { Entity, EntityType } from './hitscan';
@@ -20,7 +20,7 @@ export function convertVisibility(vis: number) {
 }
 
 export function getPlayerStart(board: Board): { x: number, y: number, z: number, sec: number } {
-  const z = slope(board, board.cursectnum, board.posx, board.posy, false) + 1024 * ZSCALE;
+  const z = board.cursectnum === -1 ? 0 : slope(board, board.cursectnum, board.posx, board.posy, false) + 1024 * ZSCALE;
   return { x: board.posx, y: board.posy, z, sec: board.cursectnum };
 }
 
@@ -230,7 +230,7 @@ export function sectorNormal(out: vec3, board: Board, sectorId: number, ceiling:
   const sector = board.sectors[sectorId];
   wallNormal(wn, board, sector.wallptr);
   vec3.negate(wn, wn);
-  const h = ceiling ? sector.ceilingheinum : sector.floorheinum;
+  const h = ceiling ? (sector.ceilingstat.slopped ? sector.ceilingheinum : 0) : (sector.floorstat.slopped ? sector.floorheinum : 0);
   const normal = ceiling ? down : up;
   vec3.lerp(out, normal, wn, Math.atan(h * ANGSCALE) / (Math.PI / 2));
   return out;
@@ -282,13 +282,11 @@ export function order(points: Iterable<[number, number]>, cw = true): Iterable<[
 }
 
 export function getWallCoords(x1: number, y1: number, x2: number, y2: number,
-  slope: SlopeCalculator, nextslope: SlopeCalculator,
-  heinum: number, nextheinum: number,
-  z: number, nextz: number): number[] {
-  const z1 = (slope(x1, y1, heinum) + z) / ZSCALE;
-  const z2 = (slope(x2, y2, heinum) + z) / ZSCALE;
-  const z3 = (nextslope(x2, y2, nextheinum) + nextz) / ZSCALE;
-  const z4 = (nextslope(x1, y1, nextheinum) + nextz) / ZSCALE;
+  cslope: SlopeCalculator, fslope: SlopeCalculator): number[] {
+  const z1 = cslope(x1, y1) / ZSCALE;
+  const z2 = cslope(x2, y2) / ZSCALE;
+  const z3 = fslope(x2, y2) / ZSCALE;
+  const z4 = fslope(x1, y1) / ZSCALE;
   if (z4 >= z1 && z3 >= z2) return null;
 
   if (z4 > z1) {
@@ -309,17 +307,17 @@ export function getWallCoords(x1: number, y1: number, x2: number, y2: number,
 }
 
 export function getMaskedWallCoords(x1: number, y1: number, x2: number, y2: number,
-  slope: SlopeCalculator, nextslope: SlopeCalculator,
-  ceilheinum: number, ceilnextheinum: number, ceilz: number, ceilnextz: number,
-  floorheinum: number, floornextheinum: number, floorz: number, floornextz: number): number[] {
-  const currz1 = (slope(x1, y1, ceilheinum) + ceilz) / ZSCALE;
-  const currz2 = (slope(x2, y2, ceilheinum) + ceilz) / ZSCALE;
-  const currz3 = (slope(x2, y2, floorheinum) + floorz) / ZSCALE;
-  const currz4 = (slope(x1, y1, floorheinum) + floorz) / ZSCALE;
-  const nextz1 = (nextslope(x1, y1, ceilnextheinum) + ceilnextz) / ZSCALE;
-  const nextz2 = (nextslope(x2, y2, ceilnextheinum) + ceilnextz) / ZSCALE;
-  const nextz3 = (nextslope(x2, y2, floornextheinum) + floornextz) / ZSCALE;
-  const nextz4 = (nextslope(x1, y1, floornextheinum) + floornextz) / ZSCALE;
+  cslope: SlopeCalculator, fslope: SlopeCalculator,
+  ncslope: SlopeCalculator, nfslope: SlopeCalculator,
+): number[] {
+  const currz1 = cslope(x1, y1) / ZSCALE;
+  const currz2 = cslope(x2, y2) / ZSCALE;
+  const currz3 = fslope(x2, y2) / ZSCALE;
+  const currz4 = fslope(x1, y1) / ZSCALE;
+  const nextz1 = ncslope(x1, y1) / ZSCALE;
+  const nextz2 = ncslope(x2, y2) / ZSCALE;
+  const nextz3 = nfslope(x2, y2) / ZSCALE;
+  const nextz4 = nfslope(x1, y1) / ZSCALE;
   const z1 = Math.min(currz1, nextz1);
   const z2 = Math.min(currz2, nextz2);
   const z3 = Math.max(currz3, nextz3);

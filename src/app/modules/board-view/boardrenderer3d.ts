@@ -1,36 +1,35 @@
-import { Disconnector, Disposable, Source, ValuesContainer } from "@utils/callbacks";
+import { Disposable, Source, ValuesContainer } from "ts-utils/callbacks";
+import { iterIsEmpty } from "ts-utils/collections";
 import { GlContext } from "@utils/gl/drawstruct";
 import { createShader } from "@utils/gl/shaders";
-import { BufferAllocator, StateGl1 } from "@utils/gl/stategl1";
-import { iter } from "@utils/iter";
-import { memoize } from "@utils/mathutils";
-import { field } from "@utils/objects";
-import { Consumer, first, Function, MultiConsumer, pair, second } from "@utils/types";
-import { BoardContext, EngineContext, EngineSettings } from "app/apis/engine";
+import { AttribDataBuilder, BufferAllocator, ShaderConfig, StateGl1, TextureSetter, vec4 } from "@utils/gl/stategl1";
+import { iter } from "ts-utils/iter";
+import { field } from "ts-utils/objects"
+import { BiFunction, Consumer, first, Function, MultiConsumer, pair, second } from "ts-utils/types";
+import { NOOP_TASK_HANDLE } from "ts-utils/scheduler";
+import { EngineContext, EngineSettings } from "app/apis/engine";
 import { mat4 } from "gl-matrix";
-import { BoardGlContext, createBoardGlContext } from "../gl/board-context";
-import { point2d, triangulate } from "../gl/geometry/builders/sector";
+import { BoardGlContext } from "../gl/board-context";
 import { EngineTextures } from "../gl/gl-context";
-import { begin, tuple, Work } from "../scheduler/work";
-import { LineRecord, NOOP_RENDERABLE, Renderable, ScreenSpriteRecord, SectorRecord, SpriteRecord, VoxelRecord, WallRecord, WallType } from "./api";
-import { iterIsEmpty } from "@utils/collections";
-import { NOOP_TASK_HANDLE } from "app/apis/app1";
+import { begin, tuple, Work } from "ts-utils/work";
+import { GridRecord, LineRecord, NOOP_RENDERABLE, Renderable, ScreenSpriteRecord, SectorRecord, SpriteRecord, VoxelRecord, WallRecord, WallType } from "./api";
 
-export function createRenderer3d(values: ValuesContainer, glContext: GlContext, ctx: EngineContext, textures: EngineTextures, boardCtx: BoardContext): Work<[], [Source<BoardRenderer3D>]> {
-
+export function createRenderer3d(values: ValuesContainer, glContext: GlContext, ctx: EngineContext, textures: EngineTextures): Work<[], [Source<BoardRenderer3D>]> {
+  const doCreateShader = (defs: string[], name: string) => createShader(glContext, `resources/shaders/${name}`, defs);
   const loadRendererWork = begin()
     .input<string[]>()
     .fork(p => p
-      .thread('Compiling wall shader', defs => createShader(glContext, 'resources/shaders/wall-instance', defs))
-      .thread('Compiling sector shader', defs => createShader(glContext, 'resources/shaders/sector-instance', defs))
-      .thread('Compiling sprite shader', defs => createShader(glContext, 'resources/shaders/sprite-instance', defs))
-      .thread('Compiling voxel shader', defs => createShader(glContext, 'resources/shaders/voxel-instance', defs))
-      .thread('Compiling screen-sprite shader', defs => createShader(glContext, 'resources/shaders/screen-sprite', defs))
-      .thread('Compiling wall select shader', defs => createShader(glContext, 'resources/shaders/wall-select', defs))
-      .thread('Compiling sector select shader', defs => createShader(glContext, 'resources/shaders/sector-select', defs))
-      .thread('Compiling line shader', defs => createShader(glContext, 'resources/shaders/line', defs)))
-    .then('Creating renderer', async (wall, sector, sprite, voxel, screenSprite, wallSelect, sectorSelect, line) => {
-      const state = new StateGl1(glContext, s => new BufferAllocator(glContext, s, 128 * 1024, 128 * 1024));
+      .thread('Compiling wall shader', defs => doCreateShader(defs, 'wall-instance'))
+      .thread('Compiling sector shader', defs => doCreateShader(defs, 'sector-instance'))
+      .thread('Compiling sprite shader', defs => doCreateShader(defs, 'sprite-instance'))
+      .thread('Compiling voxel shader', defs => doCreateShader(defs, 'voxel-instance'))
+      .thread('Compiling screen-sprite shader', defs => doCreateShader(defs, 'screen-sprite'))
+      .thread('Compiling wall select shader', defs => doCreateShader(defs, 'wall-select'))
+      .thread('Compiling sector select shader', defs => doCreateShader(defs, 'sector-select'))
+      .thread('Compiling line shader', defs => doCreateShader(defs, 'line'))
+      .thread('Compiling grid shader', defs => doCreateShader(defs, 'grid')))
+    .then('Creating renderer', async (wall, sector, sprite, voxel, screenSprite, wallSelect, sectorSelect, line, grid) => {
+      const state = new StateGl1(glContext, s => new BufferAllocator(glContext, s));
       state.register('wall-instance', wall);
       state.register('wall-select', wallSelect);
       state.register('sector-instance', sector);
@@ -39,7 +38,8 @@ export function createRenderer3d(values: ValuesContainer, glContext: GlContext, 
       state.register('voxel-instance', voxel);
       state.register('screen-sprite', screenSprite);
       state.register('line', line);
-      return new BoardRenderer3D(values, glContext, ctx, textures, boardCtx, state);
+      state.register('grid', grid);
+      return new BoardRenderer3D(textures, state);
     }).finishUntuple();
 
   let loadHandle = NOOP_TASK_HANDLE;
@@ -67,17 +67,15 @@ export function createRenderer3d(values: ValuesContainer, glContext: GlContext, 
 }
 
 export class BoardRenderer3D implements Disposable {
-  private boardGl: BoardGlContext;
-  private sectorPoints: Source<(t: number) => point2d[]>;
-
-  writeWalls: (recs: Iterable<WallRecord>) => Renderable;
-  writeSectors: (recs: Iterable<SectorRecord>) => Renderable;
-  writeSprites: (recs: Iterable<SpriteRecord>) => Renderable;
-  writeVoxels: (recs: Iterable<SpriteRecord>) => Renderable;
+  writeWalls: (recs: Iterable<WallRecord>, boardGlCtx: BoardGlContext) => Renderable;
+  writeSectors: (recs: Iterable<SectorRecord>, boardGlCtx: BoardGlContext) => Renderable;
+  writeSprites: (recs: Iterable<SpriteRecord>, boardGlCtx: BoardGlContext) => Renderable;
+  writeVoxels: (recs: Iterable<SpriteRecord>, boardGlCtx: BoardGlContext) => Renderable;
   writeScreenSprites: (recs: Iterable<ScreenSpriteRecord>) => Renderable;
-  writeWallSelect: (recs: Iterable<WallRecord>) => Renderable;
-  writeSectorSelect: (recs: Iterable<SectorRecord>) => Renderable;
+  writeWallSelect: (recs: Iterable<WallRecord>, boardGlCtx: BoardGlContext) => Renderable;
+  writeSectorSelect: (recs: Iterable<SectorRecord>, boardGlCtx: BoardGlContext) => Renderable;
   writeLines: (recs: Iterable<LineRecord>) => Renderable;
+  writeGrid: (recs: Iterable<GridRecord>, type?: number) => Renderable;
 
   view: Consumer<mat4>;
   projection: Consumer<mat4>;
@@ -89,28 +87,10 @@ export class BoardRenderer3D implements Disposable {
   screenSize: MultiConsumer<[number, number]>;
   grid: Consumer<number>;
 
-  onSectorsDisconnector: Disconnector;
-  onWallsDisconnector: Disconnector;
-  onSpritesDisconnector: Disconnector;
-
-
   constructor(
-    values: ValuesContainer,
-    glCtx: GlContext,
-    private ctx: EngineContext,
     private textures: EngineTextures,
-    private boardCtx: BoardContext,
-    private state: StateGl1
+    private state: StateGl1,
   ) {
-    this.boardGl = createBoardGlContext(glCtx);
-    const board = this.boardCtx.board.get();
-    board.sectors.forEach((s, i) => this.updateSector(i));
-    board.sprites.forEach((s, i) => this.updateSprite(i));
-    board.walls.forEach((w, i) => this.updateWall(i));
-    this.onSectorsDisconnector = this.boardCtx.onSectorsChange(s => s.forEach(s => this.updateSector(s)));
-    this.onWallsDisconnector = this.boardCtx.onWallsChange(w => w.forEach(w => this.updateWall(w)));
-    this.onSpritesDisconnector = this.boardCtx.onSpritesChange(s => s.forEach(s => this.updateSprite(s)));
-
     const matrices = this.state.uniformBlock('Matrices');
     const V = matrices.writer<[mat4]>('V');
     const IV = matrices.writer<[mat4]>('IV');
@@ -134,139 +114,95 @@ export class BoardRenderer3D implements Disposable {
     this.writeWallSelect = this.createWallSelectWriter();
     this.writeSectorSelect = this.createSectorSelectWriter();
     this.writeLines = this.createLineWriter();
-
-    this.sectorPoints = values.transformed('sector-points', boardCtx.board, board => memoize((s: number) => triangulate(board, s)));
+    this.writeGrid = this.createGridWriter();
   }
 
   async dispose() {
-    this.boardGl.dispose();
     this.state.dispose();
-    this.onSectorsDisconnector();
-    this.onWallsDisconnector();
-    this.onSpritesDisconnector();
   }
 
-  updateWall(wallId: number) {
-    const wall = this.boardCtx.board.get().walls[wallId];
-    if (wall === null) return;
-    this.boardGl.writeWall(wallId, wall);
-    this.textures.get(wall.picnum).get();
-    this.textures.get(wall.overpicnum).get();
+  private genWalls(shader: ShaderConfig, walls: TextureSetter, sectors: TextureSetter, wallP: MultiConsumer<vec4>, builder: AttribDataBuilder, recs: Iterable<WallRecord>, ctx: BoardGlContext): Renderable {
+    if (iterIsEmpty(recs)) return NOOP_RENDERABLE;
+    builder.start();
+    iter(recs).forEach(({ wallId, sectorId, type }) => {
+      if (type === WallType.VOID) {
+        wallP(wallId, sectorId, 0, 0);
+        builder.writeVertex();
+      } else if (type === WallType.NONMASKED) {
+        wallP(wallId, sectorId, 1, 0);
+        builder.writeVertex();
+        wallP(wallId, sectorId, 2, 0);
+        builder.writeVertex();
+      } else if (type === WallType.MASKED) {
+        wallP(wallId, sectorId, 1, 0);
+        builder.writeVertex();
+        wallP(wallId, sectorId, 2, 0);
+        builder.writeVertex();
+        wallP(wallId, sectorId, 3, 0);
+        builder.writeVertex();
+      } else if (type === WallType.ONLY_MASKED) {
+        wallP(wallId, sectorId, 3, 0);
+        builder.writeVertex();
+      } else if (type === WallType.ONLY_LOWER) {
+        wallP(wallId, sectorId, 2, 0);
+        builder.writeVertex();
+      } else if (type === WallType.ONLY_UPPER) {
+        wallP(wallId, sectorId, 1, 0);
+        builder.writeVertex();
+      }
+    });
+    const data = builder.build(WebGL2RenderingContext.TRIANGLE_STRIP, 4);
+    const render = _ => {
+      walls(ctx.walls);
+      sectors(ctx.sectors);
+      this.state.draw(shader, data);
+    }
+    const dispose = async () => data.data.dispose();
+    return { render, dispose };
   }
 
-  updateSector(sectorId: number) {
-    const sector = this.boardCtx.board.get().sectors[sectorId]
-    if (sector === null) return;
-    this.boardGl.writeSector(sectorId, sector);
-    this.textures.get(sector.ceilingpicnum, sector.ceilingstat.parallaxing ? this.boardCtx.parallaxPicnums : 1).get();
-    this.textures.get(sector.floorpicnum, sector.floorstat.parallaxing ? this.boardCtx.parallaxPicnums : 1).get();
-  }
-
-  updateSprite(spriteId: number) {
-    const sprite = this.boardCtx.board.get().sprites[spriteId]
-    if (sprite === null) return;
-    this.boardGl.writeSprite(spriteId, sprite);
-    this.textures.get(sprite.picnum).get();
-  }
-
-  private createWallWriter(): Function<Iterable<WallRecord>, Renderable> {
+  private createWallWriter(): BiFunction<Iterable<WallRecord>, BoardGlContext, Renderable> {
     const shader = this.state.getShader('wall-instance');
     shader.texture('pal')(this.textures.pal.get());
     shader.texture('plu')(this.textures.plu.get());
     shader.texture('atlas')(this.textures.atlas.get());
     shader.texture('infos')(this.textures.infos.get());
-    shader.texture('walls')(this.boardGl.walls);
-    shader.texture('sectors')(this.boardGl.sectors);
+    const walls = shader.texture('walls');
+    const sectors = shader.texture('sectors');
 
     const builder = shader.builder();
     const wallSectorPart = builder.vec4('aWallSectorPart_u16');
-    return recs => {
-      if (iterIsEmpty(recs)) return NOOP_RENDERABLE;
-      builder.start();
-      iter(recs).forEach(({ wallId, sectorId, type }) => {
-        if (type === WallType.VOID) {
-          wallSectorPart(wallId, sectorId, 0, 0);
-          builder.writeVertex();
-        } else if (type === WallType.NONMASKED) {
-          wallSectorPart(wallId, sectorId, 1, 0);
-          builder.writeVertex();
-          wallSectorPart(wallId, sectorId, 2, 0);
-          builder.writeVertex();
-        } else if (type === WallType.MASKED) {
-          wallSectorPart(wallId, sectorId, 1, 0);
-          builder.writeVertex();
-          wallSectorPart(wallId, sectorId, 2, 0);
-          builder.writeVertex();
-          wallSectorPart(wallId, sectorId, 3, 0);
-          builder.writeVertex();
-        } else if (type === WallType.ONLY_MASKED) {
-          wallSectorPart(wallId, sectorId, 3, 0);
-          builder.writeVertex();
-        }
-      });
-      const data = builder.buildInstanced(WebGL2RenderingContext.TRIANGLE_STRIP, 4);
-      const render = _ => this.state.drawInstanced(shader, data);
-      const dispose = async () => data.data.dispose();
-      return { render, dispose };
-    };
+    return (recs, ctx) => this.genWalls(shader, walls, sectors, wallSectorPart, builder, recs, ctx);
   }
 
-  private createWallSelectWriter(): Function<Iterable<WallRecord>, Renderable> {
+  private createWallSelectWriter(): BiFunction<Iterable<WallRecord>, BoardGlContext, Renderable> {
     const shader = this.state.getShader('wall-select');
-    shader.texture('walls')(this.boardGl.walls);
-    shader.texture('sectors')(this.boardGl.sectors);
     shader.texture('infos')(this.textures.infos.get());
+    const walls = shader.texture('walls');
+    const sectors = shader.texture('sectors');
 
     const builder = shader.builder();
     const part = builder.vec4('aWallSectorPart_u16');
-    return recs => {
-      if (iterIsEmpty(recs)) return NOOP_RENDERABLE;
-      builder.start();
-      iter(recs).forEach(({ wallId, sectorId, type }) => {
-        if (type === WallType.VOID) {
-          part(wallId, sectorId, 0, 0);
-          builder.writeVertex();
-        } else if (type === WallType.NONMASKED) {
-          part(wallId, sectorId, 1, 0);
-          builder.writeVertex();
-          part(wallId, sectorId, 2, 0);
-          builder.writeVertex();
-        } else if (type === WallType.MASKED) {
-          part(wallId, sectorId, 1, 0);
-          builder.writeVertex();
-          part(wallId, sectorId, 2, 0);
-          builder.writeVertex();
-          part(wallId, sectorId, 3, 0);
-          builder.writeVertex();
-        } else if (type === WallType.ONLY_MASKED) {
-          part(wallId, sectorId, 3, 0);
-          builder.writeVertex();
-        }
-      });
-      const data = builder.buildInstanced(WebGL2RenderingContext.TRIANGLE_STRIP, 4);
-      const render = _ => this.state.drawInstanced(shader, data);
-      const dispose = async () => data.data.dispose();
-      return { render, dispose };
-    };
+    return (recs, ctx) => this.genWalls(shader, walls, sectors, part, builder, recs, ctx);
   }
 
-  private createSectorWriter(): Function<Iterable<SectorRecord>, Renderable> {
+  private createSectorWriter(): BiFunction<Iterable<SectorRecord>, BoardGlContext, Renderable> {
     const shader = this.state.getShader('sector-instance');
     shader.texture('pal')(this.textures.pal.get());
     shader.texture('plu')(this.textures.plu.get());
     shader.texture('atlas')(this.textures.atlas.get());
     shader.texture('infos')(this.textures.infos.get());
-    shader.texture('walls')(this.boardGl.walls);
-    shader.texture('sectors')(this.boardGl.sectors);
+    const walls = shader.texture('walls');
+    const sectors = shader.texture('sectors');
 
     const builder = shader.builder();
     const pos12 = builder.vec4('aPos12');
     const pos3Sec = builder.vec4('aPos3SecPart');
-    return recs => {
+    return (recs, ctx) => {
       if (iterIsEmpty(recs)) return NOOP_RENDERABLE;
       builder.start();
       iter(recs).forEach(({ sectorId, ceiling, floor }) => {
-        const points = this.sectorPoints.get()(sectorId);
+        const points = ctx.sectorPoints.get()(sectorId);
         for (let i = 0; i < points.length; i += 3) {
           const p1 = points[i];
           const p2 = points[i + 1];
@@ -283,27 +219,31 @@ export class BoardRenderer3D implements Disposable {
           }
         }
       });
-      const data = builder.buildInstanced(WebGL2RenderingContext.TRIANGLES, 3);
-      const render = _ => this.state.drawInstanced(shader, data);
+      const data = builder.build(WebGL2RenderingContext.TRIANGLES, 3);
+      const render = _ => {
+        walls(ctx.walls);
+        sectors(ctx.sectors);
+        this.state.draw(shader, data);
+      }
       const dispose = async () => data.data.dispose();
       return { render, dispose };
     };
   }
 
-  private createSectorSelectWriter(): Function<Iterable<SectorRecord>, Renderable> {
+  private createSectorSelectWriter(): BiFunction<Iterable<SectorRecord>, BoardGlContext, Renderable> {
     const shader = this.state.getShader('sector-select');
     shader.texture('infos')(this.textures.infos.get());
-    shader.texture('walls')(this.boardGl.walls);
-    shader.texture('sectors')(this.boardGl.sectors);
+    const walls = shader.texture('walls');
+    const sectors = shader.texture('sectors');
 
     const builder = shader.builder();
     const pos12 = builder.vec4('aPos12');
     const pos3Sec = builder.vec4('aPos3SecPart');
-    return recs => {
+    return (recs, ctx) => {
       if (iterIsEmpty(recs)) return NOOP_RENDERABLE;
       builder.start();
       iter(recs).forEach(({ sectorId, ceiling, floor }) => {
-        const points = this.sectorPoints.get()(sectorId);
+        const points = ctx.sectorPoints.get()(sectorId);
         for (let i = 0; i < points.length; i += 3) {
           const p1 = points[i];
           const p2 = points[i + 1];
@@ -320,58 +260,70 @@ export class BoardRenderer3D implements Disposable {
           }
         }
       });
-      const data = builder.buildInstanced(WebGL2RenderingContext.TRIANGLES, 3);
-      const render = _ => this.state.drawInstanced(shader, data);
+      const data = builder.build(WebGL2RenderingContext.TRIANGLES, 3);
+      const render = _ => {
+        walls(ctx.walls);
+        sectors(ctx.sectors);
+        this.state.draw(shader, data);
+      }
       const dispose = async () => data.data.dispose();
       return { render, dispose };
     };
   }
 
-  private createSpriteWriter(): Function<Iterable<SpriteRecord>, Renderable> {
-    const spriteShader = this.state.getShader('sprite-instance');
-    spriteShader.texture('pal')(this.textures.pal.get());
-    spriteShader.texture('plu')(this.textures.plu.get());
-    spriteShader.texture('atlas')(this.textures.atlas.get());
-    spriteShader.texture('infos')(this.textures.infos.get());
-    spriteShader.texture('sectors')(this.boardGl.sectors);
-    spriteShader.texture('sprites')(this.boardGl.sprites);
+  private createSpriteWriter(): BiFunction<Iterable<SpriteRecord>, BoardGlContext, Renderable> {
+    const shader = this.state.getShader('sprite-instance');
+    shader.texture('pal')(this.textures.pal.get());
+    shader.texture('plu')(this.textures.plu.get());
+    shader.texture('atlas')(this.textures.atlas.get());
+    shader.texture('infos')(this.textures.infos.get());
+    const sprites = shader.texture('sprites');
+    const sectors = shader.texture('sectors');
 
-    const spriteBuilder = spriteShader.builder();
-    const spriteIdWriter = spriteBuilder.scalar('aSpriteId_u16');
-    return recs => {
+    const builder = shader.builder();
+    const spriteIdWriter = builder.scalar('aSpriteId_u16');
+    return (recs, ctx) => {
       if (iterIsEmpty(recs)) return NOOP_RENDERABLE;
-      spriteBuilder.start();
+      builder.start();
       iter(recs).forEach(({ spriteId }) => {
         spriteIdWriter(spriteId);
-        spriteBuilder.writeVertex();
+        builder.writeVertex();
       });
-      const data = spriteBuilder.buildInstanced(WebGL2RenderingContext.TRIANGLE_STRIP, 6);
-      const render = _ => this.state.drawInstanced(spriteShader, data);
+      const data = builder.build(WebGL2RenderingContext.TRIANGLE_STRIP, 6);
+      const render = _ => {
+        sectors(ctx.sectors);
+        sprites(ctx.sprites);
+        this.state.draw(shader, data);
+      }
       const dispose = async () => data.data.dispose();
       return { render, dispose };
     };
   }
 
-  private createVoxelWriter(): Function<Iterable<VoxelRecord>, Renderable> {
-    const voxelShader = this.state.getShader('voxel-instance');
-    voxelShader.texture('pal')(this.textures.pal.get());
-    voxelShader.texture('plu')(this.textures.plu.get());
-    voxelShader.texture('infos')(this.textures.infos.get());
-    voxelShader.texture('sectors')(this.boardGl.sectors);
-    voxelShader.texture('sprites')(this.boardGl.sprites);
-    const voxelTexture = voxelShader.texture('voxel');
+  private createVoxelWriter(): BiFunction<Iterable<VoxelRecord>, BoardGlContext, Renderable> {
+    const shader = this.state.getShader('voxel-instance');
+    shader.texture('pal')(this.textures.pal.get());
+    shader.texture('plu')(this.textures.plu.get());
+    shader.texture('infos')(this.textures.infos.get());
+    const voxelTexture = shader.texture('voxel');
+    const sprites = shader.texture('sprites');
+    const sectors = shader.texture('sectors');
 
-    const voxelBuilder = voxelShader.builder();
+    const voxelBuilder = shader.builder();
     const voxelSpriteId = voxelBuilder.scalar('aSpriteId_u16');
-    return recs => {
+    return (recs, ctx) => {
       if (iterIsEmpty(recs)) return NOOP_RENDERABLE;
       const data = iter(recs).groupEntries(field('voxelPicnum'), field('spriteId')).map(([picnum, spriteIds]) => {
         voxelBuilder.start();
         spriteIds.forEach(s => { voxelSpriteId(s); voxelBuilder.writeVertex(); });
         const voxel = this.textures.voxels.get()(picnum).get();
-        return pair(voxel.texture, voxelBuilder.buildInstanced(WebGL2RenderingContext.TRIANGLES, 6 * voxel.size));
+        return pair(voxel.texture, voxelBuilder.build(WebGL2RenderingContext.TRIANGLES, 6 * voxel.size));
       }).toMap(first, second);
-      const render = _ => data.forEach((data, texture) => { voxelTexture(texture); this.state.drawInstanced(voxelShader, data); });
+      const render = _ => {
+        sprites(ctx.sprites);
+        sectors(ctx.sectors);
+        data.forEach((data, texture) => { voxelTexture(texture); this.state.draw(shader, data); });
+      }
       const dispose = async () => data.values().forEach(d => d.data.dispose());
       return { render, dispose };
     };
@@ -385,22 +337,22 @@ export class BoardRenderer3D implements Disposable {
     shader.texture('atlas')(this.textures.atlas.get());
 
     const builder = shader.builder();
-    const posWriter = builder.vec3('aPos');
+    const posWriter = builder.vec4('aPosIdx');
     const offSizeWriter = builder.vec4('aOffSize_i16');
-    const picnumWriter = builder.vec4('aPicnum_u16');
+    const picnumWriter = builder.vec4('aPicnumTiles_u16');
 
     return recs => {
       if (iterIsEmpty(recs)) return NOOP_RENDERABLE;
 
       builder.start();
-      iter(recs).forEach(({ pos, off, size, picnum }) => {
-        posWriter(pos[0], pos[1], pos[2]);
+      iter(recs).forEach(({ pos, off, size, picnum, tiles, tileId }) => {
+        posWriter(pos[0], pos[1], pos[2], tileId ?? 0);
         offSizeWriter(off[0], off[1], size[0], size[1]);
-        picnumWriter(picnum, 0, 0, 0);
+        picnumWriter(picnum, tiles ?? 1, 0, 0);
         builder.writeVertex();
       });
-      const data = builder.buildInstanced(WebGL2RenderingContext.TRIANGLES, 6);
-      const render = _ => this.state.drawInstanced(shader, data);
+      const data = builder.build(WebGL2RenderingContext.TRIANGLES, 6);
+      const render = _ => this.state.draw(shader, data);
       const dispose = async () => data.data.dispose();
       return { render, dispose };
     }
@@ -420,8 +372,35 @@ export class BoardRenderer3D implements Disposable {
         endWriter(end[0], end[1], end[2]);
         builder.writeVertex();
       });
-      const data = builder.buildInstanced(WebGL2RenderingContext.LINES, 2);
-      const render = _ => this.state.drawInstanced(shader, data);
+      const data = builder.build(WebGL2RenderingContext.LINES, 2);
+      const render = _ => this.state.draw(shader, data);
+      const dispose = async () => data.data.dispose();
+      return { render, dispose };
+    }
+  }
+
+  private createGridWriter(): BiFunction<Iterable<GridRecord>, number, Renderable> {
+    const shader = this.state.getShader('grid');
+    const builder = shader.builder();
+    const pos1Writer = builder.vec3('aPos1');
+    const pos2Writer = builder.vec3('aPos2');
+    const pos3Writer = builder.vec3('aPos3');
+    const pos4Writer = builder.vec3('aPos4');
+    const typeWriter = shader.uniformBlock('Local').writer('type');
+
+    return (recs, type = 0) => {
+      if (iterIsEmpty(recs)) return NOOP_RENDERABLE;
+
+      builder.start();
+      iter(recs).forEach(({ a, b, c, d }) => {
+        pos1Writer(a[0], a[1], a[2]);
+        pos2Writer(b[0], b[1], b[2]);
+        pos3Writer(c[0], c[1], c[2]);
+        pos4Writer(d[0], d[1], d[2]);
+        builder.writeVertex();
+      });
+      const data = builder.build(WebGL2RenderingContext.TRIANGLES, 6);
+      const render = _ => { typeWriter(type); this.state.draw(shader, data); }
       const dispose = async () => data.data.dispose();
       return { render, dispose };
     }

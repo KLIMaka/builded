@@ -1,6 +1,6 @@
-import { Deck } from "../../utils/collections";
-import { Dependency, Injector, provider } from "../../utils/injector";
-import { List } from "../../utils/list";
+import { Deck } from "ts-utils/collections";
+import { Dependency, Injector, provider } from "ts-utils/injector";
+import { List } from "ts-utils/list";
 import { LOGGER } from "./app";
 
 export interface Message { }

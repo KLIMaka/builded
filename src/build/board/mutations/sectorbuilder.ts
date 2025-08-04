@@ -1,7 +1,7 @@
-import { iter } from "@utils/iter";
+import { iter } from "ts-utils/iter";
+import { forEach, map } from "ts-utils/collections";
 import { BuildReferenceTracker } from "../../../app/apis/app";
 import { track } from "../../../app/apis/referencetracker";
-import { forEach, map } from "../../../utils/collections";
 import { Board, Wall } from "../structs";
 import { resizeWalls } from "./internal";
 import { fixxrepeat } from "./walls";
@@ -17,7 +17,7 @@ export class SectorBuilder {
   wallsLength() { return iter(this.walls).map(w => w.length).reduceFirst((l, r) => l + r).orElse(0) }
 
   loop(): SectorBuilder {
-    if (this.currentLoop.length == 0) return this;
+    if (this.currentLoop.length === 0) return this;
     this.walls.push(this.currentLoop);
     this.currentLoop = [];
     return this;
@@ -41,12 +41,12 @@ export class SectorBuilder {
         const w = ptr++;
         board.walls[w] = wall;
         wall.point2 = w + 1;
-        if (wall.nextwall != -1) {
+        if (wall.nextwall !== -1) {
           const nextwall = board.walls[wall.nextwall];
           nextwall.nextsector = sectorId;
           nextwall.nextwall = w;
         }
-        if (wall.xrepeat == 0) repeatsToFix.push(w);
+        if (wall.xrepeat === 0) repeatsToFix.push(w);
       }
       lastWall.point2 = start;
     }

@@ -1,5 +1,5 @@
-import { rect, Ring } from "@utils/collections";
-import { atomic_array, int, Stream, ubyte, uint, ushort } from "@utils/stream";
+import { rect, Ring } from "ts-utils/collections";
+import { atomic_array, int, Stream, ubyte, uint, ushort } from "ts-utils/stream";
 
 export enum VoxelSide { ZM, ZP, XM, XP, YM, YP };
 export const VOXEL_SIDES = [VoxelSide.ZM, VoxelSide.ZP, VoxelSide.XM, VoxelSide.XP, VoxelSide.YM, VoxelSide.YP];

@@ -1,17 +1,17 @@
-import { Source, Value, ValuesContainer } from "@utils/callbacks";
-import { rect } from "@utils/collections";
-import { palColorFinder } from "@utils/color";
-import { loadImageFromBuffer } from "@utils/imgutils";
-import { iter } from "@utils/iter";
-import { asyncMapOptional, asyncOptional, field } from "@utils/objects";
-import { first, Function, nil, pair, second } from "@utils/types";
-import { NOOP_TASK_HANDLE } from "app/apis/app1";
+import { Source, Value, ValuesContainer } from "ts-utils/callbacks";
+import { rect } from "ts-utils/collections";
+import { palColorFinder } from "ts-utils/color";
+import { loadImageFromBuffer } from "ts-utils/imgutils";
+import { iter } from "ts-utils/iter";
+import { asyncMapOptional, asyncOptional, field } from "ts-utils/objects";
+import { first, Function, nil, pair, second } from "ts-utils/types";
 import { ArtInfoExtended, NamedArtFile, Palette } from "app/apis/engine";
 import { FileSystem } from "app/apis/fs";
 import { Attributes, readArtFile } from "build/formats/art";
 import Optional from "optional-js";
 import { EMPTY, watchFile } from "../fs/fs";
-import { begin, tuple } from "../scheduler/work";
+import { NOOP_TASK_HANDLE } from "ts-utils/scheduler";
+import { begin, tuple } from "ts-utils/work";
 
 export async function packegeFs(values: ValuesContainer, fs: Source<FileSystem>, name: string, factory: Function<ArrayBuffer, Promise<FileSystem>>): Promise<Source<FileSystem>> {
   return values.transformedAsync(`packegeFs-${name}`, await watchFile(values, name, fs), async buff => asyncMapOptional(buff, async b => factory(b)).then(o => o.orElse(EMPTY)));
@@ -120,7 +120,7 @@ export function loadPicAddonsWork(fs: FileSystem, pal: Uint8Array, files: AddonI
   const toArtImg = loadToArtImg(pal);
   return begin()
     .forkItems(files,
-      f => `Loading ${f}`,
+      f => `Loading ${f.file}`,
       f => fs.read(f.file).then(async o => pair(f, await asyncOptional(o.map(loadImageFromBuffer)))))
     .thenWork(async (handle, tuples) => {
       const infos: ArtInfoExtended[] = [];

@@ -1,11 +1,10 @@
 import { mat2d, mat4 } from "gl-matrix";
 import { EngineApi } from "../../build/board/mutations/api";
 import { Board } from "../../build/board/structs";
-import { ArtInfoProvider } from "../../build/formats/art";
 import { EMPTY_TARGET, Ray, Target } from "../../build/hitscan";
 import { MoveStruct } from "../../build/utils";
 import { Texture } from "../../utils/gl/drawstruct";
-import { Dependency } from "../../utils/injector";
+import { Dependency } from "ts-utils/injector";
 import { MessageHandler } from "./handler";
 import { ReferenceTracker } from "./referencetracker";
 import { Renderable } from "./renderable";
@@ -27,7 +26,7 @@ export interface Storage {
 export type Storages = (name: string) => Promise<Storage>;
 export const STORAGES = new Dependency<Storages>('Storages');
 
-export interface ArtProvider extends ArtInfoProvider {
+export interface ArtProvider {
   get(picnum: number): Texture;
   getParallaxTexture(picnum: number): Texture
 }

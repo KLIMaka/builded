@@ -3,20 +3,20 @@ import { Icon, actionsToActionItem, line } from "@ui/commons";
 import { confirm, info } from "@ui/message-box";
 import { Sort } from "@ui/table";
 import { SizeType, WindowBuilder } from "@ui/windows-common";
-import { Signal, Source, Value, ValuesContainer, ValuesMap, createContainer, initial } from "@utils/callbacks";
-import { Dependency, Injector, getInstances, lifecycle } from "@utils/injector";
-import { iter } from "@utils/iter";
-import { UniqueIds, asyncMapOptional, zipOptional } from "@utils/objects";
-import { size } from "@utils/size";
-import { debounced } from "@utils/time";
-import { Consumer, Supplier, identity, pair } from "@utils/types";
+import { Signal, Source, Value, ValuesContainer, ValuesMap, createContainer, initial } from "ts-utils/callbacks";
+import { Dependency, getInstances, lifecycle } from "ts-utils/injector";
+import { iter } from "ts-utils/iter";
+import { asyncMapOptional, zipOptional } from "ts-utils/objects";
+import { size } from "ts-utils/size";
+import { debounced } from "ts-utils/time";
+import { Consumer, Supplier, identity, pair } from "ts-utils/types";
 import { ACTION_DESCRIPTORS, Action, ActionDescriptors } from "app/apis/actions";
 import { APP, App, Storage } from "app/apis/app1";
 import { FS, FileSystem, FileSystemHandle, FileSystems, SerializedFileSystemHandle } from "app/apis/fs";
 import { UI, Ui, Window } from "app/apis/ui1";
 import { createSavedState } from "app/modules/default/app/storage";
 import { waitFor } from "app/modules/scheduler/ui/task-propgress";
-import { begin, WorkBuilder } from "app/modules/scheduler/work";
+import { begin } from "ts-utils/work";
 import Optional from "optional-js";
 import * as React from 'react';
 import { EMPTY } from "../fs";
@@ -25,7 +25,7 @@ import { fsIcon } from "./fs-ui-utils";
 import { OverwriteOption, confirmOverwrite } from "./overwrite";
 
 const GLOBAL = 'fs.global';
-const LOCAL = 'fs.';
+const LOCAL = 'fs';
 
 function getExtension(s: string) {
   const idx = s.lastIndexOf('.');
@@ -33,7 +33,7 @@ function getExtension(s: string) {
 }
 
 export type GlobalFileSystemsManager = {
-  newWindow(): Promise<Window>;
+  openWindow(): Promise<Window>;
 }
 
 export type FileInfo = { name: string, type: string, size: number }
@@ -72,7 +72,7 @@ function createDefaultSavedState(): SavedState {
 class GlobalFileSystemsManagerImpl implements GlobalFileSystemsManager {
   readonly clipboard: Value<Optional<FilesList>>;
   readonly recentFss: Source<FileSystemHandle[]>;
-  private ids = new UniqueIds();
+  private window: Window;
 
   constructor(
     private values: ValuesContainer,
@@ -82,7 +82,6 @@ class GlobalFileSystemsManagerImpl implements GlobalFileSystemsManager {
     private storage: Storage,
     readonly ui: Ui,
     readonly actionDescriptors: ActionDescriptors,
-    readonly injector: Injector,
   ) {
     this.clipboard = this.values.value('clipboard', Optional.empty());
     this.recentFss = values.transformed('recentFss', state.get('recent'), r => r.map(r => fs.deserialize(r)));
@@ -94,28 +93,28 @@ class GlobalFileSystemsManagerImpl implements GlobalFileSystemsManager {
       ...await iter(recent)
         .map(s => this.fs.deserialize(s))
         .map(async h => pair(h, await h.isSameEntry(handle)))
-        .await_().then(i => i
+        .await_()
+        .then(i => i
           .filter(([_, same]) => !same)
           .map(([h, _]) => h.serialized)
           .collect())
     ]);
   }
 
-  async newWindow(): Promise<Window> {
-    const id = this.ids.get();
-    const name = LOCAL + id.value;
-    const values = createContainer(name);
-    const savedState = await createSavedState(values, this.storage, name, createDefaultSavedState());
+  async openWindow(): Promise<Window> {
+    if (this.window !== undefined) return this.window;
+    const values = createContainer(LOCAL);
+    const savedState = await createSavedState(values, this.storage, LOCAL, createDefaultSavedState());
     const manager = new FileSystemsManagerImpl(values, savedState, this);
-    return new WindowBuilder(name, this.actionDescriptors, values)
+    this.window = new WindowBuilder(LOCAL, this.actionDescriptors, values)
       .title('File Systems')
       .minSize(400, 400)
-      .sizeValue(savedState.get('size'))
-      .positionValue(savedState.get('position'))
+      .state(savedState)
       .onClose(() => this.app.timer.delayed(() => values.dispose()))
+      .onClose(() => this.window = undefined)
       .actions(Object.values(manager.actions))
-      .disposable(id)
       .build(<FsManagerUiImpl manager={manager} />)
+    return this.window;
   }
 }
 
@@ -320,10 +319,10 @@ export class FileSystemsManagerImpl {
 
 export const FileSystemsManagerModule = lifecycle<GlobalFileSystemsManager>(async (injector, lifecycle) => {
   const [fs, actionDescriptors, app, ui] = await getInstances(injector, FS, ACTION_DESCRIPTORS, APP, UI);
-  const globalValues = lifecycle(createContainer('fs-global'), async c => c.dispose());
+  const globalValues = lifecycle(createContainer(GLOBAL), async c => c.dispose());
   const windowStates = lifecycle(await app.storages('ui.window-states'), async s => s.dispose());
   const globalState = await createSavedState(globalValues, windowStates, GLOBAL, createDefaultGlobalState());
-  return new GlobalFileSystemsManagerImpl(globalValues, globalState, app, fs, windowStates, ui, actionDescriptors, injector);
+  return new GlobalFileSystemsManagerImpl(globalValues, globalState, app, fs, windowStates, ui, actionDescriptors);
 });
 
 export const FS_MANAGER = new Dependency<GlobalFileSystemsManager>('File Systems Manager');

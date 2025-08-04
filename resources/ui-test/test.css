@@ -1191,3 +1191,40 @@ body {
   border-bottom-right-radius: 3px;
   border-top-right-radius: 3px;
 }
+
+.axes {}
+
+.axes-area {
+  fill: transparent;
+}
+
+.axes:hover>.axes-area {
+  fill: rgba(90, 90, 90, 0.5);
+}
+
+.axes-label {
+  text-anchor: middle;
+  font-weight: bold;
+  font-family: arial;
+  dominant-baseline: central;
+  fill: black;
+  font-size: 14px;
+  cursor: default;
+  user-select: none;
+}
+
+.axes-label.minus {
+  fill: transparent;
+}
+
+.axes-label:hover {
+  fill: white;
+}
+
+.axes-line {
+  stroke-linecap: round
+}
+
+.axes-plus {}
+
+.axes-plus {}

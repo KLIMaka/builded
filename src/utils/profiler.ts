@@ -1,6 +1,6 @@
 import { TIMER, Timer as Timer_ } from "../app/apis/app";
-import { Dependency, Injector, Plugin, provider } from "utils/injector";
-import { getOrCreate } from "./collections";
+import { Dependency, Injector, Plugin, provider } from "ts-utils/injector";
+import { getOrCreate } from "ts-utils/collections";
 
 export const DefaultProfilerConstructor: Plugin<Profiler> = provider(async (injector: Injector) => {
   const timer = await injector.getInstance(TIMER);

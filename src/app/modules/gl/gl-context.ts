@@ -1,19 +1,19 @@
-import { createContainer, Disposable, Source, ValuesContainer } from "@utils/callbacks";
-import { getOrCreate, getOrDefault, range } from "@utils/collections";
+import { createContainer, Disposable, Source, ValuesContainer } from "ts-utils/callbacks";
+import { getOrCreate, getOrDefault, range } from "ts-utils/collections";
 import { DisposableResource, GlContext, ResourceFactory, Texture } from "@utils/gl/drawstruct";
 import { createTexture } from "@utils/gl/textures";
-import { axisSwap } from "@utils/imgutils";
-import { iter } from "@utils/iter";
-import { int, sum } from "@utils/mathutils";
-import { Stream } from "@utils/stream";
-import { Packer, Rect } from "@utils/texcoordpacker";
-import { Consumer, Function, identity, pair } from "@utils/types";
-import { NOOP_TASK_HANDLE } from "app/apis/app1";
+import { axisSwap } from "ts-utils/imgutils";
+import { iter } from "ts-utils/iter";
+import { int, sum } from "ts-utils/mathutils";
+import { Stream } from "ts-utils/stream";
+import { Packer, Rect } from "ts-utils/texcoordpacker";
+import { Consumer, Function, identity, pair } from "ts-utils/types";
+import { NOOP_TASK_HANDLE } from "ts-utils/scheduler";
 import { ArtInfoExtended, EngineContext, VoxelSwap } from "app/apis/engine";
 import { animStruct, ArtInfo } from "build/formats/art";
 import { unpackVoxelSides } from "build/formats/kvx";
 import Optional from "optional-js";
-import { begin, tuple, Work } from "../scheduler/work";
+import { begin, tuple, Work } from "ts-utils/work";
 
 export function createGlContext(): GlContext {
   const offscreen = new OffscreenCanvas(0, 0);
@@ -37,17 +37,17 @@ export type VoxelDrawData = {
   texture: WebGLTexture,
 }
 
-export type EngineTextures = {
-  readonly pal: Source<WebGLTexture>,
-  readonly plu: Source<WebGLTexture>,
-  readonly trans: Source<WebGLTexture>,
-  readonly atlas: Source<WebGLTexture>,
-  readonly infos: Source<WebGLTexture>,
-  readonly art: Source<Map<number, ArtInfoExtended>>,
-  readonly voxels: Source<Function<number, Optional<VoxelDrawData>>>,
+export type EngineTextures = Readonly<{
+  pal: Source<WebGLTexture>,
+  plu: Source<WebGLTexture>,
+  trans: Source<WebGLTexture>,
+  atlas: Source<WebGLTexture>,
+  infos: Source<WebGLTexture>,
+  art: Source<Map<number, ArtInfoExtended>>,
+  voxels: Source<Function<number, Optional<VoxelDrawData>>>,
 
   get(picnum: number, additional?: number): Source<number>,
-} & Disposable;
+}> & Disposable;
 
 type AtlasRect = { rect: Rect, depth: number, uploaded: boolean }
 
@@ -178,7 +178,6 @@ function getVoxel(picnum: number, cache: Map<number, [number, DisposableResource
     const WIDTH = 1024;
     const w = WIDTH;
     const h = Math.ceil((voxels.length + 1 + quadPixels) / WIDTH);
-    console.log(`Creating voxel texture for ${picnum} with ${quads} quads, ${voxels.length} voxels, ${quadPixels} pixels, ${w}x${h}`);
     const texData = new Uint32Array(w * h * 4);
     texData.set([data.xpivot, data.ypivot, data.zpivot, quadPixels + 1]);
     voxels.map((v, i) => unpackVoxelSides(v.sides).map(s => i | (s << 28))).flat().forEach((v, i) => texData[4 + i] = v);

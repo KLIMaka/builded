@@ -1,6 +1,6 @@
-import { Source, Value, ValuesContainer } from "@utils/callbacks";
+import { Source, Value, ValuesContainer } from "ts-utils/callbacks";
 import { GridController } from "app/apis/engine";
-import { clamp, cyclic } from "../../../utils/mathutils";
+import { clamp, cyclic } from "ts-utils/mathutils";
 
 const GRID_SIZES = [16, 32, 64, 128, 256, 512, 1024];
 class GridControllerImpl implements GridController {
@@ -25,17 +25,9 @@ class GridControllerImpl implements GridController {
     }
   }
 
-  private snapGrid(coord: number): number {
-    const gridSize = this.size.get();
-    return Math.round(coord / gridSize) * gridSize
-  }
 
   incGridSize() { this.gridSizeIdx.mod(i => cyclic(i + 1, GRID_SIZES.length)) }
   decGridSize() { this.gridSizeIdx.mod(i => cyclic(i - 1, GRID_SIZES.length)) }
-  snap(x: number, mod = 1) {
-    const gridSize = this.size.get() * mod;
-    return Math.round(x / gridSize) * gridSize
-  }
 }
 
 export function DefaultGridController(values: ValuesContainer): GridController {

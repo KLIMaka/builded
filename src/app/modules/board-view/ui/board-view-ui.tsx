@@ -1,16 +1,17 @@
 import { Column, Row, Spacer, useValue } from "@ui/commons";
-import { Source } from "@utils/callbacks";
-import { iter } from "@utils/iter";
-import { objectKeys } from "@utils/objects";
-import { Consumer } from "@utils/types";
+import { Source } from "ts-utils/callbacks";
+import { iter } from "ts-utils/iter";
+import { objectKeys } from "ts-utils/objects";
+import { Consumer } from "ts-utils/types";
 import { StateChecker } from "app/apis/actions";
 import { ArtInfoExtended, BoardContext, EngineContext } from "app/apis/engine";
 import { Board, SectorStats, SpriteStats, WallStats } from "build/board/structs";
 import { EMPTY_ENTITY, Entity, EntityType } from "build/hitscan";
 import React, { createContext, useContext, useEffect, useRef } from "react";
 import { AutoSizer } from "react-virtualized";
-import { match } from "ts-pattern";
 import { ViewPosition } from "../view";
+import { Axes } from "@ui/axes";
+import { Controller3D } from "@utils/camera/controller3d";
 
 function InfoRow(props: { label: string, value: any }) {
   return <Row className='form-row'>
@@ -127,11 +128,10 @@ function InfoPanel(props: { board: Source<Board>, ent: Source<Entity> }) {
   const ent = useValue(props.ent);
   const board = useValue(props.board);
   if (ent === EMPTY_ENTITY) return <></>
-  return match(ent.type)
-    .with(EntityType.CEILING, EntityType.FLOOR, () => <SectorInfo board={board} ent={ent} />)
-    .with(EntityType.MID_WALL, EntityType.UPPER_WALL, EntityType.LOWER_WALL, () => <WallInfo board={board} ent={ent} />)
-    .with(EntityType.SPRITE, () => <SpriteInfo board={board} ent={ent} />)
-    .otherwise(() => <></>)
+  if (ent.isSector()) return <SectorInfo board={board} ent={ent} />;
+  if (ent.isWall() || ent.isEdge()) return <WallInfo board={board} ent={ent} />;
+  if (ent.isSprite()) return <SpriteInfo board={board} ent={ent} />
+  return <></>;
 }
 
 function Footer(props: { board: Source<Board> }) {
@@ -144,12 +144,13 @@ function Footer(props: { board: Source<Board> }) {
   </div>
 }
 
-export function BoardViewWindow(props: { canvas: Consumer<HTMLCanvasElement>, states: StateChecker[], board: Source<Board>, ent: Source<Entity> }) {
+export function BoardViewWindow(props: { canvas: Consumer<HTMLCanvasElement>, states: StateChecker[], board: Source<Board>, ent: Source<Entity>, ctl: Controller3D }) {
   return (
     <Column>
       <Column>
         <View canvas={props.canvas} />
         <div style={{ position: 'absolute', right: 0, bottom: 0, padding: '5px', width: '200px' }} ><InfoPanel board={props.board} ent={props.ent} /></div>
+        <div style={{ position: 'absolute', left: 0, bottom: 0, padding: '5px' }} ><Axes cameraAngles={props.ctl.camera.angle} /></div>
       </Column>
       <Footer board={props.board} />
     </Column>

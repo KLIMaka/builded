@@ -1,23 +1,24 @@
 import { createActionItem } from "@ui/action-list";
 import { Row } from "@ui/commons";
 import { MenuButton } from "@ui/menu-button";
-import { initial, Source, TRANSFORM_PLACEHOLDER, ValuesContainer, ValuesMap } from "@utils/callbacks";
-import { iter } from "@utils/iter";
-import { MultiFunction, pair } from "@utils/types";
+import { initial, Source, TRANSFORM_PLACEHOLDER, ValuesContainer, ValuesMap } from "ts-utils/callbacks";
+import { iter } from "ts-utils/iter";
+import { MultiFunction, pair } from "ts-utils/types";
 import { EngineContext } from "app/apis/engine";
 import { FileSystem, FileSystemHandle, SerializedFileSystemHandle } from "app/apis/fs";
 import Optional from "optional-js";
 import React, { ReactNode } from "react";
 import { createEngineContextWork as createEngineBlood } from "../blood/blood";
-import { createEngineContextEduke32, Eduke32ModsType, GrpInfo, loadGrpInfo1 } from "../eduke32/eduke32";
+import { createEngineContextEduke32, Eduke32ModsType, loadGrpInfoFile } from "../eduke32/eduke32";
 import { stack } from "../fs/fs";
-import { Work } from "../scheduler/work";
+import { Work } from "ts-utils/work";
+import { GrpInfo } from "../eduke32/defs";
 
 export type EngineContextRecord = {
   name: string,
   type: string,
   fileSystems: SerializedFileSystemHandle[],
-  mods: Object,
+  mods: object,
 }
 
 export type EngineContextType<T> = {
@@ -40,7 +41,7 @@ function loadGrpFiles(fss: FileSystemHandle[]): Promise<[string, Optional<GrpInf
           .map(f => f.name)
           .filter(n => n.toLowerCase().endsWith('.grp'))
           .map(n => n.substring(0, n.length - 4))
-          .map(async n => pair(n, await loadGrpInfo1(fs, n)))
+          .map(async n => pair(n, await loadGrpInfoFile(n, await fs.read(n))))
           .await_())
         .then(i => i.collect()))
       .orElse(Promise.resolve([])));

@@ -1,29 +1,32 @@
-import { Source, ValuesContainer, createContainer } from "@utils/callbacks";
-import { getOrCreate, getOrDefault, range, rect, reverseMap } from "@utils/collections";
-import { palColorFinder } from "@utils/color";
-import { LinearInterpolator, vector3 } from "@utils/interpolator";
-import { iter } from "@utils/iter";
-import { asyncMapOptional, field } from "@utils/objects";
-import { HasSymbols, ScriptFile, boolRule, createScripFile, defaultDefine, nestedRule, number, numberRule, pushField, rule, rules, rulesInclude, set, simpleRule, stringRule, symbols, token, tuple } from "@utils/scriptfile";
-import { Stream } from "@utils/stream";
-import { Function, tuple as asTuple, first, identity, nil, second } from "@utils/types";
-import { NOOP_TASK_HANDLE } from "app/apis/app1";
+import { HasSymbols, createScripFile, defaultDefine, nestedRule, number, rules, rulesInclude, set, simpleRule, symbols, token, tuple } from "@utils/scriptfile";
 import { Aliases, ArtInfoExtended, BoardContext, BuildRor, BuildTror, EMPTY_ALIASES, EMPTY_TAGS, EngineContext, EngineSettings, GlBlend, NamedArtFile, Palette, PicTags, RorLink, VoxelSwap } from "app/apis/engine";
 import { FileSystem } from "app/apis/fs";
 import { EngineApi } from "build/board/mutations/api";
+import { isValidSectorId } from "build/board/query";
 import { Board, Sector, Sprite, Wall } from "build/board/structs";
 import { AnimationType } from "build/formats/art";
 import { VoxelData, readKvx } from "build/formats/kvx";
-import { cloneBoard, cloneSector, cloneSprite, cloneWall, loadBuildMap, newBoard, newSector, newSprite, newWall } from "build/maploader";
+import { cloneBoard, cloneSector, cloneSprite, cloneWall, loadBuildMap, newBoard, newSector, newSprite, newWall, saveBuildMap } from "build/maploader";
 import { slope } from "build/utils";
 import { vec3 } from "gl-matrix";
 import Optional from "optional-js";
 import { match } from "ts-pattern";
+import { Source, ValuesContainer, createContainer } from "ts-utils/callbacks";
+import { getOrCreate, getOrDefault, range, rect, reverseMap } from "ts-utils/collections";
+import { palColorFinder } from "ts-utils/color";
+import { LinearInterpolator, vector3 } from "ts-utils/interpolator";
+import { iter } from "ts-utils/iter";
+import { asyncMapOptional, field } from "ts-utils/objects";
+import { NOOP_TASK_HANDLE } from "ts-utils/scheduler";
+import { Stream } from "ts-utils/stream";
+import { Function, tuple as asTuple, first, identity, nil, second } from "ts-utils/types";
+import { Work, begin, tuple as tupleWork } from "ts-utils/work";
 import { createBoardModifier } from "../default/board-context-utils";
-import { loadArtWork, loadEditorPicAddons, loadMaxPluId, loadPicAddonsWork, openFile, openFileOptional } from "../default/engine-commons";
+import { loadArtWork, loadEditorPicAddons, loadMaxPluId, loadPicAddonsWork, openFileOptional } from "../default/engine-commons";
 import { DefaultGridController } from "../default/grid";
-import { EMPTY, createGrpOrZipFsArrayBuffeer as createGrpOrZipFsArrayBuffer, stack, trackFiles, trackFilesSingle } from "../fs/fs";
-import { Work, begin, tuple as tupleWork } from "../scheduler/work";
+import { stack, trackFilesSingle } from "../fs/fs";
+import { EngineDefs, GrpInfo, loadEngineDefsWork, PalDef, PluDef } from "./defs";
+import { SE_TAGS, sectorLotagText } from "./tags";
 
 function engineApi(): EngineApi<Board> {
   return { cloneBoard, cloneWall, cloneSprite, cloneSector, newWall, newSector, newSprite, newBoard };
@@ -83,165 +86,8 @@ function defaultEngineSettings(values: ValuesContainer, picnumOffset: Source<num
   })
 }
 
-type FileDef = { file: string, offset?: number };
-type VoxelDef = { picnum: number } & FileDef;
-type PalDef = { id: number, shiftleft?: number } & FileDef;
-type PluDef = { id: number, noshades?: boolean, floorpal?: boolean, copyof?: number } & FileDef;
-type GlBlendDef = { src: string, dst: string };
-type BlendDef = { id: number, forward?: GlBlendDef, reverse?: GlBlendDef } & FileDef;
-type TileFromTexture = { picnum: number, file: string, alphacut?: number, xoff?: number, yoff?: number };
-type AnimTileRange = { start: number, end: number, speed: number, anim?: number };
-type EngineDefs = {
-  root: FileSystem
-  mainGrp: FileSystem,
-  addGrp: FileSystem,
-  pals: PalDef[],
-  blends: BlendDef[],
-  plus: PluDef[],
-  voxels: VoxelDef[],
-  tiles: TileFromTexture[],
-  animTileRanges: AnimTileRange[],
-}
-
-function cloneDefs(defs: EngineDefs): EngineDefs {
-  return {
-    root: defs.root,
-    mainGrp: defs.mainGrp,
-    addGrp: defs.addGrp,
-    blends: [...defs.blends],
-    pals: [...defs.pals],
-    plus: [...defs.plus],
-    voxels: [...defs.voxels],
-    tiles: [...defs.tiles],
-    animTileRanges: [...defs.animTileRanges]
-  }
-}
-
-async function loadDefaultEngineDefs(values: ValuesContainer, root: Source<FileSystem>, mainGrp: Source<FileSystem>): Promise<Source<EngineDefs>> {
-  const load = async ([root, mainGrp]: [FileSystem, FileSystem]): Promise<EngineDefs> => {
-    const fs = stack(root, mainGrp);
-    const voxels: VoxelDef[] = [];
-    const plus: PluDef[] = [];
-    const pals: PalDef[] = [];
-    const blends: BlendDef[] = [];
-    const addGrp = EMPTY;
-    const tiles: TileFromTexture[] = [];
-    const animTileRanges = [];
-    await fs.read('palette.dat').then(o => o.ifPresent(ab => {
-      pals.push({ id: 0, file: 'palette.dat', shiftleft: 2 });
-      plus.push({ id: 0, file: 'palette.dat', offset: 0x300 + 2 })
-      blends.push({ id: 0, file: 'palette.dat', offset: 0x300 + 2 + 32 * 0x100 });
-    }));
-    await fs.read('lookup.dat').then(o => o.ifPresent(ab => {
-      const stream = new Stream(ab);
-      const size = stream.readUByte();
-      for (let i = 1; i <= size; i++) {
-        const id = stream.readUByte();
-        plus.push({ id, file: 'lookup.dat', offset: stream.mark(), noshades: true });
-        stream.skip(0x100);
-      }
-    }));
-    return { root, mainGrp, addGrp, plus, voxels, pals, blends, tiles, animTileRanges }
-  }
-  const files = ['palette.dat', 'lookup.dat'];
-  return values.transformedAsyncTuple('default-engine-defs', [root, mainGrp], load, nil(), trackFiles(files, first, load))
-}
-
-async function openGrp(values: ValuesContainer, fs: Source<FileSystem>, grpName: String): Promise<Source<FileSystem>> {
-  const fn = `${grpName}.grp`;
-  const file = await openFile(values, fn, fs);
-  return values.transformedAsync(fn, file, async ab => createGrpOrZipFsArrayBuffer(ab));
-}
-
-function loadEngineDefsWork(grpName: String, values: ValuesContainer): Work<[Source<FileSystem>, Source<GrpInfo>], [Source<EngineDefs>]> {
-  const files = new Set<string>();
-
-  function loadWork(grpInfo: GrpInfo, defs: EngineDefs): Work<[], [EngineDefs]> {
-    files.clear();
-    let fs = stack(defs.root, defs.mainGrp);
-    const loadGrp = async (sf: ScriptFile, defs: EngineDefs, fn: string): Promise<void> => {
-      await begin()
-        .then(`Loading ${fn}`, async () => defs.root.read(fn))
-        .then(`Processing ${fn}`, async opt => asyncMapOptional(opt, ab => createGrpOrZipFsArrayBuffer(ab))
-          .then(o => o.ifPresent(grp => {
-            defs.addGrp = stack(grp, defs.addGrp);
-            fs = stack(defs.addGrp, fs);
-            files.add(fn);
-          })))
-        .finish()(sf.taskHandle);
-    }
-    const glBlendRule = rules<GlBlendDef>(
-      simpleRule(['src'], tuple(token), set('src')),
-      simpleRule(['dst'], tuple(token), set('dst')));
-    const engineDefsRule = rulesInclude(inc => fs.read(inc), files,
-      rule(['loadgrp'], tuple(token), loadGrp),
-      nestedRule(['palookup'], tuple(number), (_, id) => ({ id }), pushField('plus'), rules<PluDef>(
-        nestedRule(['raw'], tuple(), identity(), nil(), rules(
-          stringRule('file'),
-          numberRule('offset'),
-          boolRule('noshades'))),
-        simpleRule(['copy'], tuple(number), set('copyof')),
-        boolRule('floorpal')
-      )),
-      nestedRule(['voxel'], tuple(token), (_, file) => ({ file }), pushField('voxels'), rules<VoxelDef>(
-        simpleRule(['tile', 'tile0'], tuple(number), set('picnum')))),
-      nestedRule(['basepalette'], tuple(number), (_, id) => ({ id }), pushField('pals'), rules<PalDef>(
-        nestedRule(['raw'], tuple(), identity(), nil(), rules(
-          stringRule('file'),
-          numberRule('offset'),
-          numberRule('shiftleft')
-        )))),
-      nestedRule(['tilefromtexture'], tuple(number), (_, picnum) => ({ picnum }), pushField('tiles'), rules<TileFromTexture>(
-        stringRule('file', 'name'),
-        numberRule('xoff', 'xoffset'),
-        numberRule('yoff', 'yoffset'),
-        numberRule('alphacut'),
-      )),
-      simpleRule(['definetexture'], tuple(number, number, number, number, number, number, token), (def, picnum, _1, _2, _3, _4, _5, file) => def.tiles.push({ picnum, file })),
-      simpleRule(['animtilerange'], tuple(number, number, number, number), (c, start, end, speed, anim) => c.animTileRanges.push({ start, end, speed, anim })),
-      nestedRule(['blendtable'], tuple(number), (_, id) => ({ id }), pushField('blends'), rules<BlendDef>(
-        nestedRule(['raw'], tuple(), identity(), nil(), rules(
-          stringRule('file'),
-          numberRule('offset')
-        )),
-        nestedRule(['glblend'], tuple(), identity(), nil(), rules(
-          nestedRule(['both', 'forward'], tuple(), _ => ({}), set('forward'), glBlendRule),
-          nestedRule(['reverse'], tuple(), _ => ({}), set('reverse'), glBlendRule)
-        )))));
-
-    return !grpInfo.defname
-      ? tupleWork(async () => defs)
-      : begin()
-        .thenPass('Loading def File', () => fs.read(grpInfo.defname))
-        .thenWork(tupleWork((handle, defFile) =>
-          defFile
-            .map(def => createScripFile(grpInfo.defname, def, handle).parse(cloneDefs(defs), engineDefsRule))
-            .orElse(Promise.resolve(defs))))
-        .finish();
-  }
-
-  let loadHandle = NOOP_TASK_HANDLE;
-  async function load([defs, grpInfo]: [EngineDefs, GrpInfo]): Promise<EngineDefs> {
-    return first(await loadWork(grpInfo, defs)(loadHandle))
-  }
-
-  return begin()
-    .multiInput<[Source<FileSystem>, Source<GrpInfo>]>()
-    .thenPass('Open Grp', async (fs, grpInfo) => openGrp(values, fs, grpName))
-    .thenPass('Loading default defs', async (fs, grpInfo, mainGrp) => loadDefaultEngineDefs(values, fs, mainGrp))
-    .thenWork(tupleWork(async (handle, fs, grpInfo, mainGrp, defs) => {
-      loadHandle = handle;
-      const value = await values.transformedAsyncTuple('engine-defs', [defs, grpInfo], load, nil(), trackFiles(files, ([defs, _]) => defs.root, load));
-      loadHandle = NOOP_TASK_HANDLE;
-      return value;
-    })).finish()
-}
-
-export type GrpInfo = { name?: string, defname?: string }
-export async function loadGrpInfo1(fs: FileSystem, grpName: string): Promise<Optional<GrpInfo>> {
-  const fileName = `${grpName}.grpinfo`;
-  const o = await fs.read(fileName);
-  return asyncMapOptional(o, ab =>
+export async function loadGrpInfoFile(fileName: string, file: Optional<ArrayBuffer>): Promise<Optional<GrpInfo>> {
+  return asyncMapOptional(file, ab =>
     createScripFile(fileName, ab)
       .parse<GrpInfo>({}, rules(
         nestedRule(['grpinfo'], tuple(), identity(), nil(), rules<GrpInfo>(
@@ -253,13 +99,8 @@ export async function loadGrpInfo1(fs: FileSystem, grpName: string): Promise<Opt
 async function loadGrpInfo(values: ValuesContainer, fs: Source<FileSystem>, grpName: string): Promise<Source<GrpInfo>> {
   const fileName = `${grpName}.grpinfo`;
   const file = await openFileOptional(values, fileName, fs);
-  return values.transformedAsync('grpinfo', file, o =>
-    asyncMapOptional(o, ab =>
-      createScripFile(fileName, ab).parse<GrpInfo>({}, rules(
-        nestedRule(['grpinfo'], tuple(), identity(), nil(), rules<GrpInfo>(
-          simpleRule(['name'], tuple(token), set('name')),
-          simpleRule(['defname'], tuple(token), set('defname')))))))
-      .then(o => o.orElse({ name: "Duke Nukem 3D", defname: `${grpName}.def` })))
+  return values.transformedAsync('grpinfo', file, o => loadGrpInfoFile(fileName, o)
+    .then(o => o.orElse({ name: "Duke Nukem 3D", defname: `${grpName}.def` })))
 }
 
 function remapPal(basePlu: Uint8Array, remap: Uint8Array): Uint8Array {
@@ -430,71 +271,6 @@ function loadBlends(values: ValuesContainer, defs: Source<EngineDefs>): Source<F
   });
 }
 
-function sectorLotagText(lotag: number) {
-  switch (lotag) {
-    case 1: return "WATER";
-    case 2: return "UNDERWATER";
-    case 9: return "STAR TREK DOORS";
-    case 15: return "ELEVATOR TRANSPORT (SE 17)";
-    case 16: return "ELEVATOR PLATFORM DOWN";
-    case 17: return "ELEVATOR PLATFORM UP";
-    case 18: return "ELEVATOR DOWN";
-    case 19: return "ELEVATOR UP";
-    case 20: return "CEILING DOOR";
-    case 21: return "FLOOR DOOR";
-    case 22: return "SPLIT DOOR";
-    case 23: return "SWING DOOR (SE 11)";
-    case 25: return "SLIDE DOOR (SE 15)";
-    case 26: return "SPLIT STAR TREK DOOR";
-    case 27: return "BRIDGE (SE 20)";
-    case 28: return "DROP FLOOR (SE 21)";
-    case 29: return "TEETH DOOR (SE 22)";
-    case 30: return "ROTATE RISE BRIDGE";
-    case 31: return "2 WAY TRAIN (SE=30)";
-    case 32767: return "SECRET AREA";
-    case 65535: return "END OF LEVEL";
-    default: if (lotag > 10000 && lotag < 32767) return "1 TIME SOUND";
-  }
-  return "";
-}
-
-const SE_TAGS = [
-  "ROTATED SECTOR",                // 0
-  "ROTATION PIVOT",
-  "EARTHQUAKE",
-  "RANDOM LIGHTS AFTER SHOT OUT",
-  "RANDOM LIGHTS",
-  "(UNKNOWN)",                     // 5
-  "SUBWAY",
-  "TRANSPORT",
-  "RISING DOOR LIGHTS",
-  "LOWERING DOOR LIGHTS",
-  "DOOR CLOSE DELAY",              // 10
-  "SWING DOOR PIVOT (ST 23)",
-  "LIGHT SWITCH",
-  "EXPLOSIVE",
-  "SUBWAY CAR",
-  "SLIDE DOOR (ST 25)",            // 15
-  "ROTATE REACTOR SECTOR",
-  "ELEVATOR TRANSPORT (ST 15)",
-  "INCREMENTAL SECTOR RISE/FALL",
-  "CEILING FALL ON EXPLOSION",
-  "BRIDGE (ST 27)",                // 20
-  "DROP FLOOR (ST 28)",
-  "TEETH DOOR (ST 29)",
-  "1-WAY TRANSPORT DESTINATION",
-  "CONVEYOR BELT",
-  "ENGINE",                        // 25
-  "(UNKNOWN)",
-  "DEMO CAMERA",
-  "LIGHTNING (4890) CONTROLLER",
-  "FLOAT",
-  "2 WAY TRAIN (ST 31)",           // 30
-  "FLOOR Z",
-  "CEILING Z",
-  "EARTHQUAKE DEBRIS",
-];
-
 function getTror(board: Board): BuildTror {
   const sectorByCeilingBunch = iter(board.sectors)
     .enumerate()
@@ -505,11 +281,13 @@ function getTror(board: Board): BuildTror {
     .filter(([s, _]) => s.floorstat.tror === 1)
     .group(([sec, _]) => sec.floorxpanning, ([_, s]) => s);
   const ceiling = (sectorId: number): number[] => {
+    if (!isValidSectorId(board, sectorId)) return [];
     const sec = board.sectors[sectorId];
     if (sec.ceilingstat.tror !== 1) return [];
     return getOrDefault(sectorByFloorBunch, sec.ceilingxpanning, []);
   }
   const floor = (sectorId: number): number[] => {
+    if (!isValidSectorId(board, sectorId)) return [];
     const sec = board.sectors[sectorId];
     if (sec.floorstat.tror !== 1) return [];
     return getOrDefault(sectorByCeilingBunch, sec.floorxpanning, []);
@@ -563,7 +341,7 @@ function defaultParallaxPicnums(picnum: number): number {
 
 function createloadBoard(values: ValuesContainer): Function<Stream, Promise<BoardContext>> {
   let boardId = 1;
-  return async (stream: Stream): Promise<BoardContext> => {
+  return async (stream: Stream, name?: string): Promise<BoardContext> => {
     const boardValues = values.createChild(`board-${boardId++}`);
     const board = boardValues.value('board', loadBuildMap(stream));
     const ror = getRor(board.get());
@@ -571,9 +349,10 @@ function createloadBoard(values: ValuesContainer): Function<Stream, Promise<Boar
     const spritesBySectorMap = iter(board.get().sprites).map(field('sectnum')).enumerate().group(first, second);
     const spritesBySector = (sectorId: number) => getOrDefault(spritesBySectorMap, sectorId, []);
     const grid = DefaultGridController(values);
+    const save = async () => saveBuildMap(board.get())
     const dispose = async () => boardValues.dispose();
 
-    return { board, ror, tror, parallaxPicnums: 8, spritesBySector, ...createBoardModifier<Board>(board), grid, dispose };
+    return { name, board, ror, tror, parallaxPicnums: 8, spritesBySector, ...createBoardModifier<Board>(board), save, grid, dispose };
   }
 }
 
@@ -587,7 +366,7 @@ export const createEngineContextEduke32 = begin()
     createContainer('eduke32-module').initializeAsync(values => begin()
       .thenPass('Loading GrpInfo', () => loadGrpInfo(values, fs, grpName))
       .thenWorkPass((handle, grpInfo) => loadEngineDefsWork(grpName, values)(handle, fs, grpInfo))
-      .thenPass('Loading Resources', async (_, defs) => values.transformed('resources', defs, defs => stack(stack(defs.addGrp, defs.mainGrp), defs.root)))
+      .thenPass('Loading Resources', async (_, defs) => values.transformed('resources', defs, defs => stack(defs.root, stack(defs.addGrp, defs.mainGrp))))
       .forkPass(p => p
         .thread('Loading Pal', (_, defs, res) => loadPal(values, defs, res))
         .thread('Loading Trans', (_, defs, res) => loadTrans(values, defs, res))

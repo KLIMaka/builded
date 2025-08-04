@@ -1,13 +1,13 @@
-import { Source, Value, ValuesContainer, arrayEq } from '@utils/callbacks';
+import { Source, Value, ValuesContainer, arrayEq } from 'ts-utils/callbacks';
 import { mat4, vec3 } from 'gl-matrix';
-import { deg2rad, monoatan2, rad2deg } from '../mathutils';
+import { deg2rad, monoatan2, rad2deg } from 'ts-utils/mathutils';
 
 export class Camera {
   readonly transform: Source<mat4>;
   readonly position: Value<vec3>;
   readonly forward: Source<vec3>;
   readonly side: Source<vec3>;
-  private angle: Value<[number, number]>;
+  readonly angle: Value<[number, number]>;
 
   constructor(values: ValuesContainer, x: number, y: number, z: number, ax: number, ay: number) {
     this.position = values.valueBuilder<vec3>({ name: 'position', value: vec3.fromValues(x, y, z), eq: vec3.exactEquals });

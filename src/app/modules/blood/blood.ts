@@ -1,9 +1,9 @@
-import { createContainer, Source, ValuesContainer } from "@utils/callbacks";
-import { EMPTY_COLLECTION, getOrCreate, getOrDefault } from "@utils/collections";
-import { iter } from "@utils/iter";
-import { field } from "@utils/objects";
-import { Stream } from "@utils/stream";
-import { first, Function, second } from "@utils/types";
+import { EMPTY_COLLECTION, getOrCreate, getOrDefault } from "ts-utils/collections";
+import { createContainer, Source, ValuesContainer } from "ts-utils/callbacks";
+import { iter } from "ts-utils/iter";
+import { field } from "ts-utils/objects";
+import { Stream } from "ts-utils/stream";
+import { first, Function, second } from "ts-utils/types";
 import { BoardContext, BuildRor, BuildTror, EMPTY_ALIASES, EMPTY_TAGS, EngineContext, EngineSettings, GlBlend, Palette, PicTags, VoxelSwap } from "app/apis/engine";
 import { FileSystem } from "app/apis/fs";
 import { BloodBoard } from "build/blood/structs";
@@ -13,11 +13,11 @@ import { Sector, Sprite, Wall } from "build/board/structs";
 import { readKvx, VoxelData } from "build/formats/kvx";
 import { RffFile } from "build/formats/rff";
 import Optional from "optional-js";
-import { cloneBoard, cloneSector, cloneSprite, cloneWall, loadBloodMap, newBoard, newSector, newSprite, newWall } from '../../../build/blood/maploader';
+import { cloneBoard, cloneSector, cloneSprite, cloneWall, loadBloodMap, newBoard, newSector, newSprite, newWall, saveBloodMap } from '../../../build/blood/maploader';
 import { createBoardModifier } from "../default/board-context-utils";
 import { loadArtMap, loadArtWork, loadEditorPicAddons, loadMaxPluId, loadRaw, openFile, openFileOptional, packegeFs } from "../default/engine-commons";
 import { createRffFsArrayBuffer, stack, watchFile } from "../fs/fs";
-import { begin } from "../scheduler/work";
+import { begin } from "ts-utils/work";
 import { SECTOR_TAGS, SPRITE_TAGS, WALL_TAGS } from "./texts";
 import { DefaultGridController } from "../default/grid";
 
@@ -58,7 +58,7 @@ function loadTags(surfaceDat: ArrayBuffer): PicTags {
 
 function createloadBoard(values: ValuesContainer): Function<Stream, Promise<BoardContext<BloodBoard>>> {
   let boardId = 1;
-  return async (stream: Stream): Promise<BoardContext<BloodBoard>> => {
+  return async (stream: Stream, name?: string): Promise<BoardContext<BloodBoard>> => {
     const boardValues = values.createChild(`board-${boardId++}`);
     const board = boardValues.value('board', loadBloodMap(stream));
     const rorLinks = loadRorLinks(board.get());
@@ -68,9 +68,10 @@ function createloadBoard(values: ValuesContainer): Function<Stream, Promise<Boar
     const spritesBySector = (sectorId: number) => getOrDefault(spritesBySectorMap, sectorId, []);
     const parallaxPicnums = Math.pow(2, board.get().parallaxSize);
     const grid = DefaultGridController(values);
+    const save = async () => saveBloodMap(board.get());
     const dispose = async () => boardValues.dispose();
 
-    return { board, ror, tror, parallaxPicnums, spritesBySector, ...createBoardModifier<BloodBoard>(board), grid, dispose };
+    return { name, board, ror, tror, parallaxPicnums, spritesBySector, ...createBoardModifier<BloodBoard>(board), grid, save, dispose };
   }
 }
 
@@ -78,9 +79,9 @@ function engineSettings(values: ValuesContainer, off: Source<number>): Source<En
   return values.transformed('settings', off, off => {
     const trans1 = 0.66;
     const trans2 = 0.33;
-    const lotagSectorText = (sector: Sector) => SECTOR_TAGS.get(sector.lotag) ?? '';
-    const lotagSpriteText = (sprite: Sprite) => SPRITE_TAGS.get(sprite.lotag) ?? '';
-    const lotagWallText = (wall: Wall) => WALL_TAGS.get(wall.lotag) ?? '';
+    const lotagSectorText = (sector: Sector) => getOrDefault(SECTOR_TAGS, sector.lotag, '');
+    const lotagSpriteText = (sprite: Sprite) => getOrDefault(SPRITE_TAGS, sprite.lotag, '');
+    const lotagWallText = (wall: Wall) => getOrDefault(WALL_TAGS, wall.lotag, '');
     return { spriteShadowOff: true, trans1, trans2, lotagSectorText, lotagSpriteText, lotagWallText, fontPicnum: off + 1, pointPicnum: off };
   });
 }

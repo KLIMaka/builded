@@ -1,5 +1,5 @@
-import { Dependency } from "@utils/injector";
-import { BiFunction, Consumer, Supplier } from "@utils/types";
+import { Dependency } from "ts-utils/injector";
+import { BiFunction, Consumer, Supplier } from "ts-utils/types";
 import Optional from "optional-js";
 import { Action, ActionDescriptors, ActionHandler, ActionsProvider } from "./actions";
 import { Disconnector } from "./app1";

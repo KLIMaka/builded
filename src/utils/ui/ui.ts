@@ -1,4 +1,4 @@
-import { Consumer } from "@utils/types";
+import { Consumer } from "ts-utils/types";
 
 
 export class Element {

@@ -1,6 +1,6 @@
-import { Consumer } from "@utils/types";
+import { Consumer } from "ts-utils/types";
 import { App, BatchTask, DelayedTask, FrameTask, Logger, PeriodicTask, Timer } from "../../../apis/app1";
-import { DefaultScheduler } from "../../scheduler/scheduler";
+import { DefaultScheduler } from "ts-utils/scheduler";
 import { DefaultLogger } from "./logger";
 import { DefaultStorages } from "./storage";
 
@@ -114,6 +114,6 @@ export function DefaultApp(appName: string): App {
   const logger = DefaultLogger();
   const timer = createTimer(logger);
   const storages = DefaultStorages(appName);
-  const scheduler = DefaultScheduler(requestAnimationFrame, timer, logger);
+  const scheduler = DefaultScheduler(requestAnimationFrame, timer.now, err => logger.log('ERROR', err));
   return { logger, timer, storages, scheduler };
 }

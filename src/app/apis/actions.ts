@@ -1,6 +1,6 @@
-import { Source } from "@utils/callbacks";
-import { Dependency } from "@utils/injector";
-import { Consumer, Supplier } from "@utils/types";
+import { Source } from "ts-utils/callbacks";
+import { Dependency } from "ts-utils/injector";
+import { Consumer, Supplier } from "ts-utils/types";
 import { Bind } from "app/input/keymap";
 import Optional from "optional-js";
 

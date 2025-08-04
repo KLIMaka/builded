@@ -1,5 +1,5 @@
-import { Value } from "@utils/callbacks";
-import { Supplier } from "@utils/types";
+import { Value } from "ts-utils/callbacks";
+import { Supplier } from "ts-utils/types";
 import { Property, PropertySection } from "app/modules/painter/api";
 import { listBuilder } from "app/modules/ui/builders";
 import { Block, Ui, clazz } from "../../app/apis/ui";

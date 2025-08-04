@@ -1,6 +1,6 @@
-import { Source, Value, ValuesContainer } from '@utils/callbacks';
+import { Source, Value, ValuesContainer } from 'ts-utils/callbacks';
 import { mat4, vec2, vec3 } from 'gl-matrix';
-import { deg2rad } from 'utils/mathutils';
+import { deg2rad } from 'ts-utils/mathutils';
 import { Camera } from './camera';
 
 const invertTrans = mat4.create();

@@ -1,4 +1,4 @@
-import { struct, bits, ushort, int, short, byte, ubyte, uint, Stream, array, bit } from '../utils/stream';
+import { struct, bits, ushort, int, short, byte, ubyte, uint, Stream, array, bit } from 'ts-utils/stream';
 import { SectorStats, Sector, WallStats, Wall, SpriteStats, Sprite, Board, FACE_SPRITE } from './board/structs';
 import { ZSCALE } from './utils';
 
@@ -151,7 +151,7 @@ export function saveBuildMap(board: Board): ArrayBuffer {
   const buffer = new ArrayBuffer(size);
   const stream = new Stream(buffer);
   boardStruct.write(stream, board);
-  fixSectorSlopes(board);
+  // fixSectorSlopes(board);
   ushort.write(stream, board.numsectors);
   array(sectorStruct, board.numsectors).write(stream, board.sectors);
   ushort.write(stream, board.numwalls);
@@ -182,6 +182,9 @@ export function initWallStats() {
   stat.xflip = 0;
   stat.yflip = 0;
   stat.unk13 = stat.unk14 = stat.unk15 = 0;
+  stat.rotate90 = 0;
+  stat.yaxDownWall = 0;
+  stat.yaxUpWall = 0;
   return stat;
 }
 
@@ -225,6 +228,7 @@ export function initSectorStats() {
   stat.blocking = 0;
   stat.hitscan = 0;
   stat.unk12 = stat.unk13 = stat.unk14 = 0;
+  stat.floorShade = 0;
   return stat;
 }
 

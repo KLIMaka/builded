@@ -1,8 +1,8 @@
-import { Dependency } from "@utils/injector";
-import { Function, Result, Supplier } from "@utils/types";
+import { Dependency } from "ts-utils/injector";
+import { Function, Result, Supplier } from "ts-utils/types";
 import Optional from "optional-js";
 import { Disconnector } from "./app1";
-import { Disposable } from "@utils/callbacks";
+import { Disposable } from "ts-utils/callbacks";
 
 export type FileInfo = {
   name: string,
@@ -40,8 +40,8 @@ export type FileSystemHandle = {
   isSameEntry: Function<FileSystemHandle, Promise<boolean>>
   serialized: SerializedFileSystemHandle
 }
-
 export interface FileSystems {
+
   deserialize(serialized: SerializedFileSystemHandle): FileSystemHandle;
   pickHandle(src: SerializedFileSystemHandle['type']): Promise<Optional<FileSystemHandle>>;
 }

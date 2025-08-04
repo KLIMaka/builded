@@ -1,5 +1,5 @@
-import { createContainer, Source, Value } from "@utils/callbacks";
-import { Consumer } from "@utils/types";
+import { createContainer, Source, Value } from "ts-utils/callbacks";
+import { Consumer } from "ts-utils/types";
 import { ActionDescriptors } from "app/apis/actions";
 import { Ui } from "app/apis/ui1";
 import Optional from "optional-js";

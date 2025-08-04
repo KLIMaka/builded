@@ -1,6 +1,8 @@
-import { Disposable, Source, Value, ValuesContainer } from "@utils/callbacks";
-import { Consumer, Function, seq } from "@utils/types";
-import { Action, ActionDescriptor, ActionDescriptors, StateChecker } from "app/apis/actions";
+import { Disposable, Source, Value, ValuesContainer, ValuesMap } from "ts-utils/callbacks";
+import { getOrCreate } from "ts-utils/collections";
+import { Id, UniqueIds } from "ts-utils/objects";
+import { Consumer, Function, seq, Supplier } from "ts-utils/types";
+import { Action, ActionDescriptors, StateChecker } from "app/apis/actions";
 import { Disconnector } from "app/apis/app1";
 import { Window } from "app/apis/ui1";
 import Optional from "optional-js";
@@ -42,41 +44,86 @@ class WindowImpl implements Window {
   isModal(): boolean {
     return this.builder.props.modal ?? false;
   }
+}
 
-  getId(): string {
-    return this.builder.id;
-  }
+export type WindowSavedState = {
+  position: SizeType,
+  size: SizeType,
 }
 
 export type SizeType = [number | string, number | string];
+const uniqueIds = new Map<string, UniqueIds>();
 export class WindowBuilder {
+  uniqueId: Id;
+  uniqueName: string;
   props: WinBoxPropType = {};
-  _size: Value<SizeType>;
-  _position: Value<SizeType>;
+  _size: Supplier<Value<SizeType>>;
+  _position: Supplier<Value<SizeType>>;
   _actions: Action[] = [];
   _states: StateChecker[] = [];
   _onClose = new Set<Consumer<boolean>>();
   _onFocus = new Set<Consumer<void>>();
 
   constructor(
-    public id: string,
+    public name: string,
     public actionDescriptors: ActionDescriptors,
     public values: ValuesContainer,
   ) {
-    this._size = values.value('size', [800, 800]);
-    this.props.width = this._size.get()[0];
-    this.props.height = this._size.get()[1];
-    this._position = values.value('positions', ['center', 'center']);
-    this.props.x = this._position.get()[0];
-    this.props.y = this._position.get()[1];
-    this.props.onResize = (w, h) => this._size.modImmer(d => { d[0] = w; d[1] = h });
-    this.props.onMove = (x, y) => this._position.modImmer(d => { d[0] = x; d[1] = y });
+    this.uniqueId = getOrCreate(uniqueIds, name, _ => new UniqueIds()).get();
+    this.values.addDisposable(this.uniqueId);
+    this.uniqueName = `${this.name}-${this.uniqueId.value}`;
+    const sizeValue = values.value<SizeType>('size', [800, 800]);
+    this._size = () => sizeValue;
+    this.props.width = 800;
+    this.props.height = 800;
+    const positionValue = values.value<SizeType>('positions', ['center', 'center'])
+    this._position = () => positionValue;
+    this.props.x = 'center';
+    this.props.y = 'center';
+    this.props.onResize = (w, h) => this._size().modImmer(d => { d[0] = w; d[1] = h });
+    this.props.onMove = (x, y) => this._position().modImmer(d => { d[0] = x; d[1] = y });
     this.props.onClose = forece => this._onClose.forEach(h => h(forece));
     this.props.onFocus = () => this._onFocus.forEach(h => h());
   }
 
+  state<T extends WindowSavedState>(def: ValuesMap<T>): this {
+    this.sizeValue(def.get('size'));
+    this.positionValue(def.get('position'));
+    return this;
+  }
+
+  position(x: number | string, y: number | string): this {
+    this._position().set([x, y]);
+    this.props.x = x;
+    this.props.y = y;
+    return this;
+  }
+
+  private positionValue(position: Value<SizeType>): this {
+    this._position = () => position;
+    const [x, y] = position.get();
+    this.props.x = x;
+    this.props.y = y;
+    return this;
+  }
+
+  size(w: number, h: number): this {
+    this.props.width = w;
+    this.props.height = h;
+    this._size().set([w, h]);
+    return this;
+  }
+
+  private sizeValue(size: Value<SizeType>): this {
+    this._size = () => size;
+    const [w, h] = size.get();
+    this.props.width = w;
+    this.props.height = h;
+    return this;
+  }
+
   titleFromId(): this {
-    this.props.title = this.actionDescriptors.get(this.id).label().orElse(this.id);
+    this.props.title = this.actionDescriptors.get(this.name).label().orElse(this.name);
     return this;
   }
 
@@ -85,39 +132,8 @@ export class WindowBuilder {
     return this;
   }
 
-  position(x: number | string, y: number | string): this {
-    this._position.set([x, y]);
-    this.props.x = x;
-    this.props.y = y;
-    return this;
-  }
-
-
-  positionValue(position: Value<SizeType>): this {
-    this._position = position;
-    const [x, y] = position.get();
-    this.props.x = x;
-    this.props.y = y;
-    return this;
-  }
-
-  size(w: number, h: number): this {
-    this._size.set([w, h]);
-    this.props.width = w;
-    this.props.height = h;
-    return this;
-  }
-
-  sizeValue(size: Value<SizeType>): this {
-    this._size = size;
-    const [w, h] = size.get();
-    this.props.width = w;
-    this.props.height = h;
-    return this;
-  }
-
   action(id: string, action: Consumer<void>, enabled?: Source<boolean>): this {
-    this._actions.push(this.actionDescriptors.sub(this.id).bindSync(id, action, enabled));
+    this._actions.push(this.actionDescriptors.sub(this.name).bindSync(id, action, enabled));
     return this;
   }
 
@@ -127,7 +143,7 @@ export class WindowBuilder {
   }
 
   actionsFactory(factory: Function<ActionDescriptors, Action[]>): this {
-    return this.actions(factory(this.actionDescriptors.sub(this.id)));
+    return this.actions(factory(this.actionDescriptors.sub(this.name)));
   }
 
   states(states: StateChecker[]): this {
@@ -182,7 +198,7 @@ function WindowCommon(props: { builder: WindowBuilder, windowConsumer: Consumer<
   const winRef = useRef();
   const currentActions = useContext(CurrentActionsChannelContext);
   const actionsChannel = useContext(ActionsChannelContext);
-  const channel = actionsChannel.child(props.builder.id);
+  const channel = actionsChannel.child(props.builder.uniqueName);
 
   useEffect(() => {
     props.windowConsumer(winRef.current);

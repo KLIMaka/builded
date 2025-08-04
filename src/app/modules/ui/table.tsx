@@ -1,7 +1,7 @@
-import { Source, Value } from '@utils/callbacks';
-import { takeFirst } from '@utils/collections';
-import { clamp } from '@utils/mathutils';
-import { Function } from '@utils/types';
+import { Source, Value } from 'ts-utils/callbacks';
+import { takeFirst } from 'ts-utils/collections';
+import { clamp } from 'ts-utils/mathutils';
+import { Function } from 'ts-utils/types';
 import * as React from 'react';
 import { DragEventHandler, ReactNode, useCallback, useContext, useEffect, useRef } from 'react';
 import { AutoSizer, Column, SortDirectionType, Table, TableCellProps, TableHeaderProps, TableRowProps } from 'react-virtualized';

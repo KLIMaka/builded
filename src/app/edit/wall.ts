@@ -1,10 +1,11 @@
-import { BoardContext } from "app/apis/engine";
+import { BoardContext, EngineContext, gridSnap } from "app/apis/engine";
 import { BuildReferenceTrackerImpl } from "app/modules/default/reftracker";
 import { vec2 } from "gl-matrix";
-import { deleteWall, mergePoints, moveWall } from "../../build/board/mutations/walls";
-import { cyclic } from "../../utils/mathutils";
+import { deleteWall, fixxrepeat, mergePoints, moveWall } from "../../build/board/mutations/walls";
+import { cyclic, int } from "ts-utils/mathutils";
 import { Message, MessageHandlerReflective } from "../apis/handler";
-import { BoardInvalidate, EndMove, Flip, Move, NamedMessage, Palette, PanRepeat, SetPicnum, Shade, StartMove } from "./messages";
+import { BoardInvalidate, EndMove, Flip, Move, NamedMessage, Palette, PanRepeat, ResetPanRepeat, SetPicnum, Shade, StartMove } from "./messages";
+import { panScale } from "build/board/query";
 
 
 export class WallEnt extends MessageHandlerReflective {
@@ -12,6 +13,7 @@ export class WallEnt extends MessageHandlerReflective {
   constructor(
     private wallId: number,
     private boardCtx: BoardContext,
+    private engine: EngineContext,
     private origin = vec2.create(),
     private active = false,
     private valid = true) { super() }
@@ -27,8 +29,9 @@ export class WallEnt extends MessageHandlerReflective {
   }
 
   Move(msg: Move) {
-    let x = this.boardCtx.grid.snap(this.origin[0] + msg.dx);
-    let y = this.boardCtx.grid.snap(this.origin[1] + msg.dy);
+    const gridSize = this.boardCtx.grid.size.get();
+    const x = gridSnap(gridSize, this.origin[0] + msg.dx);
+    const y = gridSnap(gridSize, this.origin[1] + msg.dy);
     this.boardCtx.modifyBoard(`Set Wall ${this.wallId} position`, board => moveWall(board, this.wallId, x, y));
   }
 
@@ -67,19 +70,29 @@ export class WallEnt extends MessageHandlerReflective {
   }
 
   PanRepeat(msg: PanRepeat) {
-    this.boardCtx.modifyBoard(`Set Wall ${this.wallId} PanRepeat`, board => {
+    this.boardCtx.modifyBoard(`Set Wall ${this.wallId} pan/repeat`, board => {
       const wall = board.walls[this.wallId];
+      const [xs, ys] = msg.scaled ? panScale(board, this.wallId, p => this.engine.artMap.get().get(p)) : [1, 1];
       if (msg.absolute) {
-        wall.xpanning = msg.xpan;
-        wall.ypanning = msg.ypan;
+        wall.xpanning = int(msg.xpan * xs);
+        wall.ypanning = msg.ypan * ys;
         wall.xrepeat = msg.xrepeat;
         wall.yrepeat = msg.yrepeat;
       } else {
-        wall.xpanning += msg.xpan;
-        wall.ypanning += msg.ypan;
+        wall.xpanning = int(wall.xpanning + msg.xpan * xs);
+        wall.ypanning = int(wall.ypanning + msg.ypan * ys);
         wall.xrepeat += msg.xrepeat;
         wall.yrepeat += msg.yrepeat;
       }
+    })
+  }
+
+  ResetPanRepeat(_: ResetPanRepeat) {
+    this.boardCtx.modifyBoard(`Reset Wall ${this.wallId} pan/repeat`, board => {
+      const wall = board.walls[this.wallId];
+      wall.xpanning = 0;
+      wall.ypanning = 0;
+      fixxrepeat(board, this.wallId);
     })
   }
 

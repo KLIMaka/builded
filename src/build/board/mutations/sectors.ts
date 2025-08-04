@@ -1,6 +1,7 @@
+import { tuple } from "ts-utils/types";
 import { BuildReferenceTracker } from "../../../app/apis/app";
 import { track } from "../../../app/apis/referencetracker";
-import { any, chain, cyclicRange, Deck, enumerate, length, map, wrap } from "../../../utils/collections";
+import { any, chain, cyclicRange, Deck, enumerate, length, map, wrap } from "ts-utils/collections";
 import { order } from "../../utils";
 import { innerSectors, innerSectorsOfLoop, isOuterLoop, loopWalls } from "../loops";
 import { sectorOfWall } from "../query";
@@ -13,8 +14,8 @@ import { fixxrepeat } from "./walls";
 
 export function fillInnerLoop<B extends Board>(board: B, wallId: number, refs: BuildReferenceTracker, api: EngineApi<B>) {
   if (isOuterLoop(board, wallId)) throw new Error('Only inner loops can be filled');
-  if (any(loopWalls(board, wallId), w => board.walls[w].nextsector != -1)) throw new Error(`Already filled`);
-  const WALL_MAPPER = (w: number) => <[number, number]>[board.walls[w].x, board.walls[w].y];
+  if (any(loopWalls(board, wallId), w => board.walls[w].nextsector !== -1)) throw new Error(`Already filled`);
+  const WALL_MAPPER = (w: number) => tuple(board.walls[w].x, board.walls[w].y);
   const points = wrap([...map(loopWalls(board, wallId), WALL_MAPPER)]);
   createNewSector(board, points, refs, api);
 }
@@ -22,6 +23,7 @@ export function fillInnerLoop<B extends Board>(board: B, wallId: number, refs: B
 export function createInnerLoop<B extends Board>(board: B, sectorId: number, points: Iterable<[number, number]>, refs: BuildReferenceTracker, api: EngineApi<B>) {
   const sector = board.sectors[sectorId];
   const pointsLength = length(points);
+  if (pointsLength < 3) throw new Error(`Invalid createInnerLoop points count: ${pointsLength}`);
   resizeWalls(board, sectorId, sector.wallnum + pointsLength, refs);
   const wallPtr = sector.wallptr + sector.wallnum - pointsLength;
   const firstWall = board.walls[sector.wallptr];
@@ -30,7 +32,7 @@ export function createInnerLoop<B extends Board>(board: B, sectorId: number, poi
     const wall = api.cloneWall(firstWall);
     wall.x = x;
     wall.y = y;
-    wall.point2 = i == pointsLength - 1 ? wallPtr : wallPtr + i + 1;
+    wall.point2 = i === pointsLength - 1 ? wallPtr : wallPtr + i + 1;
     wall.nextsector = wall.nextwall = -1;
     board.walls[wallPtr + i] = wall;
   }
@@ -39,7 +41,7 @@ export function createInnerLoop<B extends Board>(board: B, sectorId: number, poi
 
 export function setFirstWall<B extends Board>(board: B, sectorId: number, newFirstWall: number, refs: BuildReferenceTracker) {
   const sector = board.sectors[sectorId];
-  if (sector.wallptr == newFirstWall) return;
+  if (sector.wallptr === newFirstWall) return;
   const end = sector.wallptr + sector.wallnum;
   if (newFirstWall < sector.wallptr || newFirstWall >= end) throw new Error(`Wall ${newFirstWall} not in sector ${sectorId}`);
   const loops = new Deck<Deck<Wall>>();
@@ -47,11 +49,11 @@ export function setFirstWall<B extends Board>(board: B, sectorId: number, newFir
   let currentLoop = new Deck<Wall>();
   let firstWallLoopPos = -1;
   for (let w = sector.wallptr; w < end; w++) {
-    if (w == newFirstWall) firstWallLoopPos = currentLoop.length();
+    if (w === newFirstWall) firstWallLoopPos = currentLoop.length();
     const wall = board.walls[w];
     currentLoop.push(wall);
     if (wall.point2 < w) {
-      if (firstWallLoopPos != -1) {
+      if (firstWallLoopPos !== -1) {
         for (let i of cyclicRange(firstWallLoopPos, currentLoop.length()))
           newFirstWallLoop.push(currentLoop.get(i));
         firstWallLoopPos = -1;
@@ -69,7 +71,7 @@ export function setFirstWall<B extends Board>(board: B, sectorId: number, newFir
 export function deleteLoop<B extends Board>(board: B, wallId: number, refs: BuildReferenceTracker) {
   if (isOuterLoop(board, wallId)) throw new Error('Cannot delete outer loops');
   const loop = [...loopWalls(board, wallId)];
-  if (any(loop, w => board.walls[w].nextsector != -1)) throw new Error('Cannot delete filled loop');
+  if (any(loop, w => board.walls[w].nextsector !== -1)) throw new Error('Cannot delete filled loop');
   const sectorId = sectorOfWall(board, wallId);
   moveWalls(board, sectorId, loop[0], -loop.length, refs);
 }

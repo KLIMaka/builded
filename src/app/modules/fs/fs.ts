@@ -1,8 +1,8 @@
-import { BaseValue, Source, Value, ValuesContainer } from "@utils/callbacks";
-import { getInstances, Plugin, provider } from "@utils/injector";
-import { iter } from "@utils/iter";
-import { asyncMapOptional, strcmpci as streqci } from "@utils/objects";
-import { BiFunction, Function, identity, nil, Result, resultAsync, seq, SingleTuple } from "@utils/types";
+import { BaseValue, Source, Value, ValuesContainer } from "ts-utils/callbacks";
+import { getInstances, Plugin, provider } from "ts-utils/injector";
+import { iter } from "ts-utils/iter";
+import { asyncMapOptional, strcmpci as streqci } from "ts-utils/objects";
+import { BiFunction, Function, identity, nil, Result, resultAsync, seq, SingleTuple } from "ts-utils/types";
 import { ACTION_DESCRIPTORS, ActionDescriptors } from "app/apis/actions";
 import { Ui, UI } from "app/apis/ui1";
 import { GrpFile } from "build/formats/grp";
@@ -13,8 +13,8 @@ import { match } from "ts-pattern";
 import { App, APP, Disconnector, Storage, Storages, Timer } from "../../apis/app1";
 import { DirectoryFileSystemHandle, FileFileSystemHandle, FileInfo, FileSystem, FileSystemHandle, FileSystemHandler, FileSystems, HttpFileSystemHandle, MemoryFileSystemHandle, SerializedFileSystemHandle, StackFileSystemHandle, StorageFileSystemHandle, WritableFileSystem } from "../../apis/fs";
 import { selectStorageFs } from "./ui/select-storage";
-import { getOrCreate } from "@utils/collections";
-import { Stream } from "@utils/stream";
+import { getOrCreate } from "ts-utils/collections";
+import { Stream } from "ts-utils/stream";
 
 async function pickDir(): Promise<Optional<DirectoryFileSystemHandle>> {
   try {
@@ -261,7 +261,9 @@ class StackFs extends BaseFS implements FileSystem {
   }
 
   async writable(): Promise<Optional<WritableFileSystem>> {
-    return this.top.writable()
+    const top = await this.top.writable();
+    const bottom = await this.bottom.writable();
+    return top.or(() => bottom);
   }
 
   protected firstSubscribed(): void {
@@ -288,6 +290,8 @@ class StackFs extends BaseFS implements FileSystem {
 export function stack(top: FileSystem, bottom: FileSystem) {
   return new StackFs(top, bottom);
 }
+
+
 
 class StorageFS extends BaseFS implements FileSystem, WritableFileSystem {
   constructor(
@@ -500,7 +504,7 @@ export async function createZipFsArrayBuffer(file: ArrayBuffer): Promise<FileSys
   return new ZipFS(await JSZip.loadAsync(file));
 }
 
-export async function createGrpOrZipFsArrayBuffeer(file: ArrayBuffer): Promise<FileSystem> {
+export async function createGrpOrZipFsArrayBuffer(file: ArrayBuffer): Promise<FileSystem> {
   const stream = new Stream(file);
   return (stream.readByteString(12) === 'KenSilverman')
     ? createGrpFsArrayBuffer(file)

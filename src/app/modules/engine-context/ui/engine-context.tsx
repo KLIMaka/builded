@@ -2,29 +2,31 @@ import { ActionItem, ActionList, createActionItem } from "@ui/action-list";
 import { ActionButton, ActionDescriptorsContext, Button, Column, Row, Tabs, useValue, useValuesContainer } from "@ui/commons";
 import { info } from "@ui/message-box";
 import { SizeType, WindowBuilder } from "@ui/windows-common";
-import { createContainer, disposable, Disposable, Source, Value, ValuesContainer, ValuesMap } from "@utils/callbacks";
+import { createContainer, disposable, Disposable, Source, Value, ValuesContainer, ValuesMap } from "ts-utils/callbacks";
 import { GL_CONTEXT, GlContext } from "@utils/gl/drawstruct";
-import { getInstances, Injector } from "@utils/injector";
-import { iter } from "@utils/iter";
-import { sum } from "@utils/mathutils";
-import { size } from "@utils/size";
-import { nil, Ok } from "@utils/types";
+import { getInstances, Injector } from "ts-utils/injector";
+import { iter } from "ts-utils/iter";
+import { sum } from "ts-utils/mathutils";
+import { size } from "ts-utils/size";
+import { first, nil, Ok } from "ts-utils/types";
 import { ACTION_DESCRIPTORS, ActionDescriptors } from "app/apis/actions";
-import { App, APP, ProgressInfo, TaskController, TaskValue } from "app/apis/app1";
+import { ProgressInfo, TaskController, TaskHandle, TaskValue } from "ts-utils/scheduler";
 import { EngineContext, EngineContextFactory, NamedArtFile } from "app/apis/engine";
 import { FileInfo, FileSystem, FileSystems, FS } from "app/apis/fs";
 import { UI, Ui, Window } from "app/apis/ui1";
 import { createArtEditor } from "app/modules/arteditor/arteditor-model";
 import { createBoardView } from "app/modules/board-view/board-view-model";
+import { BoardRenderer3D, createRenderer3d } from "app/modules/board-view/boardRenderer3d";
 import { createSavedState } from "app/modules/default/app/storage";
 import { httpFs, stack } from "app/modules/fs/fs";
 import { createEngineTexturesWork, EngineTextures } from "app/modules/gl/gl-context";
-import { begin } from "app/modules/scheduler/work";
+import { begin, Work } from "ts-utils/work";
 import Optional from "optional-js";
 import React, { useContext, useRef } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { EngineContextRecord, ENGINES } from "../engine-context-api";
 import { createEngine } from "./create-engine-context";
+import { APP, App } from "app/apis/app1";
 
 const ID = 'engines-context';
 
@@ -50,6 +52,7 @@ type EngineInfo = {
   kvxFiles: Source<FileInfo[]>,
   ctx: EngineContext;
   textures: EngineTextures;
+  rendererProvider: Work<[], Source<BoardRenderer3D>>,
 } & Disposable;
 
 function createDefaultState(): SavedState {
@@ -122,8 +125,16 @@ class Editor {
               kvxLoader,
               nil(),
               (fs, maps) => fs.subscribe((name, deleted) => maps.setPromiseOrDispose(m => kvxLoader(fs))));
-            const dispose = async () => { engine.dispose(); values.dispose(); textures.dispose() }
-            return { name, arts, validArts, plus, shadowsteps, artFiles, mapFiles, kvxFiles, ctx: engine, textures, dispose, ...disposable(dispose) }
+
+            let renderer: Source<BoardRenderer3D> = undefined;
+            const rendererProvider = async (handle: TaskHandle) => {
+              if (renderer !== undefined) return renderer;
+              renderer = first(await createRenderer3d(values, this.glCtx, engine, textures)(handle));
+              return renderer;
+            };
+
+            const dispose = async () => { engine.dispose(); values.dispose(); textures.dispose(); }
+            return { name, arts, validArts, plus, shadowsteps, artFiles, mapFiles, kvxFiles, ctx: engine, textures, rendererProvider, dispose, ...disposable(dispose) }
           }).finish()(handle)))
       .finishUntuple();
 
@@ -150,15 +161,14 @@ class Editor {
       .collect())
   }
 
-  async openMap(engine: EngineContext, textures: EngineTextures, mapName: string): Promise<void> {
-    (await createBoardView(this.injector, engine, textures, mapName))
+  async openMap(engine: EngineContext, textures: EngineTextures, rendererProvider: Work<[], Source<BoardRenderer3D>>, mapName: string): Promise<void> {
+    (await createBoardView(this.injector, engine, textures, rendererProvider, mapName))
       .onErr(e => { this.app.logger.log('ERROR', e); info(this.ui, this.actionDescriptors, 'Error', e.message) })
       .onOk(w => this.ui.addWindow(w));
   }
 
   async openArtEditor(ctx: EngineContext): Promise<void> {
-    const window = await createArtEditor(this.injector, ctx);
-    this.ui.addWindow(window);
+    this.ui.addWindow(await createArtEditor(this.injector, ctx));
   }
 }
 
@@ -250,7 +260,8 @@ function MapsInfoView({ info, selectedMapIdxValue, editor }: { info: EngineInfo,
   const actionDescriptors = useContext(ActionDescriptorsContext);
   const ctx = actionDescriptors.sub(ID);
   const openMapEnabled = values.transformedTuple('openMapEnabled', [selectedMapIdxValue, mapCountValue], ([selected, count]) => selected >= 0 && selected < count);
-  const openMapActionImpl = values.transformedTuple('openMapAction', [selectedMapIdxValue, info.mapFiles], ([selected, mapFiles]) => () => editor.openMap(info.ctx, info.textures, mapFiles[selected].name))
+  const openMapActionImpl = values.transformedTuple('openMapAction', [selectedMapIdxValue, info.mapFiles],
+    ([selected, mapFiles]) => () => editor.openMap(info.ctx, info.textures, info.rendererProvider, mapFiles[selected].name));
   const openMapAction = ctx.bind('open-map', async () => openMapActionImpl.get()(), openMapEnabled);
 
   return <Column className='form-panel'>
@@ -373,20 +384,23 @@ function EngineContextEditorUiImpl({ editor }: { editor: Editor }) {
   </Column>
 }
 
-
+let globalWindow: Window;
 export async function createEngines(injector: Injector): Promise<Window> {
+  if (globalWindow !== undefined) return globalWindow;
+
   const [actionDescriptors, app, ui, fs, glCtx] = await getInstances(injector, ACTION_DESCRIPTORS, APP, UI, FS, GL_CONTEXT);
   const values = createContainer(ID);
   const windowStates = await app.storages('ui.window-states');
   const state = await createSavedState(values, windowStates, ID, createDefaultState());
   const editor = new Editor(values, state, ui, actionDescriptors, fs, app, glCtx, injector);
 
-  return new WindowBuilder(ID, actionDescriptors, values)
+  globalWindow = new WindowBuilder(ID, actionDescriptors, values)
     .titleFromId()
     .minSize(400, 400)
-    .sizeValue(state.get('size'))
-    .positionValue(state.get('position'))
+    .state(state)
     .actions(Object.values(editor.actions))
     .disposable(values)
+    .onClose(() => globalWindow = undefined)
     .build(<EngineContextEditorUiImpl editor={editor} />)
+  return globalWindow;
 }

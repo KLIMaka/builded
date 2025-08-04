@@ -1,6 +1,6 @@
-import { range } from '@utils/collections';
-import { iter } from '@utils/iter';
-import { Accessor, Stream, array, atomic_array, bits, bits_signed, byte, int, short, string, struct, ubyte, uint, ushort } from '@utils/stream';
+import { range } from 'ts-utils/collections';
+import { iter } from 'ts-utils/iter';
+import { Accessor, Stream, array, atomic_array, bits, bits_signed, byte, int, short, string, struct, ubyte, uint, ushort } from "ts-utils/stream";
 import { buf } from "crc-32";
 import { Header1 } from '../board/structs';
 import { fixSectorSlopes, initSector, initSprite, initWall, sectorStats, spriteStruct, wallStruct } from '../maploader';
@@ -15,7 +15,7 @@ function encryptBuffer(buffer: Uint8Array, size: number, key: number) {
   for (let i = 0; i < size; i++) buffer[i] = buffer[i] ^ (key + i);
 }
 
-function createStream(arr: Uint8Array) {
+function createStream(arr: Uint8Array<ArrayBuffer>): Stream {
   return new Stream(arr.buffer);
 }
 
@@ -342,6 +342,7 @@ function createBoard(version: number, header1: Header1, header2: Header2, header
 }
 
 export function loadBloodMap(stream: Stream): BloodBoard {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const header = int.read(stream);
   const version = short.read(stream);
   let buf = atomic_array(ubyte, header1Struct.size).read(stream);
@@ -364,7 +365,7 @@ export function loadBloodMap(stream: Stream): BloodBoard {
   return createBoard(version, header1, header2, header3, sectors, walls, sprites);
 }
 
-function hasExtra(extra: number) { return extra != 0 && extra != 65535 }
+function hasExtra(extra: number) { return extra !== 0 && extra !== 65535 }
 
 function getSize(board: BloodBoard): number {
   const extraSectors = iter(range(0, board.numsectors)).filter(s => hasExtra(board.sectors[s].extra)).length();
@@ -435,7 +436,7 @@ function writeWalls(board: BloodBoard, stream: Stream) {
 
 function writeSectors(board: BloodBoard, stream: Stream) {
   const dec = sectorStruct.size & 0xFF;
-  fixSectorSlopes(board);
+  // fixSectorSlopes(board);
   for (let i = 0; i < board.numsectors; i++) {
     const sector = board.sectors[i];
     writeEncrypted(sectorStruct, sector, stream, dec);
@@ -463,7 +464,7 @@ function createHeader1(board: BloodBoard) {
   header1.startX = board.posx;
   header1.startY = board.posy;
   header1.startZ = board.posz;
-  header1.parallaxSize = 0;
+  header1.parallaxSize = board.parallaxSize;
   return header1;
 }
 
@@ -478,6 +479,7 @@ export function newBoard() {
   board.version = 0x0700;
   board.visibility = 800;
   board.posx = board.posy = board.posz = board.cursectnum = board.ang = 0;
+  board.parallaxSize = 0;
   return board;
 }
 

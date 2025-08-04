@@ -1,14 +1,13 @@
 import { ArtInfo } from "build/formats/art";
 import { mat4, vec4 } from "gl-matrix";
 import { nextpow2 } from "utils/mathutils";
-import { Texture } from "../../../../utils/gl/drawstruct";
+import { GlContext, Texture } from "../../../../utils/gl/drawstruct";
 import { DrawCallConsumer } from "../../../apis/renderable";
 import { BuildBuffer, createBufferFactory } from "../buffers";
 import { BuildGl } from "../buildgl";
-import { GlContext } from "../gl-context";
 import { BufferRenderable, BufferSetup, GridSetup, PointSpriteSetup, SolidSetup, WireframeSetup } from "./builders/setups";
 import { match } from "ts-pattern";
-import { disposable, Disposable } from "@utils/callbacks";
+import { disposable, Disposable } from "ts-utils/callbacks";
 
 export interface BuildersFactory extends Disposable {
   solid(hint: string): SolidBuilder;

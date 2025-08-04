@@ -1,13 +1,14 @@
+import { BiConsumer, Function } from "ts-utils/types";
 import { BuildRor, BuildTror } from "app/apis/engine";
-import { GridController } from "../../app/apis/app";
-import { any, findFirst, interpolate, intersect, range } from "../../utils/collections";
-import { LinearInterpolator } from "../../utils/interpolator";
-import { iter } from "../../utils/iter";
-import { clamp, cross2d, int, len2d } from "../../utils/mathutils";
+import { any, findFirst, interpolate, intersect, range } from "ts-utils/collections";
+import { LinearInterpolator } from "ts-utils/interpolator";
+import { iter } from "ts-utils/iter";
+import { clamp, cross2d, int, len2d } from "ts-utils/mathutils";
+import { slope } from "../utils";
 import { connectedWalls, sectorWalls } from "./loops";
 import { DEFAULT_REPEAT_RATE } from "./mutations/internal";
-import { Board } from "./structs";
-import { slope } from "build/utils";
+import { Board, Sector, Sprite, Wall } from "./structs";
+import { ArtInfo } from "build/formats/art";
 
 export function isValidWallId(board: Board, wallId: number): boolean {
   return wallId >= 0 && wallId < board.numwalls;
@@ -23,6 +24,18 @@ export function isValidSpriteId(board: Board, spriteId: number): boolean {
 
 export function wallInSector(board: Board, sectorId: number, x: number, y: number) {
   return findFirst(sectorWalls(board, sectorId), w => board.walls[w].x === x && board.walls[w].y === y).orElse(-1);
+}
+
+export function forAllWalls(board: Board, f: BiConsumer<Wall, number>) {
+  range(0, board.numwalls).forEach(w => f(board.walls[w], w));
+}
+
+export function forAllSectors(board: Board, f: BiConsumer<Sector, number>) {
+  range(0, board.numsectors).forEach(w => f(board.sectors[w], w));
+}
+
+export function forAllSprites(board: Board, f: BiConsumer<Sprite, number>) {
+  range(0, board.numsprites).forEach(w => f(board.sprites[w], w));
 }
 
 export function walllen(board: Board, wallId: number) {
@@ -60,7 +73,7 @@ export function isTJunction(board: Board, wallId: number) {
 
 const NULL_SECTOR_SET = new Set([-1]);
 export function findSectorsAtPoint(board: Board, x: number, y: number): Set<number> {
-  const sectorId = findSector(board, x, y);
+  const sectorId = findSectorBasic(board, x, y);
   if (sectorId === -1) return NULL_SECTOR_SET;
   const wallId = wallInSector(board, sectorId, x, y);
   if (wallId === -1) return new Set([sectorId]);
@@ -125,6 +138,26 @@ export function sectorOfWall(board: Board, wallId: number): number {
   }
 }
 
+function findSectorAllBasic(board: Board, x: number, y: number): number {
+  return findFirst(range(0, board.numsectors), s => inSector(board, x, y, s)).orElse(-1);
+}
+
+export function findSectorBasic(board: Board, x: number, y: number, sectorId: number = -1): number {
+  if (!isValidSectorId(board, sectorId)) return findSectorAllBasic(board, x, y);
+  const secs = new Set<number>();
+  secs.add(sectorId);
+  for (const sec of secs) {
+    const sector = board.sectors[sec];
+    if (inSector(board, x, y, sec)) return sec;
+    for (let w = 0; w < sector.wallnum; w++) {
+      const wallidx = w + sector.wallptr;
+      const wall = board.walls[wallidx];
+      if (wall.nextsector !== -1) secs.add(wall.nextsector);
+    }
+  }
+  return -1;
+}
+
 export type FindSectorResult = Readonly<{
   x: number,
   y: number,
@@ -187,7 +220,7 @@ function findSectorAll(board: Board, x: number, y: number, z: number): FindSecto
   return findFirst(range(0, board.numsectors), s => inSector(board, x, y, s)).map(sec => ({ x, y, z, sec })).orElse({ x, y, z, sec: -1 });
 }
 
-export function snapWall(board: Board, wallId: number, x: number, y: number, grid: GridController) {
+export function snapWall(board: Board, wallId: number, x: number, y: number, snap: Function<number, number>) {
   if (!isValidWallId(board, wallId)) throw new Error(`Invalid wallId: ${wallId}`);
   const wall = board.walls[wallId];
   const w1 = nextwall(board, wallId);
@@ -198,10 +231,16 @@ export function snapWall(board: Board, wallId: number, x: number, y: number, gri
   const dxt = x - wall.x;
   const dyt = y - wall.y;
   const dt = len2d(dxt, dyt) / len2d(dx, dy);
-  const t = clamp(grid.snap(dt * repeat) / repeat);
+  const t = clamp(snap(dt * repeat) / repeat);
   const xs = int(wall.x + (t * dx));
   const ys = int(wall.y + (t * dy));
   return [xs, ys];
+}
+
+export function panScale(board: Board, wallId: number, art: Function<number, ArtInfo>): [number, number] {
+  const wall = board.walls[wallId];
+  const info = art(wall.picnum);
+  return [1 / 16, 16 / info.h]
 }
 
 export function getWallBaseZ(board: Board, wallId: number, sectorId = sectorOfWall(board, wallId)): number {

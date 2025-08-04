@@ -1,4 +1,4 @@
-import { Source, Value, ValuesContainer } from "@utils/callbacks";
+import { Source, Value, ValuesContainer } from "ts-utils/callbacks";
 import { mat4, vec2, vec3 } from "gl-matrix";
 import { Camera } from "./camera";
 

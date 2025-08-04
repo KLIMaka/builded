@@ -1,28 +1,26 @@
 import { ActionItem } from "@ui/action-list";
-import { WorkplaneBuilder, WorkplaneContext, defaultWorkplaneContext, line, menuItemDescripted, workplane } from "@ui/commons";
+import { GridMove, WorkplaneBuilder, WorkplaneContext, defaultWorkplaneContext, getGridOff, line, menuItemDescripted, workplane } from "@ui/commons";
 import { SizeType, WindowBuilder } from "@ui/windows-common";
-import { Disposable, Signal, Source, Value, ValuesContainer, ValuesMap, createContainer } from "@utils/callbacks";
-import { getOrCreate, getOrDefault, prefixNotEmpty, range, takeFirst } from "@utils/collections";
-import { createCanvas, drawToCanvas, renderGrid } from "@utils/imgutils";
-import { Injector, getInstances } from "@utils/injector";
-import { iter } from "@utils/iter";
-import { clamp, cyclic } from "@utils/mathutils";
-import { Navigator, navigateList } from "@utils/navigators";
-import { Rasterizer, array, fit, palRasterizer, transform } from "@utils/pixelprovider";
-import { Consumer, Function, Predicate, Supplier, first, second } from "@utils/types";
 import { ACTION_DESCRIPTORS, Action, ActionDescriptors } from "app/apis/actions";
-import { APP, App, BatchTaskRunner } from "app/apis/app1";
+import { APP, App } from "app/apis/app1";
 import { Aliases, ArtInfoExtended, EMPTY_INFO_EXTENDED, EngineContext, NamedArtFile, Palette, PicTags } from "app/apis/engine";
 import { Window } from "app/apis/ui1";
 import { art } from "build/artraster";
 import { ArtInfo, animate } from "build/formats/art";
 import Optional from "optional-js";
 import React, { useEffect, useRef } from "react";
+import { Disposable, Signal, Source, Value, ValuesContainer, ValuesMap, createContainer } from "ts-utils/callbacks";
+import { getOrCreate, getOrDefault, prefixNotEmpty, range, takeFirst } from "ts-utils/collections";
+import { createCanvas, drawToCanvas, renderGrid } from "ts-utils/imgutils";
+import { Injector, getInstances } from "ts-utils/injector";
+import { iter } from "ts-utils/iter";
+import { clamp, cyclic } from "ts-utils/mathutils";
+import { Navigator, navigateList } from "ts-utils/navigators";
+import { Rasterizer, array, fit, palRasterizer, transform } from "ts-utils/pixelprovider";
+import { Consumer, Function, Predicate, Supplier, first, second } from "ts-utils/types";
 import { createSavedState } from "../default/app/storage";
-import { BuildGlEngineContext } from "../gl/buildgl";
 import { ArtEditorUiImpl } from "./arteditor-view";
-import { createPreviewRenderer, PreviewRenderer } from "./preview-renderer";
-import { GL_CONTEXT } from "@utils/gl/drawstruct";
+import { ArtEditor } from "./arteditor-api";
 
 const GRID_SIZES = [0, 4, 8, 16, 32, 64, 128, 256];
 const PREVIEW_SIZES = [32, 64, 100, 128, 125, 200];
@@ -71,18 +69,6 @@ export type ArtEditorActions = {
   prevPlu: Action,
   resetPlu: Action,
   toggleUpscalePreview: Action,
-}
-
-type GridMove = 'up' | 'down' | 'left' | 'right' | 'pageup' | 'pagedown';
-function getOff(move: GridMove, [cols, rows]: [number, number]): number {
-  switch (move) {
-    case "up": return -cols;
-    case "down": return cols;
-    case "left": return -1;
-    case "right": return 1;
-    case "pageup": return -cols * rows;
-    case "pagedown": return cols * rows;
-  }
 }
 
 export type RenderType = 'regular' | 'mirrored';
@@ -149,7 +135,7 @@ function filterPicnum(artFiles: Map<number, ArtInfoExtended>, query: string, tag
     .sort((l, r) => l - r);
 }
 
-export class ArtEditorImpl {
+export class ArtEditorImpl implements ArtEditor {
   readonly searchQuery: Value<string>;
   private searchHistory: Value<string[]>;
   readonly currentId: Value<number>;
@@ -171,7 +157,6 @@ export class ArtEditorImpl {
   private previewRect: Supplier<[number, number]> = () => [0, 0];
   readonly previewSize: Value<number>;
   private previewCache = new Map<number, Source<string> & Disposable>();
-  private batchRunner: BatchTaskRunner;
 
   readonly actions: ArtEditorActions;
   readonly ctx: Value<WorkplaneContext>;
@@ -187,6 +172,7 @@ export class ArtEditorImpl {
   readonly superSampleMenuOpen: Value<boolean>;
   readonly previewSizesOpen: Value<boolean>;
   readonly searchSignal: Signal;
+  private artSource: Source<[Map<number, ArtInfoExtended>, number, boolean, number]>;
 
   constructor(
     readonly values: ValuesContainer,
@@ -199,7 +185,7 @@ export class ArtEditorImpl {
     readonly plus: Source<Palette[]>,
     readonly tags: Source<PicTags>,
     private shadowsteps: Source<number>,
-    private previewRenderer: PreviewRenderer,
+    // private previewRenderer: PreviewRenderer,
     readonly aliases: Source<Aliases>
   ) {
     this.searchQuery = this.values.value('searchQuery', "");
@@ -238,9 +224,13 @@ export class ArtEditorImpl {
     this.previewSizesOpen = values.value('previewSizesOpen', false);
     this.searchSignal = values.signal();
     this.upscalePreview = this.state.get('upscalePreview');
-    this.values.addDisposable(this.batchRunner = app.timer.batchRunner(16))
+    this.artSource = values.tuple([this.artInfos, this.currentPlu, this.upscalePreview, this.previewSize]);
 
     this.animateFrame();
+  }
+
+  clickOnPicnum(picnum: number, doubleClick?: boolean): void {
+    this.currentId.set(picnum);
   }
 
   private animateFrame() {
@@ -272,7 +262,7 @@ export class ArtEditorImpl {
     const picnums = this.picnums.get();
     const idx = picnums.indexOf(current);
     if (idx === -1) this.setCurrentId(takeFirst(picnums).orElse(-1));
-    this.previewGridSize.get().ifPresent((size) => this.setCurrentId(picnums[clamp(idx + getOff(off, size), 0, picnums.length - 1)]));
+    this.previewGridSize.get().ifPresent((size) => this.setCurrentId(picnums[clamp(idx + getGridOff(off, size), 0, picnums.length - 1)]));
   }
 
   private createActions(actionDescriptors: ActionDescriptors): ArtEditorActions {
@@ -319,7 +309,7 @@ export class ArtEditorImpl {
       this.previewRect = () => [width, height];
       this.centerPic();
       return this.values.handle([this.ctxScaleOff, this.currentFrameInfo, this.superSample, this.repeat, this.currentPlu],
-        ([ctx, info, ss, repeat, plu]) => this.previewRenderer.draw(canvas, ctx, info, plu, ss, repeat)
+        ([ctx, info, ss, repeat, plu]) => {/*this.previewRenderer.draw(canvas, ctx, info, plu, ss, repeat)*/ }
       );
     });
   }
@@ -379,18 +369,21 @@ export class ArtEditorImpl {
   }
 
   getArt(picnum: number): Source<string> {
-    const renderPreview = (picnum: number, artFiles: Map<number, ArtInfoExtended>, plu: number, upscale: boolean, size: number) =>
-      new Promise<string>(ok => this.batchRunner.run(() => {
+    const renderPreview = (picnum: number, artFiles: Map<number, ArtInfoExtended>, plu: number, upscale: boolean, size: number): Promise<string> =>
+      new Promise<string>(ok => {
         const info = getOrDefault(artFiles, picnum, EMPTY_INFO_EXTENDED);
         const p = iter(this.plus.get()).first(p => p.id === plu).orElse(this.plus.get()[0]).plu;
         createCanvas(transform(fit(size - 2, size - 16, art(info), 255, upscale), c => c === 255 ? 255 : p[c]), this.rasterizer)
           .toBlob(blob => ok(URL.createObjectURL(blob)))
-      }))
-    return getOrCreate(this.previewCache, picnum, _ => this.values.transformedAsyncTupleImmediate(`artPreview_${picnum}`,
-      [this.artInfos, this.currentPlu, this.upscalePreview, this.previewSize],
-      ([art, plu, upscale, size]) => renderPreview(picnum, art, plu, upscale, size),
-      DEFAULT_PREVIEW,
-      url => { if (url !== DEFAULT_PREVIEW) URL.revokeObjectURL(url) }));
+      });
+    return getOrCreate(this.previewCache, picnum, _ =>
+      this.values.transformedAsyncBuilder({
+        name: `artPreview_${picnum}`,
+        source: this.artSource,
+        transformer: ([art, plu, upscale, size]) => renderPreview(picnum, art, plu, upscale, size),
+        initialValue: { value: DEFAULT_PREVIEW, mods: -1 },
+        disposer: url => { if (url !== DEFAULT_PREVIEW) URL.revokeObjectURL(url) }
+      }));
   }
 
   setCurrentId(picnum: number) {
@@ -519,7 +512,7 @@ export class ArtEditorImpl {
 
 export async function createArtEditor(injector: Injector, ctx: EngineContext): Promise<Window> {
   return createContainer('art-editor-model').initializeAsync(async values => {
-    const [actionDescriptors, app, glCtx] = await getInstances(injector, ACTION_DESCRIPTORS, APP, GL_CONTEXT);
+    const [actionDescriptors, app] = await getInstances(injector, ACTION_DESCRIPTORS, APP);
     const windowStates = await app.storages('ui.window-states');
     const state = await createSavedState(values, windowStates, 'art-editor', createDefaultState());
     const art = ctx.art;
@@ -529,17 +522,16 @@ export async function createArtEditor(injector: Injector, ctx: EngineContext): P
     const tags = ctx.picTags;
     const shadowsteps = ctx.shadowsteps;
     const aliases = ctx.aliases;
-    const previewRenderer = await createPreviewRenderer(values, glCtx, ctx);
-    const editor = new ArtEditorImpl(values, state, actionDescriptors, app, art, artMap, pal, plus, tags, shadowsteps, previewRenderer, aliases);
+    // const previewRenderer = await createPreviewRenderer(values, glCtx, ctx);
+    const editor = new ArtEditorImpl(values, state, actionDescriptors, app, art, artMap, pal, plus, tags, shadowsteps, aliases);
 
     return new WindowBuilder('art-editor', actionDescriptors, values)
       .titleFromId()
       .minSize(400, 400)
-      .sizeValue(state.get('size'))
-      .positionValue(state.get('position'))
+      .state(state)
       .actions(Object.values(editor.actions))
       .disposable(values)
-      .disposable(previewRenderer)
+      // .disposable(previewRenderer)
       .build(<ArtEditorUiImpl artEditor={editor} />)
   });
 }

@@ -13,7 +13,7 @@ module.exports = api => {
     }
     : {
       presets: [
-        ['@babel/preset-env', { modules: false, targets: { chrome: 100 }, loose: true }],
+        ['@babel/preset-env', { modules: false, targets: { chrome: 130 }, loose: true }],
         '@babel/preset-typescript',
         '@babel/preset-react'
       ],

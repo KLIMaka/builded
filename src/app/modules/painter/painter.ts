@@ -1,5 +1,5 @@
-import { cyclicToggler } from "@utils/objects";
-import { Consumer, Supplier, nil } from "@utils/types";
+import { cyclicToggler } from "ts-utils/objects";
+import { Consumer, Supplier, nil } from "ts-utils/types";
 import { Action, ActionDescriptors } from "app/apis/actions";
 import { Scheduler, TaskController, TaskHandle } from "app/apis/app1";
 // import { CallbackChannelImpl, transformed, value } from "../../../utils/callbacks";
@@ -15,7 +15,7 @@ import { column, listBuilder, singleActionWidget, suggestionBox, table } from ".
 import { Context, Image, PropertySection, Renderer, Value } from "./api";
 import catalog from './funcs/catalog';
 import { Workplane, WorkplaneRendererBuilder, rasterWorkplaneRenderer, renderGrid } from "./workplane";
-import { printTime } from "@utils/time";
+import { printTime } from "ts-utils/time";
 
 const GREEN_RED = new Range([0, 255, 0], [255, 0, 0], Vec3Interpolator);
 type Limiter = (r: number, g: number, b: number, a: number) => number;

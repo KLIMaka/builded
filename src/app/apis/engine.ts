@@ -1,13 +1,13 @@
-import { Disconnector, Disposable, Source } from "@utils/callbacks";
-import { EMPTY_COLLECTION, emptyMap } from "@utils/collections";
-import { Stream } from "@utils/stream";
+import { Disconnector, Disposable, Source } from "ts-utils/callbacks";
+import { EMPTY_COLLECTION, emptyMap } from "ts-utils/collections";
+import { Stream } from "ts-utils/stream";
 import { EngineApi } from "build/board/mutations/api";
-import { Board, Sector, Sprite, Wall } from "build/board/structs";
-import { ArtFile, ArtInfo, EMPTY_INFO } from "build/formats/art";
+import { Board, Sector, Sprite, Wall } from "../../build/board/structs";
+import { ArtFile, ArtInfo, EMPTY_INFO } from "../../build/formats/art";
 import { VoxelData } from "build/formats/kvx";
 import Optional from "optional-js";
 import { FileSystem } from "./fs";
-import { Consumer, Function } from "@utils/types";
+import { Consumer, Function } from "ts-utils/types";
 import { vec3 } from "gl-matrix";
 import { Draft } from "immer";
 
@@ -62,7 +62,7 @@ export type EngineContext<B extends Board = Board> = Readonly<{
   blends: Source<Function<number, GlBlend>>,
   parallaxInfo: Function<number, number>;
 
-  loadBoard(stream: Stream): Promise<BoardContext<B>>;
+  loadBoard(stream: Stream, name?: string): Promise<BoardContext<B>>;
 }> & Disposable;
 
 export type RorLink = Readonly<{
@@ -93,15 +93,20 @@ export type BuildTror = Readonly<{
   floor(sectorId: number): number[];
 }>;
 
+export function gridSnap(gridSize: number, x: number, mod = 1) {
+  const size = gridSize * mod;
+  return Math.round(x / size) * size;
+}
+
 export type GridController = Readonly<{
   size: Source<number>;
   setGridSize(size: number): void;
   incGridSize(): void;
   decGridSize(): void;
-  snap(x: number, mod?: number): number;
 }>
 
 export type BoardContext<B extends Board = Board> = Readonly<{
+  name?: string,
   board: Source<B>,
   grid: GridController,
   ror: BuildRor,
@@ -115,6 +120,7 @@ export type BoardContext<B extends Board = Board> = Readonly<{
 
   modifyBoard(msg: string, mod: Consumer<Draft<B>>): void;
   undo(): void;
+  save(): Promise<ArrayBuffer>;
 }> & Disposable;
 
 export interface EngineContextFactory<B extends Board = Board> {

@@ -1,6 +1,6 @@
 import { ActionsCollector } from "@ui/commons";
-import { Dependency } from "@utils/injector";
-import { Consumer } from "@utils/types";
+import { Dependency } from "ts-utils/injector";
+import { Consumer } from "ts-utils/types";
 import { ReactElement } from "react";
 import { ActionsProvider } from "./actions";
 import { Disconnector } from "./app1";
@@ -13,7 +13,6 @@ export type Window = {
   focus(): Promise<void>;
   onFocus(handle: Consumer<void>): Disconnector;
   isModal(): boolean;
-  getId(): string;
 }
 
 export interface Ui extends ActionsProvider {

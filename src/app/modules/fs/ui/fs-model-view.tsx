@@ -2,8 +2,8 @@ import { ActionButton, Column, Icon, Row, Spacer, TextHeight, actionsToActionIte
 import { MenuButton } from '@ui/menu-button';
 import { SearchBox } from '@ui/search-box';
 import { TypedTableCellProps, VirtualTable, VirtualTableColumn, column } from '@ui/table';
-import { iter } from '@utils/iter';
-import { size } from '@utils/size';
+import { iter } from 'ts-utils/iter';
+import { size } from 'ts-utils/size';
 import Optional from 'optional-js';
 import * as React from 'react';
 import { useMemo } from 'react';

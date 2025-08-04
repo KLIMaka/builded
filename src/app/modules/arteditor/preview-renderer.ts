@@ -1,14 +1,14 @@
 import { WorkplaneContext } from "@ui/commons";
-import { Disposable, Value, ValuesContainer } from "@utils/callbacks";
+import { Disposable, Value, ValuesContainer } from "ts-utils/callbacks";
 import { Controller3D } from "@utils/camera/controller3d";
-import { range } from "@utils/collections";
+import { range } from "ts-utils/collections";
 import { GlContext } from "@utils/gl/drawstruct";
 import { createShader } from "@utils/gl/shaders";
 import { AttribDataInstanced, BufferAllocator, StateGl1 } from "@utils/gl/stategl1";
-import { iter } from "@utils/iter";
-import { clamp, HALF_PI, PI, rad2deg } from "@utils/mathutils";
-import { Stream } from "@utils/stream";
-import { Consumer } from "@utils/types";
+import { iter } from "ts-utils/iter";
+import { clamp, HALF_PI, PI, rad2deg } from "ts-utils/mathutils";
+import { Stream } from "ts-utils/stream";
+import { Consumer } from "ts-utils/types";
 import { BoardContext } from "app/apis/engine";
 import { mat4 } from "gl-matrix";
 import { BoardGlContext, createBoardGlContext } from "../gl/board-context";
@@ -118,7 +118,7 @@ export class PreviewRenderer implements Disposable {
     pos(64, 64, 0);
     picnumAngCstat(p, 256, 1 << 4, 0)
     builder.writeVertex();
-    return builder.buildInstanced(WebGL2RenderingContext.TRIANGLES);
+    return builder.build(WebGL2RenderingContext.TRIANGLES);
   }
 
   private buildWalls(t1: number, t2: number, t3: number) {
@@ -146,10 +146,10 @@ export class PreviewRenderer implements Disposable {
         }
       }
     }))
-    const data = builder.buildInstanced(WebGL2RenderingContext.TRIANGLES);
+    const data = builder.build(WebGL2RenderingContext.TRIANGLES);
 
     return () => {
-      this.stateGl.drawInstanced(shader, data);
+      this.stateGl.draw(shader, data);
     }
 
     // const shader = this.stateGl.getShader('wall-instance');

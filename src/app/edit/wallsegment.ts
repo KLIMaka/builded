@@ -1,13 +1,13 @@
-import { pair } from "@utils/types";
-import { BoardContext } from "app/apis/engine";
+import { pair } from "ts-utils/types";
+import { BoardContext, gridSnap } from "app/apis/engine";
 import { BuildReferenceTrackerImpl } from "app/modules/default/reftracker";
 import { vec2, vec3 } from "gl-matrix";
 import { canonicalWall } from "../../build/board/loops";
 import { fixxrepeat, mergePoints, moveWall } from "../../build/board/mutations/walls";
 import { Board, Wall } from "../../build/board/structs";
 import { Entity, EntityType } from "../../build/hitscan";
-import { iter } from "../../utils/iter";
-import { cyclic, len2d } from "../../utils/mathutils";
+import { iter } from "ts-utils/iter";
+import { cyclic, len2d } from "ts-utils/mathutils";
 import { Message, MessageHandlerReflective } from "../apis/handler";
 import { BoardInvalidate, Commit, EndMove, Flip, Move, Palette, PanRepeat, ResetPanRepeat, Rotate, SetPicnum, SetWallCstat, Shade, StartMove } from "./messages";
 
@@ -49,8 +49,9 @@ export class WallSegmentsEnt extends MessageHandlerReflective {
 
   public Move(msg: Move) {
     this.boardCtx.modifyBoard(`Move Walls ${this.canonicalWalls}`, board => {
-      const x = this.boardCtx.grid.snap(this.origin[0] + msg.dx);
-      const y = this.boardCtx.grid.snap(this.origin[1] + msg.dy);
+      const gridSize = this.boardCtx.grid.size.get();
+      const x = gridSnap(gridSize, this.origin[0] + msg.dx);
+      const y = gridSnap(gridSize, this.origin[1] + msg.dy);
       const refwall = board.walls[this.refwall];
       const dx = x - refwall.x;
       const dy = y - refwall.y;

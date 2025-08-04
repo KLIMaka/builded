@@ -1,5 +1,5 @@
-import { Disconnector, Value } from "@utils/callbacks";
-import { Consumer } from "@utils/types";
+import { Disconnector, Value } from "ts-utils/callbacks";
+import { Consumer } from "ts-utils/types";
 import { Board } from "build/board/structs";
 import { applyPatches, Draft, Patch, produceWithPatches } from "immer";
 

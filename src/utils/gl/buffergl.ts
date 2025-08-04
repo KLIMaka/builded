@@ -1,5 +1,5 @@
 import { VertexBufferDynamic, createVertexBuffer, IndexBufferDynamic, createIndexBuffer, Updatable } from './bufferimpl';
-import { Place, BagController, createController } from '../bag';
+import { Place, BagController, createController } from 'ts-utils/bag';
 
 export interface Pointer {
   readonly buffer: Buffer,

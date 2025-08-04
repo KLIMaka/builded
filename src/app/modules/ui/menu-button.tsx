@@ -1,7 +1,7 @@
 import { autoUpdate, FloatingPortal, size, useClick, useDismiss, useFloating, useInteractions } from "@floating-ui/react";
-import { constSource, Source, Value } from "@utils/callbacks";
-import { EMPTY_NAVIGATOR, NavigateAction, Navigator } from "@utils/navigators";
-import { seq } from "@utils/types";
+import { constSource, Source, Value } from "ts-utils/callbacks";
+import { EMPTY_NAVIGATOR, NavigateAction, Navigator } from "ts-utils/navigators";
+import { seq } from "ts-utils/types";
 import React, { ReactElement, useCallback, useContext, useEffect } from "react";
 import { match } from "ts-pattern";
 import { ActionItem, ActionList } from "./action-list";

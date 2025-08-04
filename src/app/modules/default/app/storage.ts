@@ -1,9 +1,9 @@
-import { toValuesMap, Value, ValuesContainer, ValuesMap } from "@utils/callbacks";
+import { toValuesMap, Value, ValuesContainer, ValuesMap } from "ts-utils/callbacks";
 import Optional from "optional-js";
 import { Storage, Storages } from "../../../../app/apis/app1";
-import { getOrCreate } from "../../../../utils/collections";
-import { applyDefaults } from "@utils/objects";
-import { debounced } from "@utils/time";
+import { getOrCreate } from "ts-utils/collections";
+import { applyDefaults } from "ts-utils/objects";
+import { debounced } from "ts-utils/time";
 
 class StorageImpl implements Storage {
   private db: Promise<IDBDatabase>;

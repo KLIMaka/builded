@@ -1,7 +1,7 @@
-import { Disconnector, Value, value } from "@utils/callbacks";
-import { getInstances, Module, Plugin, provider } from "@utils/injector";
-import { iter } from "@utils/iter";
-import { Consumer } from "@utils/types";
+import { Disconnector, Value, value } from "ts-utils/callbacks";
+import { getInstances, Module, Plugin, provider } from "ts-utils/injector";
+import { iter } from "ts-utils/iter";
+import { Consumer } from "ts-utils/types";
 import { ACTION_DESCRIPTORS, Action, ActionDescriptors, StateChecker } from "app/apis/actions";
 import { UI, Ui, Window } from "app/apis/ui1";
 import * as React from 'react';
@@ -80,7 +80,10 @@ class ReactUi implements Ui {
   }
 
   addWindow(window: Window): void {
-    this.app.timer.delayed(() => this.windows.modImmer(ws => ws.set(window, this.createDescriptor(window))));
+    this.app.timer.delayed(() => {
+      if (this.windows.get().has(window)) window.focus();
+      else this.windows.modImmer(ws => ws.set(window, this.createDescriptor(window)))
+    });
   }
 
   private createDescriptor(window: Window): WindowDescriptor {

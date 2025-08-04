@@ -1,4 +1,4 @@
-import { Source } from "@utils/callbacks";
+import { Source } from "ts-utils/callbacks";
 import { ArtInfo } from "build/formats/art";
 import { vec3 } from "gl-matrix";
 import { findSector, inSector } from "../../../build/board/query";

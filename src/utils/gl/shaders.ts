@@ -1,6 +1,6 @@
-import { range } from "@utils/collections";
-import { iter } from "@utils/iter";
-import { applyNotNullOr } from "@utils/objects";
+import { range } from "ts-utils/collections";
+import { iter } from "ts-utils/iter";
+import { applyNotNullishOr } from "ts-utils/objects";
 import { loadString } from "../getter";
 import { Definition, DisposableResource, GlContext, Shader, UniformBlockDefinition, UniformDefinition } from "./drawstruct";
 
@@ -178,7 +178,7 @@ function type2String(type: number): string {
 async function preprocess(shader: string, baseDir: string): Promise<string> {
   const matchInclude = (l: string) => l.match(/^#include +"([^"]+)"/);
   const loadIncliude = (m: RegExpMatchArray) => loadString(baseDir + m[1]).then(s => preprocess(s, baseDir));
-  const lines = shader.split("\n").map(l => applyNotNullOr(matchInclude(l), loadIncliude, () => Promise.resolve(l)));
+  const lines = shader.split("\n").map(l => applyNotNullishOr(matchInclude(l), loadIncliude, () => Promise.resolve(l)));
   return Promise.all(lines).then(lines => lines.join('\n'));
 }
 

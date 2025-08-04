@@ -1,6 +1,6 @@
-import { getOrCreate } from "@utils/collections";
-import { struct, string, uint, array, byte, ubyte, Stream, atomic_array } from "@utils/stream";
+import { getOrCreate } from "ts-utils/collections";
 import Optional from "optional-js";
+import { struct, string, uint, array, byte, ubyte, Stream, atomic_array } from "ts-utils/stream";
 
 type Header = {
   sign: string;

@@ -1,6 +1,6 @@
 import { BuildReferenceTracker } from "../../../app/apis/app";
-import { forEach, range } from "@utils/collections";
-import { iter } from "@utils/iter";
+import { forEach, range } from "ts-utils/collections";
+import { iter } from "ts-utils/iter";
 import { sectorWalls } from "../loops";
 import { isValidSectorId, isValidSpriteId } from "../query";
 import { Board, Sector, Sprite } from "../structs";

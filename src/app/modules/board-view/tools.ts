@@ -1,82 +1,47 @@
-import { arrayEq, Source, ValuesContainer } from "@utils/callbacks";
+import { arrayEq, Source, ValuesContainer } from "ts-utils/callbacks";
 import { Controller3D } from "@utils/camera/controller3d";
-import { iter } from "@utils/iter";
-import { len2d } from "@utils/mathutils";
-import { identity } from "@utils/types";
-import { ArtInfoExtended, BoardContext } from "app/apis/engine";
+import { iter } from "ts-utils/iter";
+import { identity, pair } from "ts-utils/types";
+import { ArtInfoExtended, BoardContext, EngineContext, gridSnap } from "app/apis/engine";
 import { Message, MessageHandler } from "app/apis/handler";
-import { EndMove, Move, StartMove } from "app/edit/messages";
 import { SectorEnt } from "app/edit/sector";
-import { WallSegmentsEnt } from "app/edit/wallsegment";
-import { EMPTY_ENTITY, Entity, entityEq, Hitscan, hitscan, Ray, Target } from "build/hitscan";
-import { build2gl, gl2build } from "build/utils";
+import { WallEnt } from "app/edit/wall";
+import { closestWallInSectorDist, closestWallSegmentInSectorDist } from "build/board/distances";
+import { sectorOfWall, snapWall } from "build/board/query";
+import { EMPTY_ENTITY, EMPTY_TARGET, Entity, entityEq, EntityType, Hitscan, hitscan, Ray, Target, targetEq } from "build/hitscan";
+import { gl2build, slope } from "build/utils";
 import { vec3 } from "gl-matrix";
 import { ViewPosition } from "./view";
-import { WallEnt } from "app/edit/wall";
+import { WallSegmentsEnt } from "app/edit/wallsegment";
+import { SpriteEnt } from "app/edit/sprite";
 
 export type Selection = {
 
 } & MessageHandler;
 
-const EMPTY: Selection = {
+export const EMPTY: Selection = {
   handle: function (message: Message): void { }
 }
 
-export function createSelection(values: ValuesContainer, hitscan: Source<Entity>, boardCtx: BoardContext): Source<Selection> {
+export function createSelection(values: ValuesContainer, hitscan: Source<Entity>, boardCtx: BoardContext, engine: EngineContext): Source<Selection> {
   return values.transformed('selection', hitscan, hit => {
     if (hit.isWall()) {
-      return new WallEnt(hit.id, boardCtx);
+      return new WallEnt(hit.id, boardCtx, engine);
       // const board = boardCtx.board.get();
       // const w1 = board.walls[hit.id].point2;
       // return new WallSegmentsEnt([hit, Entity.wallPoint(w1)], boardCtx);
     } else if (hit.isSector()) {
-      return new SectorEnt(hit, boardCtx);
+      return new SectorEnt(hit, boardCtx, engine);
+    } else if (hit.isSprite()) {
+      return new SpriteEnt(hit.id, boardCtx, engine);
     }
     return EMPTY;
   });
 }
 
-export function createTransform(values: ValuesContainer, ctl: Controller3D, move: Source<Boolean>, parallel: Source<boolean>, vertical: Source<boolean>, hitscan: Source<Target[]>, selection: Source<Selection>) {
-  let object = EMPTY;
-  let moveStart = vec3.create();
-  values.handleStandalone([move, ctl.camera.position, ctl.forwardMouse, parallel, vertical],
-    ([move, campos, camdir, parallel, vert]) => {
-      if (!move && object === EMPTY) return;
-      if (move && object === EMPTY && selection.get() !== EMPTY) {
-        object = selection.get();
-        const origin = hitscan.get()[0].coords;
-        object.handle(new StartMove(origin));
-        moveStart = build2gl(vec3.create(), origin);
-      } else if (move && object !== EMPTY) {
-        const origin = moveStart;
-        if (vert) {
-          const dx = origin[0] - campos[0];
-          const dy = origin[2] - campos[2];
-          const dz = campos[1] - origin[1];
-          const t = len2d(dx, dy) / len2d(camdir[0], camdir[2]);
-          object.handle(new Move(0, 0, camdir[1] * t + dz));
-        } else {
-          const dz = origin[1] - campos[1];
-          const t = dz / camdir[1];
-          const result = vec3.copy(vec3.create(), camdir);
-          vec3.scale(result, result, t);
-          vec3.add(result, result, campos);
-          const delta = vec3.sub(vec3.create(), result, origin);
-          const dx = parallel && Math.abs(delta[0]) < Math.abs(delta[2]) ? 0 : delta[0];
-          const dy = parallel && Math.abs(delta[2]) < Math.abs(delta[0]) ? 0 : delta[2];
-          object.handle(new Move(dx, dy, 0));
-        }
-      } else if (!move && object !== EMPTY) {
-        object.handle(new EndMove());
-        object = EMPTY;
-      }
-    });
-}
-
 export function createHitscan(values: ValuesContainer, ctl: Controller3D, viewPosition: Source<ViewPosition>, art: Source<Map<number, ArtInfoExtended>>, boardCtx: BoardContext): Source<Target[]> {
   const hit = new Hitscan();
   const ray = values.transformedTuple('ray', [ctl.forwardMouse, viewPosition], ([fwd, pos]) => new Ray(vec3.fromValues(pos.x, pos.y, pos.z), gl2build(vec3.create(), fwd)));
-  const targetEq = (l: Target, r: Target) => entityEq(l.entity, r.entity) && vec3.exactEquals(l.coords, r.coords);
   return values.transformedTuple('hitscan', [ray, viewPosition, art, boardCtx.board], ([{ start, dir }, pos, art, board]) => {
     if (pos.sec === -1) return [];
     const fwd = gl2build(vec3.create(), ctl.getForward());
@@ -84,6 +49,58 @@ export function createHitscan(values: ValuesContainer, ctl: Controller3D, viewPo
     hitscan(board, boardCtx.spritesBySector, art, pos.sec, hit, 0);
     return [...hit.targets()];
   }, { eq: (l, r) => arrayEq(l, r, targetEq) });
+}
+
+export function createSnapTarget(values: ValuesContainer, hitscan: Source<Target[]>, boardCtx: BoardContext): Source<Target> {
+  return values.transformedTuple('snap-target', [hitscan, boardCtx.board, boardCtx.grid.size], ([hit, board, gridSize]) => {
+    if (hit.length === 0) return EMPTY_TARGET;
+    const target = hit[0];
+    // const { entity: ent, coords: [x, y, z] } = target;
+    // if (ent.type === EntityType.NONE) return target;
+    // const gridScale = boardCtx.grid.size.get();
+    // if (ent.isSector()) {
+    //   // const sectorId = ent.id;
+    //   // const [wallPoint, wallPointDist] = closestWallInSectorDist(board, sectorId, x, y);
+    //   // const [wallSegment, wallSegmentDist] = closestWallSegmentInSectorDist(board, sectorId, x, y);
+    //   return { coords: [gridSnap(gridSize, x), gridSnap(gridSize, y), z], entity: ent };
+
+    //   // if (wallPointDist < wallSegmentDist) {
+    //   //   if (wallPointDist > 64) return { coords: [gridSnap(gridSize, x), gridSnap(gridSize, y), z], entity: ent };
+    //   //   const wall = board.walls[wallPoint];
+    //   //   return { coords: [wall.x, wall.y, z], entity: Entity.of(wallPoint, EntityType.WALL_POINT) }
+    //   // } else {
+    //   //   if (wallSegmentDist > 64) return { coords: [gridSnap(gridSize, x), gridSnap(gridSize, y), z], entity: ent };
+    //   //   const wall = board.walls[wallSegment];
+    //   //   const type = ent.type === EntityType.CEILING ? EntityType.WALL_CEILING : EntityType.WALL_FLOOR;
+    //   //   return { coords: [wall.x, wall.y, z], entity: Entity.of(wallSegment, type) }
+    //   // }
+    // } else if (ent.isWall()) {
+    //   const wallId = ent.id;
+    //   const wall1 = board.walls[wallId];
+    //   const wall2 = board.walls[wall1.point2];
+    //   const [sx, sy] = snapWall(board, wallId, x, y, x => gridSnap(gridSize, x));
+    //   if (sx === wall1.x && sy === wall1.y) return { coords: [sx, sy, z], entity: Entity.of(wallId, EntityType.WALL_POINT) };
+    //   if (sx === wall2.x && sy === wall2.y) return { coords: [sx, sy, z], entity: Entity.of(wall1.point2, EntityType.WALL_POINT) };
+    //   const edges: [Target, number][] = [];
+    //   const sectorId = sectorOfWall(board, wallId);
+    //   const cz = slope(board, sectorId, sx, sy, true);
+    //   const fz = slope(board, sectorId, sx, sy, false);
+    //   edges.push(pair({ coords: [sx, sy, cz], entity: Entity.of(wallId, EntityType.WALL_CEILING) }, Math.abs(cz - z)));
+    //   edges.push(pair({ coords: [sx, sy, fz], entity: Entity.of(wallId, EntityType.WALL_FLOOR) }, Math.abs(fz - z)));
+    //   if (wall1.nextsector !== -1) {
+    //     const nextSectorId = wall1.nextsector;
+    //     const ncz = slope(board, nextSectorId, sx, sy, true);
+    //     const nfz = slope(board, nextSectorId, sx, sy, false);
+    //     edges.push(pair({ coords: [sx, sy, ncz], entity: Entity.of(wallId, EntityType.WALL_NEXT_UPPER) }, Math.abs(ncz - z)));
+    //     edges.push(pair({ coords: [sx, sy, nfz], entity: Entity.of(wallId, EntityType.WALL_NEXT_LOWER) }, Math.abs(nfz - z)));
+    //   }
+    //   edges.sort(([_1, ld], [_2, rd]) => ld - rd);
+    //   const [edge, dist] = edges[0];
+    //   if (dist < gridScale) return edge;
+    // }
+    return target;
+
+  }, { eq: targetEq });
 }
 
 export function createTargets(values: ValuesContainer, hitscan: Source<Target[]>): Source<Target[]> {
@@ -98,22 +115,4 @@ export function createEntity(values: ValuesContainer, targets: Source<Target[]>)
     // return iter(targets).first(t => t.entity !== null).map(t => t.entity).orElse(null);
   }, { eq: entityEq });
   return ent;
-}
-
-export type DrawSectorTool = {
-  start(): void;
-}
-
-type SectorContour = {
-  z: number,
-  points: number[],
-}
-
-export function createDrawSectorTool(values: ValuesContainer, ctl: Controller3D): DrawSectorTool {
-  const active = values.value('drawsector-active', false);
-  let state = {};
-  values.handleStandalone([active, ctl.camera.position, ctl.forwardMouse], ([active, campos, camdir]) => {
-    if (!active) return;
-
-  });
 }

@@ -14,7 +14,7 @@ export class Highlight implements Message { constructor(public set: Set<number> 
 export class Render implements Message { constructor(public consumer: (r: Renderable) => void) { } }
 export class SetPicnum implements Message { constructor(public picnum: number) { } }
 export class Shade implements Message { constructor(public value: number, public absolute = false) { } }
-export class PanRepeat implements Message { constructor(public xpan: number, public ypan: number, public xrepeat: number, public yrepeat: number, public absolute = false) { } }
+export class PanRepeat implements Message { constructor(public xpan: number, public ypan: number, public xrepeat: number, public yrepeat: number, public scaled = true, public absolute = false) { } }
 export class ResetPanRepeat implements Message { }
 export class Palette implements Message { constructor(public value: number, public max: number, public absolute = false) { } }
 export class Flip implements Message { constructor() { } }

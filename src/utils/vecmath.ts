@@ -1,6 +1,6 @@
 import { mat2d, mat3, mat4, vec2, vec3 } from 'gl-matrix';
-import { loopPairs } from "./collections";
-import * as MU from './mathutils';
+import { loopPairs } from "ts-utils/collections";
+import * as MU from 'ts-utils/mathutils';
 
 export function intersect2d(p1s: vec2, p1e: vec2, p2s: vec2, p2e: vec2): vec2 {
   const t = intersect2dT(p1s, p1e, p2s, p2e);

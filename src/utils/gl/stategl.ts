@@ -1,5 +1,5 @@
 import { mat4, vec3, vec4 } from 'gl-matrix';
-import { Deck, isEmpty } from '../collections';
+import { Deck, isEmpty } from 'ts-utils/collections';
 import { Buffer } from './buffergl';
 import { GlType2ArrayType } from './bufferimpl';
 import { Definition, IndexBuffer, Shader, Texture, VertexBuffer } from './drawstruct';

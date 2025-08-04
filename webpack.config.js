@@ -35,4 +35,7 @@ module.exports = {
   experiments: {
     asyncWebAssembly: true
   },
+  stats: {
+    "errorDetails": true,
+  }
 };

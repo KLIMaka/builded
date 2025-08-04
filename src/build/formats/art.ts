@@ -1,6 +1,6 @@
-import { range } from "@utils/collections";
-import { Stream, array, atomic_array, bits, byte, struct, ubyte, uint, ushort } from "../../utils/stream";
-import { iter } from "@utils/iter";
+import { range } from "ts-utils/collections";
+import { Stream, array, atomic_array, bits, byte, struct, ubyte, uint, ushort } from "ts-utils/stream";
+import { iter } from "ts-utils/iter";
 
 export class ArtInfo {
   constructor(public w: number, public h: number, public attrs: Attributes, public img: Uint8Array) { }
@@ -85,8 +85,4 @@ export function readArtFile(buffer: ArrayBuffer): ArtFile {
     return new ArtInfo(h, w, attr, pixels);
   }).collect();
   return { header, arts }
-}
-
-export interface ArtInfoProvider {
-  getInfo(picnum: number): ArtInfo;
 }

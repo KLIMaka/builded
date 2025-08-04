@@ -1,5 +1,5 @@
-import { int } from '../utils/mathutils';
-import { Raster } from '../utils/pixelprovider';
+import { int } from 'ts-utils/mathutils';
+import { Raster } from 'ts-utils/pixelprovider';
 import { ArtInfo } from './formats/art';
 
 export class ArtRaster implements Raster<number> {

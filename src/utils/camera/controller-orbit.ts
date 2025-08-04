@@ -1,5 +1,5 @@
-import { Value, Source, ValuesContainer } from "@utils/callbacks";
-import { deg2rad } from "@utils/mathutils";
+import { Value, Source, ValuesContainer } from "ts-utils/callbacks";
+import { deg2rad } from "ts-utils/mathutils";
 import { vec2, mat4, vec3 } from "gl-matrix";
 import { Camera } from "./camera";
 

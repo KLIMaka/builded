@@ -1,7 +1,7 @@
-import { Function } from "@utils/types";
+import { Function } from "ts-utils/types";
 import { vec3 } from "gl-matrix";
-import { SortedList } from "../utils/list";
-import { cross2d, int, len2d, ortonorm2d, sign } from "../utils/mathutils";
+import { SortedList } from "ts-utils/list";
+import { cross2d, int, len2d, ortonorm2d, sign } from "ts-utils/mathutils";
 import { inSector } from "./board/query";
 import { Board, FACE_SPRITE, FLOOR_SPRITE, Sector, WALL_SPRITE } from "./board/structs";
 import { ArtInfo } from "./formats/art";
@@ -9,7 +9,7 @@ import { SpriteInfo, faceSprite, floorSprite, spriteInfo, wallSprite } from "./s
 import { ANGSCALE, ZSCALE, inPolygon, rayIntersect, slope } from "./utils";
 
 export enum EntityType {
-  FLOOR, CEILING, UPPER_WALL, MID_WALL, LOWER_WALL, SPRITE, WALL_POINT
+  NONE, FLOOR, CEILING, UPPER_WALL, MID_WALL, LOWER_WALL, SPRITE, WALL_POINT, WALL_FLOOR, WALL_CEILING, WALL_NEXT_LOWER, WALL_NEXT_UPPER
 }
 
 export class Entity {
@@ -30,11 +30,12 @@ export class Entity {
   isWall() { return isWall(this.type) }
   isSector() { return isSector(this.type) }
   isSprite() { return isSprite(this.type) }
+  isEdge() { return isEdge(this.type) }
   clone() { return new Entity(this.id, this.type) }
 }
 
-export const EMPTY_ENTITY = new Entity(-1, 0);
-export function entityEq(lh: Entity, rh: Entity) {
+export const EMPTY_ENTITY = new Entity(-1, EntityType.NONE);
+export function entityEq(lh: Entity, rh: Entity): boolean {
   if (lh === rh) return true;
   return lh.id === rh.id && lh.type === rh.type;
 }
@@ -43,7 +44,10 @@ export interface Target {
   readonly coords: vec3;
   readonly entity: Entity;
 }
-export const EMPTY_TARGET: Target = { coords: vec3.create(), entity: null };
+export const EMPTY_TARGET: Target = { coords: vec3.create(), entity: EMPTY_ENTITY };
+export function targetEq(l: Target, r: Target): boolean {
+  return entityEq(l.entity, r.entity) && vec3.exactEquals(l.coords, r.coords);
+}
 
 export function isSector(type: EntityType) {
   switch (type) {
@@ -60,6 +64,17 @@ export function isWall(type: EntityType) {
     case EntityType.MID_WALL:
     case EntityType.UPPER_WALL:
     case EntityType.WALL_POINT:
+      return true;
+    default: return false;
+  }
+}
+
+export function isEdge(type: EntityType) {
+  switch (type) {
+    case EntityType.WALL_CEILING:
+    case EntityType.WALL_FLOOR:
+    case EntityType.WALL_NEXT_LOWER:
+    case EntityType.WALL_NEXT_UPPER:
       return true;
     default: return false;
   }

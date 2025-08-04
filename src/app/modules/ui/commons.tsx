@@ -1,7 +1,7 @@
-import { Disconnector, Source, Value, ValuesContainer } from '@utils/callbacks';
-import { getOrCreate } from '@utils/collections';
-import { iter } from '@utils/iter';
-import { Consumer, MultiConsumer, MultiFunction, Supplier, identity, nil, seq } from '@utils/types';
+import { Disconnector, Source, Value, ValuesContainer } from 'ts-utils/callbacks';
+import { getOrCreate } from 'ts-utils/collections';
+import { iter } from 'ts-utils/iter';
+import { Consumer, MultiConsumer, MultiFunction, Supplier, identity, nil, seq } from 'ts-utils/types';
 import { Action, ActionDescriptors, ActionsProvider, StateChecker } from 'app/apis/actions';
 import { Bind } from 'app/input/keymap';
 import React, { ForwardedRef, HTMLProps, MouseEventHandler, ReactNode, createContext, forwardRef, useContext, useRef, useSyncExternalStore } from 'react';
@@ -399,4 +399,16 @@ export function Workplane(props: { builders: WorkplaneBuilder[] }) {
 
 function Plane({ height, width, builder }: { height: number, width: number, builder: WorkplaneBuilder }) {
   return <canvas ref={ref => builder(ref, width, height)} height={height} width={width} style={{ position: 'absolute' }} />
+}
+
+export type GridMove = 'up' | 'down' | 'left' | 'right' | 'pageup' | 'pagedown';
+export function getGridOff(move: GridMove, [cols, rows]: [number, number]): number {
+  switch (move) {
+    case "up": return -cols;
+    case "down": return cols;
+    case "left": return -1;
+    case "right": return 1;
+    case "pageup": return -cols * rows;
+    case "pagedown": return cols * rows;
+  }
 }

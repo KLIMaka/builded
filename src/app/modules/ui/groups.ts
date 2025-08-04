@@ -1,5 +1,5 @@
-import { cyclic } from "@utils/mathutils";
-import { Consumer, Function, Supplier } from "@utils/types";
+import { cyclic } from "ts-utils/mathutils";
+import { Consumer, Function, Supplier } from "ts-utils/types";
 import { Disconnector, HandleProvider } from "app/apis/app1";
 import { Block, GroupsModel, Layout, addClass, clazz, removeClass } from "app/apis/ui";
 

@@ -1,6 +1,6 @@
-import { Disposable } from "@utils/callbacks";
-import { Dependency } from "@utils/injector";
-import { Consumer } from "@utils/types";
+import { Disposable } from "ts-utils/callbacks";
+import { Dependency } from "ts-utils/injector";
+import { Consumer } from "ts-utils/types";
 
 export type DisposableResource<T> = { readonly value: T } & Disposable;
 export type ResourceFactory = <T>(tag: string, value: T, disposer: Consumer<T>) => DisposableResource<T>;

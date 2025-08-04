@@ -1,4 +1,4 @@
-import { Stream, atomic_array, ubyte } from "../../utils/stream";
+import { Stream, atomic_array, ubyte } from "ts-utils/stream";
 
 
 export type FileInfo = { off: number, size: number };

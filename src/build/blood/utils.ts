@@ -1,5 +1,5 @@
-import { iter } from "@utils/iter";
-import { second } from "@utils/types";
+import { iter } from "ts-utils/iter";
+import { second } from "ts-utils/types";
 import { RorLink, RorLinks } from "app/apis/engine";
 import { vec3 } from "gl-matrix";
 import { Sprite } from "../board/structs";
@@ -25,7 +25,7 @@ export function loadRorLinks(board: BloodBoard): RorLinks {
   const floorLinks = new Map<number, RorLink>();
   const ceilingLinks = new Map<number, RorLink>();
   for (const spriteIds of linkRegistry.values()) {
-    if (spriteIds.length !== 2) throw new Error('Invalid link in sprites: ' + spriteIds);
+    if (spriteIds.length !== 2) continue;
     let [s1, s2] = spriteIds;
     let spr1 = board.sprites[s1];
     let spr2 = board.sprites[s2];

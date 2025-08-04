@@ -3,11 +3,11 @@ import { Button, Column, Icon, Row, Spacer, useValue, useValuesContainer } from 
 import { MenuButton } from "@ui/menu-button";
 import { inputText } from "@ui/message-box";
 import { modalResult, WindowBuilder } from "@ui/windows-common";
-import { createContainer, Source, Value } from "@utils/callbacks";
-import { iter } from "@utils/iter";
-import { sum } from "@utils/mathutils";
-import { size } from "@utils/size";
-import { Consumer, unwrapOptionalPromise } from "@utils/types";
+import { createContainer, Source, Value } from "ts-utils/callbacks";
+import { iter } from "ts-utils/iter";
+import { sum } from "ts-utils/mathutils";
+import { size } from "ts-utils/size";
+import { Consumer, unwrapOptionalPromise } from "ts-utils/types";
 import { ActionDescriptors } from "app/apis/actions";
 import { App } from "app/apis/app1";
 import { FileInfo, FileSystems } from "app/apis/fs";

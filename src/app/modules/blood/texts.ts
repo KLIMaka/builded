@@ -1,4 +1,4 @@
-import { mapBuilder } from "@utils/collections";
+import { mapBuilder } from "ts-utils/collections";
 
 // from mapedit.cpp https://github.com/NBlood/NBlood
 

@@ -1,9 +1,9 @@
-import { iter } from '@utils/iter';
-import { clamp } from '@utils/mathutils';
+import { iter } from 'ts-utils/iter';
+import { clamp } from 'ts-utils/mathutils';
 import * as React from 'react';
 import { HTMLProps, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { ActionDescriptorsContext, ActionsChannelContext, styles } from './commons';
-import { Consumer, nil, seq } from '@utils/types';
+import { Consumer, nil, seq } from 'ts-utils/types';
 
 type ActionItemProps = {
   children: ReactNode,

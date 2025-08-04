@@ -1,4 +1,4 @@
-import { ChangeCallback } from "@utils/callbacks";
+import { ChangeCallback } from "ts-utils/callbacks";
 import { Element, div } from "@utils/ui/ui";
 import { Button } from "app/apis/ui";
 

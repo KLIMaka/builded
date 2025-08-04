@@ -1,6 +1,6 @@
 import { autoUpdate, FloatingPortal, size, useFloating, useFocus, useInteractions } from "@floating-ui/react";
-import { Signal, Value } from "@utils/callbacks";
-import { nil, seq, Supplier } from "@utils/types";
+import { Signal, Value } from "ts-utils/callbacks";
+import { nil, seq, Supplier } from "ts-utils/types";
 import React, { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { ActionItem, ActionList } from "./action-list";
 import { ActionDescriptorsContext, ActionsChannelContext, CurrentActionsChannelContext, Icon, useValue } from "./commons";
@@ -117,7 +117,7 @@ export function SearchBoxOracle(props: SearchBoxProps & { oracle: Supplier<Actio
       <>
         <div
           ref={ref => { refs.setReference(ref); elementRef.current = ref }}
-          style={{ width }}
+          style={{ width: isOpen ? focusedWidth : width }}
           {...getReferenceProps()}
           className='text-box baseline-aligned flex-auto row-block'>
           <Icon icon='magnifying-glass' />
@@ -128,8 +128,8 @@ export function SearchBoxOracle(props: SearchBoxProps & { oracle: Supplier<Actio
             value={query}
             placeholder="Press '/'"
             onChange={e => props.value.set(e.target.value)}
-            onFocus={_ => { currentActions(searchChannel); inputRef.current.select(); elementRef.current.style.width = focusedWidth; }}
-            onBlur={_ => { currentActions(actionsChannel); elementRef.current.style.width = width }}
+            onFocus={_ => { currentActions(searchChannel); inputRef.current.select() }}
+            onBlur={_ => { currentActions(actionsChannel) }}
           />
           {query.length > 0
             ? <Icon icon='xmark' className='fa-active' onClick={_ => props.value.set('')} />
@@ -144,7 +144,7 @@ export function SearchBoxOracle(props: SearchBoxProps & { oracle: Supplier<Actio
               style={{ ...floatingStyles, zIndex: 99999 }}
               {...getFloatingProps()}
             >
-              <ActionList items={props.oracle()} onAction={() => { setIsOpen(false); blurInput() }} />
+              <ActionList items={props.oracle()} onAction={() => setIsOpen(false)} />
             </div>
           </FloatingPortal>
         )}

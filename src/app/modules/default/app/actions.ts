@@ -1,8 +1,8 @@
-import { constSource } from "@utils/callbacks";
-import { getOrCreate } from "@utils/collections";
+import { constSource } from "ts-utils/callbacks";
+import { getOrCreate } from "ts-utils/collections";
 import { loadString } from "@utils/getter";
-import { Plugin, provider } from "@utils/injector";
-import { Consumer, Supplier } from "@utils/types";
+import { Plugin, provider } from "ts-utils/injector";
+import { Consumer, Supplier } from "ts-utils/types";
 import { Action, ActionDescriptor, ActionDescriptors, ActionHandler } from "app/apis/actions";
 import { APP, Logger } from "app/apis/app1";
 import { Bind } from "app/input/keymap";

@@ -1,8 +1,8 @@
 import { BuildReferenceTracker } from "../../../app/apis/app";
-import { Collection, enumerate, loopPairs, wrap } from "../../../utils/collections";
-import { iter } from "../../../utils/iter";
+import { Collection, enumerate, loopPairs, wrap } from "ts-utils/collections";
+import { iter } from "ts-utils/iter";
 import { order } from "../../utils";
-import { Board, Sector, Wall } from "../structs";
+import { Board, Wall } from "../structs";
 import { BoardSector, BoardWall, EngineApi } from "./api";
 import { addSector } from "./internal";
 import { SectorBuilder } from "./sectorbuilder";
@@ -14,9 +14,9 @@ function searchMatchWall(board: Board, p1: [number, number], p2: [number, number
     const end = sec.wallptr + sec.wallnum;
     for (let w = sec.wallptr; w < end; w++) {
       const wall1 = board.walls[w];
-      if (wall1 == null || wall1.nextwall != -1) continue;
+      if (wall1 == null || wall1.nextwall !== -1) continue;
       const wall2 = board.walls[wall1.point2];
-      if (wall1.x == p2[0] && wall1.y == p2[1] && wall2.x == p1[0] && wall2.y == p1[1]) {
+      if (wall1.x === p2[0] && wall1.y === p2[1] && wall2.x === p1[0] && wall2.y === p1[1]) {
         return [s, w];
       }
     }

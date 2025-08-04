@@ -1,8 +1,7 @@
-import { Bag } from "@utils/bag";
-import { Disposable } from "@utils/callbacks";
-import { getOrCreate } from "@utils/collections";
-import { iter } from "@utils/iter";
-import { Function, MultiConsumer, TypedArray } from "@utils/types";
+import { Disposable } from "ts-utils/callbacks";
+import { getOrCreate } from "ts-utils/collections";
+import { iter } from "ts-utils/iter";
+import { Function, MultiConsumer, TypedArray } from "ts-utils/types";
 import { mat4 as gmlMat4 } from "gl-matrix";
 import Optional from "optional-js";
 import { match } from "ts-pattern";
@@ -158,83 +157,20 @@ class Buffer<T extends TypedArray> implements Disposable {
 
 export type BufferAllocatorFactory = Function<AttribScheme, BufferAllocator>;
 export class BufferAllocator implements Disposable {
-  private idxBag: Bag;
-  private vtxBag: Bag;
-  private idxBuffer: Buffer<Uint32Array>;
-  private vtxBuffer: Buffer<Uint8Array>;
-  private vao: DisposableResource<WebGLVertexArrayObject>;
 
   constructor(
     private glCxt: GlContext,
     private scheme: AttribScheme,
-    maxIdxSize: number,
-    maxVtxSize: number,
-  ) {
-    const gl = glCxt.gl;
-    this.idxBag = new Bag(maxIdxSize);
-    this.vtxBag = new Bag(maxVtxSize);
-    this.idxBuffer = new Buffer(glCxt, gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(maxIdxSize));
-    this.vtxBuffer = new Buffer(glCxt, gl.ARRAY_BUFFER, new Uint8Array(scheme.byteSize * maxVtxSize));
-    this.vao = this.createVAO(glCxt, scheme);
-  }
+  ) { }
 
 
-  allocate(vtxData: Uint8Array, idxData: Uint32Array): BufferData {
-    const vtxCount = vtxData.length / this.scheme.byteSize;
-    if (!Number.isInteger(vtxCount)) throw new Error(`Invalid vertex data size ${vtxData.length} (attributesSize=${this.scheme.byteSize})`);
-    const maxIdx = idxData.reduce((l, r) => Math.max(l, r));
-    if (maxIdx >= vtxCount) throw new Error(`Invalid index data. Referenced vertex id=${maxIdx}`);
-
-    const vtxoff = this.vtxBag.get(vtxData.length);
-    if (vtxoff === null) return null;
-    const idxoff = this.idxBag.get(idxData.length);
-    if (idxoff === null) {
-      this.vtxBag.put(vtxoff, vtxData.length);
-      return null;
-    }
-    const elemOff = vtxoff / this.scheme.byteSize;
-    this.vtxBuffer.set(vtxoff, vtxData);
-    this.idxBuffer.set(idxoff, idxData.map(x => x + elemOff));
-
-    return {
-      vao: this.vao.value,
-      count: idxData.length,
-      off: idxoff,
-      deallocate: () => this.deallocate(vtxoff, vtxData.length, idxoff, idxData.length),
-      upload: gl => this.update(gl)
-    }
-  }
-
-  allocateInstanced(vtxData: Uint8Array): InstancedArrayData {
+  allocate(vtxData: Uint8Array): InstancedArrayData {
     const gl = this.glCxt.gl;
     const count = vtxData.length / this.scheme.byteSize;
     const buffer = new Buffer(this.glCxt, gl.ARRAY_BUFFER, vtxData);
     const vao = this.createVAOInstanced(this.glCxt, buffer.glBuffer.value);
     const dispose = async () => { buffer.dispose(); vao.dispose() }
     return { vao: vao.value, count, dispose }
-  }
-
-  private update(gl: WebGL2RenderingContext) {
-    this.vtxBuffer.update(gl);
-    this.idxBuffer.update(gl);
-  }
-
-  private createVAO(glCtx: GlContext, scheme: AttribScheme): DisposableResource<WebGLVertexArrayObject> {
-    const gl = glCtx.gl;
-    const vao = glCtx.resource('vao', gl.createVertexArray(), vao => gl.deleteVertexArray(vao));
-    gl.bindVertexArray(vao.value);
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.idxBuffer.glBuffer.value);
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.vtxBuffer.glBuffer.value);
-    const stride = this.scheme.byteSize;
-    for (const attr of scheme.defs) {
-      gl.enableVertexAttribArray(attr.location);
-      if (attr.type.valueType === 'FLOAT')
-        gl.vertexAttribPointer(attr.location, attr.type.size, attr.type.type, false, stride, attr.type.byteOff);
-      else
-        gl.vertexAttribIPointer(attr.location, attr.type.size, attr.type.type, stride, attr.type.byteOff);
-    }
-    gl.bindVertexArray(null);
-    return vao;
   }
 
   private createVAOInstanced(glCtx: GlContext, buffer: WebGLBuffer): DisposableResource<WebGLVertexArrayObject> {
@@ -253,16 +189,7 @@ export class BufferAllocator implements Disposable {
     return vao;
   }
 
-  private deallocate(vtxoff: number, vtxsize: number, idxoff: number, idxsize: number) {
-    this.vtxBag.put(vtxoff, vtxsize);
-    this.idxBag.put(idxoff, idxsize);
-  }
-
-  async dispose(): Promise<void> {
-    this.idxBuffer.dispose();
-    this.vtxBuffer.dispose();
-    this.vao.dispose();
-  }
+  async dispose(): Promise<void> { }
 }
 
 export type AttribData = {
@@ -276,7 +203,7 @@ export type AttribDataInstanced = {
   count: number,
 };
 
-class AttribDataBuilder implements Disposable {
+export class AttribDataBuilder implements Disposable {
   constructor(
     private scheme: AttribScheme,
     private alloc: BufferAllocator,
@@ -322,15 +249,9 @@ class AttribDataBuilder implements Disposable {
     this.idxOff += pattern.length;
   }
 
-  build(mode: number): AttribData {
+  build(mode: number, count: number): AttribDataInstanced {
     const vtxSizeof = this.scheme.byteSize;
-    const bufferData = this.alloc.allocate(this.vtxData.subarray(0, this.vtxOff * vtxSizeof), this.idxData.subarray(0, this.idxOff));
-    return { mode, bufferData };
-  }
-
-  buildInstanced(mode: number, count: number): AttribDataInstanced {
-    const vtxSizeof = this.scheme.byteSize;
-    const data = this.alloc.allocateInstanced(this.vtxData.subarray(0, this.vtxOff * vtxSizeof));
+    const data = this.alloc.allocate(this.vtxData.subarray(0, this.vtxOff * vtxSizeof));
     return { data, mode, count };
   }
 
@@ -505,18 +426,7 @@ export class ShaderConfig implements Disposable {
       .orElseThrow(() => new Error(`Invalid texture uniform '${name}'`));
   }
 
-  draw(gl: WebGL2RenderingContext, attrs: AttribData) {
-    attrs.bufferData.upload(gl);
-    this.blocks.values().forEach(b => b.update(gl));
-    this.bindTextures(gl);
-    const indexBufferType = WebGL2RenderingContext.UNSIGNED_INT;
-    const indexSizeoff = 4;
-    gl.bindVertexArray(attrs.bufferData.vao);
-    gl.drawElements(attrs.mode, attrs.bufferData.count, indexBufferType, attrs.bufferData.off * indexSizeoff);
-    gl.bindVertexArray(null);
-  }
-
-  drawInstanced(gl: WebGL2RenderingContext, data: AttribDataInstanced) {
+  draw(gl: WebGL2RenderingContext, data: AttribDataInstanced) {
     this.blocks.values().forEach(b => b.update(gl));
     this.bindTextures(gl);
     gl.bindVertexArray(data.data.vao);
@@ -580,20 +490,12 @@ export class StateGl1 implements Disposable {
     return this.shaders.get(name);
   }
 
-  draw(shader: ShaderConfig, attrs: AttribData) {
+  draw(shader: ShaderConfig, data: AttribDataInstanced) {
     if (shader !== this.currentShader) {
       this.currentShader = shader;
       this.currentShader.bind(this.glCtx.gl);
     }
-    this.currentShader.draw(this.glCtx.gl, attrs);
-  }
-
-  drawInstanced(shader: ShaderConfig, data: AttribDataInstanced) {
-    if (shader !== this.currentShader) {
-      this.currentShader = shader;
-      this.currentShader.bind(this.glCtx.gl);
-    }
-    this.currentShader.drawInstanced(this.glCtx.gl, data);
+    this.currentShader.draw(this.glCtx.gl, data);
   }
   private getSampler(wrap?: Wrap): WebGLSampler {
     if (wrap === 'CLAMP') return this.clampWrap.value;

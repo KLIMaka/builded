@@ -1,11 +1,10 @@
 import { WorkplaneContext } from "@ui/commons";
-import { Disposable, Source, ValuesContainer } from "@utils/callbacks";
+import { Disposable, Source, ValuesContainer } from "ts-utils/callbacks";
 import { Controller2D } from "@utils/camera/controller2d";
 import { Buffer, BufferBuilder } from "@utils/gl/buffergl";
-import { Shader, Texture } from "@utils/gl/drawstruct";
+import { GlContext, Shader, Texture } from "@utils/gl/drawstruct";
 import { createShader } from "@utils/gl/shaders";
 import { State } from "@utils/gl/stategl";
-import { GlContext } from "app/modules/gl/gl-context";
 import { mat3, vec4 } from "gl-matrix";
 import Optional from "optional-js";
 

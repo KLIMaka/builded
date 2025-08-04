@@ -1,4 +1,4 @@
-import { Collection, all } from "../../utils/collections";
+import { Collection, all } from "ts-utils/collections";
 import { Logger, State } from "../apis/app";
 import { Message } from "../apis/handler";
 

@@ -1,10 +1,19 @@
 import Optional from "optional-js";
-import { getOrDefaultF } from "./collections";
-import { iter } from "./iter";
-import { nextpow2 } from "./mathutils";
-import { asyncMapOptional } from "./objects";
-import { BiConsumer, BiFunction, Consumer, Function, identity, MultiConsumer, MultiFunction } from "./types";
-import { NOOP_TASK_HANDLE, TaskHandle } from "app/apis/app1";
+import { getOrDefaultF } from "ts-utils/collections";
+import { iter } from "ts-utils/iter";
+import { nextpow2 } from "ts-utils/mathutils";
+import { asyncMapOptional } from "ts-utils/objects";
+import { BiConsumer, BiFunction, Consumer, Function, identity, MultiConsumer, MultiFunction } from "ts-utils/types";
+import { NOOP_TASK_HANDLE, TaskHandle } from "ts-utils/scheduler";
+
+
+/*
+ * File Tokeniser/Parser/Whatever
+ * by Jonathon Fowler
+ * Remixed completely by Ken Silverman
+ * and then ported to typescript by KLIMaka
+ * See the included license file "BUILDLIC.TXT" for license info.
+ */
 
 const _R = '\r'.charCodeAt(0);
 const _N = '\n'.charCodeAt(0);

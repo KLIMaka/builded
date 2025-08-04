@@ -255,7 +255,8 @@ sprite_t loadSprite(highp usampler2D samp, uint s) {
 vec4 loadOrient(highp usampler2D walls, sector_t sector) {
   wall_t firstWall = loadWall(walls, sector.wallPtrNum.x);
   wall_t secondWall = loadWall(walls, firstWall.point2);
-  return vec4(firstWall.pos, normalize(secondWall.pos - firstWall.pos));
+  vec2 dir = secondWall.pos - firstWall.pos;
+  return vec4(firstWall.pos, dir == vec2(0.0) ? dir : normalize(dir));
 }
 
 float angscale(float heinum) { return heinum / 4096.0; }

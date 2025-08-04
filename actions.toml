@@ -18,6 +18,12 @@ add-zip = { label = "Add Zip File...", icon = "file-zipper", bind = "control+z" 
 add-rff = { label = "Add Rff File...", icon = "box", bind = "control+r" }
 add-grp = { label = "Add Grp File...", icon = "box", bind = "control+g" }
 add-memory = { label = "Add Memory Storage...", icon = "memory", bind = "control+m" }
+left = { bind = "arrowleft" }
+right = { bind = "arrowright" }
+up = { bind = "arrowup" }
+down = { bind = "arrowdown" }
+pageup = { bind = "pageup" }
+pagedown = { bind = "pagedown" }
 
 [menu]
 close = { parent = "close" }
@@ -111,12 +117,12 @@ cancel = { parent = "close" }
 
 [art-editor]
 label = "ART Editor"
-left = { bind = "arrowleft" }
-right = { bind = "arrowright" }
-up = { bind = "arrowup" }
-down = { bind = "arrowdown" }
-pageup = { bind = "pageup" }
-pagedown = { bind = "pagedown" }
+left = { parent = "left" }
+right = { parent = "right" }
+up = { parent = "up" }
+down = { parent = "down" }
+pageup = { parent = "pageup" }
+pagedown = { parent = "pagedown" }
 search = { label = "Search", bind = "/" }
 clear-search = { bind = "escape" }
 next-plu = { label = "Next PalSwap", bind = "p" }
@@ -134,6 +140,16 @@ copy = { parent = "copy" }
 blend = { bind = "b" }
 toggle-upscale-preview = { bind = "i" }
 
+[art-select]
+label = "ART Select"
+left = { parent = "left" }
+right = { parent = "right" }
+up = { parent = "up" }
+down = { parent = "down" }
+pageup = { parent = "pageup" }
+pagedown = { parent = "pagedown" }
+select = { parent = "select" }
+
 [board-view]
 label = "Board View"
 forward = { bind = 'w' }
@@ -150,6 +166,17 @@ undo = { bind = 'control+z' }
 lookaim = { bind = 'mouse2' }
 pan-up = { bind = "arrowup" }
 pan-down = { bind = "arrowdown" }
+pan-left = { bind = "arrowleft" }
+pan-right = { bind = "arrowright" }
+pan-up-one = { bind = "alt+arrowup" }
+pan-down-one = { bind = "alt+arrowdown" }
+pan-left-one = { bind = "alt+arrowleft" }
+pan-right-one = { bind = "alt+arrowright" }
+repeat-up = { bind = "control+arrowup" }
+repeat-down = { bind = "control+arrowdown" }
+repeat-left = { bind = "control+arrowleft" }
+repeat-right = { bind = "control+arrowright" }
+pan-repeat-reset = { bind = "/" }
 flip = { bind = "f" }
 delete = { bind = "delete" }
 up = { bind = "pageup" }
@@ -161,6 +188,22 @@ move-vertical = { bind = "alt" }
 move-parallel = { bind = "shift" }
 grid-inc = { bind = "]" }
 grid-dec = { bind = "[" }
+draw = { bind = " " }
+draw-rect = { bind = "shift+ " }
+draw-back = { bind = "backspace" }
+shade = { bind = "b" }
+split-wall = { bind = "insert" }
+split-sector = { bind = "control+insert" }
+fill-loop = { bind = "alt+s" }
+delete-loop = { bind = "alt+delete" }
+delete-full = { bind = "control+delete" }
+set-first-wall = { bind = "alt+f" }
+set-picnum = { bind = "v" }
+shadow-up = { bind = "wheeldown" }
+shadow-down = { bind = "wheelup" }
+shadow-up-fast = { bind = "shift+wheeldown" }
+shadow-down-fast = { bind = "shift+wheelup" }
+save = { bind = "control+s" }
 
 [rectifier]
 label = "Rectifier"

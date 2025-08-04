@@ -1,12 +1,12 @@
-import { Value } from "@utils/callbacks";
+import { Value } from "ts-utils/callbacks";
 import { Block, Ui, clazz, style } from "app/apis/ui";
 import { clamp, int } from "../../mathutils";
 import { Formatter, ParseValidator, Parser } from "../../value";
 import { Validator, setter } from "./api";
 import { dragElement } from "../ui";
 import Optional from "optional-js";
-import { Consumer, Supplier, identity } from "@utils/types";
-import { Transformer } from "@utils/type-descriptor";
+import { Consumer, Supplier, identity } from "ts-utils/types";
+import { Transformer } from "ts-utils/type-descriptor";
 
 function wheelAction(value: Supplier<number>, set: Consumer<number>, model: NumberModel) {
   return (e: WheelEvent) => {
@@ -20,7 +20,7 @@ const FloatParseValidator: ParseValidator = (str: string) => !isNaN(Number.parse
 const IntParser: Parser<number> = Number.parseInt;
 const FloatParser: Parser<number> = Number.parseFloat;
 const NUMBER_FMT = Intl.NumberFormat('en-US', { maximumFractionDigits: 4, useGrouping: false }).format;
-export const intNumberValidator: Validator<number> = (v: number) => int(v) == v;
+export const intNumberValidator: Validator<number> = (v: number) => int(v) === v;
 
 export type NumberModel = {
   parseValidator: ParseValidator,

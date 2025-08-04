@@ -1,15 +1,15 @@
-import { BoardContext } from "app/apis/engine";
+import { BoardContext, EngineContext, gridSnap } from "app/apis/engine";
 import { BuildReferenceTrackerImpl } from "app/modules/default/reftracker";
 import { sectorWalls } from "../../build/board/loops";
 import { deleteSector } from "../../build/board/mutations/internal";
 import { Board } from "../../build/board/structs";
 import { Entity, EntityType } from "../../build/hitscan";
 import { sectorHeinum, sectorZ, setSectorHeinum, setSectorPicnum, setSectorZ, ZSCALE } from "../../build/utils";
-import { cyclic } from "../../utils/mathutils";
+import { cyclic } from "ts-utils/mathutils";
 import { MessageHandlerReflective } from "../apis/handler";
 import { Move, NamedMessage, Palette, PanRepeat, ResetPanRepeat, Rotate, SetPicnum, SetSectorCstat, Shade, StartMove } from "./messages";
-import { iter } from "@utils/iter";
-import { pair } from "@utils/types";
+import { iter } from "ts-utils/iter";
+import { pair } from "ts-utils/types";
 
 const resetPanrepeat = new PanRepeat(0, 0, 0, 0, true);
 
@@ -19,6 +19,7 @@ export class SectorEnt extends MessageHandlerReflective {
   constructor(
     private sectorEnt: Entity,
     private boardCtx: BoardContext,
+    private engine: EngineContext,
     private originz = 0,
     private zs: Set<number> = new Set(),
   ) { super() }
@@ -35,19 +36,13 @@ export class SectorEnt extends MessageHandlerReflective {
       .map(w => [board.sectors[w.nextsector].ceilingz / ZSCALE, board.sectors[w.nextsector].floorz / ZSCALE])
       .flatten()
       .set();
+    console.log(`originz=${this.originz}`);
   }
 
   Move(msg: Move) {
-    // if (this.ctx.state.get(MOVE_VERTICAL)) {
-    //   const ent = this.ctx.view.target().entity;
-    //   const z = ent != null && ent.isSector() && ent.id != this.sectorEnt.id
-    //     ? sectorZ(this.ctx.board(), ent) / ZSCALE
-    //     : this.ctx.gridController.snap(this.originz + msg.dz);
-    //   this.setZ(z * ZSCALE);
-    // }
     this.boardCtx.modifyBoard(`Set Sector ${this.sectorEnt.id}:${this.sectorEnt.type} Z`, board => {
-      console.log(`Move ${msg}`);
-      const newZ = this.boardCtx.grid.snap(this.originz + msg.dz, 0.25);
+      const newZ = gridSnap(this.boardCtx.grid.size.get(), this.originz + msg.dz, .25);
+      console.log(`originz=${this.originz} dz=${msg.dz} newz=${newZ}`);
       const z = iter(this.zs)
         .map(z => pair(z, Math.abs(newZ - z)))
         .filter(([_, dz]) => dz < (this.boardCtx.grid.size.get() * 0.25))

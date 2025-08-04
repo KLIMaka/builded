@@ -1,7 +1,8 @@
-import { Disposable, Source } from "@utils/callbacks";
-import { Dependency } from "@utils/injector";
-import { Consumer, Result } from "@utils/types";
 import Optional from "optional-js";
+import { Disposable } from "ts-utils/callbacks";
+import { Dependency } from "ts-utils/injector";
+import { Scheduler } from "ts-utils/scheduler";
+import { Consumer } from "ts-utils/types";
 
 // General
 export type Disconnector = Consumer<void>;
@@ -65,64 +66,6 @@ export interface Storage extends Disposable {
 }
 
 export type Storages = (name: string) => Promise<Storage>;
-
-// Scheduler
-export class TaskInerruptedError extends Error {
-  constructor() { super('Task Interrupted') }
-}
-
-export type EventLoop = Consumer<Consumer<number>>;
-
-export type ProgressInfo = {
-  readonly progress: Source<number>;
-  readonly info: Source<string>;
-}
-
-export interface TaskHandle {
-  plan(count: number): void;
-  incProgress(inc: number): void;
-  wait(info?: string, count?: number): Promise<void>;
-  waitFor<T>(promise: Promise<T>, info?: string, count?: number): Promise<T>;
-  waitForBatchTask(batch: Consumer<void>[], info?: string, time?: number): Promise<void>;
-}
-
-export const NOOP_TASK_HANDLE: TaskHandle = {
-  plan: (count: number) => { },
-  incProgress: (count: number) => { },
-  wait: (info?: string, count?: number) => Promise.resolve(),
-  waitFor: <T>(promise: Promise<T>, info?: string, count?: number) => promise,
-  waitForBatchTask: async (batch: Consumer<void>[], info?: string, time?: number) => batch.forEach(b => b()),
-}
-
-export type TaskValue<T> = {
-  isDone(): boolean;
-  progress(): ProgressInfo;
-  result(): Result<T>;
-}
-
-export function progress<T>(info: ProgressInfo): TaskValue<T> {
-  return { isDone: () => false, result: () => { throw new Error() }, progress: () => info }
-}
-
-export function done<T>(result: Result<T>): TaskValue<T> {
-  return { isDone: () => true, progress: () => { throw new Error() }, result: () => result }
-}
-
-export interface TaskController<T> extends ProgressInfo {
-  readonly paused: Source<boolean>;
-  readonly task: Source<TaskValue<T>>;
-
-  pause(): void;
-  unpause(): void;
-  stop(): Promise<void>;
-  end(): Promise<Result<T>>;
-}
-
-export type Task<T> = (handle: TaskHandle) => Promise<T>;
-
-export interface Scheduler {
-  exec<T>(task: Task<T>): TaskController<T>;
-}
 
 export interface App {
   readonly logger: Logger;

@@ -103,15 +103,14 @@ export function updateWall(ctx: RenderablesCacheContext, wallId: number, builder
   const [x2, y2] = [wall2.x, wall2.y];
   const tex = ctx.textures.get(wall.picnum).get();
   const info = art.get(wall.picnum);
-  const slope = createSlopeCalculator(board, sectorId);
-  const ceilingheinum = sector.ceilingstat.slopped ? sector.ceilingheinum : 0;
-  const ceilingz = sector.ceilingz;
   const floorheinum = sector.floorstat.slopped ? sector.floorheinum : 0;
   const floorz = sector.floorz;
   const normal = normals(wallNormal(wallNormal_, board, wallId));
 
   if (wall.nextwall === -1) {
-    const coords = getWallCoords(x1, y1, x2, y2, slope, slope, ceilingheinum, floorheinum, ceilingz, floorz);
+    const cslope = createSlopeCalculator(board, sectorId, true);
+    const fslope = createSlopeCalculator(board, sectorId, false);
+    const coords = getWallCoords(x1, y1, x2, y2, cslope, fslope);
     if (coords != null) {
       const base = wall.cstat.alignBottom ? floorz : ceilingz;
       applyWallTextureTransform(wall, wall2, wall, info, base, texMat_);

@@ -119,11 +119,20 @@ export function Axes(props: { cameraAngles: Source<vec2> }) {
     axis('-Z', zMinus, 'minus', m, 0, 1, 0)
   ].sort((l, r) => r.pos[2] - l.pos[2]);
 
-  return (<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg" className="axes">
+  return <svg width="100" height="100" xmlns="http://www.w3.org/2000/svg" className="axes">
     <circle cx="50" cy="50" r="50" className="axes-area" />
     {points.map(p => p.type === 'plus'
       ? <PlusAxis {...p} key={p.label} />
       : <MinusAxis {...p} key={p.label} />
     )}
-  </svg>);
+  </svg>;
 }
+
+// export function Axes(props: { cameraAngles: Source<vec2> }) {
+//   const [ax, ay] = useValue(props.cameraAngles);
+
+//   return <svg width="100" height="100" xmlns="http://www.w3.org/2000/svg" style={{ transform: `perspective(100px) rotateX(${ax - 90}deg) rotateZ(${-ay}deg)` }}>
+//     <circle cx="50" cy="50" r="40" strokeWidth={10} stroke="red" fill="none" />
+//     <line x1="50" y1="50" x2="100" y2="50" stroke="red" strokeWidth={10} />
+//   </svg>;
+// }

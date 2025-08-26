@@ -28,6 +28,11 @@
 //  filler - useless byte to make structure aligned
 //  lotag, hitag, extra - These variables used by the game programmer only
 
+export const SECTOR_NORMAL = 0;
+export const SECTOR_MASKED = 1;
+export const SECTOR_TRANSLUNCENT_MASKED = 2;
+export const SECTOR_REVERSE_TRANSLUNCENT_MASKED = 3;
+
 export type SectorStats = {
   parallaxing: boolean;
   slopped: number;
@@ -167,6 +172,7 @@ export type Wall = {
 export const FACE_SPRITE = 0;
 export const WALL_SPRITE = 1;
 export const FLOOR_SPRITE = 2;
+export const SLOPE_SPRITE = 3;
 
 export type SpriteStats = {
   blocking: number;

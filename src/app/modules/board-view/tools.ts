@@ -42,17 +42,17 @@ export function createSelection(values: ValuesContainer, hitscan: Source<Entity>
 export function createHitscan(values: ValuesContainer, ctl: Controller3D, viewPosition: Source<ViewPosition>, art: Source<Map<number, ArtInfoExtended>>, boardCtx: BoardContext): Source<Target[]> {
   const hit = new Hitscan();
   const ray = values.transformedTuple('ray', [ctl.forwardMouse, viewPosition], ([fwd, pos]) => new Ray(vec3.fromValues(pos.x, pos.y, pos.z), gl2build(vec3.create(), fwd)));
-  return values.transformedTuple('hitscan', [ray, viewPosition, art, boardCtx.board], ([{ start, dir }, pos, art, board]) => {
+  return values.transformedTuple('hitscan', [ray, viewPosition, art, boardCtx.data], ([{ start, dir }, pos, art, data]) => {
     if (pos.sec === -1) return [];
     const fwd = gl2build(vec3.create(), ctl.getForward());
     hit.reset(start[0], start[1], start[2], dir[0], dir[1], dir[2], fwd[0], fwd[1], fwd[2]);
-    hitscan(board, boardCtx.spritesBySector, art, pos.sec, hit, 0);
+    hitscan(data, art, pos.sec, hit, 0);
     return [...hit.targets()];
   }, { eq: (l, r) => arrayEq(l, r, targetEq) });
 }
 
 export function createSnapTarget(values: ValuesContainer, hitscan: Source<Target[]>, boardCtx: BoardContext): Source<Target> {
-  return values.transformedTuple('snap-target', [hitscan, boardCtx.board, boardCtx.grid.size], ([hit, board, gridSize]) => {
+  return values.transformedTuple('snap-target', [hitscan, boardCtx.data, boardCtx.grid.size], ([hit, data, gridSize]) => {
     if (hit.length === 0) return EMPTY_TARGET;
     const target = hit[0];
     // const { entity: ent, coords: [x, y, z] } = target;

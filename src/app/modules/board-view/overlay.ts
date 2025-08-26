@@ -1,9 +1,9 @@
-import { Aliases, ArtInfoExtended, EngineSettings } from "app/apis/engine";
+import { Aliases, ArtInfoExtended, BoardData, EngineSettings } from "app/apis/engine";
 import { sectorWalls } from "build/board/loops";
 import { sectorOfWall } from "build/board/query";
-import { Board, FACE_SPRITE, FLOOR_SPRITE, Sprite, Wall, WALL_SPRITE } from "build/board/structs";
+import { Board, FACE_SPRITE, FLOOR_SPRITE, Wall, WALL_SPRITE } from "build/board/structs";
 import { EMPTY_ENTITY, Entity, EntityType } from "build/hitscan";
-import { faceSprite, floorSprite, SpriteInfo, spriteInfo, wallSprite } from "build/sprites";
+import { SpriteDescriptor } from "build/sprites";
 import { createSlopeCalculator, slope, wallNormal, ZSCALE } from "build/utils";
 import { vec2, vec3 } from "gl-matrix";
 import { match } from "ts-pattern";
@@ -176,16 +176,16 @@ function selecSector(hitscan: Entity, board: Board, renderer: BoardRenderer3D, b
   return renderables(sectorR, renderer.writeLines(contour), renderer.writeScreenSprites([...points, ...fwLabel]));
 }
 
-function getWallSprite(info: SpriteInfo, renderer: BoardRenderer3D, settings: EngineSettings): Renderable {
-  const ws = wallSprite(info);
+function getWallSprite(descriptor: SpriteDescriptor, renderer: BoardRenderer3D, settings: EngineSettings): Renderable {
+  const ws = descriptor.wall();
   const a = vec3.fromValues(ws.x1, ws.ztop, ws.y1)
   const b = vec3.fromValues(ws.x2, ws.ztop, ws.y2);
   const c = vec3.fromValues(ws.x2, ws.zbottom, ws.y2);
   const d = vec3.fromValues(ws.x1, ws.zbottom, ws.y1);
   const wpos = vec3.lerp(vec3.create(), a, b, 0.5);
   const hpos = vec3.lerp(vec3.create(), a, d, 0.5);
-  const labelw = printText(`${info.w}`, settings.fontPicnum, 16, FONT_SIZE, wpos);
-  const labelh = printText(`${info.h}`, settings.fontPicnum, 16, FONT_SIZE, hpos);
+  const labelw = printText(`${descriptor.info.w}`, settings.fontPicnum, 16, FONT_SIZE, wpos);
+  const labelh = printText(`${descriptor.info.h}`, settings.fontPicnum, 16, FONT_SIZE, hpos);
   return renderables(renderer.writeLines([
     { start: a, end: b },
     { start: b, end: c },
@@ -194,16 +194,16 @@ function getWallSprite(info: SpriteInfo, renderer: BoardRenderer3D, settings: En
   ]), renderer.writeScreenSprites([...labelw, ...labelh]));
 }
 
-function getFloorSprite(info: SpriteInfo, renderer: BoardRenderer3D, settings: EngineSettings): Renderable {
-  const fs = floorSprite(info);
+function getFloorSprite(descriptor: SpriteDescriptor, renderer: BoardRenderer3D, settings: EngineSettings): Renderable {
+  const fs = descriptor.floor();
   const a = vec3.fromValues(fs.x1, fs.z, fs.y1);
   const b = vec3.fromValues(fs.x2, fs.z, fs.y2);
   const c = vec3.fromValues(fs.x3, fs.z, fs.y3);
   const d = vec3.fromValues(fs.x4, fs.z, fs.y4);
   const wpos = vec3.lerp(vec3.create(), a, b, 0.5);
   const hpos = vec3.lerp(vec3.create(), a, d, 0.5);
-  const labelw = printText(`${info.w}`, settings.fontPicnum, 16, FONT_SIZE, wpos);
-  const labelh = printText(`${info.h}`, settings.fontPicnum, 16, FONT_SIZE, hpos);
+  const labelw = printText(`${descriptor.info.w}`, settings.fontPicnum, 16, FONT_SIZE, wpos);
+  const labelh = printText(`${descriptor.info.h}`, settings.fontPicnum, 16, FONT_SIZE, hpos);
   return renderables(renderer.writeLines([
     { start: a, end: b },
     { start: b, end: c },
@@ -212,11 +212,11 @@ function getFloorSprite(info: SpriteInfo, renderer: BoardRenderer3D, settings: E
   ]), renderer.writeScreenSprites([...labelw, ...labelh]));
 }
 
-function getFaceSprite(info: SpriteInfo, renderer: BoardRenderer3D): Renderable {
-  const fs = faceSprite(info);
-  const x = info.x;
-  const y = info.y;
-  const z = info.z;
+function getFaceSprite(descripor: SpriteDescriptor, renderer: BoardRenderer3D): Renderable {
+  const fs = descripor.face();
+  const x = descripor.info.x;
+  const y = descripor.info.y;
+  const z = descripor.info.z;
   const a = vec3.fromValues(x + fs.left, z + fs.top, y + fs.left);
   const b = vec3.fromValues(x + fs.right, z + fs.top, y + fs.left);
   const c = vec3.fromValues(x + fs.right, z + fs.top, y + fs.right);
@@ -241,26 +241,23 @@ function getFaceSprite(info: SpriteInfo, renderer: BoardRenderer3D): Renderable 
   ]);
 }
 
-function selectSprite(hitscan: Entity, board: Board, renderer: BoardRenderer3D, boardGlCtx: BoardGlContext, settings: EngineSettings, aliases: Aliases, art: Map<number, ArtInfoExtended>): Renderable {
+function selectSprite(hitscan: Entity, data: BoardData, renderer: BoardRenderer3D, boardGlCtx: BoardGlContext, settings: EngineSettings, aliases: Aliases, art: Map<number, ArtInfoExtended>): Renderable {
+  const { board } = data;
   const sprite = board.sprites[hitscan.id];
-  const lotag = settings.lotagSpriteText(sprite);
-  const alias = aliases.get(sprite.picnum);
-  const aliasLabel = alias.length === 0 ? '' : `[${alias}]`;
-  const label = iter([lotag, aliasLabel]).filter(s => s.length !== 0).collect().join(' ');
-  const info = spriteInfo(board, hitscan.id, art);
+  const descriptor = data.spriteDescriptor(hitscan.id);
   return match(sprite.cstat.type)
-    .with(FACE_SPRITE, () => getFaceSprite(info, renderer))
-    .with(WALL_SPRITE, () => getWallSprite(info, renderer, settings))
-    .with(FLOOR_SPRITE, () => getFloorSprite(info, renderer, settings))
+    .with(FACE_SPRITE, () => getFaceSprite(descriptor, renderer))
+    .with(WALL_SPRITE, () => getWallSprite(descriptor, renderer, settings))
+    .with(FLOOR_SPRITE, () => getFloorSprite(descriptor, renderer, settings))
     .otherwise(() => NOOP_RENDERABLE);
 }
 
 export function getOverlay(boardGlCtx: BoardGlContext) {
-  return ([hitscan, board, settings, renderer, aliases, art]: [Entity, Board, EngineSettings, BoardRenderer3D, Aliases, Map<number, ArtInfoExtended>]) => match(hitscan)
+  return ([hitscan, data, settings, renderer, aliases, art]: [Entity, BoardData, EngineSettings, BoardRenderer3D, Aliases, Map<number, ArtInfoExtended>]) => match(hitscan)
     .with(EMPTY_ENTITY, () => NOOP_RENDERABLE)
-    .when(h => h.isSector(), h => selecSector(h, board, renderer, boardGlCtx, settings))
-    .when(h => h.isWall(), h => selectWall(h, board, renderer, boardGlCtx, settings))
-    .when(h => h.isSprite(), h => selectSprite(h, board, renderer, boardGlCtx, settings, aliases, art))
-    .when(h => h.isEdge(), h => selectEdge(h, board, renderer))
+    .when(h => h.isSector(), h => selecSector(h, data.board, renderer, boardGlCtx, settings))
+    .when(h => h.isWall(), h => selectWall(h, data.board, renderer, boardGlCtx, settings))
+    .when(h => h.isSprite(), h => selectSprite(h, data, renderer, boardGlCtx, settings, aliases, art))
+    .when(h => h.isEdge(), h => selectEdge(h, data.board, renderer))
     .otherwise(() => NOOP_RENDERABLE)
 }

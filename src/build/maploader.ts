@@ -1,5 +1,5 @@
 import { struct, bits, ushort, int, short, byte, ubyte, uint, Stream, array, bit } from 'ts-utils/stream';
-import { SectorStats, Sector, WallStats, Wall, SpriteStats, Sprite, Board, FACE_SPRITE } from './board/structs';
+import { SectorStats, Sector, WallStats, Wall, SpriteStats, Sprite, Board, FACE_SPRITE, SECTOR_NORMAL } from './board/structs';
 import { ZSCALE } from './utils';
 
 export const sectorStats = struct<SectorStats>()
@@ -224,7 +224,7 @@ export function initSectorStats() {
   stat.xflip = 0;
   stat.yflip = 0;
   stat.tror = 0;
-  stat.type = 0;
+  stat.type = SECTOR_NORMAL;
   stat.blocking = 0;
   stat.hitscan = 0;
   stat.unk12 = stat.unk13 = stat.unk14 = 0;

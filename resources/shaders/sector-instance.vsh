@@ -20,11 +20,12 @@ flat out float trans;
 
 void main() {
   sector_t sector = loadSector(sectors, uint(aPos3SecPart.z));
-  bool ceiling = aPos3SecPart.w == 0.0;
-  vec2 pos = getPos(sector, ceiling, gl_VertexID, aPos12, aPos3SecPart.xy);
+  bool ceiling = (uint(aPos3SecPart.w) & uint(1)) == uint(0);
+  uint typeOverride = uint(aPos3SecPart.w) >> uint(1);
+  vec2 pos = getPos(ceiling, gl_VertexID, aPos12, aPos3SecPart.xy);
   sector_info_t sectorInfo = getSectorInfo(walls, infos, sector, ceiling, pos);
 
-  uint type = sector_cstat_type(ceiling ? sector.ceilingFloorCstat.x : sector.ceilingFloorCstat.y);
+  uint type = typeOverride;
   vec3 wpos = sectorInfo.pos;
   vec4 finalPos = P * V * vec4(wpos, 1.0);
   vec3 eyepos = (IV * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
@@ -33,6 +34,6 @@ void main() {
   parallax = vec4(wpos - eyepos,  sectorInfo.parallax ? 1.0 : 0.0);
   picInfo = sectorInfo.picInfo;
   tc = sectorInfo.tc;
-  trans = type == uint(0) ? 1.0 : type == uint(1) ? 0.0 : type == uint(2) ? TRANS2 : TRANS1;
+  trans = type == uint(0) ? 1.0 : type == uint(2) ? TRANS2 : TRANS1;
   params = ivec4(sectorInfo.shade, sectorInfo.pal, int(sector.visibility), 0);
 }

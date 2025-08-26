@@ -207,14 +207,14 @@ export class BoardRenderer3D implements Disposable {
           const p1 = points[i];
           const p2 = points[i + 1];
           const p3 = points[i + 2];
-          if (ceiling) {
+          if (ceiling > 0) {
             pos12(p1[0], p1[1], p2[0], p2[1]);
-            pos3Sec(p3[0], p3[1], sectorId, 0);
+            pos3Sec(p3[0], p3[1], sectorId, ((ceiling - 1) << 1) | 0);
             builder.writeVertex();
           }
-          if (floor) {
+          if (floor > 0) {
             pos12(p1[0], p1[1], p2[0], p2[1]);
-            pos3Sec(p3[0], p3[1], sectorId, 1);
+            pos3Sec(p3[0], p3[1], sectorId, ((floor - 1) << 1) | 1);
             builder.writeVertex();
           }
         }

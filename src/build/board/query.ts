@@ -1,14 +1,14 @@
-import { BiConsumer, Function } from "ts-utils/types";
-import { BuildRor, BuildTror } from "app/apis/engine";
+import { BoardData } from "app/apis/engine";
+import { ArtInfo } from "build/formats/art";
 import { any, findFirst, interpolate, intersect, range } from "ts-utils/collections";
 import { LinearInterpolator } from "ts-utils/interpolator";
 import { iter } from "ts-utils/iter";
 import { clamp, cross2d, int, len2d } from "ts-utils/mathutils";
+import { BiConsumer, Function } from "ts-utils/types";
 import { slope } from "../utils";
 import { connectedWalls, sectorWalls } from "./loops";
 import { DEFAULT_REPEAT_RATE } from "./mutations/internal";
 import { Board, Sector, Sprite, Wall } from "./structs";
-import { ArtInfo } from "build/formats/art";
 
 export function isValidWallId(board: Board, wallId: number): boolean {
   return wallId >= 0 && wallId < board.numwalls;
@@ -165,7 +165,8 @@ export type FindSectorResult = Readonly<{
   sec: number
 }>;
 
-export function findSector(board: Board, tror: BuildTror, ror: BuildRor, x: number, y: number, z: number, sectorId: number = -1): FindSectorResult {
+export function findSector(data: BoardData, x: number, y: number, z: number, sectorId: number = -1): FindSectorResult {
+  const { board, ror, tror } = data;
   if (!isValidSectorId(board, sectorId)) return findSectorAll(board, x, y, z);
   const secs = new Set<number>();
   secs.add(sectorId);
@@ -176,12 +177,12 @@ export function findSector(board: Board, tror: BuildTror, ror: BuildRor, x: numb
       const trorCeilingSectors = tror.ceiling(sec);
       if (trorCeilingSectors.length !== 0) {
         const cz = slope(board, sec, x, y, true);
-        if (z < cz) return findSector(board, tror, ror, x, y, z, trorCeilingSectors[0]);
+        if (z < cz) return findSector(data, x, y, z, trorCeilingSectors[0]);
       }
       const trorFloorSectors = tror.floor(sec);
       if (trorFloorSectors.length !== 0) {
         const fz = slope(board, sec, x, y, false);
-        if (z > fz) return findSector(board, tror, ror, x, y, z, trorFloorSectors[0]);
+        if (z > fz) return findSector(data, x, y, z, trorFloorSectors[0]);
       }
 
       const ceilingLink = ror.rorLinks.ceilLink(sec);
@@ -191,7 +192,7 @@ export function findSector(board: Board, tror: BuildTror, ror: BuildRor, x: numb
           const nx = x - ceilingLink.buildDiff[0];
           const ny = y - ceilingLink.buildDiff[1];
           const nz = z - ceilingLink.buildDiff[2];
-          return findSector(board, tror, ror, nx, ny, nz, ceilingLink.dstSector);
+          return findSector(data, nx, ny, nz, ceilingLink.dstSector);
         }
       }
 
@@ -202,7 +203,7 @@ export function findSector(board: Board, tror: BuildTror, ror: BuildRor, x: numb
           const nx = x - floorLink.buildDiff[0];
           const ny = y - floorLink.buildDiff[1];
           const nz = z - floorLink.buildDiff[2];
-          return findSector(board, tror, ror, nx, ny, nz, floorLink.dstSector);
+          return findSector(data, nx, ny, nz, floorLink.dstSector);
         }
       }
       return { sec, x, y, z };

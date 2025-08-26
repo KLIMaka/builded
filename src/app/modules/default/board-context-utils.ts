@@ -1,7 +1,8 @@
-import { Disconnector, Value } from "ts-utils/callbacks";
-import { Consumer } from "ts-utils/types";
+import { Disconnector, Source, Value } from "ts-utils/callbacks";
+import { BiConsumer, Consumer } from "ts-utils/types";
 import { Board } from "build/board/structs";
 import { applyPatches, Draft, Patch, produceWithPatches } from "immer";
+import { BoardData } from "app/apis/engine";
 
 type Changes = {
   sectors: Set<number>;
@@ -42,19 +43,20 @@ function createHistoryEntry(label: string, patches: Patch[], undoPatches: Patch[
 }
 
 
-export function createBoardModifier<B extends Board>(boardValue: Value<B>) {
-  const sectorListeners = new Set<Consumer<Set<number>>>();
-  const wallListeners = new Set<Consumer<Set<number>>>();
-  const spriteListeners = new Set<Consumer<Set<number>>>();
-  const onSectorsChange = (c: Consumer<Set<number>>): Disconnector => { sectorListeners.add(c); return () => sectorListeners.delete(c) };
-  const onWallsChange = (c: Consumer<Set<number>>): Disconnector => { wallListeners.add(c); return () => wallListeners.delete(c) };
-  const onSpritesChange = (c: Consumer<Set<number>>): Disconnector => { spriteListeners.add(c); return () => spriteListeners.delete(c) };
+export function createBoardModifier<B extends Board>(boardValue: Value<B>, boardData: Source<BoardData<B>>) {
+  const sectorListeners = new Set<BiConsumer<BoardData<B>, Set<number>>>();
+  const wallListeners = new Set<BiConsumer<BoardData<B>, Set<number>>>();
+  const spriteListeners = new Set<BiConsumer<BoardData<B>, Set<number>>>();
+  const onSectorsChange = (c: BiConsumer<BoardData<B>, Set<number>>): Disconnector => { sectorListeners.add(c); return () => sectorListeners.delete(c) };
+  const onWallsChange = (c: BiConsumer<BoardData<B>, Set<number>>): Disconnector => { wallListeners.add(c); return () => wallListeners.delete(c) };
+  const onSpritesChange = (c: BiConsumer<BoardData<B>, Set<number>>): Disconnector => { spriteListeners.add(c); return () => spriteListeners.delete(c) };
   const history: HistoryEntry[] = [];
 
-  function sendNotifications(changes: Changes) {
-    if (changes.sectors.size !== 0) sectorListeners.forEach(l => l(changes.sectors));
-    if (changes.walls.size !== 0) wallListeners.forEach(l => l(changes.walls));
-    if (changes.sprites.size !== 0) spriteListeners.forEach(l => l(changes.sprites));
+  function sendNotifications(board: B, changes: Changes) {
+    const data = boardData.get();
+    if (changes.sectors.size !== 0) sectorListeners.forEach(l => l(data, changes.sectors));
+    if (changes.walls.size !== 0) wallListeners.forEach(l => l(data, changes.walls));
+    if (changes.sprites.size !== 0) spriteListeners.forEach(l => l(data, changes.sprites));
   }
 
   function modifyBoard(label: string, mod: Consumer<Draft<B>>) {
@@ -67,17 +69,17 @@ export function createBoardModifier<B extends Board>(boardValue: Value<B>) {
       const [newNextBoard, newPatches, newUndoPatches] = produceWithPatches(prevBoard, draft => applyPatches(draft, [...prevEntry.patches, ...patches]));
       boardValue.set(newNextBoard);
       if (newUndoPatches.length === 0) {
-        sendNotifications(prevEntry.changes);
+        sendNotifications(newNextBoard, prevEntry.changes);
       } else {
         const entry = createHistoryEntry(label, newPatches, newUndoPatches);
         history.push(entry);
-        sendNotifications(mergeChanges(entry.changes, prevEntry.changes));
+        sendNotifications(newNextBoard, mergeChanges(entry.changes, prevEntry.changes));
       }
     } else {
       boardValue.set(nextBoard);
       const entry = createHistoryEntry(label, patches, undoPatches);
       history.push(entry);
-      sendNotifications(entry.changes);
+      sendNotifications(nextBoard, entry.changes);
     }
   }
 
@@ -86,7 +88,7 @@ export function createBoardModifier<B extends Board>(boardValue: Value<B>) {
     const entry = history.pop();
     const undoBoard = applyPatches(boardValue.get(), entry.undoPatches);
     boardValue.set(undoBoard);
-    sendNotifications(entry.changes);
+    sendNotifications(undoBoard, entry.changes);
   }
 
   return { modifyBoard, onSectorsChange, onWallsChange, onSpritesChange, undo };

@@ -28,7 +28,7 @@ export class WallSegmentsEnt extends MessageHandlerReflective {
     public origin = vec2.create(),
     public refwall = -1,
     public active = false,
-    public canonicalWalls = iter(walls).map(w => canonicalWall(boardCtx.board.get(), w.id)).set(),
+    public canonicalWalls = iter(walls).map(w => canonicalWall(boardCtx.data.get().board, w.id)).set(),
     private valid = true) { super() }
 
 
@@ -40,7 +40,7 @@ export class WallSegmentsEnt extends MessageHandlerReflective {
   }
 
   public StartMove(msg: StartMove) {
-    const board = this.boardCtx.board.get();
+    const { board } = this.boardCtx.data.get();
     this.refwall = getClosestWallByIds(board, msg.origin, this.canonicalWalls);
     const wall = board.walls[this.refwall];
     vec2.set(this.origin, wall.x, wall.y);

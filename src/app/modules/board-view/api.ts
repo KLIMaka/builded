@@ -2,7 +2,7 @@ import { Disposable } from "ts-utils/callbacks";
 import { iter } from "ts-utils/iter";
 import { vec2, vec3 } from "gl-matrix";
 
-export type SectorRecord = { sectorId: number, ceiling: boolean, floor: boolean };
+export type SectorRecord = { sectorId: number, ceiling: number, floor: number };
 export enum WallType { VOID, NONMASKED, MASKED, ONLY_MASKED, ONLY_UPPER, ONLY_LOWER };
 export type WallRecord = { wallId: number, sectorId: number, type: WallType };
 export type SpriteRecord = { spriteId: number };

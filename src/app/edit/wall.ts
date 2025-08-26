@@ -19,7 +19,7 @@ export class WallEnt extends MessageHandlerReflective {
     private valid = true) { super() }
 
   StartMove(msg: StartMove) {
-    const board = this.boardCtx.board.get();
+    const { board } = this.boardCtx.data.get();
     const wall = board.walls[this.wallId];
     // if (this.ctx.state.get(MOVE_COPY)) {
     //   this.wallId = splitWall(board, this.wallId, wall.x, wall.y, this.ctx.art, this.ctx.refs, this.ctx.api.cloneWall);

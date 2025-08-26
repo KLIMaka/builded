@@ -66,15 +66,15 @@ export function createBoardGlContext(values: ValuesContainer, glCtx: GlContext, 
     writeData(gl, sectors.value, data, id);
   }
 
-  const onSectorsDisconnector = boardCtx.onSectorsChange(s => s.forEach(s => applyNotNullish(boardCtx.board.get().sectors[s], sec => writeSector(s, sec))));
-  const onWallsDisconnector = boardCtx.onWallsChange(w => w.forEach(w => applyNotNullish(boardCtx.board.get().walls[w], wall => writeWall(w, wall))));
-  const onSpritesDisconnector = boardCtx.onSpritesChange(s => s.forEach(s => applyNotNullish(boardCtx.board.get().sprites[s], spr => writeSprite(s, spr))));
-  const board = boardCtx.board.get();
+  const onSectorsDisconnector = boardCtx.onSectorsChange((b, s) => s.forEach(s => applyNotNullish(b.board.sectors[s], sec => writeSector(s, sec))));
+  const onWallsDisconnector = boardCtx.onWallsChange((b, w) => w.forEach(w => applyNotNullish(b.board.walls[w], wall => writeWall(w, wall))));
+  const onSpritesDisconnector = boardCtx.onSpritesChange((b, s) => s.forEach(s => applyNotNullish(b.board.sprites[s], spr => writeSprite(s, spr))));
+  const board = boardCtx.data.get().board;
   board.sectors.forEach((s, i) => writeSector(i, s));
   board.sprites.forEach((s, i) => writeSprite(i, s));
   board.walls.forEach((w, i) => writeWall(i, w));
 
-  const sectorPoints = values.transformed('sector-points', boardCtx.board, board => memoize((s: number) => triangulate(board, s)));
+  const sectorPoints = values.transformed('sector-points', boardCtx.data, data => memoize((s: number) => triangulate(data.board, s)));
 
   const dispose = async () => {
     walls.dispose();

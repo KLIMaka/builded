@@ -28,7 +28,7 @@ export class SectorEnt extends MessageHandlerReflective {
     // const sec = ctx.board.sectors[this.sectorId];
     // const slope = createSlopeCalculator(sec, ctx.board.walls);
     // this.originz = slope(x, y, this.type == HitType.CEILING ? sec.ceilingheinum : sec.floorheinum) + sectorZ(ctx.board, this.sectorId, this.type)) / ZSCALE;
-    const board = this.boardCtx.board.get()
+    const { board } = this.boardCtx.data.get()
     this.originz = sectorZ(board, this.sectorEnt) / ZSCALE;
     this.zs = iter(sectorWalls(board, this.sectorEnt.id))
       .map(w => board.walls[w])

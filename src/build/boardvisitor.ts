@@ -1,5 +1,5 @@
 import { Function } from 'ts-utils/types';
-import { BuildTror } from 'app/apis/engine';
+import { BoardData, BuildTror } from 'app/apis/engine';
 import { vec3 } from 'gl-matrix';
 import { Deck } from 'ts-utils/collections';
 import { RadialSegment, RadialSegments, TWO_PI, createSegment, dot2d, len2d, monoatan2 } from 'ts-utils/mathutils';
@@ -142,7 +142,8 @@ class VisResultImpl implements VisResult {
   forSprite(sprv: SpriteVisitor) { this.sprites.forEach(([s, d]) => sprv(s, d)) }
 }
 
-export function visitFromSector(ms: MoveStruct, fwd: vec3, board: Board, tror: BuildTror, spritesBySector: Function<number, number[]>): VisResult {
+export function visitFromSector(ms: MoveStruct, fwd: vec3, data: BoardData): VisResult {
+  const { board, spritesBySector, tror } = data;
   const visitedSectors = new Set<number>();
   const sectors: number[] = [];
   const walls: [number, number, number][] = [];

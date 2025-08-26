@@ -8,12 +8,10 @@ struct sector_info_t {
   int pal;
 };
 
-vec2 getPos(sector_t sector, bool ceiling, int vtxId, vec4 pos12, vec2 pos3) {
-  uint cstat = ceiling ? sector.ceilingFloorCstat.x : sector.ceilingFloorCstat.y;
-  bool render = !sector_cstat_tror(cstat) || sector_cstat_type(cstat) != uint(0);
-  if (vtxId == 0) return render ? (ceiling ? pos12.xy : pos3) : vec2(0.0);
-  else if (vtxId == 1) return render ? pos12.zw : vec2(0.0);
-  else if (vtxId == 2) return render ? (ceiling ? pos3 : pos12.xy) : vec2(0.0);
+vec2 getPos(bool ceiling, int vtxId, vec4 pos12, vec2 pos3) {
+  if (vtxId == 0) return ceiling ? pos12.xy : pos3;
+  else if (vtxId == 1) return pos12.zw;
+  else if (vtxId == 2) return ceiling ? pos3 : pos12.xy;
 }
 
 vec3 getTc(vec2 pos, sector_t sector, vec4 orient, pic_t pic, bool ceiling) {

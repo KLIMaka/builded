@@ -5,8 +5,9 @@ import { cross2d, int, len2d, ortonorm2d, sign } from "ts-utils/mathutils";
 import { inSector } from "./board/query";
 import { Board, FACE_SPRITE, FLOOR_SPRITE, Sector, WALL_SPRITE } from "./board/structs";
 import { ArtInfo } from "./formats/art";
-import { SpriteInfo, faceSprite, floorSprite, spriteInfo, wallSprite } from "./sprites";
+import { SpriteDescriptor, SpriteInfo, faceSprite, floorSprite, spriteInfo, wallSprite } from "./sprites";
 import { ANGSCALE, ZSCALE, inPolygon, rayIntersect, slope } from "./utils";
+import { BoardData } from "app/apis/engine";
 
 export enum EntityType {
   NONE, FLOOR, CEILING, UPPER_WALL, MID_WALL, LOWER_WALL, SPRITE, WALL_POINT, WALL_FLOOR, WALL_CEILING, WALL_NEXT_LOWER, WALL_NEXT_UPPER
@@ -236,33 +237,33 @@ function intersectWall(board: Board, wallId: number, hit: Hitscan): number {
   return nextsecId;
 }
 
-function intersectFaceSprite(sprId: number, sinfo: SpriteInfo, hit: Hitscan) {
+function intersectFaceSprite(sprId: number, descriptor: SpriteDescriptor, hit: Hitscan) {
   const [xs, ys, zs] = hit.ray.start;
   const [vx, vy, vz] = hit.ray.dir;
   const [fx, fy] = hit.forward;
   if (vx === 0 && vy === 0) return;
 
-  const sprite = faceSprite(sinfo);
+  const sprite = descriptor.face();
   const [ofx, ofy] = ortonorm2d(fx, fy);
   const p1 = sprite.left;
   const p2 = sprite.right;
-  const x1 = sinfo.x + ofx * p1;
-  const y1 = sinfo.y + ofy * p1;
-  const x2 = sinfo.x + ofx * p2;
-  const y2 = sinfo.y + ofy * p2;
+  const x1 = descriptor.info.x + ofx * p1;
+  const y1 = descriptor.info.y + ofy * p1;
+  const x2 = descriptor.info.x + ofx * p2;
+  const y2 = descriptor.info.y + ofy * p2;
 
   const inter = rayIntersect(xs, ys, zs / ZSCALE, vx, vy, vz / ZSCALE, x1, y1, x2, y2);
   if (inter === null) return;
   const [ix, iy, iz, it] = inter;
-  if ((iz > sinfo.z + sprite.top) || (iz < sinfo.z + sprite.bottom)) return;
+  if ((iz > descriptor.info.z + sprite.top) || (iz < descriptor.info.z + sprite.bottom)) return;
   hit.hit(it, sprId, EntityType.SPRITE, ix, iy, iz * ZSCALE);
 }
 
-function intersectWallSprite(board: Board, sprId: number, sinfo: SpriteInfo, hit: Hitscan) {
+function intersectWallSprite(board: Board, sprId: number, descriptor: SpriteDescriptor, hit: Hitscan) {
   const [xs, ys, zs] = hit.ray.start;
   const [vx, vy, vz] = hit.ray.dir;
   const spr = board.sprites[sprId];
-  const sprite = wallSprite(sinfo);
+  const sprite = descriptor.wall();
   if (spr.cstat.onesided && cross2d(sprite.x1 - xs, sprite.y1 - ys, sprite.x2 - xs, sprite.y2 - ys) < 0) return;
   const intersect = rayIntersect(xs, ys, zs / ZSCALE, vx, vy, vz / ZSCALE, sprite.x1, sprite.y1, sprite.x2, sprite.y2);
   if (intersect == null) return;
@@ -284,37 +285,38 @@ function points(x1: number, y1: number, x2: number, y2: number, x3: number, y3: 
   return arr;
 }
 
-function intersectFloorSprite(sprId: number, sinfo: SpriteInfo, hit: Hitscan) {
+function intersectFloorSprite(sprId: number, descriptor: SpriteDescriptor, hit: Hitscan) {
   const [xs, ys, zs] = hit.ray.start;
   const [vx, vy, vz] = hit.ray.dir;
   if (vz === 0) return;
   const zss = zs / ZSCALE;
   const vzs = vz / ZSCALE;
-  if (sinfo.onesided && !sinfo.yf && vzs > 0) return;
-  if (sinfo.onesided && sinfo.yf && vzs < 0) return;
-  const dz = sinfo.z - zss;
+  if (descriptor.info.onesided && !descriptor.info.yf && vzs > 0) return;
+  if (descriptor.info.onesided && descriptor.info.yf && vzs < 0) return;
+  const dz = descriptor.info.z - zss;
   if (sign(dz) !== sign(vzs)) return;
   const t = dz / vzs;
   const ix = xs + int(vx * t);
   const iy = ys + int(vy * t);
-  const sprite = floorSprite(sinfo);
+  const sprite = descriptor.floor();
   if (!inPolygon(ix, iy, points(sprite.x1, sprite.y1, sprite.x2, sprite.y2, sprite.x3, sprite.y3, sprite.x4, sprite.y4))) return;
-  hit.hit(t - SPRITE_OFF, sprId, EntityType.SPRITE, ix, iy, sinfo.z);
+  hit.hit(t - SPRITE_OFF, sprId, EntityType.SPRITE, ix, iy, descriptor.info.z);
 }
 
-function intersectSprite(board: Board, artInfo: Map<number, ArtInfo>, sprId: number, hit: Hitscan) {
+function intersectSprite(board: Board, artInfo: Map<number, ArtInfo>, sprId: number, spriteDescriptor: Function<number, SpriteDescriptor>, hit: Hitscan) {
   const spr = board.sprites[sprId];
-  const sinfo = spriteInfo(board, sprId, artInfo);
+  const descriptor = spriteDescriptor(sprId);
   if (spr.cstat.type === FACE_SPRITE) {
-    intersectFaceSprite(sprId, sinfo, hit);
+    intersectFaceSprite(sprId, descriptor, hit);
   } else if (spr.cstat.type === WALL_SPRITE) {
-    intersectWallSprite(board, sprId, sinfo, hit);
+    intersectWallSprite(board, sprId, descriptor, hit);
   } else if (spr.cstat.type === FLOOR_SPRITE) {
-    intersectFloorSprite(sprId, sinfo, hit);
+    intersectFloorSprite(sprId, descriptor, hit);
   }
 }
 
-export function hitscan(board: Board, spritesBySector: Function<number, number[]>, artInfo: Map<number, ArtInfo>, secId: number, hit: Hitscan, cliptype: number) {
+export function hitscan(data: BoardData, artInfo: Map<number, ArtInfo>, secId: number, hit: Hitscan, cliptype: number) {
+  const { board, spritesBySector, spriteDescriptor } = data;
   const stack = new Set([secId]);
   for (const s of stack) {
     const sec = board.sectors[s];
@@ -330,7 +332,7 @@ export function hitscan(board: Board, spritesBySector: Function<number, number[]
     const sprs = spritesBySector(s);
     if (sprs === undefined) continue;
     for (let j = 0; j < sprs.length; j++) {
-      intersectSprite(board, artInfo, sprs[j], hit);
+      intersectSprite(board, artInfo, sprs[j], spriteDescriptor, hit);
     }
   }
 }

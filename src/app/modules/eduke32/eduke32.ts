@@ -1,12 +1,13 @@
 import { HasSymbols, createScripFile, defaultDefine, nestedRule, number, rules, rulesInclude, set, simpleRule, symbols, token, tuple } from "@utils/scriptfile";
-import { Aliases, ArtInfoExtended, BoardContext, BuildRor, BuildTror, EMPTY_ALIASES, EMPTY_TAGS, EngineContext, EngineSettings, GlBlend, NamedArtFile, Palette, PicTags, RorLink, VoxelSwap } from "app/apis/engine";
+import { Aliases, ArtInfoExtended, BoardContext, BuildRor, BuildTror, DEFAULT_SECTOR_SETTING, EMPTY_ALIASES, EMPTY_TAGS, EngineContext, EngineSettings, GlBlend, NamedArtFile, Palette, PicTags, RorLink, SectorSettings, VoxelSwap } from "app/apis/engine";
 import { FileSystem } from "app/apis/fs";
 import { EngineApi } from "build/board/mutations/api";
-import { isValidSectorId } from "build/board/query";
-import { Board, Sector, Sprite, Wall } from "build/board/structs";
+import { forAllSectors, isValidSectorId } from "build/board/query";
+import { Board, Sector, SECTOR_NORMAL, SECTOR_REVERSE_TRANSLUNCENT_MASKED, SECTOR_TRANSLUNCENT_MASKED, Sprite, Wall } from "build/board/structs";
 import { AnimationType } from "build/formats/art";
 import { VoxelData, readKvx } from "build/formats/kvx";
 import { cloneBoard, cloneSector, cloneSprite, cloneWall, loadBuildMap, newBoard, newSector, newSprite, newWall, saveBuildMap } from "build/maploader";
+import { spriteInfo } from "build/sprites";
 import { slope } from "build/utils";
 import { vec3 } from "gl-matrix";
 import Optional from "optional-js";
@@ -25,7 +26,7 @@ import { createBoardModifier } from "../default/board-context-utils";
 import { loadArtWork, loadEditorPicAddons, loadMaxPluId, loadPicAddonsWork, openFileOptional } from "../default/engine-commons";
 import { DefaultGridController } from "../default/grid";
 import { stack, trackFilesSingle } from "../fs/fs";
-import { EngineDefs, GrpInfo, loadEngineDefsWork, PalDef, PluDef } from "./defs";
+import { EngineDefs, GrpInfo, PalDef, PluDef, loadEngineDefsWork } from "./defs";
 import { SE_TAGS, sectorLotagText } from "./tags";
 
 function engineApi(): EngineApi<Board> {
@@ -295,7 +296,7 @@ function getTror(board: Board): BuildTror {
   return { ceiling, floor }
 }
 
-function getRor(board: Board): BuildRor {
+function getRor(board: Board, tror: BuildTror): [BuildRor, Map<number, SectorSettings>] {
   const TRANSPORT_TAG = 7;
   const WATER_TAG = 1;
   const UNDERWATER_TAG = 2;
@@ -306,13 +307,13 @@ function getRor(board: Board): BuildRor {
     .group(([spr, s, sec]) => spr.hitag, identity());
   const floorLinks = new Map<number, RorLink>();
   const ceilingLinks = new Map<number, RorLink>();
+  const settings = new Map<number, SectorSettings>();
   for (const links of transportsByHitag.values()) {
     if (links.length !== 2) continue;
     let [spr1, s1, sec1] = links[0];
     let [spr2, s2, sec2] = links[1];
     if (sec1.lotag === WATER_TAG) [spr1, spr2, s1, s2, sec1, sec2] = [spr2, spr1, s2, s1, sec2, sec1];
-    board.sectors[spr1.sectnum].ceilingstat.type = 2;
-    board.sectors[spr2.sectnum].floorstat.type = 2;
+
     const spr1z = slope(board, spr1.sectnum, spr1.x, spr1.y, true);
     const spr2z = slope(board, spr2.sectnum, spr2.x, spr2.y, false);
     const srcSpritePos = vec3.fromValues(spr1.x, spr1.y, spr1z);
@@ -320,11 +321,24 @@ function getRor(board: Board): BuildRor {
     const buildDiff = vec3.sub(vec3.create(), srcSpritePos, dstSpritePos);
     ceilingLinks.set(spr1.sectnum, { buildDiff, dstSector: spr2.sectnum, transparent: true });
     floorLinks.set(spr2.sectnum, { buildDiff: vec3.negate(vec3.create(), buildDiff), dstSector: spr1.sectnum, transparent: true });
+    getOrCreate(settings, spr1.sectnum, _ => ({ ceiling: 'normal', floor: 'normal' })).ceiling = 'trans2';
+    getOrCreate(settings, spr2.sectnum, _ => ({ ceiling: 'normal', floor: 'normal' })).floor = 'trans2';
   }
+  forAllSectors(board, (sector, s) => {
+    const ceil = tror.ceiling(s);
+    const floor = tror.floor(s);
+    const ceilingType = sector.ceilingstat.type === SECTOR_NORMAL ? 'nodraw'
+      : sector.ceilingstat.type === SECTOR_TRANSLUNCENT_MASKED ? 'trans2'
+        : sector.ceilingstat.type === SECTOR_REVERSE_TRANSLUNCENT_MASKED ? 'trans1' : 'normal';
+    const floorType = sector.floorstat.type === SECTOR_NORMAL ? 'nodraw'
+      : sector.floorstat.type === SECTOR_TRANSLUNCENT_MASKED ? 'trans2'
+        : sector.floorstat.type === SECTOR_REVERSE_TRANSLUNCENT_MASKED ? 'trans1' : 'normal';
+    if (ceil.length > 0) getOrCreate(settings, s, _ => ({ ceiling: 'normal', floor: 'normal' })).ceiling = ceilingType;
+    if (floor.length > 0) getOrCreate(settings, s, _ => ({ ceiling: 'normal', floor: 'normal' })).floor = floorType;
+  });
   const floorLink = (sectorId: number) => floorLinks.get(sectorId);
   const ceilLink = (sectorId: number) => ceilingLinks.get(sectorId);
-  const hasRor = (sectorId: number) => floorLinks.has(sectorId) || ceilingLinks.has(sectorId);
-  return { rorLinks: { floorLink, ceilLink, hasRor }, isMirrorPic: _ => false } as BuildRor;
+  return [{ rorLinks: { floorLink, ceilLink }, isMirrorPic: _ => false } as BuildRor, settings];
 }
 
 function packOffs(offs: number[]): number {
@@ -339,20 +353,27 @@ function defaultParallaxPicnums(picnum: number): number {
     .otherwise(() => 0);
 }
 
-function createloadBoard(values: ValuesContainer): Function<Stream, Promise<BoardContext>> {
+function createloadBoard(values: ValuesContainer, art: Source<Map<number, ArtInfoExtended>>): Function<Stream, Promise<BoardContext>> {
   let boardId = 1;
   return async (stream: Stream, name?: string): Promise<BoardContext> => {
     const boardValues = values.createChild(`board-${boardId++}`);
     const board = boardValues.value('board', loadBuildMap(stream));
-    const ror = getRor(board.get());
-    const tror = getTror(board.get());
-    const spritesBySectorMap = iter(board.get().sprites).map(field('sectnum')).enumerate().group(first, second);
-    const spritesBySector = (sectorId: number) => getOrDefault(spritesBySectorMap, sectorId, []);
+    const data = boardValues.transformedTuple('data', [board, art], ([board, art]) => {
+      const tror = getTror(board);
+      const [ror, sectorSettingsMap] = getRor(board, tror);
+      const sectorSettings = (sectorId: number) => getOrDefault(sectorSettingsMap, sectorId, DEFAULT_SECTOR_SETTING);
+      const spritesBySectorMap = iter(board.sprites).map(field('sectnum')).enumerate().group(first, second);
+      const spritesBySector = (sectorId: number) => getOrDefault(spritesBySectorMap, sectorId, []);
+      const parallaxPicnums = 8;
+      const spriteDescriptorsMap = iter(range(0, board.numsprites)).toMap(identity(), s => spriteInfo(board, s, art));
+      const spriteDescriptor = (spriteId: number) => spriteDescriptorsMap.get(spriteId);
+      return { board, ror, tror, spritesBySector, parallaxPicnums, spriteDescriptor, sectorSettings }
+    });
     const grid = DefaultGridController(values);
     const save = async () => saveBuildMap(board.get())
     const dispose = async () => boardValues.dispose();
 
-    return { name, board, ror, tror, parallaxPicnums: 8, spritesBySector, ...createBoardModifier<Board>(board), save, grid, dispose };
+    return { name, data, grid, ...createBoardModifier(board, data), save, dispose };
   }
 }
 
@@ -396,7 +417,7 @@ export const createEngineContextEduke32 = begin()
           spriteVoxelSwap,
           blends: loadBlends(values, defs),
           parallaxInfo: defaultParallaxPicnums,
-          loadBoard: createloadBoard(values),
+          loadBoard: createloadBoard(values, addonArtMap.map),
           dispose: () => values.dispose()
         }
       }).finish()(handle)

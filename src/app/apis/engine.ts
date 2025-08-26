@@ -7,9 +7,10 @@ import { ArtFile, ArtInfo, EMPTY_INFO } from "../../build/formats/art";
 import { VoxelData } from "build/formats/kvx";
 import Optional from "optional-js";
 import { FileSystem } from "./fs";
-import { Consumer, Function } from "ts-utils/types";
+import { BiConsumer, Consumer, Function } from "ts-utils/types";
 import { vec3 } from "gl-matrix";
 import { Draft } from "immer";
+import { SpriteDescriptor } from "build/sprites";
 
 export interface PicTags {
   allTags(): Iterable<string>;
@@ -65,6 +66,14 @@ export type EngineContext<B extends Board = Board> = Readonly<{
   loadBoard(stream: Stream, name?: string): Promise<BoardContext<B>>;
 }> & Disposable;
 
+export type SectorDrawType = 'normal' | 'nodraw' | 'trans1' | 'trans2';
+export type SectorSettings = {
+  ceiling: SectorDrawType,
+  floor: SectorDrawType,
+}
+export const DEFAULT_SECTOR_SETTING: SectorSettings = { ceiling: 'normal', floor: 'normal' };
+
+export type RorType = 'ceiling' | 'floor';
 export type RorLink = Readonly<{
   dstSector: number;
   buildDiff: vec3;
@@ -72,15 +81,13 @@ export type RorLink = Readonly<{
 }>;
 
 export interface RorLinks {
-  ceilLink(sectorId: number): RorLink;
-  floorLink(sectorId: number): RorLink;
-  hasRor(sectorId: number): boolean;
+  ceilLink(sectorId: number): RorLink | undefined;
+  floorLink(sectorId: number): RorLink | undefined;
 }
 
 export const EMPTY_ROR_LINKS: RorLinks = {
   ceilLink: _ => undefined,
   floorLink: _ => undefined,
-  hasRor: _ => false,
 };
 
 export type BuildRor = Readonly<{
@@ -105,18 +112,24 @@ export type GridController = Readonly<{
   decGridSize(): void;
 }>
 
-export type BoardContext<B extends Board = Board> = Readonly<{
-  name?: string,
-  board: Source<B>,
-  grid: GridController,
+export type BoardData<B extends Board = Board> = {
+  board: B,
   ror: BuildRor,
   tror: BuildTror,
-  parallaxPicnums: number;
-  spritesBySector(sectorId: number): number[];
+  parallaxPicnums: number,
+  sectorSettings: Function<number, SectorSettings>,
+  spritesBySector: Function<number, number[]>,
+  spriteDescriptor: Function<number, SpriteDescriptor>,
+}
 
-  onWallsChange(c: Consumer<Set<number>>): Disconnector;
-  onSectorsChange(c: Consumer<Set<number>>): Disconnector;
-  onSpritesChange(c: Consumer<Set<number>>): Disconnector;
+export type BoardContext<B extends Board = Board> = Readonly<{
+  name?: string,
+  grid: GridController,
+  data: Source<BoardData<B>>,
+
+  onWallsChange(c: BiConsumer<BoardData<B>, Set<number>>): Disconnector;
+  onSectorsChange(c: BiConsumer<BoardData<B>, Set<number>>): Disconnector;
+  onSpritesChange(c: BiConsumer<BoardData<B>, Set<number>>): Disconnector;
 
   modifyBoard(msg: string, mod: Consumer<Draft<B>>): void;
   undo(): void;

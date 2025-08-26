@@ -22,7 +22,7 @@ import { quadraticInterpolator } from "ts-utils/interpolator";
 import { iter } from "ts-utils/iter";
 import { clamp, int } from "ts-utils/mathutils";
 import { applyNotNullish } from "ts-utils/objects";
-import { fit, palRasterizer, transform } from "ts-utils/pixelprovider";
+import { fit, palRasterizer, pluTransform, transform } from "ts-utils/pixelprovider";
 import { Scheduler } from "ts-utils/scheduler";
 import { Stream } from "ts-utils/stream";
 import { DelayedValue } from "ts-utils/timed";
@@ -42,9 +42,9 @@ import { ViewPosition } from "./view";
 
 function createViewPosition(values: ValuesContainer, ctl: Controller3D, boardCtx: BoardContext): Source<ViewPosition> {
   let lastSector = -1;
-  return values.transformedTuple('viewPosition', [ctl.getPosition(), boardCtx.board], ([pos, board]) => {
+  return values.transformedTuple('viewPosition', [ctl.getPosition(), boardCtx.data], ([pos, data]) => {
     const [x, y, z] = gl2build(vec3.create(), pos);
-    const { sec, x: nx, y: ny, z: nz } = findSector(board, boardCtx.tror, boardCtx.ror, x, y, z, lastSector);
+    const { sec, x: nx, y: ny, z: nz } = findSector(data, x, y, z, lastSector);
     lastSector = sec;
     if (x !== nx || y !== ny || z !== nz) {
       const [nnx, nny, nnz] = build2gl(vec3.create(), vec3.fromValues(nx, ny, nz));
@@ -71,9 +71,10 @@ export async function createBoardView(injector: Injector, ctx: EngineContext, te
       .forkPass(p => p
         .threadWork(rendererProvider)
         .threadWork(async (handle, boardCtx) => {
+          const { board, parallaxPicnums } = boardCtx.data.get();
           const loadSectorTextures = (sector: Sector) => {
-            textures.get(sector.ceilingpicnum, sector.ceilingstat.parallaxing ? boardCtx.parallaxPicnums : 1).get();
-            textures.get(sector.floorpicnum, sector.floorstat.parallaxing ? boardCtx.parallaxPicnums : 1).get();
+            textures.get(sector.ceilingpicnum, sector.ceilingstat.parallaxing ? parallaxPicnums : 1).get();
+            textures.get(sector.floorpicnum, sector.floorstat.parallaxing ? parallaxPicnums : 1).get();
           }
           const loadSpriteTextures = (sprite: Sprite) => {
             textures.get(sprite.picnum).get()
@@ -83,12 +84,12 @@ export async function createBoardView(injector: Injector, ctx: EngineContext, te
             textures.get(wall.picnum).get();
             textures.get(wall.overpicnum).get();
           }
-          boardCtx.onSectorsChange(ss => ss.forEach(s => applyNotNullish(boardCtx.board.get().sectors[s], loadSectorTextures)));
-          boardCtx.onSpritesChange(ss => ss.forEach(s => applyNotNullish(boardCtx.board.get().sprites[s], loadSpriteTextures)));
-          boardCtx.onWallsChange(ws => ws.forEach(w => applyNotNullish(boardCtx.board.get().walls[w], loadWallTextures)));
-          const tasks = iter(boardCtx.board.get().sectors).map(s => () => loadSectorTextures(s))
-            .chain(iter(boardCtx.board.get().sprites).map(s => () => loadSpriteTextures(s)))
-            .chain(iter(boardCtx.board.get().walls).map(w => () => loadWallTextures(w)))
+          boardCtx.onSectorsChange((b, ss) => ss.forEach(s => applyNotNullish(b.board.sectors[s], loadSectorTextures)));
+          boardCtx.onSpritesChange((b, ss) => ss.forEach(s => applyNotNullish(b.board.sprites[s], loadSpriteTextures)));
+          boardCtx.onWallsChange((b, ws) => ws.forEach(w => applyNotNullish(b.board.walls[w], loadWallTextures)));
+          const tasks = iter(board.sectors).map(s => () => loadSectorTextures(s))
+            .chain(iter(board.sprites).map(s => () => loadSpriteTextures(s)))
+            .chain(iter(board.walls).map(w => () => loadWallTextures(w)))
             .collect();
           await handle.waitForBatchTask(tasks, 'Preloading textures');
           return []
@@ -105,8 +106,8 @@ function createUtils(values: ValuesContainer, engine: EngineContext) {
   const picRasterizer = values.transformedTuple('pic-rasterizer', [engine.artMap, engine.plus, rasterizer],
     ([art, plus, rasterizer]) => (picnum: number, pal: number, canvas: HTMLCanvasElement) => {
       const info = getOrDefault(art, picnum, EMPTY_INFO_EXTENDED);
-      const p = iter(plus).first(p => p.id === pal).orElseGet(() => plus[0]).plu;
-      drawToCanvas(transform(fit(128, 128, new ArtRaster(info), 255), c => c === 255 ? 255 : p[c]), canvas.getContext('2d'), rasterizer);
+      const plu = pluTransform(iter(plus).first(p => p.id === pal).orElseGet(() => plus[0]).plu);
+      drawToCanvas(transform(fit(128, 128, new ArtRaster(info), 255), plu), canvas.getContext('2d'), rasterizer);
     });
   const picInfo = values.transformed('pic-info', engine.artMap, art => (picnum: number) => getOrDefault(art, picnum, EMPTY_INFO_EXTENDED));
   const alias = values.transformed('alias', engine.aliases, aliases => (picnum: number) => aliases.get(picnum));
@@ -149,12 +150,12 @@ async function saveBoard(engine: EngineContext, boardCtx: BoardContext, ui: Ui, 
 }
 
 function createWindow(values: ValuesContainer, engine: EngineContext, boardCtx: BoardContext, renderer: Source<BoardRenderer3D>, glContext: GlContext, app: App, ui: Ui, actionDescriptors: ActionDescriptors, injector: Injector): Window {
-  values.handleStandalone([renderer], renderer => {
+  values.handleStandalone([renderer, values.field('parallaxPicnums', boardCtx.data, "parallaxPicnums")], ([renderer, parallaxPicnums]) => {
     renderer.depthShadowScale(1024);
-    renderer.parallaxPics(boardCtx.parallaxPicnums);
+    renderer.parallaxPics(parallaxPicnums);
   })
   const boardGlCtx = createBoardGlContext(values, glContext, boardCtx);
-  const board = boardCtx.board.get();
+  const { board } = boardCtx.data.get();
 
   const sprite = getPlayerStart(board);
   const ctl = new Controller3D(values);
@@ -186,7 +187,7 @@ function createWindow(values: ValuesContainer, engine: EngineContext, boardCtx: 
   values.handleStandalone([boardCtx.grid.size, renderer], ([gridSize, renderer]) => renderer.grid(gridSize));
 
   const toRender = createToRender(renderer, boardCtx, boardGlCtx, engine, values, viewPosition, ctl.camera.forward);
-  const overlay = values.transformedTuple('overlay', [entity, boardCtx.board, engine.settings, renderer, engine.aliases, engine.artMap], getOverlay(boardGlCtx), { disposer })
+  const overlay = values.transformedTuple('overlay', [entity, boardCtx.data, engine.settings, renderer, engine.aliases, engine.artMap], getOverlay(boardGlCtx), { disposer })
   const utils = createUtils(values, engine);
   const drawSectorTool = createDrawSectorTool(values, ctl, renderer, engine.settings, hitscan, boardCtx, engine);
   const utilsTool = createUtilsTool(boardCtx, selection, hitscan, engine, injector);
@@ -229,7 +230,8 @@ function createWindow(values: ValuesContainer, engine: EngineContext, boardCtx: 
       gl.viewport(0, 0, width, height);
       gl.clearColor(0, 0, 0, 1.0);
       gl.clearDepth(1);
-      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      gl.clearStencil(0);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
 
       draw();
       drawOverlayImpl(gl, overlay, renderable, transform);
@@ -276,7 +278,7 @@ function createWindow(values: ValuesContainer, engine: EngineContext, boardCtx: 
         <BoardViewWindow
           canvas={c => canvasValue.set(c)}
           states={states}
-          board={boardCtx.board}
+          board={values.field('board', boardCtx.data, 'board')}
           ent={entity}
           ctl={ctl}
         />

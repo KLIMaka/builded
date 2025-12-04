@@ -8,8 +8,8 @@ import { palRasterizer } from "../../utils/pixelprovider";
 import { listBox } from "../../utils/ui/controls/listbox";
 import { DrawPanel } from "../../utils/ui/drawpanel";
 import { menuButton } from "../../utils/ui/renderers";
-import { ART } from "../apis/app";
-import { Ui, UI, Window } from "../apis/ui";
+import { ART } from "../apis/app2";
+import { Ui, UI, Window } from "../apis/ui2";
 import { PicNumCallback } from "../edit/tools/selection";
 
 function createDrawPanel(arts: ArtInfoProvider, pal: Uint8Array, canvas: HTMLCanvasElement, cb: PicNumCallback, iter: () => Iterable<number>) {

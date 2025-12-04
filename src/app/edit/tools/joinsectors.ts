@@ -2,7 +2,7 @@ import { EngineApi } from "../../../build/board/mutations/api";
 import { joinSectors } from "../../../build/board/mutations/joinsectors";
 import { isJoinedSectors } from "../../../build/board/query";
 import { create, lifecycle, Module, plugin } from "../../../utils/injector";
-import { BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, REFERENCE_TRACKER, VIEW, View } from "../../apis/app";
+import { BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, REFERENCE_TRACKER, VIEW, View } from "../../apis/app2";
 import { BUS, busDisconnector, MessageBus } from "../../apis/handler";
 import { Commit, INVALIDATE_ALL, NamedMessage } from "../messages";
 import { DefaultTool, TOOLS_BUS } from "./toolsbus";

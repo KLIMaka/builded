@@ -1,5 +1,5 @@
 import { Disconnector, Source, Value } from "ts-utils/callbacks";
-import { BiConsumer, Consumer } from "ts-utils/types";
+import { BiConsumer, Consumer, notUndefined } from "ts-utils/types";
 import { Board } from "build/board/structs";
 import { applyPatches, Draft, Patch, produceWithPatches } from "immer";
 import { BoardData } from "app/apis/engine";
@@ -47,9 +47,11 @@ export function createBoardModifier<B extends Board>(boardValue: Value<B>, board
   const sectorListeners = new Set<BiConsumer<BoardData<B>, Set<number>>>();
   const wallListeners = new Set<BiConsumer<BoardData<B>, Set<number>>>();
   const spriteListeners = new Set<BiConsumer<BoardData<B>, Set<number>>>();
+
   const onSectorsChange = (c: BiConsumer<BoardData<B>, Set<number>>): Disconnector => { sectorListeners.add(c); return () => sectorListeners.delete(c) };
   const onWallsChange = (c: BiConsumer<BoardData<B>, Set<number>>): Disconnector => { wallListeners.add(c); return () => wallListeners.delete(c) };
   const onSpritesChange = (c: BiConsumer<BoardData<B>, Set<number>>): Disconnector => { spriteListeners.add(c); return () => spriteListeners.delete(c) };
+
   const history: HistoryEntry[] = [];
 
   function sendNotifications(board: B, changes: Changes) {
@@ -64,7 +66,7 @@ export function createBoardModifier<B extends Board>(boardValue: Value<B>, board
     const [nextBoard, patches, undoPatches] = produceWithPatches<B>(baseBaord, draft => { mod(draft) });
     if (patches.length === 0) return;
     if (history.length !== 0 && history[history.length - 1].label === label) {
-      const prevEntry = history.pop();
+      const prevEntry = notUndefined(history.pop());
       const prevBoard = applyPatches(baseBaord, prevEntry.undoPatches);
       const [newNextBoard, newPatches, newUndoPatches] = produceWithPatches(prevBoard, draft => applyPatches(draft, [...prevEntry.patches, ...patches]));
       boardValue.set(newNextBoard);
@@ -85,7 +87,7 @@ export function createBoardModifier<B extends Board>(boardValue: Value<B>, board
 
   function undo() {
     if (history.length === 0) return;
-    const entry = history.pop();
+    const entry = notUndefined(history.pop());
     const undoBoard = applyPatches(boardValue.get(), entry.undoPatches);
     boardValue.set(undoBoard);
     sendNotifications(undoBoard, entry.changes);

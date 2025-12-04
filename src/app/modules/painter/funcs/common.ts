@@ -1,5 +1,5 @@
 import { Supplier } from "@utils/types";
-import { Ui } from "app/apis/ui";
+import { Ui } from "app/apis/ui2";
 import { transformed, value } from "../../../../utils/callbacks";
 import { iter } from "../../../../utils/iter";
 import { FLOAT_MODEL, NumberModel } from "../../../../utils/ui/controls/numberbox";

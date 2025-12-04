@@ -1,20 +1,21 @@
-import { BaseValue, Source, Value, ValuesContainer } from "ts-utils/callbacks";
-import { getInstances, Plugin, provider } from "ts-utils/injector";
-import { iter } from "ts-utils/iter";
-import { asyncMapOptional, strcmpci as streqci } from "ts-utils/objects";
-import { BiFunction, Function, identity, nil, Result, resultAsync, seq, SingleTuple } from "ts-utils/types";
 import { ACTION_DESCRIPTORS, ActionDescriptors } from "app/apis/actions";
-import { Ui, UI } from "app/apis/ui1";
+import { Ui, UI } from "app/apis/ui";
+import { VALUES, Values } from "app/apis/values";
 import { GrpFile } from "build/formats/grp";
 import { RffFile } from "build/formats/rff";
 import JSZip from "jszip";
 import Optional from "optional-js";
 import { match } from "ts-pattern";
-import { App, APP, Disconnector, Storage, Storages, Timer } from "../../apis/app1";
-import { DirectoryFileSystemHandle, FileFileSystemHandle, FileInfo, FileSystem, FileSystemHandle, FileSystemHandler, FileSystems, HttpFileSystemHandle, MemoryFileSystemHandle, SerializedFileSystemHandle, StackFileSystemHandle, StorageFileSystemHandle, WritableFileSystem } from "../../apis/fs";
-import { selectStorageFs } from "./ui/select-storage";
+import { BaseValue, Source, Value, ValuesContainer } from "ts-utils/callbacks";
 import { getOrCreate } from "ts-utils/collections";
+import { getInstances, Plugin, provider } from "ts-utils/injector";
+import { iter } from "ts-utils/iter";
+import { asyncMapOptional, strcmpci as streqci } from "ts-utils/objects";
 import { Stream } from "ts-utils/stream";
+import { BiFunction, Function, identity, nil, notUndefined, Result, resultAsync, seq, SingleTuple } from "ts-utils/types";
+import { App, APP, Disconnector, Storage, Storages, Timer } from "../../apis/app";
+import { DirectoryFileSystemHandle, FileFileSystemHandle, FileInfo, FileSource, FileSystem, FileSystemHandle, FileSystemHandler, FileSystems, HttpFileSystemHandle, MemoryFileSystemHandle, SerializedFileSystemHandle, StackFileSystemHandle, StorageFileSystemHandle, WritableFileSystem } from "../../apis/fs";
+import { selectStorageFs } from "./ui/select-storage";
 
 async function pickDir(): Promise<Optional<DirectoryFileSystemHandle>> {
   try {
@@ -69,6 +70,7 @@ class FileSystemHandleImpl<T extends SerializedFileSystemHandle> implements File
 class FileSystemsImpl implements FileSystems {
   constructor(
     private app: App,
+    private values: Values,
     private ui: Ui,
     private aDescriptors: ActionDescriptors,
   ) { }
@@ -95,13 +97,13 @@ class FileSystemsImpl implements FileSystems {
       .with('zip', async () => (await pickFile('zip')).map(d => this.deserialize(d)))
       .with('rff', async () => (await pickFile('rff')).map(d => this.deserialize(d)))
       .with('grp', async () => (await pickFile('grp')).map(d => this.deserialize(d)))
-      .with('http', async () => Optional.of(this.deserialize({ type: 'http', name: 'inMemory' })))
+      .with('http', async () => Optional.of(this.deserialize({ type: 'http', path: '' })))
       .with('stack', async () => Optional.empty())
       .exhaustive();
   }
 
   private async pickStorage(): Promise<Optional<string>> {
-    return selectStorageFs(this.app, this.ui, this.aDescriptors, this)
+    return selectStorageFs(this.app, this.ui, this.aDescriptors, this.values, this)
   }
 
   private createStorage(serialized: StorageFileSystemHandle): FileSystemHandle {
@@ -135,7 +137,7 @@ class FileSystemsImpl implements FileSystems {
     return new FileSystemHandleImpl(
       serialized.name,
       serialized,
-      async h => inMemoryFS(this.app.timer),
+      async h => inMemoryFS(serialized.name, this.app.timer),
       async h => h.serialized.type === 'memory' && serialized.name === h.name
     );
   }
@@ -146,8 +148,8 @@ class FileSystemsImpl implements FileSystems {
     return new FileSystemHandleImpl(
       'stack',
       serialized,
-      async h => stack((await topHandle.open()).unwrap(), (await bottomHandle.open()).unwrap()),
-      async h => h.serialized.type === 'stack' && this.deserialize(h.serialized.top).isSameEntry(topHandle) && this.deserialize(h.serialized.bottom).isSameEntry(bottomHandle)
+      async h => Promise.all([topHandle.open(), bottomHandle.open()]).then(([top, bottom]) => stack(top.unwrap(), bottom.unwrap())),
+      async h => h.serialized.type === 'stack' && await Promise.all([this.deserialize(h.serialized.top).isSameEntry(topHandle), this.deserialize(h.serialized.bottom).isSameEntry(bottomHandle)]).then(([t, b]) => t && b)
     )
   }
 
@@ -162,12 +164,13 @@ class FileSystemsImpl implements FileSystems {
 }
 
 export const DefaultFileSystemsConstructor: Plugin<FileSystems> = provider(async injector => {
-  const [app, ui, aDescriptors] = await getInstances(injector, APP, UI, ACTION_DESCRIPTORS);
-  return new FileSystemsImpl(app, ui, aDescriptors);
+  const [app, ui, aDescriptors, values] = await getInstances(injector, APP, UI, ACTION_DESCRIPTORS, VALUES);
+  return new FileSystemsImpl(app, values, ui, aDescriptors);
 });
 
 class StubFs implements FileSystem {
   readonly type = 'memory';
+  readonly name = 'stub';
 
   async info(name: string): Promise<Optional<FileInfo>> {
     return Optional.empty();
@@ -197,6 +200,7 @@ abstract class BaseFS implements FileSystem {
 
   constructor(
     readonly type: SerializedFileSystemHandle['type'],
+    readonly name: string,
     private handlers = new Set<FileSystemHandler>()) {
   }
   abstract info(name: string): Promise<Optional<FileInfo>>;
@@ -230,14 +234,14 @@ abstract class BaseFS implements FileSystem {
 }
 
 class StackFs extends BaseFS implements FileSystem {
-  private topDisconnector: Disconnector;
-  private bottomDisconnector: Disconnector;
+  private topDisconnector: Disconnector | undefined;
+  private bottomDisconnector: Disconnector | undefined;
 
   constructor(
     private top: FileSystem,
     private bottom: FileSystem,
   ) {
-    super('stack')
+    super('stack', 'stack')
   }
 
   private async call<T>(call: Function<FileSystem, Promise<Optional<T>>>): Promise<Optional<T>> {
@@ -278,8 +282,8 @@ class StackFs extends BaseFS implements FileSystem {
   }
 
   protected lastDisconnected(): void {
-    this.topDisconnector();
-    this.bottomDisconnector();
+    this.topDisconnector?.();
+    this.bottomDisconnector?.();
   }
 
   async dispose(): Promise<void> {
@@ -293,12 +297,13 @@ export function stack(top: FileSystem, bottom: FileSystem) {
 
 
 
-class StorageFS extends BaseFS implements FileSystem, WritableFileSystem {
+class StorageFS extends BaseFS implements FileSystem, WritableFileSystem, FileSource {
   constructor(
+    name: string,
     private timer: Timer,
     private filesStorage: Storage,
     private infoStorage: Storage) {
-    super('storage');
+    super('storage', name);
   }
 
   async read(name: string): Promise<Optional<ArrayBuffer>> {
@@ -338,17 +343,19 @@ export async function storageFS(name: string, storages: Storages, timer: Timer):
   return getOrCreate(ACTIVE_STORAGE_FS, name, async _ => {
     const files = await storages(`${name}_files`);
     const info = await storages(`${name}_info`);
-    return new StorageFS(timer, files, info);
+    return new StorageFS(name, timer, files, info);
   })
 }
 
 type MemoryFile = { data: ArrayBuffer, info: FileInfo }
-class InMemoryFS extends BaseFS implements FileSystem {
+class InMemoryFS extends BaseFS implements FileSystem, FileSource {
   private data: Map<string, MemoryFile> = new Map();
 
   constructor(
-    private timer: Timer) {
-    super('memory');
+    name: string,
+    private timer: Timer,
+  ) {
+    super('memory', name);
   }
 
   async info(name: string): Promise<Optional<FileInfo>> {
@@ -378,14 +385,15 @@ class InMemoryFS extends BaseFS implements FileSystem {
   }
 }
 
-export function inMemoryFS(timer: Timer) {
-  return new InMemoryFS(timer);
+export function inMemoryFS(name: string, timer: Timer) {
+  return new InMemoryFS(name, timer);
 }
 
-class LocalFS extends BaseFS implements FileSystem, WritableFileSystem {
+class LocalFS extends BaseFS implements FileSystem, WritableFileSystem, FileSource {
   constructor(
-    private directoryHandle: FileSystemDirectoryHandle) {
-    super('dir');
+    private directoryHandle: FileSystemDirectoryHandle,
+  ) {
+    super('dir', directoryHandle.name);
   }
 
   private async getChain(root: FileSystemDirectoryHandle, chain: string[]): Promise<FileSystemFileHandle> {
@@ -396,7 +404,7 @@ class LocalFS extends BaseFS implements FileSystem, WritableFileSystem {
     } else if (chain.length === 1) {
       return root.getFileHandle(chain[0]);
     } else {
-      const dir = chain.shift();
+      const dir = notUndefined(chain.shift());
       return this.getChain(await root.getDirectoryHandle(dir), chain);
     }
   }
@@ -406,7 +414,7 @@ class LocalFS extends BaseFS implements FileSystem, WritableFileSystem {
       const handle = await this.getChain(this.directoryHandle, file.split('/'));
       const content = await handle.getFile();
       return Optional.of(content);
-    } catch (e) {
+    } catch (e: any) {
       if (e.name === 'NotFoundError' || e.name === 'TypeError') return Optional.empty();
       throw e;
     }
@@ -456,10 +464,13 @@ export function createLocalFs(dirHandle: FileSystemDirectoryHandle) {
   return new LocalFS(dirHandle);
 }
 
-class ZipFS extends BaseFS implements FileSystem {
+class ZipFS extends BaseFS implements FileSystem, FileSource {
 
-  constructor(private zip: JSZip) {
-    super("zip");
+  constructor(
+    name: string,
+    private zip: JSZip,
+  ) {
+    super("zip", name);
   }
 
   async read(name: string): Promise<Optional<ArrayBuffer>> {
@@ -475,7 +486,8 @@ class ZipFS extends BaseFS implements FileSystem {
       name: file[0].name,
       lastModified: +file[0].date,
       size: (file as any)._data.uncompressedSize,
-    } as FileInfo)
+      src: this
+    })
   }
 
   async list(): Promise<FileInfo[]> {
@@ -485,8 +497,9 @@ class ZipFS extends BaseFS implements FileSystem {
       result.push({
         name: file.name,
         lastModified: +file.date,
-        size: (file as any)._data.uncompressedSize
-      } as FileInfo)
+        size: (file as any)._data.uncompressedSize,
+        src: this
+      })
     });
     return result;
   }
@@ -497,35 +510,36 @@ class ZipFS extends BaseFS implements FileSystem {
 }
 
 export async function createZipFsFile(file: File): Promise<ZipFS> {
-  return new ZipFS(await JSZip.loadAsync(file));
+  return new ZipFS(file.name, await JSZip.loadAsync(file));
 }
 
-export async function createZipFsArrayBuffer(file: ArrayBuffer): Promise<FileSystem> {
-  return new ZipFS(await JSZip.loadAsync(file));
+export async function createZipFsArrayBuffer(name: string, file: ArrayBuffer): Promise<FileSystem> {
+  return new ZipFS(name, await JSZip.loadAsync(file));
 }
 
-export async function createGrpOrZipFsArrayBuffer(file: ArrayBuffer): Promise<FileSystem> {
+export async function createGrpOrZipFsArrayBuffer(name: string, file: ArrayBuffer): Promise<FileSystem> {
   const stream = new Stream(file);
   return (stream.readByteString(12) === 'KenSilverman')
-    ? createGrpFsArrayBuffer(file)
-    : createZipFsArrayBuffer(file);
+    ? createGrpFsArrayBuffer(name, file)
+    : createZipFsArrayBuffer(name, file);
 }
 
-class RffFS extends BaseFS implements FileSystem {
+class RffFS extends BaseFS implements FileSystem, FileSource {
   constructor(
+    name: string,
     private rff: RffFile,
-    private fileLastModified: number = 0) {
-    super('rff')
+    private fileLastModified: number = 0,
+  ) {
+    super('rff', name)
   }
 
   async read(name: string): Promise<Optional<ArrayBuffer>> {
-    return Optional.ofNullable(this.rff.getByName(name));
+    return this.rff.getByName(name);
   }
 
   async info(name: string): Promise<Optional<FileInfo>> {
-    const rec = this.rff.getRecord(name);
-    if (!rec) return Optional.empty();
-    return Optional.of({ name: rec.filename, size: rec.size, lastModified: this.fileLastModified, src: this });
+    return this.rff.getRecord(name)
+      .map(rec => ({ name: rec.filename, size: rec.size, lastModified: this.fileLastModified, src: this }));
   }
 
   async list(): Promise<FileInfo[]> {
@@ -538,18 +552,20 @@ class RffFS extends BaseFS implements FileSystem {
 }
 
 export async function createRffFs(file: File): Promise<RffFS> {
-  return new RffFS(new RffFile(await file.arrayBuffer()));
+  return new RffFS(file.name, new RffFile(await file.arrayBuffer()));
 }
 
-export function createRffFsArrayBuffer(buffer: ArrayBuffer): FileSystem {
-  return new RffFS(new RffFile(buffer));
+export function createRffFsArrayBuffer(name: string, buffer: ArrayBuffer): FileSystem {
+  return new RffFS(name, new RffFile(buffer));
 }
 
-class GrpFS extends BaseFS implements FileSystem {
+class GrpFS extends BaseFS implements FileSystem, FileSource {
   constructor(
+    name: string,
     private grp: GrpFile,
-    private fileLastModified: number = 0) {
-    super('grp')
+    private fileLastModified: number = 0,
+  ) {
+    super('grp', name);
   }
 
   async read(name: string): Promise<Optional<ArrayBuffer>> {
@@ -571,19 +587,19 @@ class GrpFS extends BaseFS implements FileSystem {
   }
 }
 
-export async function createGrpFs(file: File,): Promise<GrpFS> {
-  return new GrpFS(new GrpFile(await file.arrayBuffer()));
+export async function createGrpFs(file: File): Promise<GrpFS> {
+  return new GrpFS(file.name, new GrpFile(await file.arrayBuffer()));
 }
 
-export function createGrpFsArrayBuffer(buffer: ArrayBuffer): FileSystem {
-  return new GrpFS(new GrpFile(buffer));
+export function createGrpFsArrayBuffer(name: string, buffer: ArrayBuffer): FileSystem {
+  return new GrpFS(name, new GrpFile(buffer));
 }
 
 class HttpFs extends BaseFS {
   constructor(
     private basePath: string,
   ) {
-    super('http');
+    super('http', basePath);
   }
 
   async info(name: string): Promise<Optional<FileInfo>> {

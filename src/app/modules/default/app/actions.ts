@@ -4,7 +4,7 @@ import { loadString } from "@utils/getter";
 import { Plugin, provider } from "ts-utils/injector";
 import { Consumer, Supplier } from "ts-utils/types";
 import { Action, ActionDescriptor, ActionDescriptors, ActionHandler } from "app/apis/actions";
-import { APP, Logger } from "app/apis/app1";
+import { APP, Logger } from "app/apis/app";
 import { Bind } from "app/input/keymap";
 import Optional from "optional-js";
 import toml from "toml";

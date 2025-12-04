@@ -1,7 +1,7 @@
 import { SerializedFileSystemHandle } from "app/apis/fs";
 import { match } from "ts-pattern";
 
-export function fsIcon(type: SerializedFileSystemHandle['type']): string {
+export function fsIcon(type: SerializedFileSystemHandle['type'] | undefined): string {
   return match(type)
     .with('storage', () => 'database')
     .with('dir', () => 'folder-open')
@@ -9,5 +9,7 @@ export function fsIcon(type: SerializedFileSystemHandle['type']): string {
     .with('memory', () => 'memory')
     .with('rff', 'grp', () => 'floppy-disk')
     .with('stack', () => 'folder-open')
+    .with('http', () => 'wifi')
+    .with(undefined, () => 'question')
     .exhaustive();
 }

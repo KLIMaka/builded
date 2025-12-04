@@ -1,6 +1,5 @@
 import { workplane, Workplane, WorkplaneContext, workplaneController } from "@ui/commons";
 import { WindowBuilder } from "@ui/windows-common";
-import { createContainer } from "ts-utils/callbacks";
 import { interpolate, range } from "ts-utils/collections";
 import { GL_CONTEXT, Texture } from "@utils/gl/drawstruct";
 import { createTexture } from "@utils/gl/textures";
@@ -12,8 +11,8 @@ import { iter } from "ts-utils/iter";
 import { int, len2d } from "ts-utils/mathutils";
 import { firstNot } from "ts-utils/objects";
 import { ACTION_DESCRIPTORS } from "app/apis/actions";
-import { APP } from "app/apis/app1";
-import { Window } from "app/apis/ui1";
+import { APP } from "app/apis/app";
+import { Window } from "app/apis/ui";
 import { mat3, vec3 } from "gl-matrix";
 import Optional from "optional-js";
 import React, { DragEvent } from "react";

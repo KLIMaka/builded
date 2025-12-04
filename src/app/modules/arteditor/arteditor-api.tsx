@@ -22,7 +22,7 @@ export type ArtEditor = {
   clickOnPicnum(picnum: number, doubleClick?: boolean): void;
 };
 
-export const ArtEditorContext = createContext<ArtEditor>(null);
+export const ArtEditorContext = createContext<ArtEditor>({} as ArtEditor);
 
 export function Art({ src, size, picnum }: { src: Source<string>, size: number, picnum: number }) {
   const artEditor = useContext(ArtEditorContext);
@@ -49,7 +49,7 @@ export function Browser() {
   const artEditor = useContext(ArtEditorContext);
   const picnums = useValue(artEditor.picnums);
   const size = useValue(artEditor.previewSize);
-  const gridRef = useRef<Grid>();
+  const gridRef = useRef<Grid>(null);
 
   const createCellRenderer = (width: number, height: number): GridCellRenderer => {
     const columnsCount = int(width / size);
@@ -70,15 +70,16 @@ export function Browser() {
   useEffect(() => {
     const scrollToId = (picnum: number) => {
       const grid = gridRef.current;
+      if (grid === null) return;
       const cols = grid.props.columnCount;
       const picnums = artEditor.picnums.get();
       const idx = picnums.indexOf(picnum);
       const rowIndex = int(idx / cols);
       const columnIndex = idx % cols;
-      grid.scrollToCell({ rowIndex, columnIndex })
+      grid?.scrollToCell({ rowIndex, columnIndex })
     }
-    return seq(artEditor.currentId.subscribe(scrollToId), artEditor.previewGridSize.subscribe(o => o.ifPresent(_ => scrollToId(artEditor.currentId.get()))));
-  }, [artEditor.currentId, artEditor.picnums, artEditor.previewGridSize, gridRef]);
+    return seq(artEditor.currentId.subscribe(scrollToId));
+  }, [artEditor.currentId, artEditor.picnums, gridRef]);
 
   return (
     <div className="flex-fill">

@@ -1,9 +1,8 @@
-import { autoUpdate, FloatingPortal, size, useFloating, useFocus, useInteractions } from "@floating-ui/react";
-import { Signal, Value } from "ts-utils/callbacks";
-import { nil, seq, Supplier } from "ts-utils/types";
 import React, { useCallback, useContext, useEffect, useRef, useState } from "react";
+import { Signal, Value } from "ts-utils/callbacks";
+import { nil, notNull, seq, Supplier } from "ts-utils/types";
 import { ActionItem, ActionList } from "./action-list";
-import { ActionDescriptorsContext, ActionsChannelContext, CurrentActionsChannelContext, Icon, useValue } from "./commons";
+import { ActionDescriptorsContext, ActionsChannelContext, checkClickInside, CurrentActionsChannelContext, Icon, useValue } from "./commons";
 
 export type SearchBoxProps = {
   value: Value<string>,
@@ -19,20 +18,20 @@ export function SearchBox(props: SearchBoxProps) {
   const currentActions = useContext(CurrentActionsChannelContext);
   const searchChannel = actionsChannel.child(props.channelName, true);
   const query = useValue(props.value);
-  const inputRef = useRef<HTMLInputElement>();
-  const elementRef = useRef<HTMLDivElement>();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const elementRef = useRef<HTMLDivElement>(null);
   const width = props.width ?? '200px'
   const focusedWidth = props.focusedWidth ?? width;
 
   const createActions = useCallback(() => {
     const ctx = actionDescriptors.sub('controls.textbox');
-    const blurAction = ctx.bindSync('close', () => inputRef.current.blur());
+    const blurAction = ctx.bindSync('close', () => inputRef.current?.blur());
     return [blurAction]
   }, [actionDescriptors]);
 
   useEffect(() => {
     return seq(
-      props.focusSignal ? props.focusSignal.subscribe(() => inputRef.current.focus()) : nil(),
+      props.focusSignal ? props.focusSignal.subscribe(() => inputRef.current?.focus()) : nil(),
       searchChannel.collector().add(...createActions())
     );
   }, [createActions, props.focusSignal, searchChannel])
@@ -52,8 +51,8 @@ export function SearchBox(props: SearchBoxProps) {
             value={query}
             placeholder="Press '/'"
             onChange={e => props.value.set(e.target.value)}
-            onFocus={_ => { currentActions(searchChannel); inputRef.current.select(); elementRef.current.style.width = focusedWidth }}
-            onBlur={_ => { currentActions(actionsChannel); elementRef.current.style.width = width }}
+            onFocus={_ => { currentActions(searchChannel); inputRef.current?.select(); notNull(elementRef.current).style.width = focusedWidth }}
+            onBlur={_ => { currentActions(actionsChannel); notNull(elementRef.current).style.width = width }}
           />
           {query.length > 0
             ? <Icon icon='xmark' className='fa-active' onClick={_ => props.value.set('')} />
@@ -70,33 +69,13 @@ export function SearchBoxOracle(props: SearchBoxProps & { oracle: Supplier<Actio
   const currentActions = useContext(CurrentActionsChannelContext);
   const searchChannel = actionsChannel.child(props.channelName, true);
   const query = useValue(props.value);
-  const inputRef = useRef<HTMLInputElement>();
-  const elementRef = useRef<HTMLDivElement>();
+  const inputRef = useRef<HTMLInputElement>(null);
   const [isOpen, setIsOpen] = useState(false);
-  const blurInput = () => inputRef.current.blur();
-  const focusInput = () => inputRef.current.focus();
+  const blurInput = () => inputRef.current?.blur();
+  const focusInput = () => inputRef.current?.focus();
   const width = props.width ?? '200px'
   const focusedWidth = props.focusedWidth ?? width;
-
-  const { refs, floatingStyles, context } = useFloating<HTMLInputElement>({
-    placement: "bottom-start",
-    open: isOpen,
-    onOpenChange: setIsOpen,
-    whileElementsMounted: autoUpdate,
-    middleware: [
-      size({
-        apply({ rects, elements, availableHeight }) {
-          Object.assign(elements.floating.style, {
-            maxHeight: `${availableHeight}px`,
-            minWidth: `${rects.reference.width}px`,
-          })
-        },
-        padding: 10,
-      }),
-    ],
-  });
-  const focus = useFocus(context);
-  const { getReferenceProps, getFloatingProps } = useInteractions([focus]);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const createActions = useCallback(() => {
     const ctx = actionDescriptors.sub('controls.textbox');
@@ -106,19 +85,20 @@ export function SearchBoxOracle(props: SearchBoxProps & { oracle: Supplier<Actio
   }, [actionDescriptors]);
 
   useEffect(() => {
+    const clickOutsideHandler = (e: PointerEvent) => { if (isOpen && !checkClickInside(e, listRef, inputRef)) setIsOpen(false) };
+    document.addEventListener('pointerdown', clickOutsideHandler);
     return seq(
+      () => document.removeEventListener('pointerdown', clickOutsideHandler),
       props.focusSignal ? props.focusSignal.subscribe(focusInput) : nil(),
       searchChannel.collector().add(...createActions())
     );
-  }, [createActions, props.focusSignal, searchChannel])
+  }, [createActions, isOpen, props.focusSignal, searchChannel])
 
   return (
     <ActionsChannelContext.Provider value={searchChannel}>
       <>
         <div
-          ref={ref => { refs.setReference(ref); elementRef.current = ref }}
-          style={{ width: isOpen ? focusedWidth : width }}
-          {...getReferenceProps()}
+          style={{ width: isOpen ? focusedWidth : width, ['anchorName' as any]: '--searchbox' }}
           className='text-box baseline-aligned flex-auto row-block'>
           <Icon icon='magnifying-glass' />
           <input
@@ -128,8 +108,8 @@ export function SearchBoxOracle(props: SearchBoxProps & { oracle: Supplier<Actio
             value={query}
             placeholder="Press '/'"
             onChange={e => props.value.set(e.target.value)}
-            onFocus={_ => { currentActions(searchChannel); inputRef.current.select() }}
-            onBlur={_ => { currentActions(actionsChannel) }}
+            onFocus={_ => { currentActions(searchChannel); inputRef.current?.select(); setIsOpen(true); }}
+            onBlur={_ => { currentActions(actionsChannel); }}
           />
           {query.length > 0
             ? <Icon icon='xmark' className='fa-active' onClick={_ => props.value.set('')} />
@@ -137,16 +117,13 @@ export function SearchBoxOracle(props: SearchBoxProps & { oracle: Supplier<Actio
           }
         </div>
         {isOpen && (
-          <FloatingPortal>
-            <div
-              className="menu"
-              ref={refs.setFloating}
-              style={{ ...floatingStyles, zIndex: 99999 }}
-              {...getFloatingProps()}
-            >
-              <ActionList items={props.oracle()} onAction={() => setIsOpen(false)} />
-            </div>
-          </FloatingPortal>
+          <div
+            ref={listRef}
+            className="menu"
+            style={{ position: 'absolute', zIndex: 99999, ['positionAnchor' as any]: '--searchbox', ['positionArea' as any]: 'bottom span-right', width: 'anchor-size(width)' }}
+          >
+            <ActionList items={props.oracle()} onAction={() => setIsOpen(false)} />
+          </div>
         )}
       </>
     </ActionsChannelContext.Provider>)

@@ -5,7 +5,7 @@ import { Entity, EntityType, Target } from "../../../build/hitscan";
 import { Deck, map } from "../../../utils/collections";
 import { create, Dependency, getInstances, instance, lifecycle, Module, plugin } from "../../../utils/injector";
 import { detuple0, detuple1 } from "../../../utils/mathutils";
-import { SnapType, STATE } from "../../apis/app";
+import { SnapType, STATE } from "../../apis/app2";
 import { busDisconnector, Message, MessageHandler, MessageHandlerList, NULL_MESSAGE_HANDLER } from "../../apis/handler";
 import { RenderablesCache, RENDRABLES_CACHE } from "../../modules/gl/geometry/cache";
 import { EntityFactory, ENTITY_FACTORY } from "../context";

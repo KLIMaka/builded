@@ -2,8 +2,10 @@ import { iter } from 'ts-utils/iter';
 import { clamp } from 'ts-utils/mathutils';
 import * as React from 'react';
 import { HTMLProps, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { ActionDescriptorsContext, ActionsChannelContext, styles } from './commons';
+import { ActionDescriptorsContext, ActionsChannelContext, styles, useValuesContainer } from './commons';
 import { Consumer, nil, seq } from 'ts-utils/types';
+import { List, ListRowProps, ListRowRenderer } from 'react-virtualized';
+import { Value } from 'ts-utils/callbacks';
 
 type ActionItemProps = {
   children: ReactNode,
@@ -14,19 +16,18 @@ type ActionItemProps = {
   active: number,
   setActive: Consumer<number>,
   stripped: boolean,
+  style?: React.CSSProperties
 }
 
 
-function ActionListItem({ children, id, action, selected, active, setActive, disabled, stripped }: ActionItemProps) {
+function ActionListItem({ children, id, action, selected, active, setActive, disabled, stripped, style }: ActionItemProps) {
   const actions: HTMLProps<HTMLDivElement> = disabled ? {} : { onClick: _ => action(), onMouseEnter: _ => setActive(id), onMouseLeave: _ => setActive(-1) }
-  return (
-    <div className={'action-list-item ' + styles({ selected, disabled, active: active === id, even: stripped && (id % 2 === 0) })} {...actions} >
-      {children}
-    </div>
-  )
+  return <div style={style} className={'action-list-item ' + styles({ selected, disabled, active: active === id, even: stripped && (id % 2 === 0) })} {...actions} >
+    {children}
+  </div>
 }
 
-function scrollToView(parent: HTMLElement) {
+function scrollToView(parent: HTMLElement | null) {
   if (!parent) return;
   const parentRect = parent.getBoundingClientRect()
   const activeList = parent.getElementsByClassName('active');
@@ -53,14 +54,14 @@ export function ActionList(props: ActionListProps & HTMLProps<HTMLDivElement>) {
   const [active, setActive] = useState(-1);
   const actionDescriptors = useContext(ActionDescriptorsContext);
   const actionsChannel = useContext(ActionsChannelContext);
-  const listContainerRef = useRef<HTMLDivElement>();
+  const listContainerRef = useRef<HTMLDivElement>(null);
   const onAction = props.onAction ?? nil();
   const stripped = props.stripped ?? false;
 
   const moveActive = useCallback((current: number, off: number) => {
     const items = props.items;
     if (items.length === 0) return -1;
-    const skipDisabled = (idx: number, dir: number, first = true) => {
+    const skipDisabled = (idx: number, dir: number, first = true): number => {
       let ptr = idx;
       for (; ;) {
         if (!items[ptr].disabled) return ptr;
@@ -96,18 +97,44 @@ export function ActionList(props: ActionListProps & HTMLProps<HTMLDivElement>) {
           key={i}
           id={i}
           action={seq(item.action, onAction)}
-          selected={item.selected}
-          disabled={item.disabled}
+          selected={item.selected ?? false}
+          disabled={item.disabled ?? false}
           active={active}
           setActive={setActive}
           stripped={stripped}>
           {item.element}
         </ActionListItem>)
         .collect()}
-    </div>
-  )
+    </div>)
+}
+
+function createActionItemRowRenderer(active: Value<number>, props: ActionListProps & HTMLProps<HTMLDivElement>): ListRowRenderer {
+  return (rowProps: ListRowProps) => {
+    const item = props.items[rowProps.index];
+    return <ActionListItem
+      key={rowProps.index}
+      id={rowProps.index}
+      style={rowProps.style}
+      action={item.action}
+      selected={item.selected ?? false}
+      disabled={item.disabled ?? false}
+      active={active.get()}
+      setActive={a => active.set(a)}
+      stripped={props.stripped ?? false}
+    >
+      {item.element}
+    </ActionListItem>
+  }
 }
 
 export function ActionList1(props: ActionListProps & HTMLProps<HTMLDivElement>) {
-
+  const values = useValuesContainer('list');
+  const active = values.value('active', -1);
+  return <List
+    height={100}
+    width={200}
+    rowCount={props.items.length}
+    rowHeight={20}
+    rowRenderer={createActionItemRowRenderer(active, props)}
+  />
 }

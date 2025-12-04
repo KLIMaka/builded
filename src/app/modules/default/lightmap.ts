@@ -5,7 +5,7 @@ import { ANGSCALE, createSlopeCalculator, getWallCoords, wallNormal, ZSCALE } fr
 import { mat2d, mat4, vec2, vec3, vec4 } from "gl-matrix";
 import { first, map, range } from "../../../utils/collections";
 import { create, Injector, provider } from "../../../utils/injector";
-import { BOARD, BoardProvider, Lightmaps } from "../../apis/app";
+import { BOARD, BoardProvider, Lightmaps } from "../../apis/app2";
 import { Packer, Rect } from "../../../utils/texcoordpacker";
 
 class BoundingBox {

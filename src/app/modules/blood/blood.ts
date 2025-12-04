@@ -1,36 +1,37 @@
-import { EMPTY_COLLECTION, getOrCreate, getOrDefault, range } from "ts-utils/collections";
-import { createContainer, Source, ValuesContainer } from "ts-utils/callbacks";
-import { iter } from "ts-utils/iter";
-import { field } from "ts-utils/objects";
-import { Stream } from "ts-utils/stream";
-import { first, Function, identity, second } from "ts-utils/types";
-import { ArtInfoExtended, BoardContext, BuildRor, BuildTror, DEFAULT_SECTOR_SETTING, EMPTY_ALIASES, EMPTY_TAGS, EngineContext, EngineSettings, GlBlend, Palette, PicTags, VoxelSwap } from "app/apis/engine";
+import { ArtInfoExtended, BoardContext, BuildRor, BuildTror, DEFAULT_BLEND, DEFAULT_SECTOR_SETTING, EMPTY_ALIASES, EMPTY_TAGS, EngineContext, EngineSettings, GlBlend, Palette, PicTags, VoxelSwap } from "app/apis/engine";
 import { FileSystem } from "app/apis/fs";
+import { Values } from "app/apis/values";
 import { BloodBoard } from "build/blood/structs";
 import { loadRorLinks, MIRROR_PIC } from "build/blood/utils";
 import { EngineApi } from "build/board/mutations/api";
 import { Sector, Sprite, Wall } from "build/board/structs";
 import { readKvx, VoxelData } from "build/formats/kvx";
 import { RffFile } from "build/formats/rff";
+import { spriteInfo } from "build/sprites";
 import Optional from "optional-js";
+import { Source, ValuesContainer } from "ts-utils/callbacks";
+import { EMPTY_COLLECTION, getOrCreate, getOrDefault } from "ts-utils/collections";
+import { Iter, iter } from "ts-utils/iter";
+import { field } from "ts-utils/objects";
+import { Stream } from "ts-utils/stream";
+import { first, Function, identity, second } from "ts-utils/types";
+import { begin } from "ts-utils/work";
 import { cloneBoard, cloneSector, cloneSprite, cloneWall, loadBloodMap, newBoard, newSector, newSprite, newWall, saveBloodMap } from '../../../build/blood/maploader';
 import { createBoardModifier } from "../default/board-context-utils";
 import { loadArtMap, loadArtWork, loadEditorPicAddons, loadMaxPluId, loadRaw, openFile, openFileOptional, packegeFs } from "../default/engine-commons";
-import { createRffFsArrayBuffer, stack, watchFile } from "../fs/fs";
-import { begin } from "ts-utils/work";
-import { SECTOR_TAGS, SPRITE_TAGS, WALL_TAGS } from "./texts";
 import { DefaultGridController } from "../default/grid";
-import { spriteInfo } from "build/sprites";
+import { createRffFsArrayBuffer, stack, watchFile } from "../fs/fs";
+import { SECTOR_TAGS, SPRITE_TAGS, WALL_TAGS } from "./texts";
 
 function engineApi(): EngineApi<BloodBoard> {
   return { cloneBoard, cloneWall, cloneSprite, cloneSector, newWall, newSector, newSprite, newBoard };
 }
 
 function genDefaultPlu() {
-  const plu = new Uint8Array(new ArrayBuffer(256 * 64));
-  for (let s = 0; s < 64; s++) {
-    for (let i = 0; i < 256; i++) plu[s * 256 + i] = i;
-  }
+  const plu = new Uint8Array(256 * 64);
+  for (let s = 0; s < 64; s++)
+    for (let i = 0; i < 256; i++)
+      plu[s * 256 + i] = i;
   return plu;
 }
 
@@ -70,7 +71,7 @@ function createloadBoard(values: ValuesContainer, art: Source<Map<number, ArtInf
       const spritesBySectorMap = iter(board.sprites).map(field('sectnum')).enumerate().group(first, second);
       const spritesBySector = (sectorId: number) => getOrDefault(spritesBySectorMap, sectorId, []);
       const parallaxPicnums = Math.pow(2, board.parallaxSize);
-      const spriteDescriptorsMap = iter(range(0, board.numsprites)).toMap(identity(), s => spriteInfo(board, s, art));
+      const spriteDescriptorsMap = Iter.range(0, board.numsprites).toMap(identity(), s => spriteInfo(board, s, art));
       const spriteDescriptor = (spriteId: number) => spriteDescriptorsMap.get(spriteId);
       return { board, ror, tror, spritesBySector, parallaxPicnums, spriteDescriptor, sectorSettings }
     });
@@ -97,7 +98,7 @@ function engineSettings(values: ValuesContainer, off: Source<number>): Source<En
 
 type FileById = (fid: number, ext: string) => Optional<ArrayBuffer>;
 function loadFileById(values: ValuesContainer, bloodRff: Source<Optional<RffFile>>): Source<FileById> {
-  const toFileById: Function<RffFile, FileById> = (rff: RffFile) => (fid, ext) => Optional.ofNullable(rff.getRecordById(ext, fid)).map(rec => rff.get(rec));
+  const toFileById: Function<RffFile, FileById> = (rff: RffFile) => (fid, ext) => rff.getRecordById(ext, fid).map(rec => rff.get(rec));
   return values.transformed('file-by-id', bloodRff, rff => rff.map(toFileById).orElse((_1, _2) => Optional.empty()));
 }
 
@@ -114,27 +115,30 @@ async function createSpriteVoxelSwap(values: ValuesContainer, fs: Source<FileSys
   }
   const voxelInfo = values.transformed('voxel-info', voxelDat, buff => buff.map(loadVoxelInfo).orElse(_ => 0xffff));
   const cache = new Map<number, Optional<VoxelData>>();
-  return values.transformedTuple('sprite-swap', [fileById, voxelInfo], ([fileById, voxelInfo]) => picnum => {
-    const fileId = voxelInfo(picnum);
-    if (fileId === 0xffff) return Optional.empty();
-    return getOrCreate(cache, fileId, fileId => {
-      const voxelFile = fileById(fileId, 'kvx');
-      return voxelFile.map(buff => readKvx(new Stream(buff)));
-    })
+  return values.transformedTuple('sprite-swap', [fileById, voxelInfo], ([fileById, voxelInfo]) => {
+    cache.clear();
+    return picnum => {
+      const fileId = voxelInfo(picnum);
+      if (fileId === 0xffff) return Optional.empty();
+      return getOrCreate(cache, fileId, fileId => {
+        const voxelFile = fileById(fileId, 'kvx');
+        return voxelFile.map(buff => readKvx(new Stream(buff)));
+      })
+    }
   })
 }
 
 export const createEngineContextWork = begin()
-  .input<Source<FileSystem>>()
-  .thenWork((handle, fs) =>
-    createContainer('blood-module').initializeAsync(values => begin()
+  .multiInput<[Source<FileSystem>, Values]>()
+  .thenWork((handle, fs, values) =>
+    values.create('blood-module').initializeAsync(values => begin()
       .input<Source<FileSystem>>()
       .thenWorkPass((handle, fs) => begin()
         .input<Source<FileSystem>>()
         .forkPass(p => p
-          .thread('Loading BLOOD.RFF', fs => packegeFs(values, fs, 'BLOOD.RFF', async buff => createRffFsArrayBuffer(buff)))
-          .thread('Loading SOUNDS.RFF', fs => packegeFs(values, fs, 'SOUNDS.RFF', async buff => createRffFsArrayBuffer(buff)))
-          .thread('Loading GUI.RFF', fs => packegeFs(values, fs, 'GUI.RFF', async buff => createRffFsArrayBuffer(buff))))
+          .thread('Loading BLOOD.RFF', fs => packegeFs(values, fs, 'BLOOD.RFF', async buff => createRffFsArrayBuffer('BLOOD.RFF', buff)))
+          .thread('Loading SOUNDS.RFF', fs => packegeFs(values, fs, 'SOUNDS.RFF', async buff => createRffFsArrayBuffer('SOUNDS.RFF', buff)))
+          .thread('Loading GUI.RFF', fs => packegeFs(values, fs, 'GUI.RFF', async buff => createRffFsArrayBuffer('GUI.RFF', buff))))
         .then('Creating Resources', async (fs, [blood, sounds, gui]) =>
           values.transformedTuple('stackFs', [blood, sounds, gui, fs], ([blood, sounds, gui, fs]) => stack(fs, stack(blood, stack(sounds, gui)))))
         .finish()(handle, fs))
@@ -149,13 +153,13 @@ export const createEngineContextWork = begin()
       .then<EngineContext<BloodBoard>>('', async (fs, resources, [pal, trans, plus, picTags, spriteVoxelSwap, art], artAddon) => {
         const api = engineApi();
         const settings = engineSettings(values, artAddon.offset);
-        const name = values.const('', "Blood");
+        const name = values.const('name', "Blood");
         const artMap = artAddon.map;
         const shadowsteps = values.const('shadowsteps', 64);
         const aliases = values.const('aliases', EMPTY_ALIASES);
         const maxPluId = loadMaxPluId(values, plus);
         const parallaxInfo = (_: number) => 0xffffff;
-        const blends = values.const<Function<number, GlBlend>>('blend', _ => ({ src: WebGL2RenderingContext.SRC_ALPHA, dst: WebGL2RenderingContext.ONE_MINUS_SRC_ALPHA }));
+        const blends = values.const<Function<number, GlBlend>>('blend', _ => DEFAULT_BLEND);
         const loadBoard = createloadBoard(values, artAddon.map);
         const dispose = () => values.dispose();
         return { name, resources, api, settings, pal, trans, picTags, plus, maxPluId, art, artMap, shadowsteps, aliases, spriteVoxelSwap, blends, parallaxInfo, loadBoard, dispose }

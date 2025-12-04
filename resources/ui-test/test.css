@@ -238,6 +238,7 @@
   border-bottom-right-radius: 3px;
   box-shadow: var(--window-border-shadow);
   box-sizing: border-box;
+  overflow: auto;
 }
 
 .menu-item {
@@ -284,8 +285,9 @@
   display: flex;
   border-bottom-left-radius: 5px;
   border-bottom-right-radius: 5px;
-  overflow: hidden;
   top: 24px;
+  overflow: visible;
+  contain: none;
 }
 
 .window-toolbar {
@@ -503,11 +505,12 @@
 
 *::-webkit-scrollbar-track {
   background-color: var(--border);
+  border-radius: 6px;
 }
 
 *::-webkit-scrollbar-thumb {
   background-color: var(--fg-gray);
-  border-radius: 2px;
+  border-radius: 6px;
 }
 
 .table-container {
@@ -550,11 +553,14 @@
 
 .virtual-table-container {
   background-color: var(--table-odd-color);
-  border: solid 1px var(--fg-gray);
+  border: solid 1px var(--border);
+  border-radius: 6px;
 }
 
 .virtual-table {
   background-color: var(--table-odd-color);
+  border-radius: 6px;
+  padding-top: 2px;
 }
 
 .virtual-table:focus-visible {
@@ -604,6 +610,16 @@
   border-radius: 3px;
 }
 
+.table-row:hover {
+  background-color: var(--table-hover-color);
+  border-radius: 3px;
+}
+
+.virtual-table-row.selected:hover {
+  background-color: var(--table-hover-select-color);
+  border-radius: 3px;
+}
+
 .virtual-table-row.selected {
   background-color: var(--table-select-color);
   border-radius: 3px;
@@ -613,18 +629,9 @@
   background-color: var(--table-even-color);
 }
 
-.table-row:hover {
-  background-color: var(--table-hover-color);
-  border-radius: 3px;
-}
 
 .table-row.selected {
   background-color: var(--table-select-color);
-  border-radius: 3px;
-}
-
-.table-row.selected:hover {
-  background-color: var(--table-hover-select-color);
   border-radius: 3px;
 }
 
@@ -987,6 +994,7 @@ body {
   flex-direction: row;
   flex: 1;
   flex-wrap: wrap;
+  overflow: hidden
 }
 
 .nonwrap-row-block {
@@ -1004,6 +1012,7 @@ body {
   display: flex;
   flex-direction: column;
   flex: 1;
+  overflow: hidden;
 }
 
 .label-holder {
@@ -1228,3 +1237,33 @@ body {
 .axes-plus {}
 
 .axes-plus {}
+
+.progress-container {
+  position: relative;
+  overflow: hidden;
+  border-radius: 6px;
+  margin: 2px 2px;
+}
+
+.progress-foreground {
+  display: flex;
+  width: 100%;
+  background-color: var(--selected);
+}
+
+.progress-background {
+  position: absolute;
+  display: flex;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background-color: var(--border-hl);
+}
+
+.progress-text {
+  text-wrap: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  padding: 2px 10px;
+}

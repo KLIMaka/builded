@@ -1,5 +1,5 @@
 import { Value } from "ts-utils/callbacks";
-import { Block, Ui, clazz, style } from "app/apis/ui";
+import { Block, Ui, clazz, style } from "app/apis/ui2";
 import { clamp, int } from "../../mathutils";
 import { Formatter, ParseValidator, Parser } from "../../value";
 import { Validator, setter } from "./api";

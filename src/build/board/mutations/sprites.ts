@@ -1,4 +1,4 @@
-import { GridController } from "../../../app/apis/app";
+import { GridController } from "../../../app/apis/app2";
 import { vec3 } from "gl-matrix";
 import { findFirst } from "../../../utils/collections";
 import { int } from "../../../utils/mathutils";

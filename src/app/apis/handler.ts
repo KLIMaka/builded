@@ -1,7 +1,7 @@
 import { Deck } from "ts-utils/collections";
 import { Dependency, Injector, provider } from "ts-utils/injector";
 import { List } from "ts-utils/list";
-import { LOGGER } from "./app";
+import { LOGGER } from "./app2";
 
 export interface Message { }
 export interface Context { }

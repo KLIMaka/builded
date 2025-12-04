@@ -2,7 +2,7 @@ import { Collection, Deck, isEmpty } from "../../utils/collections";
 import { Lexer, LexerRule } from "../../utils/lexer";
 import { EndMove, Flip, Move, NamedMessage, Palette, PanRepeat, ResetPanRepeat, SetPicnum, SetSectorCstat, SetWallCstat, Shade, SpriteMode, StartMove, SetSpriteCstat, Rotate } from "../edit/messages";
 import { Message } from "../apis/handler";
-import { Logger } from "../apis/app";
+import { Logger } from "../apis/app2";
 
 class MessageParser {
   private lexer = new Lexer();
@@ -34,8 +34,8 @@ class MessageParser {
 const PARSER = new MessageParser();
 
 const NOOP_MESSAGE: Message = {};
-function createMessage(logger: Logger, constr: Function, ...types: string[]) { 
-const args = [...types].map(t => PARSER.get(t));
+function createMessage(logger: Logger, constr: Function, ...types: string[]) {
+  const args = [...types].map(t => PARSER.get(t));
   try {
     return Reflect.construct(constr, args);
   } catch (e) {

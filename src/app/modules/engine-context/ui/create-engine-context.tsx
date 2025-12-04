@@ -1,32 +1,38 @@
-import { ActionItem, ActionList, createActionItem } from "@ui/action-list";
-import { ActionButton, actionsToActionItem, Button, Column, Icon, Row, Spacer, TextHeight, TextInput, useValue, useValuesContainer } from "@ui/commons";
+import { createActionItem } from "@ui/action-list";
+import { ActionButton, actionsToActionItem, Button, Column, Icon, NonwrapLabel, Row, Spacer, TextHeight, TextInput, useValue, useValuesContainer } from "@ui/commons";
 import { MenuButton } from "@ui/menu-button";
+import { row, selectIdSelectionModel, TypedTableCellProps, VirtualTable } from "@ui/table";
 import { modalResult, WindowBuilder } from "@ui/windows-common";
-import { createContainer, Source, toValuesMap, Value, ValuesContainer, ValuesMap } from "ts-utils/callbacks";
-import { iter } from "ts-utils/iter";
-import { sum } from "ts-utils/mathutils";
-import { asyncMapOptional } from "ts-utils/objects";
-import { size } from "ts-utils/size";
-import { Consumer, first, pair, Result } from "ts-utils/types";
-import { ActionDescriptors, Actionify } from "app/apis/actions";
-import { App } from "app/apis/app1";
-import { FileInfo, FileSystem, FileSystemHandle, FileSystems, SerializedFileSystemHandle } from "app/apis/fs";
-import { Ui } from "app/apis/ui1";
+import { Action, ActionDescriptors } from "app/apis/actions";
+import { App } from "app/apis/app";
+import { FileSystemHandle, FileSystems, SerializedFileSystemHandle } from "app/apis/fs";
+import { Ui } from "app/apis/ui";
+import { Values } from "app/apis/values";
 import { stack } from "app/modules/fs/fs";
 import { fsIcon } from "app/modules/fs/ui/fs-ui-utils";
-import { begin } from "ts-utils/work";
 import Optional from "optional-js";
 import React from "react";
 import { match } from "ts-pattern";
+import { Source, toValuesMap, Value, ValuesContainer, ValuesMap } from "ts-utils/callbacks";
+import { iter } from "ts-utils/iter";
+import { sum } from "ts-utils/mathutils";
+import { asyncMapOptional } from "ts-utils/objects";
+import { Scheduler, TaskValue } from "ts-utils/scheduler";
+import { size } from "ts-utils/size";
+import { Consumer, first, notUndefined, pair } from "ts-utils/types";
+import { begin } from "ts-utils/work";
 import { EngineContextRecord, EngineContextType, ENGINES } from "../engine-context-api";
 
 const ID = 'engines-context-create';
 
 type Actions = {
-  add: Actionify<'addStorage' | 'addDir' | 'addZip' | 'addRff' | 'addGrp' | 'addMemory'>,
-  fs: Actionify<'moveUp' | 'moveDown' | 'delete'>
+  add: Record<'addStorage' | 'addDir' | 'addZip' | 'addRff' | 'addGrp' | 'addMemory', Action>,
+  fs: Record<'moveUp' | 'moveDown' | 'delete', Action>
 };
-type FsInfo = { handle: FileSystemHandle, disconnected: boolean, files: number, size: number }
+
+type FsInfoDetails = { files: number, size: number }
+const EMPTY: FsInfoDetails = { files: 0, size: 0 }
+type FsInfo = { type: SerializedFileSystemHandle['type'], name: string, details: Source<TaskValue<FsInfoDetails>> }
 
 type CreateEngineWindowProps = {
   result: Consumer<boolean>,
@@ -41,13 +47,15 @@ type CreateEngineWindowProps = {
   selected: Value<number>
 }
 
-function createFsItem(info: FsInfo, idx: number, currentSelected: number, selected: Value<number>): ActionItem {
-  const element = <Row className='baseline-aligned gap-10'>
-    <Icon icon={fsIcon(info.handle.serialized.type)} className='fa-fixwidth' />
-    <div className='flex-fill'> {info.handle.name}</div>
-    <div>{size(info.size)} in {info.files} files(s)</div>
+function FsRow(props: { info: FsInfo }) {
+  const details = useValue(props.info.details);
+  return <Row className='gap-10'>
+    <Icon icon={fsIcon(props.info.type)} className='fa-fixwidth' />
+    <NonwrapLabel label={props.info.name} />
+    {details.isDone()
+      ? details.result().map(d => <div> {size(d.size)} in {d.files} files(s)</div>).getOk()
+      : <Icon icon="spinner" className="fa-spin-pulse" />}
   </Row>
-  return createActionItem(element, () => selected.set(idx), false, idx === currentSelected);
 }
 
 function createAddItems(values: ValuesContainer, engineType: Value<Optional<EngineContextType<any>>>) {
@@ -56,15 +64,16 @@ function createAddItems(values: ValuesContainer, engineType: Value<Optional<Engi
     .collect());
 }
 
+function FsRenderer({ cellData }: TypedTableCellProps<FsInfo, FsInfo>) {
+  return <FsRow info={notUndefined(cellData)} />
+}
+
 function CreateEngineWindow(props: CreateEngineWindowProps) {
   const values = useValuesContainer(ID);
   const error = useValue(props.error);
   const valid = useValue(props.valid);
-  const selected = useValue(props.selected);
   const openEngineType = values.value('openEngineType', false);
   const addMenuOpen = values.value('addMenuOpen', false);
-  const fss = values.transformed('fileItems', props.fsInfos, fss => iter(fss).enumerate().map(([info, idx]) => createFsItem(info, idx, selected, props.selected)).collect());
-  const fileItems = useValue(fss);
   const engineType = useValue(props.engineType);
   const engineMods = useValue(props.engineMods);
   const addItems = values.const('addItems', actionsToActionItem(Object.values(props.actions.add)));
@@ -96,7 +105,12 @@ function CreateEngineWindow(props: CreateEngineWindowProps) {
       <Row className='flex-fill gap-10' >
         <div style={{ flexBasis: '100px' }} />
         <Column className="flex-fill">
-          <ActionList className='action-list-bg flex-fill' items={fileItems} stripped={true} />
+          <VirtualTable
+            rows={props.fsInfos}
+            columns={[row('info', 'Info', FsRenderer, 0, 1, 1)]}
+            selected={selectIdSelectionModel(values, props.selected, props.fsInfos)}
+            disableHeader
+          />
         </Column>
       </Row>
     </Column>
@@ -146,7 +160,7 @@ function createActions(actionDescriptors: ActionDescriptors, fs: FileSystems, fi
       .with('down', () => 1)
       .exhaustive();
     selected.mod(s => s + delta);
-    fileSystems.modImmer(fss => { const tmp = fss[s]; fss[s] = fss[s + delta]; fss[s + delta] = tmp })
+    fileSystems.modImmer(fss => { [fss[s], fss[s + delta]] = [fss[s + delta], fss[s]] })
   })
   return {
     add: {
@@ -165,23 +179,15 @@ function createActions(actionDescriptors: ActionDescriptors, fs: FileSystems, fi
   }
 }
 
-async function createFsInfo(handle: FileSystemHandle, fs: Result<FileSystem>): Promise<FsInfo> {
-  const list = await asyncMapOptional(fs.optional(), fs => fs.list())
-  const fsSize = (list: FileInfo[]): number => iter(list).map(l => l.size).reduceFirst(sum).orElse(0);
-  return list
-    .map(l => ({ handle, size: fsSize(l), files: l.length, disconnected: false } as FsInfo))
-    .orElse({ handle, size: 0, files: 0, disconnected: true })
+function createFsInfo(scheduler: Scheduler, handle: FileSystemHandle): FsInfo {
+  const details = scheduler.exec(async () => asyncMapOptional(await handle.open().then(r => r.optional()), fs => fs.list())
+    .then(list =>
+      list.map(l => ({ size: l.map(l => l.size).reduce(sum, 0), files: l.length })).orElse(EMPTY)));
+  return { name: handle.name, type: handle.serialized.type, details: details.task };
 }
 
-async function createFileSystemsInfo(values: ValuesContainer, fileSystems: Source<FileSystemHandle[]>): Promise<Source<FsInfo[]>> {
-  return values.transformedAsync('fileSystemInfos', fileSystems, fss => iter(fss)
-    .map(async h => pair(h, await h.open()))
-    .await_()
-    .then(i => i
-      .map(([h, fs]) => createFsInfo(h, fs))
-      .await_()
-      .then(i => i
-        .collect())))
+function createFileSystemsInfo(values: ValuesContainer, scheduler: Scheduler, fileSystems: Source<FileSystemHandle[]>): Source<FsInfo[]> {
+  return values.transformed('fileSystemInfos', fileSystems, fss => fss.map(handle => createFsInfo(scheduler, handle)));
 }
 
 function createResultHandler(
@@ -191,8 +197,9 @@ function createResultHandler(
   fsHandles: Source<FileSystemHandle[]>,
   fs: FileSystems,
   error: Value<Optional<Error>>,
-  resultAndClose: Consumer<EngineContextRecord>,
+  resultAndClose: Consumer<EngineContextRecord | null>,
   app: App,
+  values: Values,
 ) {
   return async (isOk: boolean) => {
     if (isOk) {
@@ -204,12 +211,12 @@ function createResultHandler(
           .map(h => h.serialized)
           .collect()
       };
-      const values = createContainer('tmp-values-create-engine-context');
+      const localValues = values.create('tmp-values-create-engine-context');
       const createEngine = iter(ENGINES).first(e => e.id === record.type).map(e => e.factory).orElseThrow(() => new Error(`Unknown engine type: '${record.type}' `));
       const work = begin()
         .forkItems(record.fileSystems, f => `Opening File System...`, f => fs.deserialize(f).open())
-        .then('Building FS Stack...', async fss => values.value('', iter(fss).map(r => r.unwrap()).reduceFirst(stack).get()))
-        .thenWork((handle, fs) => createEngine(handle, fs, record.mods))
+        .then('Building FS Stack...', async fss => localValues.value('fs-stack', iter(fss).map(r => r.unwrap()).reduceFirst(stack).get()))
+        .thenWork((handle, fs) => createEngine(handle, fs, values, record.mods))
         .finishUntuple();
       const task = app.scheduler.exec(work);
       const result = await task.end();
@@ -217,38 +224,39 @@ function createResultHandler(
         .map(async ctx => await ctx.dispose())
         .onOk(_ => resultAndClose(record))
         .onErr(e => { app.logger.log('ERROR', e); error.set(Optional.of(e)) })
-      await values.dispose();
+      await localValues.dispose();
     } else {
       resultAndClose(null);
     }
   }
 }
 
-export async function createEngine(ui: Ui, actionDescriptors: ActionDescriptors, fs: FileSystems, app: App, def?: EngineContextRecord): Promise<Optional<EngineContextRecord>> {
-  return createContainer(ID).initializeAsync(async values => {
-    const name = values.value('name', def?.name ?? '');
-    const engineType = values.value('engineType', iter(ENGINES).first(e => e.id === def?.type));
-    const engineMods = values.value('engineMods', toValuesMap(def?.mods ?? iter(ENGINES).first(e => e.id === def?.type).map(e => e.defaultMods).orElse({}), values));
-    const fsHandles = values.value('fsHandles', iter(def?.fileSystems ?? []).map(h => fs.deserialize(h)).collect());
-    const fsInfos = await createFileSystemsInfo(values, fsHandles);
-    const error = values.value('error', Optional.empty<Error>());
-    const selected = values.value('selected', -1);
+export async function createEngine(ui: Ui, actionDescriptors: ActionDescriptors, fs: FileSystems, app: App, values: Values, def?: EngineContextRecord): Promise<Optional<EngineContextRecord>> {
+  return values.create(ID).initializeAsync(async localValues => {
+    const name = localValues.value('name', def?.name ?? '');
+    const engineType = localValues.value('engineType', iter(ENGINES).first(e => e.id === def?.type));
+    const engineDefault = iter(ENGINES).first(e => e.id === def?.type).map(e => e.defaultMods).orElse({});
+    const engineMods = localValues.value('engineMods', toValuesMap(def?.mods ?? engineDefault, engineDefault, localValues));
+    const fsHandles = localValues.value('fsHandles', iter(def?.fileSystems ?? []).map(h => fs.deserialize(h)).collect());
+    const fsInfos = createFileSystemsInfo(localValues, app.scheduler, fsHandles);
+    const error = localValues.value('error', Optional.empty<Error>());
+    const selected = localValues.value('selected', -1);
     const clearError = () => error.set(Optional.empty());
-    values.handleStandalone([engineType], type => { clearError(); type.ifPresent(t => engineMods.set(toValuesMap(def?.type === t.id ? def.mods : t.defaultMods, values))) });
-    values.handleStandalone([fsHandles], clearError);
-    const valid = values.transformedTuple('valid', [engineType, error, fsHandles], ([type, err, fss]) => type.isPresent() && !err.isPresent() && fss.length > 0);
-    const actions = createActions(actionDescriptors, fs, fsHandles, selected, values);
+    localValues.handleStandalone([engineType], type => { clearError(); type.ifPresent(t => engineMods.set(toValuesMap(def?.type === t.id ? def.mods : t.defaultMods, t.defaultMods, localValues))) });
+    localValues.handleStandalone([fsHandles], clearError);
+    const valid = localValues.transformedTuple('valid', [engineType, error, fsHandles], ([type, err, fss]) => type.isPresent() && !err.isPresent() && fss.length > 0);
+    const actions = createActions(actionDescriptors, fs, fsHandles, selected, localValues);
 
     return new Promise<Optional<EngineContextRecord>>(ok => {
       const [resultAndClose, close] = modalResult(() => window.close(), ok);
-      const result = createResultHandler(engineType, engineMods, name, fsHandles, fs, error, resultAndClose, app);
-      const window = new WindowBuilder(ID, actionDescriptors, values)
+      const result = createResultHandler(engineType, engineMods, name, fsHandles, fs, error, resultAndClose, app, values);
+      const window = new WindowBuilder(ID, actionDescriptors, localValues)
         .titleFromId()
         .size(500, 350)
         .minSize(450, 300)
         .actions([...Object.values(actions.add), ...Object.values(actions.fs)])
         .onClose(close)
-        .disposable(values)
+        .disposable(localValues)
         .build(<CreateEngineWindow
           result={result}
           name={name}

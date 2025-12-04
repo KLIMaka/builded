@@ -2,7 +2,7 @@ import { Disposable, Source, ValuesContainer, createContainer } from '@utils/cal
 import { BoardContext, EngineSettings, VoxelSwap } from 'app/apis/engine';
 import { Board } from 'build/board/structs';
 import { forEach, getOrCreate, mapBuilder } from 'utils/collections';
-import { BoardProvider } from '../../../apis/app';
+import { BoardProvider } from '../../../apis/app2';
 import { Builder } from '../../../apis/builder';
 import { MessageHandler, MessageHandlerReflective } from '../../../apis/handler';
 import { BuildRenderableProvider, ClusterRenderable, Renderable, SectorRenderable, WallRenderable } from '../../../apis/renderable';
@@ -20,6 +20,7 @@ import { updateWall2d } from './builders/wall2d';
 import { WallHelperBuilder, updateWallHelper } from './builders/wallhelper';
 import { updateWallPoint } from './builders/wallpointhelper';
 import { BuildersFactory } from './common';
+import { Values } from 'app/apis/values';
 
 class Entry<T> {
   constructor(public value: T, public valid: boolean = false) { }
@@ -162,31 +163,31 @@ export interface RenderablesCache extends MessageHandler, Disposable {
   readonly selected: CachedSelectedRenderableProvider;
 }
 
-export class RenderablesCacheContext {
-  readonly board: BoardProvider;
-  readonly textures: EngineTextures;
-  readonly factory: BuildersFactory;
-  readonly state: Map<string, Source<any>>;
-  readonly settings: EngineSettings;
-  readonly voxels: Source<VoxelSwap<any>>;
-  readonly ctx: BoardContext;
-}
+export type RenderablesCacheContext = Readonly<{
+  board: BoardProvider;
+  textures: EngineTextures;
+  factory: BuildersFactory;
+  state: Map<string, Source<any>>;
+  settings: EngineSettings;
+  voxels: Source<VoxelSwap<any>>;
+  ctx: BoardContext;
+}>
 
 export const WALL_COLOR = 'wallColor';
 export const MASKED_WALL_COLOR = 'maskedWallColor';
 export const INTERSECTOR_WALL_COLOR = 'intersectorWallColor';
 export const SPRITE_COLOR = 'spriteColor';
 
-export function createRenderablesCache<B extends Board>(ctx: BoardContext<B>, textures: EngineTextures, factory: BuildersFactory, settings: EngineSettings, voxels: Source<VoxelSwap<B>>): RenderablesCache {
-  const values = createContainer('renderables-cache');
+export function createRenderablesCache<B extends Board>(values: Values, ctx: BoardContext<B>, textures: EngineTextures, factory: BuildersFactory, settings: EngineSettings, voxels: Source<VoxelSwap<B>>): RenderablesCache {
+  const localValues = values.create('renderables-cache');
   const state = mapBuilder<string, Source<any>>()
-    .add(WALL_COLOR, values.value('WALL_COLOR', [1, 1, 1, 1]))
-    .add(INTERSECTOR_WALL_COLOR, values.value('INTERSECTOR_WALL_COLOR', [1, 0, 0, 1]))
-    .add(MASKED_WALL_COLOR, values.value('MASKED_WALL_COLOR', [0, 0, 1, 1]))
-    .add(SPRITE_COLOR, values.value('SPRITE_COLOR', [0, 1, 1, 1]))
+    .add(WALL_COLOR, localValues.value('WALL_COLOR', [1, 1, 1, 1]))
+    .add(INTERSECTOR_WALL_COLOR, localValues.value('INTERSECTOR_WALL_COLOR', [1, 0, 0, 1]))
+    .add(MASKED_WALL_COLOR, localValues.value('MASKED_WALL_COLOR', [0, 0, 1, 1]))
+    .add(SPRITE_COLOR, localValues.value('SPRITE_COLOR', [0, 1, 1, 1]))
     .build();
   const board = () => ctx.board;
-  return new RenderablesCacheImpl(values, { board, factory, textures, state, settings, voxels, ctx })
+  return new RenderablesCacheImpl(localValues, { board, factory, textures, state, settings, voxels, ctx })
 }
 
 export class RenderablesCacheImpl extends MessageHandlerReflective implements RenderablesCache {

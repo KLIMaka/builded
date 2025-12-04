@@ -54,8 +54,7 @@ vec3 getWall3dPosMasked(int vtxId, wall_t wall1, wall_t wall2, vec4 orient, vec4
 
 vec3 getTc(vec3 pos, wall_t orig, wall_t ref, pic_t picInfo, vec2 p1, vec2 p2, float basez) {
   float yf = wall_cstat_yflip(ref) ? -1.0 : 1.0;
-  bool nonSwapped = ref.pos == p1;
-  vec3 base = nonSwapped && wall_cstat_xflip(orig) ? vec3(p2, basez) : vec3(p1, basez);
+  vec3 base = wall_cstat_xflip(orig) ? vec3(p2, basez) : vec3(p1, basez);
   bool rotate90 = wall_cstat_rotate90(ref);
   float yfr = rotate90 ? -1.0 : 1.0;
   vec2 size = rotate90 ? picInfo.sizeOff.yx : picInfo.sizeOff.xy;

@@ -1,9 +1,8 @@
-import { toValuesMap, Value, ValuesContainer, ValuesMap } from "ts-utils/callbacks";
 import Optional from "optional-js";
-import { Storage, Storages } from "../../../../app/apis/app1";
+import { toValuesMap, Value, ValuesContainer, ValuesMap } from "ts-utils/callbacks";
 import { getOrCreate } from "ts-utils/collections";
 import { applyDefaults } from "ts-utils/objects";
-import { debounced } from "ts-utils/time";
+import { Storage, Storages, Timer } from "../../../apis/app";
 
 class StorageImpl implements Storage {
   private db: Promise<IDBDatabase>;
@@ -108,13 +107,12 @@ export async function storageValue<T>(values: ValuesContainer, storage: Storage,
   return value;
 }
 
-export async function createSavedState<T>(values: ValuesContainer, storage: Storage, id: string, def: T, debounce = 1000): Promise<ValuesMap<T>> {
-  let disposed = false;
-  const save = debounced(() => { if (!disposed) storage.set(id, state.getObject()) }, debounce);
+export async function createSavedState<T>(values: ValuesContainer, storage: Storage, id: string, def: T, timer: Timer): Promise<ValuesMap<T>> {
+  const save = timer.debounced(() => storage.set(id, state.getObject()), 1000);
   const loadedState = await storage.get<T>(id);
   const initialState = loadedState.map(s => applyDefaults(s, def)).orElse(def);
-  const state = toValuesMap(initialState, values);
-  state.handle(values, save);
-  values.addDisconnector(() => disposed = true);
+  const state = toValuesMap(initialState, def, values);
+  state.handle(values, () => save.run());
+  values.addDisposable(save);
   return state;
 }

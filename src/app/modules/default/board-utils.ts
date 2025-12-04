@@ -1,7 +1,7 @@
 import { Board } from "../../../build/board/structs";
 import { getOrCreate } from "../../../utils/collections";
 import { getInstances, Injector, Plugin } from "../../../utils/injector";
-import { BOARD, BoardUtils } from "../../apis/app";
+import { BOARD, BoardUtils } from "../../apis/app2";
 import { BUS, Handle, MessageHandlerReflective } from "../../apis/handler";
 import { BoardInvalidate } from "../../edit/messages";
 

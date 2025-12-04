@@ -4,9 +4,11 @@ import { iter } from 'ts-utils/iter';
 import { Consumer, MultiConsumer, MultiFunction, Supplier, identity, nil, seq } from 'ts-utils/types';
 import { Action, ActionDescriptors, ActionsProvider, StateChecker } from 'app/apis/actions';
 import { Bind } from 'app/input/keymap';
-import React, { ForwardedRef, HTMLProps, MouseEventHandler, ReactNode, createContext, forwardRef, useContext, useRef, useSyncExternalStore } from 'react';
+import React, { ForwardedRef, HTMLProps, MouseEventHandler, ReactNode, RefObject, createContext, forwardRef, useContext, useRef, useSyncExternalStore } from 'react';
 import { AutoSizer } from 'react-virtualized';
 import { ActionItem } from './action-list';
+import { Values } from 'app/apis/values';
+import { progress } from 'ts-utils/scheduler';
 
 export const Column = forwardRef(function Column({ children, className, ...rest }: React.HTMLProps<HTMLDivElement> & { className?: string }, ref: ForwardedRef<HTMLDivElement>) {
   return (
@@ -27,8 +29,8 @@ export const SizedText = forwardRef(function SizedText(props: SizedTextProps, re
   return (<div ref={ref} style={{ width: props.size }}>{props.text}</div>)
 })
 
-export const Icon = forwardRef(function Icon({ icon, ...rest }: React.HTMLProps<HTMLDivElement> & { icon: string }, ref: ForwardedRef<HTMLDivElement>) {
-  return <div ref={ref} {...rest} className={`fa-solid fa-${icon} ${rest.className ?? ''}`} ></div>
+export const Icon = forwardRef(function Icon({ icon, type, ...rest }: React.HTMLProps<HTMLDivElement> & { icon: string, type?: 'solid' | 'regular' }, ref: ForwardedRef<HTMLDivElement>) {
+  return <div ref={ref} {...rest} className={`fa-${type ?? 'solid'} fa-${icon} ${rest.className ?? ''}`} ></div>
 })
 
 export const Button = forwardRef(function Button({ ...rest }: React.HTMLProps<HTMLDivElement>, ref: ForwardedRef<HTMLDivElement>) {
@@ -49,6 +51,10 @@ export const ToggleButton = forwardRef(function ToggleButton({ icon, pressedValu
     </div>)
 })
 
+export function NonwrapLabel(props: { label: any }) {
+  return <div className='flex-fill nonwrap-row-block-item' title={props.label}>{props.label}</div>
+}
+
 export function TextHeight() {
   return <div style={{ width: "0px" }}>&nbsp;</div>;
 }
@@ -62,7 +68,7 @@ export function TextInput(props: TextInputProps) {
   const currentActions = useContext(CurrentActionsChannelContext);
   const searchChannel = actionsChannel.child(`input-text-${props.name}`, true);
 
-  const ref = useRef<HTMLInputElement>();
+  const ref = useRef<HTMLInputElement>(null);
   const value = useValue(props.value);
 
   return (<ActionsChannelContext.Provider value={searchChannel}>
@@ -89,6 +95,14 @@ export function ActionButton({ action }: { action: Action }) {
       {action.descriptor.label().map(d => <div>{d}</div>).orElse(<></>)}
     </div>
   )
+}
+
+export function FieldValue(props: { label: string, value: Source<string> }) {
+  const value = useValue(props.value);
+  return <Row className='form-row'>
+    <div className='form-row-label'>{props.label}</div>
+    <div className='form-row-content'>{value}</div>
+  </Row>
 }
 
 export function GroupItem({ label, selected, onSelected }: { label: string, selected: boolean, onSelected: MouseEventHandler }) {
@@ -122,9 +136,9 @@ function TabButtons(props: { items: TabItem[], active: Value<number> }) {
     {iter(props.items)
       .enumerate()
       .map(([t, i]) =>
-        <Row key={i} className={`tab flex-nonwrap gap-5 baseline-aligned ${styles({ active: props.active.get() === i })}`} onClick={_ => props.active.set(i)}>
+        <Row key={i} className={`tab flex-auto gap-5 baseline-aligned ${styles({ active: props.active.get() === i })}`} onClick={_ => props.active.set(i)}>
           {t.icon ? <Icon icon={t.icon} /> : <></>}
-          <div className='flex-fill'>{t.label}</div>
+          <div style={{ textWrap: 'nowrap' }} className='flex-fill'>{t.label}</div>
         </Row>)
       .collect()}
   </Row><Spacer /></Row>
@@ -139,6 +153,7 @@ export function Tabs(props: { items: TabItem[], active: Value<number> }) {
     {activeItem.content}
   </Column>
 }
+
 
 export function line(text: string): ActionItem {
   return {
@@ -186,6 +201,15 @@ export function KeyBind({ bind }: { bind: Bind }) {
   )
 }
 
+export function ProgressBar(props: { progress: Source<number>, info: Source<string> }) {
+  const progress = useValue(props.progress);
+  const info = useValue(props.info);
+  return <div className="flex-fill progress-container">
+    <div className="progress-background" style={{ clipPath: `inset(0 0 0 ${progress}%)` }}><div className='progress-text'>{info}</div></div>
+    <div className="progress-foreground" style={{ clipPath: `inset(0 ${100 - progress}% 0 0)` }} ><div className='progress-text'>{info}</div></div>
+  </div>
+}
+
 export function actionsToActionItem(actions: Action[]): ActionItem[] {
   return actions.map(a => {
     const descr = a.descriptor;
@@ -206,7 +230,7 @@ export function Spacer() {
 }
 
 export function styles<K extends keyof any>(input: Record<K, boolean>): string {
-  return iter(Object.keys(input)).filter(k => input[k]).map(identity()).collect().join(' ');
+  return iter(Object.keys(input)).filter(k => (input as any)[k]).map(identity()).collect().join(' ');
 }
 
 export function asyncStateLoader<T>(loader: Supplier<Promise<T>>, consumer: Consumer<T>) {
@@ -250,13 +274,13 @@ export function useValue<T>(value: Source<T>): T {
 export function useValuesContainer(name: string): ValuesContainer {
   const parentValues = useContext(ValuesContainerContext);
   const values = parentValues.createChild(`${name}-react`);
-  return useSyncExternalStore(_ => nil, () => values);
+  return useSyncExternalStore(_ => () => values.dispose(), () => values);
 }
 
 export class ActionsNode implements ActionsProvider {
   constructor(
     private id: string,
-    private parent: ActionsNode,
+    private parent: ActionsNode | null,
     private blocking = false,
     private actionsCollector = new ActionsCollector(),
     private children = new Map<string, ActionsNode>()
@@ -291,10 +315,11 @@ export class ActionsNode implements ActionsProvider {
   }
 }
 
-export const ActionsChannelContext = createContext<ActionsNode>(null);
-export const CurrentActionsChannelContext = createContext<Consumer<ActionsNode>>(null);
-export const ActionDescriptorsContext = createContext<ActionDescriptors>(null);
-export const ValuesContainerContext = createContext<ValuesContainer>(null);
+export const ActionsChannelContext = createContext<ActionsNode>(null as any as ActionsNode);
+export const CurrentActionsChannelContext = createContext<Consumer<ActionsNode>>(null as any as Consumer<ActionsNode>);
+export const ActionDescriptorsContext = createContext<ActionDescriptors>(null as any as ActionDescriptors);
+export const ValuesContext = createContext<Values>(null as any as Values);
+export const ValuesContainerContext = createContext<ValuesContainer>(null as any as ValuesContainer);
 
 
 export function addEventListener<K extends keyof HTMLElementEventMap>(elem: HTMLElement, type: K, listener: (this: HTMLElement, ev: HTMLElementEventMap[K]) => any): Disconnector {
@@ -302,7 +327,7 @@ export function addEventListener<K extends keyof HTMLElementEventMap>(elem: HTML
   return () => elem.removeEventListener(type, listener);
 }
 
-export type WorkplaneBuilder = MultiConsumer<[HTMLCanvasElement, number, number]>;
+export type WorkplaneBuilder = MultiConsumer<[HTMLCanvasElement | null, number, number]>;
 export type WorkplaneContext = {
   xmouse: number,
   ymouse: number,
@@ -411,4 +436,9 @@ export function getGridOff(move: GridMove, [cols, rows]: [number, number]): numb
     case "pageup": return -cols * rows;
     case "pagedown": return cols * rows;
   }
+}
+
+export function checkClickInside(e: PointerEvent, ...refs: RefObject<HTMLElement>[]): boolean {
+  const target = e.target as Node;
+  return target !== null && iter(refs).any(r => r.current?.contains(target) ?? false)
 }

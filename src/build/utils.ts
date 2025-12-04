@@ -75,11 +75,11 @@ export function setSectorHeinum(board: Board, sectorEnt: Entity, h: number): boo
   const sec = board.sectors[sectorEnt.id];
   if (sectorEnt.type === EntityType.CEILING) {
     sec.ceilingheinum = h;
-    if (h !== 0) sec.ceilingstat.slopped = 1;
+    if (h !== 0) sec.ceilingstat.slopped = true;
   }
   else {
     sec.floorheinum = h;
-    if (h !== 0) sec.floorstat.slopped = 1;
+    if (h !== 0) sec.floorstat.slopped = true;
   }
   return true;
 }
@@ -109,7 +109,7 @@ export function createSlopeCalculator(board: Board, sectorId: number, ceiling: b
   const stat = ceiling ? sector.ceilingstat : sector.floorstat;
   const z = ceiling ? sector.ceilingz : sector.floorz;
   const heinum = ceiling ? sector.ceilingheinum : sector.floorheinum;
-  if (stat.slopped === 0 || heinum === 0) return _ => z;
+  if (!stat.slopped || heinum === 0) return _ => z;
   const wall1 = board.walls[sector.wallptr];
   const wall2 = board.walls[wall1.point2];
   const dx = wall2.x - wall1.x;
@@ -129,7 +129,7 @@ export function createSlopeCalculator(board: Board, sectorId: number, ceiling: b
 export function lineIntersect(
   sx: number, sy: number, sz: number,
   x2: number, y2: number, z2: number,
-  x3: number, y3: number, x4: number, y4: number): [number, number, number, number] {
+  x3: number, y3: number, x4: number, y4: number): [number, number, number, number] | null {
 
   const x21 = x2 - sx, x34 = x3 - x4;
   const y21 = y2 - sy, y34 = y3 - y4;
@@ -165,7 +165,7 @@ export function lineIntersect(
 export function rayIntersect(
   xs: number, ys: number, zs: number,
   vx: number, vy: number, vz: number,
-  x3: number, y3: number, x4: number, y4: number): [number, number, number, number] {
+  x3: number, y3: number, x4: number, y4: number): [number, number, number, number] | null {
 
   const x34 = x3 - x4;
   const y34 = y3 - y4;
@@ -282,7 +282,7 @@ export function order(points: Iterable<[number, number]>, cw = true): Iterable<[
 }
 
 export function getWallCoords(x1: number, y1: number, x2: number, y2: number,
-  cslope: SlopeCalculator, fslope: SlopeCalculator): number[] {
+  cslope: SlopeCalculator, fslope: SlopeCalculator): number[] | null {
   const z1 = cslope(x1, y1) / ZSCALE;
   const z2 = cslope(x2, y2) / ZSCALE;
   const z3 = fslope(x2, y2) / ZSCALE;

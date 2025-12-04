@@ -1,7 +1,7 @@
 import { cyclicToggler } from "ts-utils/objects";
 import { Consumer, Supplier, nil } from "ts-utils/types";
 import { Action, ActionDescriptors } from "app/apis/actions";
-import { Scheduler, TaskController, TaskHandle } from "app/apis/app1";
+import { Scheduler, TaskController, TaskHandle } from "app/apis/app";
 // import { CallbackChannelImpl, transformed, value } from "../../../utils/callbacks";
 import { chain, getOrCreate, mapBuilder } from "../../../utils/collections";
 import { Range, Vec3Interpolator } from "../../../utils/interpolator";
@@ -10,7 +10,7 @@ import { int, normalize, vec42int } from "../../../utils/mathutils";
 import { Mapper, f32array } from "../../../utils/pixelprovider";
 import { propSections } from "../../../utils/ui/renderers";
 import { VecStack } from "../../../utils/vecstack";
-import { Block, TableModel, Ui, Widget, Window, WindowBuilder, blockActions, clazz, style } from "../../apis/ui";
+import { Block, TableModel, Ui, Widget, Window, WindowBuilder, blockActions, clazz, style } from "../../apis/ui2";
 import { column, listBuilder, singleActionWidget, suggestionBox, table } from "../ui/builders";
 import { Context, Image, PropertySection, Renderer, Value } from "./api";
 import catalog from './funcs/catalog';

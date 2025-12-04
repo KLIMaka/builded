@@ -6,7 +6,7 @@ import { createSlopeCalculator, rayIntersect, wallNormal, ZSCALE } from "../../.
 import { takeFirst } from "../../../utils/collections";
 import { create, lifecycle, Module, plugin } from "../../../utils/injector";
 import { cross2d, dot2d, int, len2d } from "utils/mathutils";
-import { BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, REFERENCE_TRACKER, SnapType, View, VIEW } from "../../apis/app";
+import { BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, REFERENCE_TRACKER, SnapType, View, VIEW } from "../../apis/app2";
 import { busDisconnector } from "../../apis/handler";
 import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/gl/geometry/common";
 import { LineBuilder } from "../../modules/gl/buffers";

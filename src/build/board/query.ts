@@ -136,6 +136,7 @@ export function sectorOfWall(board: Board, wallId: number): number {
     if (sec.wallptr > wallId) end = pivot - 1;
     else start = pivot + 1;
   }
+  return -1;
 }
 
 function findSectorAllBasic(board: Board, x: number, y: number): number {

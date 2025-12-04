@@ -31,7 +31,7 @@ export function createUtilsTool(boardCtx: BoardContext, selection: Source<Select
     if (!t.entity.isWall()) return;
     const { entity: { id: w }, coords: [cx, cy] } = t;
     const gridSize = boardCtx.grid.size.get();
-    const [x, y] = snapWall(boardCtx.board.get(), w, cx, cy, x => gridSnap(gridSize, x));
+    const [x, y] = snapWall(boardCtx.data.get().board, w, cx, cy, x => gridSnap(gridSize, x));
     boardCtx.modifyBoard(`Split wall ${w} on ${x},${y}`,
       board => splitWall(board, w, x, y, p => engine.artMap.get().get(p), refs, engine.api.cloneWall));
   }
@@ -41,7 +41,7 @@ export function createUtilsTool(boardCtx: BoardContext, selection: Source<Select
     if (!t.entity.isWall()) return;
     const { entity: { id: w }, coords: [cx, cy] } = t;
     const gridSize = boardCtx.grid.size.get();
-    const [x, y] = snapWall(boardCtx.board.get(), w, cx, cy, x => gridSnap(gridSize, x));
+    const [x, y] = snapWall(boardCtx.data.get().board, w, cx, cy, x => gridSnap(gridSize, x));
     boardCtx.modifyBoard(`Split Sector on Wall ${w} from point [${x}, ${y}]`,
       board => splitSectorFromPoint(board, w, [x, y], p => engine.artMap.get().get(p), refs, engine.api));
   }

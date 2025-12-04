@@ -1,18 +1,18 @@
 import { SizeType, WindowBuilder } from "@ui/windows-common";
 import { Action, ACTION_DESCRIPTORS, ActionDescriptors } from "app/apis/actions";
-import { App, APP } from "app/apis/app1";
+import { App, APP } from "app/apis/app";
 import { Aliases, ArtInfoExtended, BoardContext, EMPTY_INFO_EXTENDED, EngineContext, NamedArtFile, Palette, PicTags } from "app/apis/engine";
-import { UI, Window } from "app/apis/ui1";
+import { UI, Window } from "app/apis/ui";
 import { art } from "build/artraster";
 import Optional from "optional-js";
 import React from "react";
-import { createContainer, Disposable, Source, Value, ValuesContainer, ValuesMap } from "ts-utils/callbacks";
+import { Disposable, Source, Value, ValuesContainer, ValuesMap } from "ts-utils/callbacks";
 import { getOrCreate, getOrDefault, takeFirst } from "ts-utils/collections";
 import { createCanvas } from "ts-utils/imgutils";
 import { getInstances, Injector } from "ts-utils/injector";
 import { iter } from "ts-utils/iter";
 import { fit, palRasterizer, Rasterizer, transform } from "ts-utils/pixelprovider";
-import { BiFunction, Consumer, first, Predicate } from "ts-utils/types";
+import { BiFunction, Consumer, first, notNull, Predicate } from "ts-utils/types";
 import { createSavedState } from "../default/app/storage";
 import { ArtSelectUiImpl } from "./art-select-view";
 import { ArtEditor } from "./arteditor-api";
@@ -20,6 +20,7 @@ import { getGridOff, GridMove } from "@ui/commons";
 import { clamp } from "ts-utils/mathutils";
 import { Board } from "build/board/structs";
 import { forAllSectors, forAllSprites, forAllWalls } from "build/board/query";
+import { VALUES } from "app/apis/values";
 
 const ID = 'art-select';
 const DEFAULT_PREVIEW = 'resources/black.png';
@@ -135,7 +136,7 @@ export class ArtSelectImpl implements ArtEditor {
         const info = getOrDefault(artFiles, picnum, EMPTY_INFO_EXTENDED);
         const p = this.plus.get()[0].plu;
         createCanvas(transform(fit(size - 2, size - 16, art(info), 255), c => c === 255 ? 255 : p[c]), this.rasterizer)
-          .toBlob(blob => ok(URL.createObjectURL(blob)))
+          .toBlob(blob => ok(URL.createObjectURL(notNull(blob))))
       });
     return getOrCreate(this.previewCache, picnum, _ =>
       this.values.transformedAsyncBuilder({
@@ -172,11 +173,12 @@ function readBoard(board: Board): BoardPicnumInfo {
 }
 
 export async function createArtSelect(injector: Injector, engine: EngineContext, boardCtx: BoardContext, picnumConsumer: Consumer<Optional<number>>): Promise<Window> {
-  return await createContainer('art-select-model').initializeAsync(async values => {
-    const picnum = values.value<Optional<number>>('picnum', Optional.empty());
+  const values = await injector.getInstance(VALUES);
+  return await values.create('art-select-model').initializeAsync(async localValues => {
+    const picnum = localValues.value<Optional<number>>('picnum', Optional.empty());
     const [actionDescriptors, app] = await getInstances(injector, ACTION_DESCRIPTORS, APP);
     const windowStates = await app.storages('ui.window-states');
-    const state = await createSavedState(values, windowStates, ID, createDefaultState());
+    const state = await createSavedState(localValues, windowStates, ID, createDefaultState(), app.timer);
     const art = engine.art;
     const artMap = engine.artMap;
     const pal = engine.pal;
@@ -184,18 +186,18 @@ export async function createArtSelect(injector: Injector, engine: EngineContext,
     const tags = engine.picTags;
     const shadowsteps = engine.shadowsteps;
     const aliases = engine.aliases;
-    const select = new ArtSelectImpl(values, state, actionDescriptors, app, art, artMap, pal, plus, tags, shadowsteps, aliases, id => picnum.set(Optional.of(id)), readBoard(boardCtx.board.get()));
-    const win = new WindowBuilder(ID, actionDescriptors, values)
+    const select = new ArtSelectImpl(localValues, state, actionDescriptors, app, art, artMap, pal, plus, tags, shadowsteps, aliases, id => picnum.set(Optional.of(id)), readBoard(boardCtx.data.get().board));
+    const win = new WindowBuilder(ID, actionDescriptors, localValues)
       .titleFromId()
       .modal()
       .minSize(400, 400)
       .state(state)
       .actions(select.actions)
-      .disposable(values)
+      .disposable(localValues)
       .onClose(() => picnumConsumer(picnum.get()))
       .build(<ArtSelectUiImpl artEditor={select} />)
 
-    values.handleStandalone([picnum], (picnum) => picnum.ifPresent(_ => win.close()))
+    localValues.handleStandalone([picnum], (picnum) => picnum.ifPresent(_ => win.close()))
     return win;
   });
 }

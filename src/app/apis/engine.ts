@@ -44,6 +44,7 @@ export type EngineSettings = Readonly<{
 export type VoxelSwap = (picnum: number) => Optional<VoxelData>;
 
 export type GlBlend = { src: number, dst: number };
+export const DEFAULT_BLEND: GlBlend = { src: WebGL2RenderingContext.SRC_ALPHA, dst: WebGL2RenderingContext.ONE_MINUS_SRC_ALPHA };
 
 export type EngineContext<B extends Board = Board> = Readonly<{
   name: Source<string>,
@@ -67,13 +68,10 @@ export type EngineContext<B extends Board = Board> = Readonly<{
 }> & Disposable;
 
 export type SectorDrawType = 'normal' | 'nodraw' | 'trans1' | 'trans2';
-export type SectorSettings = {
-  ceiling: SectorDrawType,
-  floor: SectorDrawType,
-}
+export type SectorSurfaceType = 'ceiling' | 'floor';
+export type SectorSettings = Record<SectorSurfaceType, SectorDrawType>;
 export const DEFAULT_SECTOR_SETTING: SectorSettings = { ceiling: 'normal', floor: 'normal' };
 
-export type RorType = 'ceiling' | 'floor';
 export type RorLink = Readonly<{
   dstSector: number;
   buildDiff: vec3;
@@ -118,8 +116,8 @@ export type BoardData<B extends Board = Board> = {
   tror: BuildTror,
   parallaxPicnums: number,
   sectorSettings: Function<number, SectorSettings>,
-  spritesBySector: Function<number, number[]>,
-  spriteDescriptor: Function<number, SpriteDescriptor>,
+  spritesBySector: Function<number, number[] | undefined>,
+  spriteDescriptor: Function<number, SpriteDescriptor | undefined>,
 }
 
 export type BoardContext<B extends Board = Board> = Readonly<{

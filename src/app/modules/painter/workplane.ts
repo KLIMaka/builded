@@ -1,5 +1,5 @@
 import { Consumer, Supplier } from "@utils/types";
-import { Block, Ui, Widget, style } from "app/apis/ui";
+import { Block, Ui, Widget, style } from "app/apis/ui2";
 import { int } from "../../../utils/mathutils";
 import { Raster, rasterizeRGBA8, rect, resize } from "../../../utils/pixelprovider";
 

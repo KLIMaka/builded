@@ -24,6 +24,5 @@ export type ActionHandler = Supplier<Promise<void>>;
 export type Action = { descriptor: ActionDescriptor, handler: ActionHandler, enabled: Source<boolean> }
 export type StateChecker = { bind: Bind, action: Consumer<boolean> }
 export type ActionsProvider = { actions: Supplier<Iterable<Action>>, states: Supplier<Iterable<StateChecker>> }
-export type Actionify<T extends string> = { [F in T]: Action }
 
 export const ACTION_DESCRIPTORS = new Dependency<ActionDescriptors>('ActionDescriptors');

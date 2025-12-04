@@ -1,6 +1,6 @@
 import { EntityType } from "../../../build/hitscan";
 import { create, lifecycle, Module, plugin } from "../../../utils/injector";
-import { BOARD, BoardProvider, View, VIEW } from "../../apis/app";
+import { BOARD, BoardProvider, View, VIEW } from "../../apis/app2";
 import { busDisconnector } from "../../apis/handler";
 import { NamedMessage, Palette, SetPicnum, Shade } from "../messages";
 import { Selected, SELECTED } from "./selection";

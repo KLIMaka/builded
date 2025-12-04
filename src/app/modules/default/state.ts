@@ -1,4 +1,4 @@
-import { State } from "../../apis/app";
+import { State } from "../../apis/app2";
 
 export class StateImpl implements State {
   private state: { [index: string]: any } = {};

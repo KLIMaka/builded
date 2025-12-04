@@ -235,3 +235,7 @@ label = "Select Storage"
 add-storage = { bind = "control+a" }
 close = { parent = "close" }
 select = { parent = "select" }
+
+[settings]
+label = "Settings"
+bind = "g"

@@ -1,9 +1,10 @@
+import { buf } from "crc-32";
 import { range } from 'ts-utils/collections';
 import { iter } from 'ts-utils/iter';
 import { Accessor, Stream, array, atomic_array, bits, bits_signed, byte, int, short, string, struct, ubyte, uint, ushort } from "ts-utils/stream";
-import { buf } from "crc-32";
+import { notNull } from 'ts-utils/types';
 import { Header1 } from '../board/structs';
-import { fixSectorSlopes, initSector, initSprite, initWall, sectorStats, spriteStruct, wallStruct } from '../maploader';
+import { initSector, initSprite, initWall, sectorStats, spriteStruct, wallStruct } from '../maploader';
 import { BloodBoard, BloodSector, BloodSprite, BloodWall, SectorExtra, SpriteExtra, WallExtra } from './structs';
 
 
@@ -421,7 +422,7 @@ function writeSprites(board: BloodBoard, stream: Stream) {
   for (let i = 0; i < board.numsprites; i++) {
     const sprite = board.sprites[i];
     writeEncrypted(spriteStruct, sprite, stream, dec);
-    if (hasExtra(sprite.extra)) spriteExtraStruct.write(stream, sprite.extraData);
+    if (hasExtra(sprite.extra)) spriteExtraStruct.write(stream, notNull(sprite.extraData));
   }
 }
 
@@ -430,7 +431,7 @@ function writeWalls(board: BloodBoard, stream: Stream) {
   for (let i = 0; i < board.numwalls; i++) {
     const wall = board.walls[i];
     writeEncrypted(wallStruct, wall, stream, dec);
-    if (hasExtra(wall.extra)) wallExtraStruct.write(stream, wall.extraData);
+    if (hasExtra(wall.extra)) wallExtraStruct.write(stream, notNull(wall.extraData));
   }
 }
 
@@ -440,7 +441,7 @@ function writeSectors(board: BloodBoard, stream: Stream) {
   for (let i = 0; i < board.numsectors; i++) {
     const sector = board.sectors[i];
     writeEncrypted(sectorStruct, sector, stream, dec);
-    if (hasExtra(sector.extra)) sectorExtraStruct.write(stream, sector.extraData);
+    if (hasExtra(sector.extra)) sectorExtraStruct.write(stream, notNull(sector.extraData));
   }
 }
 
@@ -506,7 +507,7 @@ export function cloneSector(sector: BloodSector): BloodSector {
   Object.assign(sectorCopy, sector);
   sectorCopy.floorstat = Object.assign({}, sector.floorstat);
   sectorCopy.ceilingstat = Object.assign({}, sector.ceilingstat);
-  if (sector.extraData) sectorCopy.extraData = Object.assign(new SectorExtra(), sector.extraData);
+  if (sector.extraData) sectorCopy.extraData = Object.assign({}, sector.extraData);
   return sectorCopy;
 }
 
@@ -514,7 +515,7 @@ export function cloneWall(wall: BloodWall): BloodWall {
   const wallCopy = {} as BloodWall;
   Object.assign(wallCopy, wall);
   wallCopy.cstat = Object.assign({}, wall.cstat);
-  if (wall.extraData) wallCopy.extraData = Object.assign(new WallExtra(), wall.extraData);
+  if (wall.extraData) wallCopy.extraData = Object.assign({}, wall.extraData);
   return wallCopy;
 }
 
@@ -522,7 +523,7 @@ export function cloneSprite(sprite: BloodSprite): BloodSprite {
   const spriteCopy = {} as BloodSprite;
   Object.assign(spriteCopy, sprite);
   spriteCopy.cstat = Object.assign({}, sprite.cstat);
-  if (sprite.extraData) spriteCopy.extraData = Object.assign(new SpriteExtra(), sprite.extraData);
+  if (sprite.extraData) spriteCopy.extraData = Object.assign({}, sprite.extraData);
   return spriteCopy;
 }
 

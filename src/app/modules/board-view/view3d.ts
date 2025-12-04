@@ -7,7 +7,7 @@ import { Controller3D } from "../../../utils/camera/controller3d";
 import { LinearInterpolator } from "../../../utils/interpolator";
 import { int } from "../../../utils/mathutils";
 import { DelayedValue } from "../../../utils/timed";
-import { BoardProvider, BoardUtils, GridController } from "../../apis/app";
+import { BoardProvider, BoardUtils, GridController } from "../../apis/app2";
 import { Renderable } from "../../apis/renderable";
 import { NamedMessage } from "../../edit/messages";
 import { BuildGl } from "../gl/buildgl";

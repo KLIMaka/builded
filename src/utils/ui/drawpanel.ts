@@ -1,4 +1,4 @@
-import { Block } from "app/apis/ui";
+import { Block } from "app/apis/ui2";
 import { Deck, isEmpty, map } from "../collections";
 import { drawToCanvas } from "../imgutils";
 import { iter } from "../iter";

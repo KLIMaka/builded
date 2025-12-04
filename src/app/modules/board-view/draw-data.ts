@@ -1,11 +1,11 @@
-import { BoardContext, BoardData, EngineContext, GlBlend, RorLink, RorType, SectorSettings, VoxelSwap } from "app/apis/engine";
+import { BoardContext, BoardData, EngineContext, GlBlend, RorLink, SectorSurfaceType, SectorSettings, VoxelSwap } from "app/apis/engine";
 import { Board, Wall } from "build/board/structs";
 import { visitFromSector, VisResult } from "build/boardvisitor";
 import { build2gl } from "build/utils";
 import { mat4, vec3 } from "gl-matrix";
 import { Source, ValuesContainer } from "ts-utils/callbacks";
 import { getOrCreate, range } from "ts-utils/collections";
-import { iter } from "ts-utils/iter";
+import { Iter, iter } from "ts-utils/iter";
 import { first, Function, pair } from "ts-utils/types";
 import { BoardGlContext } from "../gl/board-context";
 import { NOOP_RENDERABLE, Renderable, SectorRecord, SpriteRecord, VoxelRecord, WallRecord, WallType } from "./api";
@@ -40,7 +40,7 @@ function disposeDrawData(data: DrawData) {
   data.transSectors.dispose();
   data.blendSprites.values().forEach(s => s.dispose());
   data.voxels.dispose();
-  data.rors.forEach(d => disposeDrawData(d.drawData));
+  data.rors.forEach(d => { d.cap.dispose(); disposeDrawData(d.drawData) });
 }
 
 export function createToRender(renderer: Source<BoardRenderer3D>, boardCtx: BoardContext, boardGlCtx: BoardGlContext, engine: EngineContext, values: ValuesContainer, viewPosition: Source<ViewPosition>, fwd: Source<vec3>) {
@@ -55,7 +55,7 @@ export function createToRender(renderer: Source<BoardRenderer3D>, boardCtx: Boar
 type RorLinkData = Readonly<{
   sectorId: number,
   link: RorLink,
-  type: RorType,
+  type: SectorSurfaceType,
 }>
 
 type SectorData = Readonly<{
@@ -182,14 +182,14 @@ function getDrawData(voxelSwap: VoxelSwap, data: BoardData, boardCtx: BoardConte
 }
 
 function createAll(renderer: BoardRenderer3D, board: Board, boardGlCtx: BoardGlContext): DrawData {
-  const sectors = renderer.writeSectors(iter(range(0, board.numsectors))
+  const sectors = renderer.writeSectors(Iter.range(0, board.numsectors)
     .map(sectorId => ({ sectorId, ceiling: 1, floor: 1 })), boardGlCtx);
   const walls = renderer.writeWalls(iter(range(0, board.numsectors))
     .map(s => pair(board.sectors[s], s))
-    .map(([sec, sectorId]) => iter(range(sec.wallptr, sec.wallptr + sec.wallnum))
+    .map(([sec, sectorId]) => Iter.range(sec.wallptr, sec.wallptr + sec.wallnum)
       .map(wallId => ({ wallId, sectorId, type: wallType(board.walls[wallId]) })))
     .flatten(), boardGlCtx);
-  const sprites = renderer.writeSprites(iter(range(0, board.numsprites)).map(spriteId => ({ spriteId })), boardGlCtx);
+  const sprites = renderer.writeSprites(Iter.range(0, board.numsprites).map(spriteId => ({ spriteId })), boardGlCtx);
   return {
     sectors,
     walls,

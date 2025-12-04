@@ -1,9 +1,10 @@
 import { HasSymbols, createScripFile, defaultDefine, nestedRule, number, rules, rulesInclude, set, simpleRule, symbols, token, tuple } from "@utils/scriptfile";
 import { Aliases, ArtInfoExtended, BoardContext, BuildRor, BuildTror, DEFAULT_SECTOR_SETTING, EMPTY_ALIASES, EMPTY_TAGS, EngineContext, EngineSettings, GlBlend, NamedArtFile, Palette, PicTags, RorLink, SectorSettings, VoxelSwap } from "app/apis/engine";
 import { FileSystem } from "app/apis/fs";
+import { Values } from "app/apis/values";
 import { EngineApi } from "build/board/mutations/api";
 import { forAllSectors, isValidSectorId } from "build/board/query";
-import { Board, Sector, SECTOR_NORMAL, SECTOR_REVERSE_TRANSLUNCENT_MASKED, SECTOR_TRANSLUNCENT_MASKED, Sprite, Wall } from "build/board/structs";
+import { Board, SECTOR_NORMAL, SECTOR_REVERSE_TRANSLUNCENT_MASKED, SECTOR_TRANSLUNCENT_MASKED, Sector, Sprite, Wall } from "build/board/structs";
 import { AnimationType } from "build/formats/art";
 import { VoxelData, readKvx } from "build/formats/kvx";
 import { cloneBoard, cloneSector, cloneSprite, cloneWall, loadBuildMap, newBoard, newSector, newSprite, newWall, saveBuildMap } from "build/maploader";
@@ -12,7 +13,7 @@ import { slope } from "build/utils";
 import { vec3 } from "gl-matrix";
 import Optional from "optional-js";
 import { match } from "ts-pattern";
-import { Source, ValuesContainer, createContainer } from "ts-utils/callbacks";
+import { Source, ValuesContainer } from "ts-utils/callbacks";
 import { getOrCreate, getOrDefault, range, rect, reverseMap } from "ts-utils/collections";
 import { palColorFinder } from "ts-utils/color";
 import { LinearInterpolator, vector3 } from "ts-utils/interpolator";
@@ -20,7 +21,7 @@ import { iter } from "ts-utils/iter";
 import { asyncMapOptional, field } from "ts-utils/objects";
 import { NOOP_TASK_HANDLE } from "ts-utils/scheduler";
 import { Stream } from "ts-utils/stream";
-import { Function, tuple as asTuple, first, identity, nil, second } from "ts-utils/types";
+import { Function, tuple as asTuple, first, identity, nil, notUndefined, second } from "ts-utils/types";
 import { Work, begin, tuple as tupleWork } from "ts-utils/work";
 import { createBoardModifier } from "../default/board-context-utils";
 import { loadArtWork, loadEditorPicAddons, loadMaxPluId, loadPicAddonsWork, openFileOptional } from "../default/engine-commons";
@@ -69,7 +70,7 @@ async function loadTags(values: ValuesContainer, fs: Source<FileSystem>, fn: str
         )),
       defaultDefine());
     return asyncMapOptional<ArrayBuffer, PicTags>(await fs.read(fn), async tags => {
-      const picTags = await createScripFile(fn, tags).parse({ groups: [], symbols: new Map() }, fileParser).then(field('groups'));
+      const picTags = await createScripFile(fn, tags).parse<Context>({ groups: [], symbols: new Map() }, fileParser).then(field('groups'));
       return { allTags: () => picTags.map(p => p.name), tags: picnum => iter(picTags).filter(p => p.tiles.has(picnum)).map(p => p.name).collect() };
     }).then(o => o.orElse(EMPTY_TAGS))
   }
@@ -125,7 +126,7 @@ async function loadPlus(values: ValuesContainer, defs: Source<EngineDefs>, fs: S
     const plus = await iter(defs.plus)
       .filter(d => d.file !== undefined)
       .groupEntries(field('file'), identity())
-      .map(async ([file, d]) => asTuple(d, await fs.read(file)))
+      .map(async ([file, d]) => asTuple(d, await fs.read(notUndefined(file))))
       .await_()
       .then(defs => defs
         .filter(([_, o]) => o.isPresent())
@@ -147,7 +148,8 @@ async function loadVoxels(values: ValuesContainer, defs: Source<EngineDefs>, fs:
   return values.transformedAsyncTuple('voxels', [defs, fs], async ([defs, fs]) => {
     cache.clear();
     const files = await iter(defs.voxels)
-      .map(async v => asTuple(v, await fs.read(v.file)))
+      .filter(v => v.file !== undefined)
+      .map(async v => asTuple(v, await fs.read(notUndefined(v.file))))
       .await_()
       .then(defs => defs
         .filter(([_, buff]) => buff.isPresent())
@@ -167,7 +169,7 @@ async function loadPal(values: ValuesContainer, defs: Source<EngineDefs>, fs: So
   }
   return values.transformedAsyncTuple('pal', [defs, fs], async ([defs, fs]) => {
     const palDef = getOrDefault(iter(defs.pals).toMap(field('id'), identity()), 0, { id: 0, file: 'palette.dat' });
-    const file = await fs.read(palDef.file);
+    const file = await fs.read(notUndefined(palDef.file));
     return file.map(buff => loadPal(palDef, buff)).orElse(DEFAULT_PAL);
   });
 }
@@ -176,7 +178,7 @@ const DEFAULT_TRANS = new Uint8Array(iter(rect(256, 256)).map(first).collect())
 async function loadTrans(values: ValuesContainer, defs: Source<EngineDefs>, fs: Source<FileSystem>): Promise<Source<Uint8Array>> {
   return values.transformedAsyncTuple('trans', [defs, fs], async ([defs, fs]) => {
     const blendDef = getOrDefault(iter(defs.blends).toMap(field('id'), identity()), 0, { id: 0, file: 'palette.dat', offset: 0x300 + 32 * 0x100 });
-    const file = await fs.read(blendDef.file);
+    const file = await fs.read(notUndefined(blendDef.file));
     return file.map(buff => new Uint8Array(buff, blendDef.offset ?? 0, 256 * 256)).orElse(DEFAULT_TRANS);
   });
 }
@@ -239,17 +241,16 @@ function loadArtMap(values: ValuesContainer, defs: Source<EngineDefs>, arts: Sou
       iter(defs.tiles)
         .zip(first(await loadPicAddonsWork(fs, pal, defs.tiles)(loadHandle)))
         .filter(([t, i]) => i.h !== 0 && i.w !== 0)
-        .forEach(([t, i]) => map.set(t.picnum, i))
+        .forEach(([t, i]) => map.set(notUndefined(t.picnum), i))
 
       iter(defs.animTileRanges)
         .forEach(({ start, end, speed, anim }) => {
-          const picnum = anim === AnimationType.ANIMATE_BACKWARD ? end : start;
+          const animType = anim ?? AnimationType.NO_ANIMATION;
+          const picnum = animType === AnimationType.ANIMATE_BACKWARD ? end : start;
           const frames = Math.abs(start - end);
           const info = map.get(picnum);
           if (info === undefined) return;
-          info.attrs.frames = frames;
-          info.attrs.speed = speed;
-          info.attrs.animType = anim;
+          info.attrs = { ...info.attrs, frames, speed, animType };
         });
 
       return map;
@@ -266,7 +267,7 @@ function loadBlends(values: ValuesContainer, defs: Source<EngineDefs>): Source<F
   return values.transformed('bleands', defs, defs => {
     const map = iter(defs.blends)
       .filter(b => b.forward !== undefined)
-      .toMap<number, GlBlend>(b => b.id, b => ({ src: WebGL2RenderingContext[b.forward.src], dst: WebGL2RenderingContext[b.forward.dst] }));
+      .toMap<number, GlBlend>(b => b.id, b => ({ src: (WebGL2RenderingContext as any)[notUndefined(b.forward?.src)], dst: (WebGL2RenderingContext as any)[notUndefined(b.forward?.dst)] }));
     const def: GlBlend = { src: WebGL2RenderingContext.SRC_ALPHA, dst: WebGL2RenderingContext.ONE_MINUS_SRC_ALPHA };
     return blendId => getOrDefault(map, blendId, def);
   });
@@ -275,22 +276,22 @@ function loadBlends(values: ValuesContainer, defs: Source<EngineDefs>): Source<F
 function getTror(board: Board): BuildTror {
   const sectorByCeilingBunch = iter(board.sectors)
     .enumerate()
-    .filter(([s, _]) => s.ceilingstat.tror === 1)
+    .filter(([s, _]) => s.ceilingstat.tror)
     .group(([sec, _]) => sec.ceilingxpanning, ([_, s]) => s);
   const sectorByFloorBunch = iter(board.sectors)
     .enumerate()
-    .filter(([s, _]) => s.floorstat.tror === 1)
+    .filter(([s, _]) => s.floorstat.tror)
     .group(([sec, _]) => sec.floorxpanning, ([_, s]) => s);
   const ceiling = (sectorId: number): number[] => {
     if (!isValidSectorId(board, sectorId)) return [];
     const sec = board.sectors[sectorId];
-    if (sec.ceilingstat.tror !== 1) return [];
+    if (!sec.ceilingstat.tror) return [];
     return getOrDefault(sectorByFloorBunch, sec.ceilingxpanning, []);
   }
   const floor = (sectorId: number): number[] => {
     if (!isValidSectorId(board, sectorId)) return [];
     const sec = board.sectors[sectorId];
-    if (sec.floorstat.tror !== 1) return [];
+    if (!sec.floorstat.tror) return [];
     return getOrDefault(sectorByCeilingBunch, sec.floorxpanning, []);
   }
   return { ceiling, floor }
@@ -379,15 +380,18 @@ function createloadBoard(values: ValuesContainer, art: Source<Map<number, ArtInf
 
 export type Eduke32ModsType = {
   grpName: string,
+  mainGrpFirst: boolean,
 }
 
 export const createEngineContextEduke32 = begin()
-  .multiInput<[Source<FileSystem>, Eduke32ModsType]>()
-  .thenWork((handle, fs, { grpName }) =>
-    createContainer('eduke32-module').initializeAsync(values => begin()
+  .multiInput<[Source<FileSystem>, Values, Eduke32ModsType]>()
+  .thenWork((handle, fs, values, { grpName, mainGrpFirst }) =>
+    values.create('eduke32-module').initializeAsync(values => begin()
       .thenPass('Loading GrpInfo', () => loadGrpInfo(values, fs, grpName))
       .thenWorkPass((handle, grpInfo) => loadEngineDefsWork(grpName, values)(handle, fs, grpInfo))
-      .thenPass('Loading Resources', async (_, defs) => values.transformed('resources', defs, defs => stack(defs.root, stack(defs.addGrp, defs.mainGrp))))
+      .thenPass('Loading Resources', async (_, defs) => values.transformed('resources', defs, defs => mainGrpFirst
+        ? stack(stack(defs.addGrp, defs.mainGrp), defs.root)
+        : stack(defs.root, stack(defs.addGrp, defs.mainGrp))))
       .forkPass(p => p
         .thread('Loading Pal', (_, defs, res) => loadPal(values, defs, res))
         .thread('Loading Trans', (_, defs, res) => loadTrans(values, defs, res))
@@ -401,7 +405,7 @@ export const createEngineContextEduke32 = begin()
       .thenPass('Creating default Fog pals', (grpInfo, defs, resources, [pal, trans, plus, spriteVoxelSwap, art, aliases, picTags], artMap, addonArtMap) => generateFogPals(values, pal, plus))
       .then<EngineContext>('', async (grpInfo, defs, resources, [pal, trans, plus, spriteVoxelSwap, art, aliases, picTags], artMap, addonArtMap, plusWithFog) => {
         return {
-          name: values.field('name', grpInfo, 'name'),
+          name: values.transformed('name', grpInfo, grpInfo => grpInfo.name ?? ''),
           resources,
           api: engineApi(),
           settings: defaultEngineSettings(values, addonArtMap.offset),

@@ -2,7 +2,7 @@ import { build2gl } from "../../../build/utils";
 import { vec3 } from "gl-matrix";
 import { create, getInstances, lifecycle, Module, plugin } from "../../../utils/injector";
 import { detuple0, detuple1 } from "../../../utils/mathutils";
-import { LOGGER, Logger, STATE } from "../../apis/app";
+import { LOGGER, Logger, STATE } from "../../apis/app2";
 import { busDisconnector, MessageHandler, NULL_MESSAGE_HANDLER } from "../../apis/handler";
 import { RenderablesCache, RENDRABLES_CACHE } from "../../modules/gl/geometry/cache";
 import { EntityFactory, ENTITY_FACTORY } from "../context";

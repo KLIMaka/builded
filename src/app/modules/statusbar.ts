@@ -1,10 +1,10 @@
 import { create, lifecycle, Module, plugin } from "../../utils/injector";
 import { Profiler, PROFILER } from "../../utils/profiler";
-import { View, VIEW } from "../apis/app";
+import { View, VIEW } from "../apis/app2";
 import { BUS, busDisconnector, MessageHandlerReflective } from "../apis/handler";
 import { PostFrame } from "../edit/messages";
-import { Ui } from "app/apis/ui";
-import { UI } from "app/apis/ui";
+import { Ui } from "app/apis/ui2";
+import { UI } from "app/apis/ui2";
 import { div, Element, span } from "utils/ui/ui";
 
 

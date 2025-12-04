@@ -16,7 +16,7 @@ export function loadEngineDefsWork(fs: FileSystem, values: ValuesContainer): Wor
   const loadGrp = async (sf: ScriptFile, defs: EngineDefs, fn: string): Promise<void> => {
     await begin()
       .then(`Loading ${fn}`, async () => defs.root.read(fn))
-      .then(`Processing ${fn}`, async opt => asyncMapOptional(opt, ab => createGrpOrZipFsArrayBuffer(ab))
+      .then(`Processing ${fn}`, async opt => asyncMapOptional(opt, ab => createGrpOrZipFsArrayBuffer(fn, ab))
         .then(o => o.ifPresent(grp => {
           defs.addGrp = stack(grp, defs.addGrp);
           fs = stack(defs.addGrp, fs);

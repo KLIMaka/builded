@@ -6,7 +6,7 @@ import { build2gl, createSlopeCalculator, wallNormal, ZSCALE } from "../../../bu
 import { vec2, vec3 } from "gl-matrix";
 import { create, getInstances, lifecycle, Module, plugin } from "../../../utils/injector";
 import { dot2d } from "../../../utils/mathutils";
-import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, GRID, GridController, REFERENCE_TRACKER, SnapType, View, VIEW } from "../../apis/app";
+import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, GRID, GridController, REFERENCE_TRACKER, SnapType, View, VIEW } from "../../apis/app2";
 import { BUS, busDisconnector, MessageBus } from "../../apis/handler";
 import { Renderables } from "../../apis/renderable";
 import { BuildersFactory, BUILDERS_FACTORY } from "../../modules/gl/geometry/common";

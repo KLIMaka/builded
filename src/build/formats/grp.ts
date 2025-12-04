@@ -4,7 +4,6 @@ import { Stream, atomic_array, ubyte } from "ts-utils/stream";
 export type FileInfo = { off: number, size: number };
 export class GrpFile {
   private data: Stream;
-  private count: number;
   readonly infos = new Map<string, FileInfo>();
 
   constructor(buf: ArrayBuffer) {
@@ -15,9 +14,9 @@ export class GrpFile {
   private loadFiles() {
     const d = this.data;
     d.setOffset(12);
-    this.count = d.readUInt();
-    let off = this.count * 16 + 16;
-    for (let i = 0; i < this.count; i++) {
+    const count = d.readUInt();
+    let off = count * 16 + 16;
+    for (let i = 0; i < count; i++) {
       const fname = d.readByteString(12);
       const size = d.readUInt();
       this.infos.set(fname.toLowerCase(), { off, size });

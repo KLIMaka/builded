@@ -1,8 +1,11 @@
-import { Consumer } from "ts-utils/types";
-import { App, BatchTask, DelayedTask, FrameTask, Logger, PeriodicTask, Timer } from "../../../apis/app1";
+import { iter } from "ts-utils/iter";
 import { DefaultScheduler } from "ts-utils/scheduler";
+import { Consumer, Function, nil, notUndefined } from "ts-utils/types";
+import { App, BatchTask, Cache, DebouncedTask, DelayedTask, FrameTask, PeriodicTask, Timer } from "../../../apis/app";
 import { DefaultLogger } from "./logger";
 import { DefaultStorages } from "./storage";
+import { Plugin, provider } from "ts-utils/injector";
+import { VALUES } from "app/apis/values";
 
 function now(): number {
   return performance.now();
@@ -23,11 +26,28 @@ function delayed(task: Consumer<void>, delayMs?: number): DelayedTask {
   return { cancel, dispose };
 }
 
+function debounced(task: Consumer<void>, delayMs: number): DebouncedTask {
+  let timeoutId: number | undefined;
+  const runTask = () => {
+    task();
+    timeoutId = undefined;
+  }
+  const run = () => {
+    if (timeoutId) window.clearTimeout(timeoutId);
+    timeoutId = window.setTimeout(runTask, delayMs);
+  }
+  const dispose = async () => {
+    if (timeoutId !== undefined) task();
+    window.clearTimeout(timeoutId);
+  }
+  return { run, dispose }
+}
+
 function onFrame(task: Consumer<number>): FrameTask {
   let lastTime = now();
   let taskId = 0;
   let minDtMsImpl = 0;
-  let errorConsumer: Consumer<Error> = undefined;
+  let errorConsumer: Consumer<any> | undefined = undefined;
   const taskImpl = () => {
     const dt = now() - lastTime;
     if (minDtMsImpl <= dt) {
@@ -35,7 +55,7 @@ function onFrame(task: Consumer<number>): FrameTask {
       try {
         task(dt);
       } catch (e) {
-        errorConsumer(e);
+        errorConsumer?.(e);
       }
     }
     taskId = requestAnimationFrame(taskImpl);
@@ -99,21 +119,49 @@ function batchRunner(batch: Consumer<void>[], maxTimeMs = 10): BatchTask {
   return { end: () => promise, stop, pause, unpause, dispose: stop };
 }
 
-function createTimer(logger: Logger): Timer {
+function createTimer(): Timer {
   return {
     now,
     periodic,
     delayed,
+    debounced,
     onFrame,
     microtask,
     batchRunner,
   }
 }
 
-export function DefaultApp(appName: string): App {
-  const logger = DefaultLogger();
-  const timer = createTimer(logger);
-  const storages = DefaultStorages(appName);
-  const scheduler = DefaultScheduler(requestAnimationFrame, timer.now, err => logger.log('ERROR', err));
-  return { logger, timer, storages, scheduler };
+function createCache(): Cache {
+  const map = new Map<string, WeakRef<any>>();
+  const get = <T>(name: string) => map.get(name)?.deref() as T | undefined;
+  const getOrCreate = (name: string, factory: Function<string, any>) => {
+    const value = map.get(name);
+    if (value === undefined || value.deref() === undefined) {
+      const nvalue = factory(name);
+      map.set(name, new WeakRef(nvalue));
+      return nvalue;
+    }
+    return value;
+  }
+  const dispose = () => iter(map.values())
+    .map(v => v.deref()?.dispose)
+    .filter(v => v !== undefined)
+    .map(v => notUndefined(v)())
+    .await_()
+    .then(nil());
+
+  return { get, getOrCreate, dispose }
+}
+
+export function DefaultAppConstructor(appName: string): Plugin<App> {
+  return provider(async injector => {
+    const values = await injector.getInstance(VALUES);
+    const logger = DefaultLogger();
+    const timer = createTimer();
+    const storages = DefaultStorages(appName);
+    const scheduler = DefaultScheduler(requestAnimationFrame, timer.now, values.create('scheduler'));
+    const cache = createCache();
+    const dispose = async () => { };
+    return { logger, timer, storages, scheduler, cache, dispose }
+  });
 }

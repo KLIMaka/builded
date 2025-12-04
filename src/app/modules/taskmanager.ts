@@ -2,9 +2,9 @@ import { getInstances, lifecycle, Module, plugin } from "../../utils/injector";
 import { iter } from "../../utils/iter";
 import { GridModel, renderGrid } from "../../utils/ui/renderers";
 import { div, Element, replaceContent, span, tag } from "../../utils/ui/ui";
-import { ScheddulerHandler, SCHEDULER, SchedulerTask, TaskHandle } from "../apis/app";
+import { ScheddulerHandler, SCHEDULER, SchedulerTask, TaskHandle } from "../apis/app2";
 import { BUS, busDisconnector } from "../apis/handler";
-import { UI, Ui, Window } from "../apis/ui";
+import { UI, Ui, Window } from "../apis/ui2";
 import { namedMessageHandler } from "../edit/messages";
 
 

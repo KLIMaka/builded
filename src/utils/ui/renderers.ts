@@ -2,7 +2,7 @@ import { Value } from "ts-utils/callbacks";
 import { Supplier } from "ts-utils/types";
 import { Property, PropertySection } from "app/modules/painter/api";
 import { listBuilder } from "app/modules/ui/builders";
-import { Block, Ui, clazz } from "../../app/apis/ui";
+import { Block, Ui, clazz } from "../../app/apis/ui2";
 import { iter } from "../iter";
 import { FLOAT_MODEL, NumberModel, numberBox } from "./controls/numberbox";
 

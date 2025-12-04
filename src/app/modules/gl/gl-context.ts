@@ -1,36 +1,44 @@
-import { createContainer, Disposable, Source, ValuesContainer } from "ts-utils/callbacks";
-import { getOrCreate, getOrDefault, range } from "ts-utils/collections";
 import { DisposableResource, GlContext, ResourceFactory, Texture } from "@utils/gl/drawstruct";
 import { createTexture } from "@utils/gl/textures";
-import { axisSwap } from "ts-utils/imgutils";
-import { iter } from "ts-utils/iter";
-import { int, sum } from "ts-utils/mathutils";
-import { Stream } from "ts-utils/stream";
-import { Packer, Rect } from "ts-utils/texcoordpacker";
-import { Consumer, Function, identity, pair } from "ts-utils/types";
-import { NOOP_TASK_HANDLE } from "ts-utils/scheduler";
 import { ArtInfoExtended, EngineContext, VoxelSwap } from "app/apis/engine";
+import { VALUES, Values } from "app/apis/values";
 import { animStruct, ArtInfo } from "build/formats/art";
 import { unpackVoxelSides } from "build/formats/kvx";
 import Optional from "optional-js";
+import { Disposable, Source, ValuesContainer } from "ts-utils/callbacks";
+import { getOrCreate, getOrDefault, range } from "ts-utils/collections";
+import { axisSwap } from "ts-utils/imgutils";
+import { Plugin, provider } from "ts-utils/injector";
+import { iter } from "ts-utils/iter";
+import { int, sum } from "ts-utils/mathutils";
+import { gen, NOOP_TASK_HANDLE } from "ts-utils/scheduler";
+import { Stream } from "ts-utils/stream";
+import { Packer, Rect } from "ts-utils/texcoordpacker";
+import { Consumer, first, Function, identity, notNull, notUndefined, pair, second } from "ts-utils/types";
 import { begin, tuple, Work } from "ts-utils/work";
 
-export function createGlContext(): GlContext {
+
+export const DefaultGlContextConstructor: Plugin<GlContext> = provider(async injector => {
+  const values = await injector.getInstance(VALUES);
+  const localValues = values.create('gl-context');
   const offscreen = new OffscreenCanvas(0, 0);
-  const gl = offscreen.getContext('webgl2', { antialias: true, stencil: true, desynchronized: false, alpha: false });
+  const gl = notNull(offscreen.getContext('webgl2', { antialias: true, stencil: true, desynchronized: false, alpha: false }));
   gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
   gl.enable(gl.CULL_FACE);
   gl.enable(gl.DEPTH_TEST);
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-  const resources = new Map<string, Set<any>>();
+  const resourcesInfo = localValues.value('resources', new Map<string, number>());
   const resource = <T>(tag: string, value: T, disposer: Consumer<T>): DisposableResource<T> => {
-    const res = getOrCreate(resources, tag, _ => new Set<T>());
-    res.add(value);
-    return { value, dispose: async () => { res.delete(value); disposer(value) } }
+    resourcesInfo.modImmer(i => i.set(tag, (i.get(tag) ?? 0) + 1));
+    const dispose = async () => {
+      resourcesInfo.modImmer(i => i.set(tag, notUndefined(i.get(tag)) - 1))
+      disposer(value);
+    }
+    return { value, dispose }
   }
-  const info = () => iter(resources.entries()).map(([n, s]) => `${n}:${s.size}`).join(',').reduce((l, r) => l + r, '');
-  return { offscreen, gl, resource, info }
-}
+  return { offscreen, gl, resource, resourcesInfo }
+});
+
 
 export type VoxelDrawData = {
   size: number,
@@ -58,9 +66,10 @@ function createArtTextureWork(values: ValuesContainer, glCtx: GlContext, arts: S
     .enumerate()
     .map(([p, depth]) => ({ depth, rect: p.pack(w, h), uploaded: false }))
     .first(({ rect }) => rect !== undefined)
+    .map(({ rect, depth, uploaded }) => ({ rect: notUndefined(rect), depth, uploaded }))
     .orElseGet(() => {
       const packer = new Packer(size, size);
-      const rect = packer.pack(w, h);
+      const rect = notUndefined(packer.pack(w, h));
       const depth = packers.length;
       const uploaded = false;
       packers.push(packer);
@@ -75,9 +84,9 @@ function createArtTextureWork(values: ValuesContainer, glCtx: GlContext, arts: S
       .map(([id, a]) => pair(id, pair(a.w, a.h)))
       .collect();
     whs.sort(([id1, [w1, h1]], [id2, [w2, h2]]) => - w1 * h1 + w2 * h2);
-    const rects = new Map<number, AtlasRect>();
-    const jobs = iter(whs).map(([id, [w, h]]) => () => { rects.set(id, pack(w, h)) }).collect();
-    await loadHandle.waitForBatchTask(jobs, 'Allocate Atlas');
+    const jobs = iter(whs).map(([id, [w, h]]) => () => pair(id, pack(w, h))).collect();
+    const results = await loadHandle.waitMaybe(gen(jobs, (_, i, total) => `Allocate Atlas (${i}/${total})`), 'Allocate Atlas');
+    const rects = iter(results).toMap(first, second);
     return new ArtTexture(glCtx, arts, size, size, rects, packers.length, parallaxInfo);
   }
 
@@ -126,7 +135,7 @@ class ArtTexture implements Disposable {
 
   get(picnum: number, additional = 0): number {
     const atlasRect = this.rects.get(picnum);
-    if (atlasRect?.uploaded ?? true) return picnum;
+    if (atlasRect === undefined || atlasRect.uploaded) return picnum;
     const info = this.arts.get(picnum);
     if (info === undefined) return picnum;
     const arr = axisSwap(info.img, info.h, info.w);
@@ -172,7 +181,7 @@ function getVoxel(picnum: number, cache: Map<number, [number, DisposableResource
   if (loaded !== undefined) return Optional.of({ texture: loaded[1].value, size: loaded[0] });
   return voxels(picnum).map(data => {
     const voxels = data.list();
-    const count = (x: number) => range(0, 6).map(i => (x >> i) & 1).reduce((l, r) => l + r);
+    const count = (x: number) => range(0, 6).map(i => (x >> i) & 1).reduce(sum);
     const quads = voxels.map(v => count(v.sides)).reduce(sum);
     const quadPixels = Math.ceil(quads / 4);
     const WIDTH = 1024;
@@ -193,9 +202,9 @@ function getVoxel(picnum: number, cache: Map<number, [number, DisposableResource
 }
 
 export const createEngineTexturesWork = begin()
-  .multiInput<[EngineContext, GlContext]>()
-  .thenWork((handle, engine, glCtx) =>
-    createContainer('engine-textures').initializeAsync(async values => begin()
+  .multiInput<[EngineContext, GlContext, Values]>()
+  .thenWork((handle, engine, glCtx, values) =>
+    values.create('engine-textures').initializeAsync(async values => begin()
       .thenWorkPass(createArtTextureWork(values, glCtx, engine.artMap, engine.parallaxInfo))
       .then<EngineTextures>('Create Textures', async artTexture => {
         const { gl } = glCtx;
@@ -207,7 +216,7 @@ export const createEngineTexturesWork = begin()
           const plusLength = maxPluId + 1;
           const pluMap = iter(plus).toMap(p => p.id, identity());
           const tex = new Uint8Array(256 * steps * plusLength);
-          const defPlu = pluMap.get(0);
+          const defPlu = notUndefined(pluMap.get(0));
           for (const i of range(0, plusLength)) tex.set(getOrDefault(pluMap, i, defPlu).plu, 256 * steps * i);
           for (let i = 0; i < steps * plusLength; i++) tex[256 * i - 1] = 255;
           return createTexture(glCtx, 256, steps * plusLength, tex, gl.LUMINANCE);
@@ -218,7 +227,8 @@ export const createEngineTexturesWork = begin()
         const textures = new Map<number, Source<number>>();
         const atlas = values.transformed(`atlas-texture`, artTexture, t => t.atlasId.value);
         const infos = values.transformed(`infos-texture`, artTexture, t => t.infoId.value);
-        const get = (picnum: number, additional = 0) => getOrCreate(textures, picnum, _ => values.transformed(`texture_${picnum}`, artTexture, mega => mega.get(picnum, additional)));
+        const textureValues = values.createChild('textures');
+        const get = (picnum: number, additional = 0) => getOrCreate(textures, picnum, _ => textureValues.transformed(`${picnum}`, artTexture, mega => mega.get(picnum, additional)));
         const voxelsCache = new Map<number, [number, DisposableResource<WebGLTexture>]>();
         const voxels = values.transformed('voxels', engine.spriteVoxelSwap, voxels => (picnum: number) => getVoxel(picnum, voxelsCache, voxels, glCtx));
         const dispose = async () => { values.dispose(); voxelsCache.values().forEach(([_, t]) => t.dispose()) }

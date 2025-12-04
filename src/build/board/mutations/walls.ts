@@ -1,7 +1,7 @@
 import { Function } from "ts-utils/types";
 import { ArtInfo } from "build/formats/art";
 import { vec3 } from "gl-matrix";
-import { BuildReferenceTracker } from "../../../app/apis/app";
+import { BuildReferenceTracker } from "../../../app/apis/app2";
 import { track } from "../../../app/apis/referencetracker";
 import { forEach, length } from "ts-utils/collections";
 import { cross2d, int } from "ts-utils/mathutils";

@@ -3,18 +3,19 @@ import { Button, Column, Icon, Row, Spacer, useValue, useValuesContainer } from 
 import { MenuButton } from "@ui/menu-button";
 import { inputText } from "@ui/message-box";
 import { modalResult, WindowBuilder } from "@ui/windows-common";
-import { createContainer, Source, Value } from "ts-utils/callbacks";
+import { ActionDescriptors } from "app/apis/actions";
+import { App } from "app/apis/app";
+import { FileInfo, FileSystems } from "app/apis/fs";
+import { Ui } from "app/apis/ui";
+import { Values } from "app/apis/values";
+import { storageValue } from "app/modules/default/app/storage";
+import Optional from "optional-js";
+import React from "react";
+import { Source, Value } from "ts-utils/callbacks";
 import { iter } from "ts-utils/iter";
 import { sum } from "ts-utils/mathutils";
 import { size } from "ts-utils/size";
 import { Consumer, unwrapOptionalPromise } from "ts-utils/types";
-import { ActionDescriptors } from "app/apis/actions";
-import { App } from "app/apis/app1";
-import { FileInfo, FileSystems } from "app/apis/fs";
-import { Ui } from "app/apis/ui1";
-import { storageValue } from "app/modules/default/app/storage";
-import Optional from "optional-js";
-import React from "react";
 
 const ID = 'select-storage-fs';
 
@@ -91,13 +92,13 @@ function createFsActionItem(info: FsInfo, selected: Value<Optional<FsInfo>>): Ac
   return createActionItem(element, () => selected.set(Optional.of(info)));
 }
 
-export async function selectStorageFs(app: App, ui: Ui, aDescriptors: ActionDescriptors, fs: FileSystems): Promise<Optional<string>> {
-  const values = createContainer(ID);
+export async function selectStorageFs(app: App, ui: Ui, aDescriptors: ActionDescriptors, values: Values, fs: FileSystems): Promise<Optional<string>> {
+  const localValues = values.create(ID);
   const globalStorage = await app.storages('global');
-  const storageNames = await storageValue(values, globalStorage, `${ID}.storages`, [] as string[]);
-  const selected = values.value('selected', Optional.empty<FsInfo>());
-  const isSelected = values.transformed('isSelected', selected, s => s.isPresent());
-  const storageInfos = await values.transformedAsync('storageInfos', storageNames, async names => (await iter(names)
+  const storageNames = await storageValue(localValues, globalStorage, `${ID}.storages`, [] as string[]);
+  const selected = localValues.value('selected', Optional.empty<FsInfo>());
+  const isSelected = localValues.transformed('isSelected', selected, s => s.isPresent());
+  const storageInfos = await localValues.transformedAsync('storageInfos', storageNames, async names => (await iter(names)
     .map(async name => (await getFilesList(name, fs)).map(l => getFsInfo(name, l)))
     .await_())
     .filter(o => o.isPresent())
@@ -105,7 +106,7 @@ export async function selectStorageFs(app: App, ui: Ui, aDescriptors: ActionDesc
     .map(i => createFsActionItem(i, selected))
     .collect());
   const addNew = async () => {
-    (await inputText(app, ui, aDescriptors, 'Input Name', 'Input new storage name', 'database', '', 400, 130))
+    (await inputText(app, ui, aDescriptors, values, 'Input Name', 'Input new storage name', 'database', '', 400, 130))
       .ifPresent(n => storageNames.mod(s => [n, ...s.filter(s => s !== n)]));
   }
 
@@ -113,7 +114,7 @@ export async function selectStorageFs(app: App, ui: Ui, aDescriptors: ActionDesc
     const [resultAndClose, close] = modalResult(() => window.close(), ok);
     const result = (isOk: boolean) => isOk ? resultAndClose(selected.get().get().name) : resultAndClose(null)
 
-    const window = new WindowBuilder(ID, aDescriptors, values)
+    const window = new WindowBuilder(ID, aDescriptors, localValues)
       .modal()
       .titleFromId()
       .size(450, 130)
@@ -121,7 +122,7 @@ export async function selectStorageFs(app: App, ui: Ui, aDescriptors: ActionDesc
       .action('add-storage', () => addNew())
       .action('select', () => result(true), isSelected)
       .onClose(close)
-      .disposable(values)
+      .disposable(localValues)
       .build(<SelectStorage
         result={result}
         storageNames={storageNames}

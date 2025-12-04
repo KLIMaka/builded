@@ -1,6 +1,6 @@
 import { PROFILER } from "utils/profiler";
 import { getInstances, Module, plugin, provider } from "../../../utils/injector";
-import { TIMER } from "../../apis/app";
+import { TIMER } from "../../apis/app2";
 import { BUS } from "../../apis/handler";
 import { Frame, PostFrame, PreFrame } from "../../edit/messages";
 

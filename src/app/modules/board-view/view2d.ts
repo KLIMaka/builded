@@ -9,7 +9,7 @@ import { Controller2D } from "../../../utils/camera/controller2d";
 import { LinearInterpolator } from "../../../utils/interpolator";
 import { clamp, int, len2d } from "../../../utils/mathutils";
 import { DelayedValue } from "../../../utils/timed";
-import { ArtProvider, BoardProvider, BoardUtils, GridController, SnapTarget, SnapTargets, SnapType, State } from "../../apis/app";
+import { ArtProvider, BoardProvider, BoardUtils, GridController, SnapTarget, SnapTargets, SnapType, State } from "../../apis/app2";
 import { Renderable } from "../../apis/renderable";
 import { BoardInvalidate, LoadBoard } from "../../edit/messages";
 import { BuildGl } from "../gl/buildgl";

@@ -1,13 +1,12 @@
-import { Function } from "ts-utils/types";
+import { BoardData } from "app/apis/engine";
 import { vec3 } from "gl-matrix";
-import { SortedList } from "ts-utils/list";
 import { cross2d, int, len2d, ortonorm2d, sign } from "ts-utils/mathutils";
+import { first, Function } from "ts-utils/types";
 import { inSector } from "./board/query";
 import { Board, FACE_SPRITE, FLOOR_SPRITE, Sector, WALL_SPRITE } from "./board/structs";
 import { ArtInfo } from "./formats/art";
-import { SpriteDescriptor, SpriteInfo, faceSprite, floorSprite, spriteInfo, wallSprite } from "./sprites";
+import { SpriteDescriptor } from "./sprites";
 import { ANGSCALE, ZSCALE, inPolygon, rayIntersect, slope } from "./utils";
-import { BoardData } from "app/apis/engine";
 
 export enum EntityType {
   NONE, FLOOR, CEILING, UPPER_WALL, MID_WALL, LOWER_WALL, SPRITE, WALL_POINT, WALL_FLOOR, WALL_CEILING, WALL_NEXT_LOWER, WALL_NEXT_UPPER
@@ -105,27 +104,33 @@ const EMPTY: Target = { entity: EMPTY_ENTITY, coords: [0, 0, 0] };
 
 export class Hitscan {
   constructor(
-    private targetsList = new SortedList<Target>(),
+    private targetsListUnordered: [Target, number][] = [],
+    private targetsList: Target[] = [],
     public ray = new Ray(),
     public forward = vec3.create()
   ) { }
 
-  public reset(xs: number, ys: number, zs: number, vx: number, vy: number, vz: number, fx = vx, fy = vy, fz = vz) {
-    this.targetsList.clear();
-    this.targetsList.add(EMPTY, Number.MAX_VALUE);
+  reset(xs: number, ys: number, zs: number, vx: number, vy: number, vz: number, fx = vx, fy = vy, fz = vz) {
+    this.targetsListUnordered = [[EMPTY, Number.MAX_VALUE]];
     vec3.set(this.ray.start, xs, ys, zs);
     vec3.set(this.ray.dir, vx, vy, vz);
     vec3.set(this.forward, fx, fy, fz);
   }
 
-  public hit(t: number, id: number, type: EntityType, x: number, y: number, z: number) {
-    const target: Target = { entity: new Entity(id, type), coords: [x, y, z] };
-    this.targetsList.add(target, t);
+  finish() {
+    this.targetsList = this.targetsListUnordered
+      .toSorted(([t1, n1], [t2, n2]) => n1 - n2)
+      .map(first);
   }
 
-  isEmpty(): boolean { return this.targetsList.isEmpty() }
-  target() { return this.targetsList.first() }
-  targets(): Iterable<Target> { return this.targetsList.get() }
+  hit(t: number, id: number, type: EntityType, x: number, y: number, z: number) {
+    const target: Target = { entity: new Entity(id, type), coords: [x, y, z] };
+    this.targetsListUnordered.push([target, t]);
+  }
+
+  isEmpty(): boolean { return this.targetsList.length === 1 }
+  target() { return this.targetsList[0] }
+  targets(): Iterable<Target> { return this.targetsList }
 }
 
 const hitPoint = vec3.create();
@@ -303,9 +308,10 @@ function intersectFloorSprite(sprId: number, descriptor: SpriteDescriptor, hit: 
   hit.hit(t - SPRITE_OFF, sprId, EntityType.SPRITE, ix, iy, descriptor.info.z);
 }
 
-function intersectSprite(board: Board, artInfo: Map<number, ArtInfo>, sprId: number, spriteDescriptor: Function<number, SpriteDescriptor>, hit: Hitscan) {
+function intersectSprite(board: Board, artInfo: Map<number, ArtInfo>, sprId: number, spriteDescriptor: Function<number, SpriteDescriptor | undefined>, hit: Hitscan) {
   const spr = board.sprites[sprId];
   const descriptor = spriteDescriptor(sprId);
+  if (descriptor === undefined) return;
   if (spr.cstat.type === FACE_SPRITE) {
     intersectFaceSprite(sprId, descriptor, hit);
   } else if (spr.cstat.type === WALL_SPRITE) {
@@ -335,4 +341,5 @@ export function hitscan(data: BoardData, artInfo: Map<number, ArtInfo>, secId: n
       intersectSprite(board, artInfo, sprs[j], spriteDescriptor, hit);
     }
   }
+  hit.finish();
 }

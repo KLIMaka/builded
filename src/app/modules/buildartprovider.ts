@@ -5,7 +5,7 @@ import { createTexture, TextureImpl } from "../../utils/gl/textures";
 import { IndexedImgLib, INDEXED_IMG_LIB } from "../../utils/imglib";
 import { create, Dependency, lifecycle } from "../../utils/injector";
 import { int } from "../../utils/mathutils";
-import { ArtProvider, Logger, LOGGER } from "../apis/app";
+import { ArtProvider, Logger, LOGGER } from "../apis/app2";
 
 export const GL = new Dependency<WebGL2RenderingContext>('GL');
 export const OFFSCREEN = new Dependency<OffscreenCanvas>('Offscreen');

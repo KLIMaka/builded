@@ -2,7 +2,7 @@ import { BUS } from "app/apis/handler"
 import { Key } from "app/edit/messages"
 import { loadString } from "../../../utils/getter"
 import { Dependency, Plugin, getInstances, lifecycle } from "../../../utils/injector"
-import { LOGGER, STATE } from "../../apis/app"
+import { LOGGER, STATE } from "../../apis/app2"
 import { Input, loadBinds } from "../../input/keymap"
 import { messageParser } from "../../input/messageparser"
 
@@ -43,18 +43,18 @@ export const DefaultInputConstructor: Plugin<Input> = lifecycle(async (injector,
 // export function InputModule(module: Module) {
 //   module.bind(plugin('Input'), lifecycle(async (injector, lifecycle) => {
 
-    // const kbe = (handler: (key: string) => void) => (e: KeyboardEvent) => {
-    //   if (e.target != document.body) return true;
-    //   handler(e.key.toLowerCase());
-    //   e.preventDefault();
-    //   return false;
-    // }
-    // const keyup = kbe(key => bus.handle(new Key(key, false)));
-    // const keydown = kbe(key => bus.handle(new Key(key, true)));
-    // document.addEventListener('keyup', keyup);
-    // document.addEventListener('keydown', keydown);
-    // document.addEventListener('wheel', e => { if (e.ctrlKey) e.preventDefault(); return false; }, { passive: false });
-    // window.addEventListener('blur', () => consumer.reset(state));
+// const kbe = (handler: (key: string) => void) => (e: KeyboardEvent) => {
+//   if (e.target != document.body) return true;
+//   handler(e.key.toLowerCase());
+//   e.preventDefault();
+//   return false;
+// }
+// const keyup = kbe(key => bus.handle(new Key(key, false)));
+// const keydown = kbe(key => bus.handle(new Key(key, true)));
+// document.addEventListener('keyup', keyup);
+// document.addEventListener('keydown', keydown);
+// document.addEventListener('wheel', e => { if (e.ctrlKey) e.preventDefault(); return false; }, { passive: false });
+// window.addEventListener('blur', () => consumer.reset(state));
 
 //     const queue = new Deck<Key>();
 

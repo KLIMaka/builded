@@ -1,4 +1,4 @@
-import { Disposable } from "ts-utils/callbacks";
+import { Disposable, Source } from "ts-utils/callbacks";
 import { Dependency } from "ts-utils/injector";
 import { Consumer } from "ts-utils/types";
 
@@ -9,7 +9,7 @@ export type GlContext = {
   offscreen: OffscreenCanvas,
   gl: WebGL2RenderingContext,
   resource: ResourceFactory,
-  info(): string,
+  resourcesInfo: Source<Map<string, number>>;
 }
 export const GL_CONTEXT = new Dependency<GlContext>('Gl Context');
 

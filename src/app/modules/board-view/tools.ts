@@ -26,7 +26,7 @@ export const EMPTY: Selection = {
 export function createSelection(values: ValuesContainer, hitscan: Source<Entity>, boardCtx: BoardContext, engine: EngineContext): Source<Selection> {
   return values.transformed('selection', hitscan, hit => {
     if (hit.isWall()) {
-      return new WallEnt(hit.id, boardCtx, engine);
+      return new WallEnt(hit, boardCtx, engine);
       // const board = boardCtx.board.get();
       // const w1 = board.walls[hit.id].point2;
       // return new WallSegmentsEnt([hit, Entity.wallPoint(w1)], boardCtx);

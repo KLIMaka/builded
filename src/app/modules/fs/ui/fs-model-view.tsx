@@ -1,4 +1,4 @@
-import { ActionButton, Column, Icon, Row, Spacer, TextHeight, actionsToActionItem, useValue, useValuesContainer } from '@ui/commons';
+import { ActionButton, Column, Icon, NonwrapLabel, Row, Spacer, TextHeight, actionsToActionItem, useValue, useValuesContainer } from '@ui/commons';
 import { MenuButton } from '@ui/menu-button';
 import { SearchBox } from '@ui/search-box';
 import { TypedTableCellProps, VirtualTable, VirtualTableColumn, column } from '@ui/table';
@@ -14,20 +14,20 @@ import { fsIcon } from './fs-ui-utils';
 
 function Footer({ manager }: { manager: FileSystemsManagerImpl }) {
   const files = useValue(manager.files);
-  const selected = useValue(manager.selected);
+  const selected = useValue(manager.selected).selected();
   const totalSize = useMemo(() => iter(files).map(f => f.size).reduceFirst((l, h) => l + h).orElse(0), [files]);
   const selectedSize = iter(selected).map(f => f.size).reduceFirst((l, h) => l + h).orElse(0);
   return (<div className='row-block window-footer flex-auto gap-5'>
     <Spacer />
-    <div className='padded-5'>{size(selectedSize)} / {size(totalSize)} in {selected.size} / {files.length} file(s)</div>
+    <div className='padded-5'>{size(selectedSize)} / {size(totalSize)} in {selected.length} / {files.length} file(s)</div>
   </div>)
 }
 
 function FileNameRenderer({ cellData }: TypedTableCellProps<FileInfo, string>) {
-  return (<div className='row-block nonwrap-row-block baseline-aligned gap-5'>
-    <div className='fa-regular fa-file' />
-    <div className='nonwrap-row-block-item flex-fill'>{cellData}</div>
-  </div>)
+  return (<Row className='baseline-aligned gap-5'>
+    <Icon icon='file' type='regular' />
+    <NonwrapLabel label={cellData} />
+  </Row>)
 }
 
 function FileExtRenderer({ cellData }: TypedTableCellProps<FileInfo, string>) {
@@ -35,7 +35,7 @@ function FileExtRenderer({ cellData }: TypedTableCellProps<FileInfo, string>) {
 }
 
 function FileSizeRenderer({ cellData }: TypedTableCellProps<FileInfo, number>) {
-  return <div>{size(cellData)}</div>
+  return <div>{size(cellData ?? 0)}</div>
 }
 
 const tableColumns: VirtualTableColumn<FileInfo, any>[] = [

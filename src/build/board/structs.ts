@@ -35,20 +35,20 @@ export const SECTOR_REVERSE_TRANSLUNCENT_MASKED = 3;
 
 export type SectorStats = {
   parallaxing: boolean;
-  slopped: number;
-  swapXY: number;
-  doubleSmooshiness: number;
-  xflip: number;
-  yflip: number;
-  alignToFirstWall: number;
+  slopped: boolean;
+  swapXY: boolean;
+  doubleSmooshiness: boolean;
+  xflip: boolean;
+  yflip: boolean;
+  alignToFirstWall: boolean;
   type: number;
-  blocking: number;
-  tror: number;
-  hitscan: number;
-  unk12: number;
-  unk13: number;
-  unk14: number;
-  floorShade: number
+  blocking: boolean;
+  tror: boolean;
+  hitscan: boolean;
+  unk12: boolean;
+  unk13: boolean;
+  unk14: boolean;
+  floorShade: boolean
 }
 
 export type Sector<Stats extends SectorStats = SectorStats> = {

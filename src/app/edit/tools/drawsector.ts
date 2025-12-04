@@ -11,7 +11,7 @@ import { ZSCALE } from "../../../build/utils";
 import { Deck, wrap } from "../../../utils/collections";
 import { Module, create, lifecycle, plugin } from "../../../utils/injector";
 import { int, len2d } from "../../../utils/mathutils";
-import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, REFERENCE_TRACKER, VIEW, View } from "../../apis/app";
+import { ART, ArtProvider, BOARD, BoardProvider, BuildReferenceTracker, ENGINE_API, REFERENCE_TRACKER, VIEW, View } from "../../apis/app2";
 import { BUS, MessageBus, busDisconnector } from "../../apis/handler";
 import { NULL_RENDERABLE, Renderable, Renderables } from "../../apis/renderable";
 import { LineBuilder, PointSpritesBuilder } from "../../modules/gl/buffers";

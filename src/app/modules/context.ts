@@ -3,7 +3,7 @@ import { Board } from '../../build/board/structs';
 import { INDEXED_IMG_LIB, IndexedImgLibJsConstructor } from '../../utils/imglib';
 import { Module, getInstances, instance, lifecycle, plugin } from '../../utils/injector';
 import { DefaultProfilerConstructor, PROFILER } from '../../utils/profiler';
-import { ART, BOARD, BOARD_UTILS, ENGINE_API, GRID, LIGHTMAPS, REFERENCE_TRACKER, SCHEDULER, STATE, STORAGES } from '../apis/app';
+import { ART, BOARD, BOARD_UTILS, ENGINE_API, GRID, LIGHTMAPS, REFERENCE_TRACKER, SCHEDULER, STATE, STORAGES } from '../apis/app2';
 import { BUS, DefaultMessageBusConstructor, MessageHandlerReflective, busDisconnector } from '../apis/handler';
 import { DefaultScheduler } from './scheduler/scheduler';
 import { ENTITY_FACTORY, EntityFactoryConstructor } from '../edit/context';

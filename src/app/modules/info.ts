@@ -6,7 +6,7 @@ import { div, Element, tag, span } from "utils/ui/ui";
 import { Sector, Sprite, Wall } from "../../build/board/structs";
 import { Entity, EntityType } from "../../build/hitscan";
 import { create, lifecycle, Module, plugin } from "../../utils/injector";
-import { ART, ArtProvider, BOARD, BoardProvider, View, VIEW } from "../apis/app";
+import { ART, ArtProvider, BOARD, BoardProvider, View, VIEW } from "../apis/app2";
 import { BUS, busDisconnector, MessageHandlerReflective } from "../apis/handler";
 import { BoardInvalidate, Frame } from "../edit/messages";
 import { Palette, RAW_PAL, RAW_PLUs } from "../modules/artselector";

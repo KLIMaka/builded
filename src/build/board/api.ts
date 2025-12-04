@@ -1,5 +1,5 @@
 import { Board } from "./structs";
-import { BOARD, BoardProvider } from "../../app/apis/app";
+import { BOARD, BoardProvider } from "../../app/apis/app2";
 import { create, Injector } from "../../utils/injector";
 
 let context: Context;

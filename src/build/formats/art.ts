@@ -1,9 +1,12 @@
-import { range } from "ts-utils/collections";
-import { Stream, array, atomic_array, bits, byte, struct, ubyte, uint, ushort } from "ts-utils/stream";
 import { iter } from "ts-utils/iter";
+import { array, atomic_array, bits, byte, Stream, struct, ubyte, uint, ushort } from "ts-utils/stream";
 
 export class ArtInfo {
-  constructor(public w: number, public h: number, public attrs: Attributes, public img: Uint8Array) { }
+  constructor(
+    readonly w: number,
+    readonly h: number,
+    readonly attrs: Attributes,
+    readonly img: Uint8Array) { }
 }
 
 export type Header = {
@@ -26,18 +29,27 @@ export enum AnimationType {
   ANIMATE_BACKWARD = 3,
 }
 
-export class Attributes {
-  frames = 0;
-  animType = AnimationType.NO_ANIMATION;
-  xoff = 0;
-  yoff = 0;
-  speed = 0;
-  type = 0;
+export type Attributes = Readonly<{
+  frames: number;
+  animType: AnimationType;
+  xoff: number;
+  yoff: number;
+  speed: number;
+  type: number;
+}>;
+
+export const EMPTY_ATTRS: Attributes = {
+  animType: AnimationType.NO_ANIMATION,
+  frames: 0,
+  xoff: 0,
+  yoff: 0,
+  speed: 0,
+  type: 0
 }
 
-export const EMPTY_INFO = new ArtInfo(0, 0, new Attributes(), new Uint8Array(0));
+export const EMPTY_INFO = new ArtInfo(0, 0, EMPTY_ATTRS, new Uint8Array(0));
 
-export function animate(frame: number, info: ArtInfo) {
+export function animate(frame: number, info: ArtInfo): number {
   if (info.attrs.frames === 0) return 0;
   const max = info.attrs.frames + 1;
   if (info.attrs.animType === AnimationType.NO_ANIMATION) return 0;
@@ -46,6 +58,7 @@ export function animate(frame: number, info: ArtInfo) {
     return x >= max ? max * 2 - 2 - x : x;
   } else if (info.attrs.animType === AnimationType.ANIMATE_FORWARD) return frame % max;
   else if (info.attrs.animType === AnimationType.ANIMATE_BACKWARD) return - frame % max;
+  return 0;
 }
 
 export const animStruct = struct<Attributes>()
@@ -59,13 +72,19 @@ export const animStruct = struct<Attributes>()
 export type ArtFile = {
   header: Header,
   arts: ArtInfo[]
+  fileSize: number,
 }
+
 
 function checkVersion(stream: Stream) {
   const version = stream.readUInt();
   if (version === 1) {
-    stream.setOffset(0); return;
-  } else if (version === 0x4c495542 && stream.readUInt() === 0x54524144) return; // BUILDART
+    stream.setOffset(0);
+    return;
+  }
+  stream.setOffset(0);
+  const signature = stream.readByteString(8);
+  if (signature === 'BUILDART') return;
   throw new Error('Invalid Art File');
 }
 
@@ -77,12 +96,7 @@ export function readArtFile(buffer: ArrayBuffer): ArtFile {
   const hs = array(ushort, size).read(stream);
   const ws = array(ushort, size).read(stream);
   const attrs = array(animStruct, size).read(stream);
-  const arts = iter(range(0, size)).map(i => {
-    const w = ws[i];
-    const h = hs[i];
-    const attr = attrs[i];
-    const pixels = atomic_array(ubyte, w * h).read(stream);
-    return new ArtInfo(h, w, attr, pixels);
-  }).collect();
-  return { header, arts }
+  const arts = iter(ws).zip2(hs, attrs).map(([w, h, attr]) => new ArtInfo(h, w, attr, atomic_array(ubyte, w * h).read(stream))).collect();
+  const fileSize = buffer.byteLength;
+  return { header, arts, fileSize }
 }

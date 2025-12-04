@@ -1,14 +1,18 @@
 import { Dependency } from "ts-utils/injector";
 import { Function, Result, Supplier } from "ts-utils/types";
 import Optional from "optional-js";
-import { Disconnector } from "./app1";
+import { Disconnector } from "./app";
 import { Disposable } from "ts-utils/callbacks";
+
+export type FileSource = Readonly<{
+  name: string,
+}> & FileSystem
 
 export type FileInfo = {
   name: string,
   size: number,
   lastModified: number,
-  src: FileSystem,
+  src: FileSource,
 }
 
 export interface WritableFileSystem {
@@ -18,6 +22,7 @@ export interface WritableFileSystem {
 
 export interface FileSystem extends Disposable {
   readonly type: SerializedFileSystemHandle['type'];
+  readonly name: string;
 
   info(name: string): Promise<Optional<FileInfo>>;
   read(name: string): Promise<Optional<ArrayBuffer>>;

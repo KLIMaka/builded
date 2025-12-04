@@ -1,12 +1,13 @@
-import { createContainer, Source, Value } from "ts-utils/callbacks";
-import { Consumer } from "ts-utils/types";
 import { ActionDescriptors } from "app/apis/actions";
-import { Ui } from "app/apis/ui1";
+import { App } from "app/apis/app";
+import { Ui } from "app/apis/ui";
+import { Values } from "app/apis/values";
 import Optional from "optional-js";
 import React, { useContext, useEffect, useRef } from "react";
+import { Source, Value } from "ts-utils/callbacks";
+import { Consumer } from "ts-utils/types";
 import { ActionDescriptorsContext, ActionsChannelContext, Button, Column, CurrentActionsChannelContext, Icon, Row, Spacer, useValue } from "./commons";
 import { modalResult, WindowBuilder } from "./windows-common";
-import { App } from "app/apis/app1";
 
 function ConfirmOkCancel({ result, text, icon }: { result: Consumer<boolean>, text: string, icon: string }) {
   return <div className='column-block'>
@@ -22,18 +23,18 @@ function ConfirmOkCancel({ result, text, icon }: { result: Consumer<boolean>, te
   </div>
 }
 
-export function confirm(ui: Ui, actionDescriptors: ActionDescriptors, title: string, text: string): Promise<Optional<boolean>> {
-  const values = createContainer('confirm-box');
+export function confirm(ui: Ui, actionDescriptors: ActionDescriptors, values: Values, title: string, text: string): Promise<Optional<boolean>> {
+  const localvalues = values.create('confirm-box');
   return new Promise<Optional<boolean>>(async result => {
     const [resultAndClose, close] = modalResult(() => window.close(), result);
-    const window = new WindowBuilder('message-box', actionDescriptors, values)
+    const window = new WindowBuilder('message-box', actionDescriptors, localvalues)
       .modal()
       .title(title)
       .size(300, 150)
       .action('ok', () => resultAndClose(true))
       .action('cancel', () => resultAndClose(false))
       .onClose(close)
-      .disposable(values)
+      .disposable(localvalues)
       .build(<ConfirmOkCancel result={resultAndClose} text={text} icon='fa-triangle-exclamation' />);
     ui.addWindow(window);
   })
@@ -52,18 +53,18 @@ function Info({ result, text, icon }: { result: Consumer<void>, text: string, ic
   </div>
 }
 
-export function info(ui: Ui, actionDescriptors: ActionDescriptors, title: string, text: string, icon = 'fa-triangle-exclamation'): Promise<Optional<void>> {
-  const values = createContainer('info-box');
+export function info(ui: Ui, actionDescriptors: ActionDescriptors, values: Values, title: string, text: string, icon = 'fa-triangle-exclamation'): Promise<Optional<void>> {
+  const localValues = values.create('info-box');
   return new Promise<Optional<void>>(async result => {
     const [resultAndClose, close] = modalResult(() => window.close(), result);
-    const window = new WindowBuilder('message-box', actionDescriptors, values)
+    const window = new WindowBuilder('message-box', actionDescriptors, localValues)
       .modal()
       .title(title)
       .size(300, 150)
       .action('ok', resultAndClose)
       .action('cancel', resultAndClose)
       .onClose(close)
-      .disposable(values)
+      .disposable(localValues)
       .build(<Info result={resultAndClose} text={text} icon={icon} />);
     ui.addWindow(window)
   });
@@ -75,12 +76,12 @@ function InputText(props: { result: Consumer<boolean>, text: string, icon: strin
   const currentActions = useContext(CurrentActionsChannelContext);
   const searchChannel = actionsChannel.child('input-text-box', true);
 
-  const ref = useRef<HTMLInputElement>();
+  const ref = useRef<HTMLInputElement>(null);
   const value = useValue(props.value);
   const isValid = useValue(props.isValid);
   useEffect(() => {
     const ctx = actionDescriptors.sub('controls.textbox');
-    ref.current.focus()
+    ref.current?.focus()
     return searchChannel.collector().add(
       ctx.bindSync('close', () => props.result(false)),
       ctx.bindSync('enter', () => props.result(true))
@@ -122,23 +123,23 @@ function InputText(props: { result: Consumer<boolean>, text: string, icon: strin
   </ActionsChannelContext.Provider>
 }
 
-export function inputText(app: App, ui: Ui, actionDescriptors: ActionDescriptors, title: string, text: string, icon: string, def?: string, width?: number, height?: number): Promise<Optional<string>> {
+export function inputText(app: App, ui: Ui, actionDescriptors: ActionDescriptors, values: Values, title: string, text: string, icon: string, def?: string, width?: number, height?: number): Promise<Optional<string>> {
   const ID = 'input-text-box';
-  const values = createContainer(ID);
-  const value = values.value('value', def);
-  const isValid = values.transformed('isValid', value, v => v.length > 0);
+  const localValues = values.create(ID);
+  const value = localValues.value('value', def ?? '');
+  const isValid = localValues.transformed('isValid', value, v => v.length > 0);
   return new Promise<Optional<string>>(async ok => {
     const [resultAndClose, close] = modalResult(() => window.close(), ok);
     const result = (isOk: boolean) => isOk ? resultAndClose(value.get()) : resultAndClose(null);
 
-    const window = new WindowBuilder(ID, actionDescriptors, values)
+    const window = new WindowBuilder(ID, actionDescriptors, localValues)
       .modal()
       .title(title)
       .size(width ?? 300, height ?? 150)
       .action('ok', () => result(true), isValid)
       .action('cancel', () => result(false))
       .onClose(close)
-      .onClose(() => app.timer.delayed(() => values.dispose()))
+      .disposable(localValues)
       .build(<InputText
         result={result}
         text={text}

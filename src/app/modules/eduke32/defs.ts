@@ -1,21 +1,21 @@
-import { Source, ValuesContainer } from "ts-utils/callbacks";
-import { createGrpOrZipFsArrayBuffer, EMPTY, stack, trackFiles } from "../fs/fs";
-import { first, identity, nil } from "ts-utils/types";
-import { Stream } from "ts-utils/stream";
+import { ScriptFile, boolRule, createScripFile, nestedRule, number, numberRule, pushField, rule, rules, rulesInclude, set, simpleRule, stringRule, token, tuple } from "@utils/scriptfile";
 import { FileSystem } from "app/apis/fs";
-import { ScriptFile, rules, simpleRule, token, set, rulesInclude, rule, nestedRule, number, pushField, stringRule, numberRule, boolRule, createScripFile, tuple } from "@utils/scriptfile";
+import { Source, ValuesContainer } from "ts-utils/callbacks";
 import { asyncMapOptional } from "ts-utils/objects";
 import { NOOP_TASK_HANDLE } from "ts-utils/scheduler";
+import { Stream } from "ts-utils/stream";
+import { first, identity, nil, notUndefined } from "ts-utils/types";
 import { Work, begin, tuple as tupleWork } from "ts-utils/work";
-import { openFile } from "../default/engine-commons";
+import { openFileOptional } from "../default/engine-commons";
+import { EMPTY, createGrpOrZipFsArrayBuffer, stack, trackFiles } from "../fs/fs";
 
-export type FileDef = { file: string, offset?: number };
-export type VoxelDef = { picnum: number } & FileDef;
+export type FileDef = Partial<{ file: string, offset: number }>;
+export type VoxelDef = Partial<{ picnum: number }> & FileDef;
 export type PalDef = { id: number, shiftleft?: number } & FileDef;
 export type PluDef = { id: number, noshades?: boolean, floorpal?: boolean, copyof?: number } & FileDef;
-export type GlBlendDef = { src: string, dst: string };
+export type GlBlendDef = Partial<{ src: string, dst: string }>;
 export type BlendDef = { id: number, forward?: GlBlendDef, reverse?: GlBlendDef } & FileDef;
-export type TileFromTexture = { picnum: number, file: string, alphacut?: number, xoff?: number, yoff?: number };
+export type TileFromTexture = Partial<{ picnum: number, file: string, alphacut: number, xoff: number, yoff: number }>;
 export type AnimTileRange = { start: number, end: number, speed: number, anim?: number };
 export type EngineDefs = {
   root: FileSystem
@@ -53,7 +53,7 @@ export async function loadDefaultEngineDefs(values: ValuesContainer, root: Sourc
     const blends: BlendDef[] = [];
     const addGrp = EMPTY;
     const tiles: TileFromTexture[] = [];
-    const animTileRanges = [];
+    const animTileRanges: AnimTileRange[] = [];
     await fs.read('palette.dat').then(o => o.ifPresent(ab => {
       pals.push({ id: 0, file: 'palette.dat', shiftleft: 2 });
       plus.push({ id: 0, file: 'palette.dat', offset: 0x300 + 2 })
@@ -76,8 +76,8 @@ export async function loadDefaultEngineDefs(values: ValuesContainer, root: Sourc
 
 async function openGrp(values: ValuesContainer, fs: Source<FileSystem>, grpName: string): Promise<Source<FileSystem>> {
   const fn = `${grpName}.grp`;
-  const file = await openFile(values, fn, fs);
-  return values.transformedAsync(fn, file, async ab => createGrpOrZipFsArrayBuffer(ab));
+  const file = await openFileOptional(values, fn, fs);
+  return values.transformedAsync(fn, file, o => o.map(ab => createGrpOrZipFsArrayBuffer(fn, ab)).orElse(Promise.resolve(EMPTY)));
 }
 
 export function loadEngineDefsWork(grpName: string, values: ValuesContainer): Work<[Source<FileSystem>, Source<GrpInfo>], [Source<EngineDefs>]> {
@@ -87,15 +87,13 @@ export function loadEngineDefsWork(grpName: string, values: ValuesContainer): Wo
     files.clear();
     let fs = stack(defs.root, defs.mainGrp);
     const loadGrp = async (sf: ScriptFile, defs: EngineDefs, fn: string): Promise<void> => {
-      await begin()
-        .then(`Loading ${fn}`, async () => defs.root.read(fn))
-        .then(`Processing ${fn}`, async opt => asyncMapOptional(opt, ab => createGrpOrZipFsArrayBuffer(ab))
-          .then(o => o.ifPresent(grp => {
-            defs.addGrp = stack(grp, defs.addGrp);
-            fs = stack(defs.addGrp, fs);
-            files.add(fn);
-          })))
-        .finish()(sf.taskHandle);
+      const file = await defs.root.read(fn);
+      await asyncMapOptional(file, ab => createGrpOrZipFsArrayBuffer(fn, ab))
+        .then(o => o.ifPresent(grp => {
+          defs.addGrp = stack(grp, defs.addGrp);
+          fs = stack(defs.addGrp, fs);
+          files.add(fn);
+        }));
     }
     const glBlendRule = rules<GlBlendDef>(
       simpleRule(['src'], tuple(token), set('src')),
@@ -136,11 +134,11 @@ export function loadEngineDefsWork(grpName: string, values: ValuesContainer): Wo
     return !grpInfo.defname
       ? tupleWork(async () => defs)
       : begin()
-        .thenPass('Loading def File', () => fs.read(grpInfo.defname))
-        .thenWork(tupleWork((handle, defFile) =>
+        .thenPass('Loading def File', () => fs.read(notUndefined(grpInfo.defname)))
+        .then('Parsing def file', defFile =>
           defFile
-            .map(def => createScripFile(grpInfo.defname, def, handle).parse(cloneDefs(defs), engineDefsRule))
-            .orElse(Promise.resolve(defs))))
+            .map(def => createScripFile(notUndefined(grpInfo.defname), def).parse(cloneDefs(defs), engineDefsRule))
+            .orElse(Promise.resolve(defs)))
         .finish();
   }
 

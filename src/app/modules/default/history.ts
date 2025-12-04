@@ -1,7 +1,7 @@
 import { Board } from "../../../build/board/structs";
 import { Deck } from "../../../utils/collections";
 import { getInstances, Injector } from "../../../utils/injector";
-import { ENGINE_API, LOGGER, TIMER } from "../../apis/app";
+import { ENGINE_API, LOGGER, TIMER } from "../../apis/app2";
 import { BUS, Handle, MessageHandlerReflective } from "../../apis/handler";
 import { Commit, INVALIDATE_ALL, LoadBoard, NamedMessage } from "../../edit/messages";
 

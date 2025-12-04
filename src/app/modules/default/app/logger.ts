@@ -1,4 +1,4 @@
-import { Disconnector, LogHandler, LogLevel, Logger } from "../../../apis/app1";
+import { Disconnector, LogHandler, LogLevel, Logger } from "../../../apis/app";
 
 class LoggerImpl implements Logger {
   private handlers: Set<LogHandler> = new Set();

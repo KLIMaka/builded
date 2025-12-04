@@ -1,32 +1,15 @@
 import { getOrCreate } from "ts-utils/collections";
 import Optional from "optional-js";
-import { struct, string, uint, array, byte, ubyte, Stream, atomic_array } from "ts-utils/stream";
+import { string, uint, array, byte, ubyte, Stream, atomic_array, builder, AccessorType } from "ts-utils/stream";
 
-type Header = {
-  sign: string;
-  version: number;
-  offFat: number;
-  numFiles: number;
-}
-
-type FatRecord = {
-  unk1: number[];
-  unk2: number;
-  offset: number;
-  size: number;
-  time: number;
-  flags: number;
-  filename: string;
-  fileId: number;
-}
-
-const headerStruct = struct<Header>()
+const headerStruct = builder()
   .field('sign', string(4))
   .field('version', uint)
   .field('offFat', uint)
-  .field('numFiles', uint);
+  .field('numFiles', uint)
+  .build();
 
-const fatRecord = struct<FatRecord>()
+const fatRecord = builder()
   .field('unk1', array(byte, 16))
   .field('offset', uint)
   .field('size', uint)
@@ -34,11 +17,14 @@ const fatRecord = struct<FatRecord>()
   .field('time', uint)
   .field('flags', ubyte)
   .field('filename', string(11))
-  .field('fileId', uint);
+  .field('fileId', uint)
+  .build();
+
+type FatRecord = AccessorType<typeof fatRecord>
 
 export class RffFile {
   private data: Stream;
-  private header: Header;
+  private header: AccessorType<typeof headerStruct>;
   private namesTable = new Map<string, FatRecord>();
   private fileIdMap = new Map<string, Map<number, FatRecord>>();
   readonly fat: FatRecord[];
@@ -47,8 +33,7 @@ export class RffFile {
     this.data = new Stream(buf);
     this.header = headerStruct.read(this.data);
     this.data.setOffset(this.header.offFat);
-    const len = this.header.numFiles * fatRecord.size;
-    const fat = atomic_array(ubyte, len).read(this.data);
+    const fat = atomic_array(ubyte, this.header.numFiles * fatRecord.size).read(this.data);
     this.decodeFat(fat);
     const fatBuffer = new Stream(fat.buffer);
     fatBuffer.setOffset(fat.byteOffset);
@@ -87,19 +72,17 @@ export class RffFile {
     return arr.buffer;
   }
 
-  getByName(fname: string): ArrayBuffer {
-    const record = this.getRecord(fname);
-    return record ? this.get(record) : null;
+  getByName(fname: string): Optional<ArrayBuffer> {
+    return this.getRecord(fname).map(r => this.get(r));
   }
 
-  getRecord(fname: string): FatRecord {
-    return this.namesTable.get(fname.toLowerCase());
+  getRecord(fname: string): Optional<FatRecord> {
+    return Optional.ofNullable(this.namesTable.get(fname.toLowerCase()));
   }
 
-  getRecordById(ext: string, fid: number): FatRecord {
+  getRecordById(ext: string, fid: number): Optional<FatRecord> {
     return Optional.ofNullable(this.fileIdMap.get(ext.toLowerCase()))
       .map(m => m.get(fid))
-      .orElse(null)
   }
 }
 

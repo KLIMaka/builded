@@ -4,7 +4,7 @@ import { mat4, vec3 } from 'gl-matrix';
 import { Controller2D } from '../../../utils/camera/controller2d';
 import { Deck } from '../../../utils/collections';
 import { Injector, getInstances } from '../../../utils/injector';
-import { BOARD, BoardProvider } from '../../apis/app';
+import { BOARD, BoardProvider } from '../../apis/app2';
 import { BuildRenderableProvider, HELPER_GRID, SPRITE_LABEL, Renderable, SortingRenderable } from '../../apis/renderable';
 import { GRID_SECTOR_MATRIX } from '../gl/geometry/builders/common';
 import { RENDRABLES_CACHE } from '../gl/geometry/cache';

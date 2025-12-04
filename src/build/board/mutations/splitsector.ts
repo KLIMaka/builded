@@ -1,11 +1,11 @@
-import { Function, pair } from 'ts-utils/types';
 import { ArtInfo } from 'build/formats/art';
 import { vec3 } from 'gl-matrix';
-import { BuildReferenceTracker } from '../../../app/apis/app';
-import { track } from '../../../app/apis/referencetracker';
-import { all, Collection, enumerate, first, last, map, range, reversed, takeFirst, wrap } from 'ts-utils/collections';
-import { iter } from 'ts-utils/iter';
+import { all, Collection, enumerate, first, last, map, reversed, takeFirst, wrap } from 'ts-utils/collections';
+import { Iter, iter } from 'ts-utils/iter';
 import { cross2d, dot2d, int, len2d } from 'ts-utils/mathutils';
+import { Function, pair } from 'ts-utils/types';
+import { BuildReferenceTracker } from '../../../app/apis/app2';
+import { track } from '../../../app/apis/referencetracker';
 import { clockwise, inPolygon, rayIntersect, wallNormal } from '../../utils';
 import { loopPoints, loopStart, loopWalls, sectorWalls, wallsBetween } from '../loops';
 import { sectorOfWall, wallInSector } from '../query';
@@ -74,7 +74,7 @@ function splitSectorImpl<B extends Board>(board: B, sectorId: number, firstWall:
   newSectorBuilder.build(board, newSectorId, refs);
   const newSector = board.sectors[newSectorId];
   const wallEnd = newSector.wallptr + firstLoopLength - 1;
-  const mwalls = iter(range(wallEnd, wallEnd - lengthWoLast)).map(w => pair(newSectorId, w)).collect();
+  const mwalls = Iter.range(wallEnd, wallEnd - lengthWoLast).map(w => pair(newSectorId, w)).collect();
   const reversedWoLast = iter(reversed(points)).take(lengthWoLast);
   oldSectorBuilder
     .addWalls(createNewWalls(reversedWoLast, mwalls, refWall, board, api.cloneWall))

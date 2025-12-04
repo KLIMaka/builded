@@ -1,4 +1,4 @@
-import { TIMER, Timer as Timer_ } from "../app/apis/app";
+import { TIMER, Timer as Timer_ } from "../app/apis/app2";
 import { Dependency, Injector, Plugin, provider } from "ts-utils/injector";
 import { getOrCreate } from "ts-utils/collections";
 
@@ -38,21 +38,21 @@ export const PROFILER = new Dependency<Profiler>('Profiler');
 
 export class DefaultTimer implements Timer {
   private time = 0;
-  private startTime = -1;
+  private Iterableime = -1;
 
   constructor(private timer: Timer_) { };
 
-  get() { return this.startTime != -1 ? this.timer() - this.startTime : this.time }
+  get() { return this.Iterableime != -1 ? this.timer() - this.Iterableime : this.time }
 
   start() {
-    if (this.startTime == -1) this.startTime = this.timer();
+    if (this.Iterableime == -1) this.Iterableime = this.timer();
     return this;
   }
 
   stop() {
-    if (this.startTime != -1) {
-      this.time = this.timer() - this.startTime;
-      this.startTime = -1;
+    if (this.Iterableime != -1) {
+      this.time = this.timer() - this.Iterableime;
+      this.Iterableime = -1;
     }
     return this;
   }

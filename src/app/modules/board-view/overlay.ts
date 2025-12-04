@@ -7,12 +7,12 @@ import { SpriteDescriptor } from "build/sprites";
 import { createSlopeCalculator, slope, wallNormal, ZSCALE } from "build/utils";
 import { vec2, vec3 } from "gl-matrix";
 import { match } from "ts-pattern";
-import { range } from "ts-utils/collections";
-import { iter } from "ts-utils/iter";
+import { Iter } from "ts-utils/iter";
 import { memoize } from "ts-utils/mathutils";
 import { BoardGlContext } from "../gl/board-context";
 import { LineRecord, NOOP_RENDERABLE, printText, Renderable, renderables, ScreenSpriteRecord, WallType } from "./api";
 import { BoardRenderer3D } from "./boardRenderer3d";
+import { notUndefined } from "ts-utils/types";
 
 const POINT_OFF = vec2.fromValues(-2.5, 2.5);
 const POINT_SIZE = vec2.fromValues(5, 5);
@@ -149,15 +149,15 @@ function selecSector(hitscan: Entity, board: Board, renderer: BoardRenderer3D, b
   const picnum = settings.pointPicnum;
   const sectorId = hitscan.id;
   const sector = board.sectors[sectorId];
-  const ceiling = hitscan.type === EntityType.CEILING;
-  const slope = createSlopeCalculator(board, sectorId, ceiling);
+  const ceiling = hitscan.type === EntityType.CEILING ? 1 : 0;
+  const slope = createSlopeCalculator(board, sectorId, ceiling === 1);
   const pos = memoize((wallId: number) => {
     const wall = board.walls[wallId];
     const z = slope(wall.x, wall.y) / ZSCALE;
     return vec3.fromValues(wall.x, z, wall.y);
   });
-  const points = iter(range(sector.wallptr, sector.wallptr + sector.wallnum)).map(w => ({ picnum, pos: pos(w), off: POINT_OFF, size: POINT_SIZE })).collect();
-  const sectorR = renderer.writeSectorSelect([{ ceiling, floor: !ceiling, sectorId }], boardGlCtx);
+  const points = Iter.range(sector.wallptr, sector.wallptr + sector.wallnum).map(w => ({ picnum, pos: pos(w), off: POINT_OFF, size: POINT_SIZE })).collect();
+  const sectorR = renderer.writeSectorSelect([{ ceiling, floor: 1 - ceiling, sectorId }], boardGlCtx);
   const contour: LineRecord[] = [];
   let fw = sector.wallptr;
   sectorWalls(board, sectorId).forEach(w => {
@@ -244,7 +244,7 @@ function getFaceSprite(descripor: SpriteDescriptor, renderer: BoardRenderer3D): 
 function selectSprite(hitscan: Entity, data: BoardData, renderer: BoardRenderer3D, boardGlCtx: BoardGlContext, settings: EngineSettings, aliases: Aliases, art: Map<number, ArtInfoExtended>): Renderable {
   const { board } = data;
   const sprite = board.sprites[hitscan.id];
-  const descriptor = data.spriteDescriptor(hitscan.id);
+  const descriptor = notUndefined(data.spriteDescriptor(hitscan.id));
   return match(sprite.cstat.type)
     .with(FACE_SPRITE, () => getFaceSprite(descriptor, renderer))
     .with(WALL_SPRITE, () => getWallSprite(descriptor, renderer, settings))

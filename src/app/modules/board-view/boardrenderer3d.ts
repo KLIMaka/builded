@@ -5,7 +5,7 @@ import { createShader } from "@utils/gl/shaders";
 import { AttribDataBuilder, BufferAllocator, ShaderConfig, StateGl1, TextureSetter, vec4 } from "@utils/gl/stategl1";
 import { iter } from "ts-utils/iter";
 import { field } from "ts-utils/objects"
-import { BiFunction, Consumer, first, Function, MultiConsumer, pair, second } from "ts-utils/types";
+import { BiFunction, Consumer, first, Function, MultiConsumer, notNull, pair, second } from "ts-utils/types";
 import { NOOP_TASK_HANDLE } from "ts-utils/scheduler";
 import { EngineContext, EngineSettings } from "app/apis/engine";
 import { mat4 } from "gl-matrix";
@@ -70,7 +70,7 @@ export class BoardRenderer3D implements Disposable {
   writeWalls: (recs: Iterable<WallRecord>, boardGlCtx: BoardGlContext) => Renderable;
   writeSectors: (recs: Iterable<SectorRecord>, boardGlCtx: BoardGlContext) => Renderable;
   writeSprites: (recs: Iterable<SpriteRecord>, boardGlCtx: BoardGlContext) => Renderable;
-  writeVoxels: (recs: Iterable<SpriteRecord>, boardGlCtx: BoardGlContext) => Renderable;
+  writeVoxels: (recs: Iterable<VoxelRecord>, boardGlCtx: BoardGlContext) => Renderable;
   writeScreenSprites: (recs: Iterable<ScreenSpriteRecord>) => Renderable;
   writeWallSelect: (recs: Iterable<WallRecord>, boardGlCtx: BoardGlContext) => Renderable;
   writeSectorSelect: (recs: Iterable<SectorRecord>, boardGlCtx: BoardGlContext) => Renderable;
@@ -94,7 +94,7 @@ export class BoardRenderer3D implements Disposable {
     const matrices = this.state.uniformBlock('Matrices');
     const V = matrices.writer<[mat4]>('V');
     const IV = matrices.writer<[mat4]>('IV');
-    this.view = (view: mat4) => { V(view); IV(mat4.invert(mat4.create(), view)); };
+    this.view = (view: mat4) => { V(view); IV(notNull(mat4.invert(mat4.create(), view))); };
     this.projection = matrices.writer<[mat4]>('P');
 
     const engineParams = this.state.uniformBlock('Engine');
@@ -152,7 +152,7 @@ export class BoardRenderer3D implements Disposable {
       }
     });
     const data = builder.build(WebGL2RenderingContext.TRIANGLE_STRIP, 4);
-    const render = _ => {
+    const render = (gl: WebGL2RenderingContext) => {
       walls(ctx.walls);
       sectors(ctx.sectors);
       this.state.draw(shader, data);
@@ -220,7 +220,7 @@ export class BoardRenderer3D implements Disposable {
         }
       });
       const data = builder.build(WebGL2RenderingContext.TRIANGLES, 3);
-      const render = _ => {
+      const render = (gl: WebGL2RenderingContext) => {
         walls(ctx.walls);
         sectors(ctx.sectors);
         this.state.draw(shader, data);
@@ -261,7 +261,7 @@ export class BoardRenderer3D implements Disposable {
         }
       });
       const data = builder.build(WebGL2RenderingContext.TRIANGLES, 3);
-      const render = _ => {
+      const render = (gl: WebGL2RenderingContext) => {
         walls(ctx.walls);
         sectors(ctx.sectors);
         this.state.draw(shader, data);
@@ -290,7 +290,7 @@ export class BoardRenderer3D implements Disposable {
         builder.writeVertex();
       });
       const data = builder.build(WebGL2RenderingContext.TRIANGLE_STRIP, 6);
-      const render = _ => {
+      const render = (gl: WebGL2RenderingContext) => {
         sectors(ctx.sectors);
         sprites(ctx.sprites);
         this.state.draw(shader, data);
@@ -319,7 +319,7 @@ export class BoardRenderer3D implements Disposable {
         const voxel = this.textures.voxels.get()(picnum).get();
         return pair(voxel.texture, voxelBuilder.build(WebGL2RenderingContext.TRIANGLES, 6 * voxel.size));
       }).toMap(first, second);
-      const render = _ => {
+      const render = (gl: WebGL2RenderingContext) => {
         sprites(ctx.sprites);
         sectors(ctx.sectors);
         data.forEach((data, texture) => { voxelTexture(texture); this.state.draw(shader, data); });
@@ -352,7 +352,7 @@ export class BoardRenderer3D implements Disposable {
         builder.writeVertex();
       });
       const data = builder.build(WebGL2RenderingContext.TRIANGLES, 6);
-      const render = _ => this.state.draw(shader, data);
+      const render = (gl: WebGL2RenderingContext) => this.state.draw(shader, data);
       const dispose = async () => data.data.dispose();
       return { render, dispose };
     }
@@ -373,13 +373,13 @@ export class BoardRenderer3D implements Disposable {
         builder.writeVertex();
       });
       const data = builder.build(WebGL2RenderingContext.LINES, 2);
-      const render = _ => this.state.draw(shader, data);
+      const render = (gl: WebGL2RenderingContext) => this.state.draw(shader, data);
       const dispose = async () => data.data.dispose();
       return { render, dispose };
     }
   }
 
-  private createGridWriter(): BiFunction<Iterable<GridRecord>, number, Renderable> {
+  private createGridWriter(): BiFunction<Iterable<GridRecord>, number | undefined, Renderable> {
     const shader = this.state.getShader('grid');
     const builder = shader.builder();
     const pos1Writer = builder.vec3('aPos1');
@@ -400,7 +400,7 @@ export class BoardRenderer3D implements Disposable {
         builder.writeVertex();
       });
       const data = builder.build(WebGL2RenderingContext.TRIANGLES, 6);
-      const render = _ => { typeWriter(type); this.state.draw(shader, data); }
+      const render = (gl: WebGL2RenderingContext) => { typeWriter(type); this.state.draw(shader, data); }
       const dispose = async () => data.data.dispose();
       return { render, dispose };
     }

@@ -1,17 +1,17 @@
+import { Axes } from "@ui/axes";
 import { Column, Row, Spacer, useValue } from "@ui/commons";
-import { Source } from "ts-utils/callbacks";
-import { iter } from "ts-utils/iter";
-import { objectKeys } from "ts-utils/objects";
-import { Consumer } from "ts-utils/types";
+import { Controller3D } from "@utils/camera/controller3d";
 import { StateChecker } from "app/apis/actions";
 import { ArtInfoExtended, BoardContext, EngineContext } from "app/apis/engine";
 import { Board, SectorStats, SpriteStats, WallStats } from "build/board/structs";
 import { EMPTY_ENTITY, Entity, EntityType } from "build/hitscan";
 import React, { createContext, useContext, useEffect, useRef } from "react";
 import { AutoSizer } from "react-virtualized";
+import { Source } from "ts-utils/callbacks";
+import { iter } from "ts-utils/iter";
+import { objectKeys } from "ts-utils/objects";
+import { Consumer } from "ts-utils/types";
 import { ViewPosition } from "../view";
-import { Axes } from "@ui/axes";
-import { Controller3D } from "@utils/camera/controller3d";
 
 function InfoRow(props: { label: string, value: any }) {
   return <Row className='form-row'>
@@ -20,7 +20,7 @@ function InfoRow(props: { label: string, value: any }) {
   </Row>
 }
 
-function View(props: { canvas: Consumer<HTMLCanvasElement>, }) {
+function View(props: { canvas: Consumer<HTMLCanvasElement | null>, }) {
   return <AutoSizer className="flex-fill" >
     {({ height, width }) => (
       <canvas tabIndex={1} height={height} width={width} ref={c => props.canvas(c)} />
@@ -30,14 +30,14 @@ function View(props: { canvas: Consumer<HTMLCanvasElement>, }) {
 
 type Utils = {
   picInfo: Source<(picnum: number) => ArtInfoExtended>,
-  picRasterizer: Source<(picnum: number, pal: number, canvas: HTMLCanvasElement) => void>,
+  picRasterizer: Source<(picnum: number, pal: number, canvas: HTMLCanvasElement | null) => void>,
   alias: Source<(picnum: number) => string>,
   readonly viewPosition: Source<ViewPosition>,
   readonly boardCtx: BoardContext,
   readonly engine: EngineContext,
 }
 
-export const UtilsContext = createContext<Utils>(null);
+export const UtilsContext = createContext<Utils>(null as any as Utils);
 
 function PicPreview(props: { picnum: number, pal: number }) {
   const utils = useContext(UtilsContext);
@@ -46,7 +46,7 @@ function PicPreview(props: { picnum: number, pal: number }) {
   const picRasterizer = useValue(utils.picRasterizer);
   const info = picInfo(props.picnum);
   const alias = aliasInfo(props.picnum);
-  const canvasRef = useRef<HTMLCanvasElement>();
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => picRasterizer(props.picnum, props.pal, canvasRef.current));
   return <div>
     <div>{`Alias: ${alias}`}</div>
@@ -98,10 +98,18 @@ function SpriteInfo(props: { ent: Entity, board: Board }) {
   </Column>
 }
 
+function getWallId(ent: Entity, board: Board): number {
+  const refWall = board.walls[ent.id];
+  return ent.type === EntityType.LOWER_WALL && refWall.cstat.swapBottoms
+    ? refWall.nextwall
+    : ent.id;
+}
+
 function WallInfo(props: { ent: Entity, board: Board }) {
   const utils = useContext(UtilsContext);
   const settings = useValue(utils.engine.settings);
-  const wall = props.board.walls[props.ent.id];
+  const wallId = getWallId(props.ent, props.board);
+  const wall = props.board.walls[wallId];
   const getStat = (s: WallStats) => iter(objectKeys(s)).filter(k => s[k] === 1).map(k => k.toString()).join(', ').collect();
   const picnum = (() => {
     if (wall.cstat.swapBottoms === 1 && props.ent.type === EntityType.LOWER_WALL)
@@ -109,7 +117,7 @@ function WallInfo(props: { ent: Entity, board: Board }) {
     return wall.cstat.masking && props.ent.type === EntityType.MID_WALL ? wall.overpicnum : wall.picnum;
   })();
   return <Column className="form-panel">
-    <InfoRow label="Wall Id" value={props.ent.id} />
+    <InfoRow label="Wall Id" value={wallId} />
     <InfoRow label="Pos" value={`${wall.x}, ${wall.y}`} />
     <InfoRow label="Picnum" value={wall.picnum} />
     <InfoRow label="OPicnum" value={wall.overpicnum} />
@@ -144,7 +152,7 @@ function Footer(props: { board: Source<Board> }) {
   </div>
 }
 
-export function BoardViewWindow(props: { canvas: Consumer<HTMLCanvasElement>, states: StateChecker[], board: Source<Board>, ent: Source<Entity>, ctl: Controller3D }) {
+export function BoardViewWindow(props: { canvas: Consumer<HTMLCanvasElement | null>, states: StateChecker[], board: Source<Board>, ent: Source<Entity>, ctl: Controller3D }) {
   return (
     <Column>
       <Column>

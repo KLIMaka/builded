@@ -4,14 +4,13 @@ import { iter } from "ts-utils/iter";
 import { nextpow2 } from "ts-utils/mathutils";
 import { asyncMapOptional } from "ts-utils/objects";
 import { BiConsumer, BiFunction, Consumer, Function, identity, MultiConsumer, MultiFunction } from "ts-utils/types";
-import { NOOP_TASK_HANDLE, TaskHandle } from "ts-utils/scheduler";
 
 
 /*
  * File Tokeniser/Parser/Whatever
  * by Jonathon Fowler
  * Remixed completely by Ken Silverman
- * and then ported to typescript by KLIMaka
+ * and then ported to typescript by KLIMaka klimaka01@gmail.com
  * See the included license file "BUILDLIC.TXT" for license info.
  */
 
@@ -35,7 +34,7 @@ function checkNl(tx: Uint8Array, off: number): [number, boolean] {
 export class ExistedSymbolError extends Error {
 }
 
-export function createScripFile(name: string, buf: ArrayBuffer, taskHandle: TaskHandle = NOOP_TASK_HANDLE): ScriptFile {
+export function createScripFile(name: string, buf: ArrayBuffer): ScriptFile {
   const bufCopy = buf.slice(0);
   const inText = new Uint8Array(bufCopy);
   const lineOffs: number[] = [];
@@ -83,7 +82,7 @@ export function createScripFile(name: string, buf: ArrayBuffer, taskHandle: Task
   lineOffs.push(nflen);
   inText[nflen++] = 0;
 
-  return new ScriptFile(name, new Uint8Array(bufCopy.slice(0, nflen - 1)), lineOffs, taskHandle);
+  return new ScriptFile(name, new Uint8Array(bufCopy.slice(0, nflen - 1)), lineOffs);
 }
 
 export class ScriptFile {
@@ -94,7 +93,6 @@ export class ScriptFile {
     private name: string,
     private text: Uint8Array,
     private lineOffs: number[],
-    readonly taskHandle: TaskHandle = NOOP_TASK_HANDLE
   ) { }
 
   linenum(off: number): number {
@@ -142,7 +140,7 @@ export class ScriptFile {
 
   getToken(): string {
     this.skipOverWs();
-    if (this.isEof()) return null;
+    if (this.isEof()) return '';
     const start = this.textPtr;
     this.skipOverToken();
     return this.decoder.decode(this.text.subarray(start, this.textPtr));
@@ -159,14 +157,10 @@ export class ScriptFile {
   }
 
   async parse<T>(ctx: T, parser: BiFunction<ScriptFile, T, Promise<void>>, braced = false): Promise<T> {
-    let start = this.textPtr;
     const end = (braced) ? this.getBraces() : this.text.length;
-    this.taskHandle.plan(end - start);
     this.skipOverWs();
     while (this.textPtr < end) {
-      await this.taskHandle.waitFor(parser(this, ctx), `Parsing ${this.name}...`, 0);
-      this.taskHandle.incProgress(this.textPtr - start);
-      start = this.textPtr;
+      await parser(this, ctx);
       this.skipOverWs();
     }
     if (braced && this.getToken() !== '}') throw new Error();
@@ -212,7 +206,7 @@ export function nestedRule<C, NC, T extends any[]>(
   return { tokenAliases, argsParser, processor }
 }
 
-export type HasSymbols = { symbols: Map<string, number> }
+export type HasSymbols = Readonly<{ symbols: Map<string, number> }>
 function resolve(ctx: HasSymbols, token: string): number {
   return getOrDefaultF(ctx.symbols, token, t => Number.parseInt(t))
 }
@@ -237,18 +231,16 @@ export function rules<C>(...rules: Parser<C, any>[]): BiFunction<ScriptFile, C, 
   }
 }
 
-export function rulesInclude<C>(includer: Function<string, Promise<Optional<ArrayBuffer>>>, files: Set<String>, ...rules: Parser<C, any>[]): BiFunction<ScriptFile, C, Promise<void>> {
+export function rulesInclude<C>(includer: Function<string, Promise<Optional<ArrayBuffer>>>, files: Set<String>, ...rules: Parser<C, any[]>[]): BiFunction<ScriptFile, C, Promise<void>> {
   const includeParser = async (sf: ScriptFile, ctx: C, inc: string) => {
-    const handle = sf.taskHandle;
     files.add(inc);
-    handle.plan(1);
-    const file = await handle.waitFor(includer(inc), `Loading ${inc}...`);
+    const file = await includer(inc);
     await asyncMapOptional(file, async f => {
-      const sfi = createScripFile(inc, f, sf.taskHandle);
+      const sfi = createScripFile(inc, f);
       return await sfi.parse(ctx, parser);
     });
   }
-  const newRules = [rule(['include', '#include'], tuple(token), includeParser), ...rules];
+  const newRules: Parser<C, any[]>[] = [rule(['include', '#include'], tuple(token), includeParser), ...rules];
   const parser = async (sf: ScriptFile, ctx: C) => {
     const token = sf.getToken();
     await iter(newRules)

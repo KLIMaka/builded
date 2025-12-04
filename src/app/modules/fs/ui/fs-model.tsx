@@ -1,24 +1,24 @@
 import { ActionItem } from "@ui/action-list";
 import { Icon, actionsToActionItem, line } from "@ui/commons";
 import { confirm, info } from "@ui/message-box";
-import { Sort } from "@ui/table";
+import { SelectionController, Sort, setSelectionModel } from "@ui/table";
 import { SizeType, WindowBuilder } from "@ui/windows-common";
-import { Signal, Source, Value, ValuesContainer, ValuesMap, createContainer, initial } from "ts-utils/callbacks";
+import { ACTION_DESCRIPTORS, Action, ActionDescriptors } from "app/apis/actions";
+import { APP, App, Storage } from "app/apis/app";
+import { FS, FileSystem, FileSystemHandle, FileSystems, SerializedFileSystemHandle } from "app/apis/fs";
+import { UI, Ui, Window } from "app/apis/ui";
+import { VALUES, Values } from "app/apis/values";
+import { createSavedState } from "app/modules/default/app/storage";
+import { waitFor } from "app/modules/scheduler/ui/task-propgress";
+import Optional from "optional-js";
+import * as React from 'react';
+import { Signal, Source, Value, ValuesContainer, ValuesMap, initial } from "ts-utils/callbacks";
 import { Dependency, getInstances, lifecycle } from "ts-utils/injector";
 import { iter } from "ts-utils/iter";
 import { asyncMapOptional, zipOptional } from "ts-utils/objects";
 import { size } from "ts-utils/size";
-import { debounced } from "ts-utils/time";
 import { Consumer, Supplier, identity, pair } from "ts-utils/types";
-import { ACTION_DESCRIPTORS, Action, ActionDescriptors } from "app/apis/actions";
-import { APP, App, Storage } from "app/apis/app1";
-import { FS, FileSystem, FileSystemHandle, FileSystems, SerializedFileSystemHandle } from "app/apis/fs";
-import { UI, Ui, Window } from "app/apis/ui1";
-import { createSavedState } from "app/modules/default/app/storage";
-import { waitFor } from "app/modules/scheduler/ui/task-propgress";
 import { begin } from "ts-utils/work";
-import Optional from "optional-js";
-import * as React from 'react';
 import { EMPTY } from "../fs";
 import { FsManagerUiImpl } from "./fs-model-view";
 import { fsIcon } from "./fs-ui-utils";
@@ -57,7 +57,7 @@ type SavedState = {
   position: SizeType,
   size: SizeType,
   selectedFsName: string,
-  sort: Sort,
+  sort: Sort<FileInfo>,
 }
 
 function createDefaultSavedState(): SavedState {
@@ -72,10 +72,11 @@ function createDefaultSavedState(): SavedState {
 class GlobalFileSystemsManagerImpl implements GlobalFileSystemsManager {
   readonly clipboard: Value<Optional<FilesList>>;
   readonly recentFss: Source<FileSystemHandle[]>;
-  private window: Window;
+  private window: Window | undefined;
 
   constructor(
-    private values: ValuesContainer,
+    readonly values: Values,
+    private localValues: ValuesContainer,
     private state: ValuesMap<GlobalSavedState>,
     readonly app: App,
     readonly fs: FileSystems,
@@ -83,8 +84,8 @@ class GlobalFileSystemsManagerImpl implements GlobalFileSystemsManager {
     readonly ui: Ui,
     readonly actionDescriptors: ActionDescriptors,
   ) {
-    this.clipboard = this.values.value('clipboard', Optional.empty());
-    this.recentFss = values.transformed('recentFss', state.get('recent'), r => r.map(r => fs.deserialize(r)));
+    this.clipboard = this.localValues.value('clipboard', Optional.empty());
+    this.recentFss = localValues.transformed('recentFss', state.get('recent'), r => r.map(r => fs.deserialize(r)));
   }
 
   async addRecent(handle: FileSystemHandle) {
@@ -103,8 +104,8 @@ class GlobalFileSystemsManagerImpl implements GlobalFileSystemsManager {
 
   async openWindow(): Promise<Window> {
     if (this.window !== undefined) return this.window;
-    const values = createContainer(LOCAL);
-    const savedState = await createSavedState(values, this.storage, LOCAL, createDefaultSavedState());
+    const values = this.values.create(LOCAL);
+    const savedState = await createSavedState(values, this.storage, LOCAL, createDefaultSavedState(), this.app.timer);
     const manager = new FileSystemsManagerImpl(values, savedState, this);
     this.window = new WindowBuilder(LOCAL, this.actionDescriptors, values)
       .title('File Systems')
@@ -143,37 +144,38 @@ export class FileSystemsManagerImpl {
   readonly loadedFiles: Source<FileInfo[]>;
   readonly reloadFiles: Consumer<void>;
   readonly files: Source<FileInfo[]>;
-  readonly sort: Value<Sort>;
+  readonly sort: Value<Sort<FileInfo>>;
   readonly storages: Source<ActionItem[]>
   readonly actions: ManagerActions;
-  readonly selected: Value<Set<FileInfo>>;
+  readonly selected: Source<SelectionController<FileInfo>>;
   readonly query: Value<string>;
   readonly addMenuOpen: Value<boolean>;
   readonly createEngineOpen: Value<boolean>;
   readonly searchSiganl: Signal<[]>;
 
   constructor(
-    readonly values: ValuesContainer,
+    readonly localValues: ValuesContainer,
     readonly state: ValuesMap<SavedState>,
     private global: GlobalFileSystemsManagerImpl,
   ) {
-    this.selected = this.values.value<Set<FileInfo>>('selected', new Set())
-    this.query = this.values.value('query', '');
-    this.selectedFsHandle = this.values.value('selectedFsHandle', Optional.empty());
+    this.query = this.localValues.value('query', '');
+    this.selectedFsHandle = this.localValues.value('selectedFsHandle', Optional.empty());
     this.selectedFs = this.createSelectedFs(this.selectedFsHandle);
     this.sort = state.get('sort');
     [this.loadedFiles, this.reloadFiles] = this.createLoadedFiles(this.selectedFs);
     this.files = this.createFiles(this.loadedFiles, this.sort, this.query);
+    this.selected = setSelectionModel(this.localValues, this.files);
+    this.localValues.handleStandalone([this.selectedFs], _ => { this.selected.get().unselectAll() });
     this.actions = this.createActions(global.actionDescriptors, this.createRecentConsumer());
     this.storages = this.createStorages(global.recentFss, this.selectedFsHandle,
       [this.actions.addStorage, this.actions.addDir, this.actions.addZip, this.actions.addRff, this.actions.addGrp]);
-    this.addMenuOpen = values.value('addMenuOpen', false);
-    this.createEngineOpen = values.value('createEngineOpen', false);
-    this.searchSiganl = values.signal();
+    this.addMenuOpen = localValues.value('addMenuOpen', false);
+    this.createEngineOpen = localValues.value('createEngineOpen', false);
+    this.searchSiganl = localValues.signal();
   }
 
   private createSelectedFs(handle: Source<Optional<FileSystemHandle>>): Value<FileSystem> {
-    return this.values.transformedAsyncBuilder({
+    return this.localValues.transformedAsyncBuilder({
       name: 'selectedFs',
       source: handle,
       initialValue: initial(EMPTY),
@@ -183,28 +185,29 @@ export class FileSystemsManagerImpl {
 
   private createLoadedFiles(source: Source<FileSystem>): [Source<FileInfo[]>, Consumer<void>] {
     const transformer = async (fs: FileSystem) => {
-      this.selected.set(new Set());
       const files = await fs.list();
       return files.map(f => { return { name: f.name, size: f.size, type: getExtension(f.name) } })
     }
-    const debouncedReload = debounced(() => loadedFiles.forceReload(), 100);
-    const srcConnector = (fs: FileSystem, _: Value<FileInfo[]>) => fs.subscribe((name, deleted) => debouncedReload());
-    const loadedFiles = this.values.transformedAsyncBuilder({ name: 'loadedFiles', source, transformer, initialValue: initial<FileInfo[]>([]), srcConnector });
+    const debouncedReload = this.global.app.timer.debounced(() => loadedFiles.forceReload(), 100);
+    this.localValues.addDisposable(debouncedReload);
+    const srcConnector = (fs: FileSystem, _: Value<FileInfo[]>) => fs.subscribe((name, deleted) => debouncedReload.run());
+    const loadedFiles = this.localValues.transformedAsyncBuilder({ name: 'loadedFiles', source, transformer, initialValue: initial<FileInfo[]>([]), srcConnector });
     return [loadedFiles, () => loadedFiles.forceReload()];
   }
 
-  private createFiles(files: Source<FileInfo[]>, sort: Source<Sort>, query: Source<string>): Source<FileInfo[]> {
-    return this.values.transformedTuple('files', [files, sort, query], ([files, sort, query]) => {
+  private createFiles(files: Source<FileInfo[]>, sort: Source<Sort<FileInfo>>, query: Source<string>): Source<FileInfo[]> {
+    return this.localValues.transformedTuple('files', [files, sort, query], ([files, sort, query]) => {
       const queryLc = query.toLowerCase();
       const filtered = files.filter(f => f.name.toLowerCase().includes(queryLc));
-      if (sort.column === undefined) return filtered;
+      const sortColumn = sort.column;
+      if (sortColumn === undefined) return filtered;
       const [dirG, dirL] = sort.direction === 'ASC' ? [-1, 1] : [1, -1];
-      return [...filtered.sort((l, r) => l[sort.column] < r[sort.column] ? dirG : dirL)];
+      return [...filtered.sort((l, r) => l[sortColumn] < r[sortColumn] ? dirG : dirL)];
     });
   }
 
   private createStorages(recent: Source<FileSystemHandle[]>, activeFsHandle: Value<Optional<FileSystemHandle>>, addActions: Action[]): Source<ActionItem[]> {
-    return this.values.transformedTuple('storages', [recent, activeFsHandle],
+    return this.localValues.transformedTuple('storages', [recent, activeFsHandle],
       ([recent, _]) => [
         ...recent.map(handle => this.createFsItem(handle)),
         line('Add'),
@@ -232,8 +235,8 @@ export class FileSystemsManagerImpl {
 
   private createActions(actionDescriptors: ActionDescriptors, recentConsumer: Consumer<SerializedFileSystemHandle['type']>): ManagerActions {
     const fsCtx = actionDescriptors.sub('fs');
-    const nonEmptySelection = this.values.transformed('nonEmptySelection', this.selected, s => s.size !== 0);
-    const nonEmptyClipboard = this.values.transformed('nonEmptyClipboard', this.global.clipboard, c => c.isPresent());
+    const nonEmptySelection = this.localValues.transformed('nonEmptySelection', this.selected, s => s.selected().length !== 0);
+    const nonEmptyClipboard = this.localValues.transformed('nonEmptyClipboard', this.global.clipboard, c => c.isPresent());
     const register = (id: string, action: Consumer<void>, enabled?: Source<boolean>) => fsCtx.bindSync(id, action, enabled);
     return {
       addDir: register('add-dir', () => recentConsumer('dir')),
@@ -256,7 +259,7 @@ export class FileSystemsManagerImpl {
   }
 
   private copy() {
-    this.global.clipboard.set(Optional.of({ fs: this.selectedFs.get(), files: iter(this.selected.get()).map(f => f.name).collect() }));
+    this.global.clipboard.set(Optional.of({ fs: this.selectedFs.get(), files: iter(this.selected.get().selected()).map(f => f.name).collect() }));
   }
 
   private async paste() {
@@ -265,8 +268,8 @@ export class FileSystemsManagerImpl {
   }
 
   private async delete() {
-    const selected = this.selected.get();
-    const isOk = await confirm(this.global.ui, this.global.actionDescriptors, 'Delete', `Do you really want to delete the ${selected.size} selected files(s)?`);
+    const selected = this.selected.get().selected();
+    const isOk = await confirm(this.global.ui, this.global.actionDescriptors, this.global.values, 'Delete', `Do you really want to delete the ${selected.length} selected files(s)?`);
     if (!isOk.orElse(false)) return;
     await this.selectedFs.get().writable().then(w => w.ifPresent(async writable => {
       const scheduler = this.global.app.scheduler;
@@ -274,7 +277,7 @@ export class FileSystemsManagerImpl {
         .forkItems(selected, f => `Deleting ${f.name}...`, f => writable.delete(f.name))
         .finish()
       );
-      await waitFor(this.global.ui, this.global.actionDescriptors, "Delete", task);
+      await waitFor(this.global.ui, this.global.actionDescriptors, this.global.values, "Delete", task);
     }));
   }
 
@@ -290,7 +293,7 @@ export class FileSystemsManagerImpl {
             const dstFile = filesMap.get(fn.toLowerCase());
             if (!dstFile) return 'yes';
             const text = `Do you really want to overwrite file '${fn}'? Old size ${size(dstFile.size)} new size ${size(byteLength)}`;
-            const isOk = await confirmOverwrite(this.global.ui, this.global.actionDescriptors, 'Overwrite', text)
+            const isOk = await confirmOverwrite(this.global.ui, this.global.actionDescriptors, this.global.values, 'Overwrite', text)
             return isOk.orElse('all-no')
           }
           return work.input<OverwriteOption>()
@@ -306,23 +309,23 @@ export class FileSystemsManagerImpl {
                   (option === 'all-no' || option === 'no')
                     ? option
                     : w.write(file.name, data)
-                      .catch(e => info(this.global.ui, this.global.actionDescriptors, 'Error', e.message))
+                      .catch(e => info(this.global.ui, this.global.actionDescriptors, this.global.values, 'Error', e.message))
                       .then(_ => option)
                 ).then(o => o.orElse(prevOption)))
             ).finish(['yes']);
         }).finish());
-      const result = await waitFor(this.global.ui, this.global.actionDescriptors, "Write", task);
-      result.onErr(e => { this.global.app.logger.log('ERROR', e); info(this.global.ui, this.global.actionDescriptors, 'Error', e.message) })
+      const result = await waitFor(this.global.ui, this.global.actionDescriptors, this.global.values, "Write", task);
+      result.onErr(e => { this.global.app.logger.log('ERROR', e); info(this.global.ui, this.global.actionDescriptors, this.global.values, 'Error', e.message) })
     }));
   }
 }
 
 export const FileSystemsManagerModule = lifecycle<GlobalFileSystemsManager>(async (injector, lifecycle) => {
-  const [fs, actionDescriptors, app, ui] = await getInstances(injector, FS, ACTION_DESCRIPTORS, APP, UI);
-  const globalValues = lifecycle(createContainer(GLOBAL), async c => c.dispose());
+  const [fs, actionDescriptors, app, ui, values] = await getInstances(injector, FS, ACTION_DESCRIPTORS, APP, UI, VALUES);
+  const globalValues = lifecycle(values.create(GLOBAL), async c => c.dispose());
   const windowStates = lifecycle(await app.storages('ui.window-states'), async s => s.dispose());
-  const globalState = await createSavedState(globalValues, windowStates, GLOBAL, createDefaultGlobalState());
-  return new GlobalFileSystemsManagerImpl(globalValues, globalState, app, fs, windowStates, ui, actionDescriptors);
+  const globalState = await createSavedState(globalValues, windowStates, GLOBAL, createDefaultGlobalState(), app.timer);
+  return new GlobalFileSystemsManagerImpl(values, globalValues, globalState, app, fs, windowStates, ui, actionDescriptors);
 });
 
 export const FS_MANAGER = new Dependency<GlobalFileSystemsManager>('File Systems Manager');

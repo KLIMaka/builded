@@ -1,6 +1,6 @@
 import { Dependency, getInstances, lifecycle } from "../../utils/injector";
 import { replaceContent, span, Table } from "../../utils/ui/ui";
-import { UI } from "../apis/ui";
+import { UI } from "../apis/ui2";
 
 export const MAP_NAMES = new Dependency<() => Promise<string[]>>('MapNames');
 export const MAP_SELECTOR = new Dependency<() => Promise<string>>('MapSelector');

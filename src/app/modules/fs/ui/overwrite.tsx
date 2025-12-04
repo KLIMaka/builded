@@ -1,10 +1,10 @@
 import { modalResult, WindowBuilder } from "@ui/windows-common";
-import { createContainer } from "ts-utils/callbacks";
-import { Consumer } from "ts-utils/types";
 import { ActionDescriptors } from "app/apis/actions";
-import { Ui } from "app/apis/ui1";
+import { Ui } from "app/apis/ui";
+import { Values } from "app/apis/values";
 import Optional from "optional-js";
 import React from "react";
+import { Consumer } from "ts-utils/types";
 
 export type OverwriteOption = 'yes' | 'no' | 'all-yes' | 'all-no';
 
@@ -24,11 +24,11 @@ export function ConfirmOkCancel({ result, text, icon }: { result: Consumer<Overw
   </div>
 }
 
-export function confirmOverwrite(ui: Ui, actionDescriptors: ActionDescriptors, title: string, text: string): Promise<Optional<OverwriteOption>> {
-  const values = createContainer('override-box');
+export function confirmOverwrite(ui: Ui, actionDescriptors: ActionDescriptors, values: Values, title: string, text: string): Promise<Optional<OverwriteOption>> {
+  const localValues = values.create('override-box');
   return new Promise<Optional<OverwriteOption>>(async (ok, error) => {
     const [resultAndClose, close] = modalResult(() => window.close(), ok);
-    const window = new WindowBuilder('overwrite-box', actionDescriptors, values)
+    const window = new WindowBuilder('overwrite-box', actionDescriptors, localValues)
       .modal()
       .title(title)
       .size(450, 150)
@@ -37,7 +37,7 @@ export function confirmOverwrite(ui: Ui, actionDescriptors: ActionDescriptors, t
       .action('all-yes', () => resultAndClose('all-yes'))
       .action('all-no', () => resultAndClose('all-no'))
       .onClose(close)
-      .disposable(values)
+      .disposable(localValues)
       .build(<ConfirmOkCancel result={resultAndClose} text={text} icon='fa-triangle-exclamation' />)
     ui.addWindow(window);
   });

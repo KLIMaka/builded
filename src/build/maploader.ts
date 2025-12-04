@@ -3,21 +3,21 @@ import { SectorStats, Sector, WallStats, Wall, SpriteStats, Sprite, Board, FACE_
 import { ZSCALE } from './utils';
 
 export const sectorStats = struct<SectorStats>()
-  .field('parallaxing', bit())
-  .field('slopped', bits(1))
-  .field('swapXY', bits(1))
-  .field('doubleSmooshiness', bits(1))
-  .field('xflip', bits(1))
-  .field('yflip', bits(1))
-  .field('alignToFirstWall', bits(1))
+  .field('parallaxing', bit)
+  .field('slopped', bit)
+  .field('swapXY', bit)
+  .field('doubleSmooshiness', bit)
+  .field('xflip', bit)
+  .field('yflip', bit)
+  .field('alignToFirstWall', bit)
   .field('type', bits(2))
-  .field('blocking', bits(1))
-  .field('tror', bits(1))
-  .field('hitscan', bits(1))
-  .field('unk12', bits(1))
-  .field('unk13', bits(1))
-  .field('unk14', bits(1))
-  .field('floorShade', bits(1));
+  .field('blocking', bit)
+  .field('tror', bit)
+  .field('hitscan', bit)
+  .field('unk12', bit)
+  .field('unk13', bit)
+  .field('unk14', bit)
+  .field('floorShade', bit);
 
 export const sectorStruct = struct<Sector>()
   .field('wallptr', ushort)
@@ -164,8 +164,8 @@ export function saveBuildMap(board: Board): ArrayBuffer {
 export function fixSectorSlopes(board: Board) {
   for (var i = 0; i < board.numsectors; i++) {
     const sec = board.sectors[i];
-    sec.ceilingstat.slopped = 1;
-    sec.floorstat.slopped = 1;
+    sec.ceilingstat.slopped = true;
+    sec.floorstat.slopped = true;
   }
 }
 
@@ -216,19 +216,19 @@ export function newWall() {
 
 export function initSectorStats() {
   const stat = {} as SectorStats;
-  stat.alignToFirstWall = 0;
-  stat.doubleSmooshiness = 0;
+  stat.alignToFirstWall = false;
+  stat.doubleSmooshiness = false;
   stat.parallaxing = false;
-  stat.slopped = 0;
-  stat.swapXY = 0;
-  stat.xflip = 0;
-  stat.yflip = 0;
-  stat.tror = 0;
+  stat.slopped = false;
+  stat.swapXY = false;
+  stat.xflip = false;
+  stat.yflip = false;
+  stat.tror = false;
   stat.type = SECTOR_NORMAL;
-  stat.blocking = 0;
-  stat.hitscan = 0;
-  stat.unk12 = stat.unk13 = stat.unk14 = 0;
-  stat.floorShade = 0;
+  stat.blocking = false;
+  stat.hitscan = false;
+  stat.unk12 = stat.unk13 = stat.unk14 = false;
+  stat.floorShade = false;
   return stat;
 }
 

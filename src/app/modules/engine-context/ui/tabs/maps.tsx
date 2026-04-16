@@ -1,11 +1,13 @@
 import { Column, Icon, NonwrapLabel, Row, Spacer, useValue, useValuesContainer } from "@ui/commons";
-import { Sort, TypedTableCellProps, VirtualTable, VirtualTableColumn, column, singleSelectionModel } from "@ui/table";
+import { column, singleSelectionModel, Sort, TypedTableCellProps, VirtualTable, VirtualTableColumn } from "@ui/table";
 import { FileInfo, FileSource } from "app/apis/fs";
 import { fsIcon } from "app/modules/fs/ui/fs-ui-utils";
 import React from "react";
+import { match } from "ts-pattern";
 import { Source } from "ts-utils/callbacks";
 import { sum } from "ts-utils/mathutils";
 import { size } from "ts-utils/size";
+import { BiFn } from "ts-utils/types";
 import { Editor, EngineInfo } from "../engine-context";
 
 
@@ -43,6 +45,15 @@ function MapsSummary(props: { mapsCount: Source<number>, mapsSize: Source<number
   </Row>
 }
 
+function sortFunction(field: keyof FileInfo, dirG: number, dirL: number): BiFn<FileInfo, FileInfo, number> {
+  return match(field)
+    .returnType<BiFn<FileInfo, FileInfo, number>>()
+    .with('lastModified', 'size', f => (l, r) => l[f] < r[f] ? dirG : dirL)
+    .with('name', f => (l, r) => l[f].toLowerCase() < r[f].toLowerCase() ? dirG : dirL)
+    .with('src', f => (l, r) => l[f].name.toLowerCase() < r[f].name.toLowerCase() ? dirG : dirL)
+    .exhaustive()
+}
+
 export function MapsInfoView({ info, editor }: { info: EngineInfo, editor: Editor }) {
   const values = useValuesContainer(`maps`);
   const sort = values.value<Sort<FileInfo>>('sort', { column: 'name', direction: "ASC" });
@@ -50,7 +61,7 @@ export function MapsInfoView({ info, editor }: { info: EngineInfo, editor: Edito
     const sortColumn = sort.column;
     if (sortColumn === undefined) return maps;
     const [dirG, dirL] = sort.direction === 'ASC' ? [-1, 1] : [1, -1];
-    return maps.toSorted((l, r) => l[sortColumn] < r[sortColumn] ? dirG : dirL);
+    return maps.toSorted(sortFunction(sortColumn, dirG, dirL));
   });
   const mapsCount = values.transformed('maps-count', info.mapFiles, maps => maps.length);
   const mapsSize = values.transformed('maps-size', info.mapFiles, maps => maps.map(m => m.size).reduce(sum))

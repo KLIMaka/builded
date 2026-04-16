@@ -12,7 +12,7 @@ import { ArtRaster } from "build/artraster";
 import { BloodBoard } from "build/blood/structs";
 import { findSector } from "build/board/query";
 import { Sector, Sprite, Wall } from "build/board/structs";
-import { build2gl, getPlayerStart, gl2build, sectorNormal, wallNormal } from "build/utils";
+import { build2gl, getPlayerStart, gl2build } from "build/utils";
 import { vec3 } from "gl-matrix";
 import React from "react";
 import { Source, ValuesContainer, disposer } from "ts-utils/callbacks";
@@ -21,10 +21,10 @@ import { drawToCanvas } from "ts-utils/imgutils";
 import { Injector, getInstances } from "ts-utils/injector";
 import { quadraticInterpolator } from "ts-utils/interpolator";
 import { Iter, iter } from "ts-utils/iter";
-import { clamp, int } from "ts-utils/mathutils";
+import { int } from "ts-utils/mathutils";
 import { applyNotNullish } from "ts-utils/objects";
 import { fit, palRasterizer, pluTransform, transform } from "ts-utils/pixelprovider";
-import { gen, Scheduler } from "ts-utils/scheduler";
+import { Scheduler, gen } from "ts-utils/scheduler";
 import { Stream } from "ts-utils/stream";
 import { DelayedValue } from "ts-utils/timed";
 import { Result, notNull } from "ts-utils/types";
@@ -104,12 +104,12 @@ export async function createBoardView(injector: Injector, ctx: EngineContext, te
 
 
 function createUtils(values: ValuesContainer, engine: EngineContext) {
-  const rasterizer = values.transformed('pal-rasterizer', engine.pal, pal => palRasterizer(pal));
+  const rasterizer = values.transformed('pal-rasterizer', engine.pal, palRasterizer);
   const picRasterizer = values.transformedTuple('pic-rasterizer', [engine.artMap, engine.plus, rasterizer],
     ([art, plus, rasterizer]) => (picnum: number, pal: number, canvas: HTMLCanvasElement | null) => {
       if (canvas === null) return;
       const info = getOrDefault(art, picnum, EMPTY_INFO_EXTENDED);
-      const plu = pluTransform(iter(plus).first(p => p.id === pal).orElseGet(() => plus[0]).plu);
+      const plu = pluTransform(iter(plus).first(p => p.id === pal).orElse(plus[0]).plu);
       drawToCanvas(transform(fit(128, 128, new ArtRaster(info), 255), plu), notNull(canvas.getContext('2d')), rasterizer);
     });
   const picInfo = values.transformed('pic-info', engine.artMap, art => (picnum: number) => getOrDefault(art, picnum, EMPTY_INFO_EXTENDED));
@@ -123,26 +123,6 @@ function drawOverlayImpl(gl: WebGL2RenderingContext, ...rs: Renderable[]) {
   rs.forEach(r => r.render(gl));
   gl.disable(gl.BLEND);
   gl.enable(gl.DEPTH_TEST);
-}
-
-function shade(boardCtx: BoardContext, ctl: Controller3D): void {
-  const dir = ctl.getForward();
-  const sh = (x: number) => int(32 + clamp(x, -1, 0) * 64);
-  boardCtx.modifyBoard('shade', board => {
-    Iter.range(0, board.numsectors).forEach(s => {
-      const cn = sectorNormal(vec3.create(), board, s, true);
-      const fn = sectorNormal(vec3.create(), board, s, false);
-      const cdot = vec3.dot(dir, cn);
-      const fdot = vec3.dot(dir, fn);
-      board.sectors[s].ceilingshade = sh(cdot);
-      board.sectors[s].floorshade = sh(fdot);
-    });
-    Iter.range(0, board.numwalls).forEach(w => {
-      const n = wallNormal(vec3.create(), board, w);
-      const dot = vec3.dot(dir, n);
-      board.walls[w].shade = sh(dot);
-    })
-  });
 }
 
 async function saveBoard(engine: EngineContext, boardCtx: BoardContext, ui: Ui, actionDescriptors: ActionDescriptors, values: Values, scheduler: Scheduler) {
@@ -170,7 +150,7 @@ function createWindow(values: Values, localValues: ValuesContainer, engine: Engi
   const targets = createTargets(localValues, hitscan);
   const snapTarget = createSnapTarget(localValues, hitscan, boardCtx);
   // const entity = createEntity(values, targets);
-  const entity = localValues.transformed('entyty', snapTarget, st => st.entity);
+  const entity = localValues.field('entyty', snapTarget, 'entity');
   const selection = createSelection(localValues, entity, boardCtx, engine);
   const moveState = localValues.value('move-state', false);
   const verticalState = localValues.value('vertical-state', false);
@@ -193,7 +173,7 @@ function createWindow(values: Values, localValues: ValuesContainer, engine: Engi
   const overlay = localValues.transformedTuple('overlay', [entity, boardCtx.data, engine.settings, renderer, engine.aliases, engine.artMap], getOverlay(boardGlCtx), { disposer: disposer() })
   const utils = createUtils(localValues, engine);
   const drawSectorTool = createDrawSectorTool(localValues, ctl, renderer, engine.settings, hitscan, boardCtx, engine);
-  const utilsTool = createUtilsTool(boardCtx, selection, hitscan, engine, injector);
+  const utilsTool = createUtilsTool(boardCtx, selection, hitscan, engine, ctl, injector);
 
   const actionsCtx = actionDescriptors.sub('board-view');
   const bind = (name: string) => actionsCtx.get(name).bind().get();
@@ -218,7 +198,7 @@ function createWindow(values: Values, localValues: ValuesContainer, engine: Engi
     ([blends, data, view, renderer]) => () => drawImpl(renderer, gl, blends, view, data, view));
 
   const redrawProc = localValues.transformedTuple('redraw', [ctl.size, ctl.projection, canvasValue, renderer, draw, overlay, drawSectorTool.renderable, transform],
-    ([size, projection, canvas, renderer, draw, overlay, renderable, transform]) => (dt: number) => {
+    ([size, projection, canvas, renderer, draw, overlay, renderable, transform]) => () => {
       if (!canvas) return;
 
       const [width, height] = size;
@@ -227,7 +207,7 @@ function createWindow(values: Values, localValues: ValuesContainer, engine: Engi
       offscreen.height = height;
 
       renderer.screenSize(width, height);
-      renderer.time(app.timer.now());
+      renderer.time(app.timer.now() % 10000.0);
       renderer.projection(projection);
 
       gl.viewport(0, 0, width, height);
@@ -242,20 +222,22 @@ function createWindow(values: Values, localValues: ValuesContainer, engine: Engi
       canvas
         ?.getContext('bitmaprenderer')
         ?.transferFromImageBitmap(offscreen.transferToImageBitmap());
+    });
 
-      ctl.moveForward((forwardDamper.get() + backDamper.get()) * 5 * dt);
-      ctl.moveSideway((leftDamper.get() + rightDamper.get()) * 5 * dt);
-    })
-
-  const redrawTask = app.timer.onFrame(dt => redrawProc.get()(dt));
+  const updateMovement = app.timer.onFrame(dt => {
+    ctl.moveForward((forwardDamper.get() + backDamper.get()) * 5 * dt);
+    ctl.moveSideway((leftDamper.get() + rightDamper.get()) * 5 * dt);
+  })
+  const redrawTask = app.timer.onFrame(_ => redrawProc.get()());
   redrawTask.onError(e => app.logger.log('ERROR', e));
+  updateMovement.start();
   redrawTask.start();
+
   const actionsFactory = (desc: ActionDescriptors) => {
     return [
       desc.bindSync('undo', () => boardCtx.undo()),
       desc.bindSync('grid-inc', () => boardCtx.grid.incGridSize()),
       desc.bindSync('grid-dec', () => boardCtx.grid.decGridSize()),
-      desc.bindSync('shade', () => shade(boardCtx, ctl)),
       desc.bind('save', async () => saveBoard(engine, boardCtx, ui, actionDescriptors, values, app.scheduler)),
       ...drawSectorTool.registerActions(desc),
       ...utilsTool.registerActions(desc)
@@ -273,6 +255,7 @@ function createWindow(values: Values, localValues: ValuesContainer, engine: Engi
     .actionsFactory(actionsFactory)
     .states(states)
     .disposable(redrawTask)
+    .disposable(updateMovement)
     .disposable(localValues)
     .disposable(boardCtx)
     .disposable(boardGlCtx)

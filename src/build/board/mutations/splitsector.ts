@@ -3,7 +3,7 @@ import { vec3 } from 'gl-matrix';
 import { all, Collection, enumerate, first, last, map, reversed, takeFirst, wrap } from 'ts-utils/collections';
 import { Iter, iter } from 'ts-utils/iter';
 import { cross2d, dot2d, int, len2d } from 'ts-utils/mathutils';
-import { Function, pair } from 'ts-utils/types';
+import { Fn, pair } from 'ts-utils/types';
 import { BuildReferenceTracker } from '../../../app/apis/app2';
 import { track } from '../../../app/apis/referencetracker';
 import { clockwise, inPolygon, rayIntersect, wallNormal } from '../../utils';
@@ -105,7 +105,7 @@ export function splitSector<B extends Board>(board: B, sectorId: number, points:
     return splitSectorImpl(board, sectorId, lastWall, firstWall, loop, wrap([...reversed(points)]), refs, api);
 }
 
-export function splitSectorFromPoint<B extends Board>(board: B, wallId: number, pointonWall: point2d, art: Function<number, ArtInfo>, refs: BuildReferenceTracker, api: EngineApi<B>) {
+export function splitSectorFromPoint<B extends Board>(board: B, wallId: number, pointonWall: point2d, art: Fn<number, ArtInfo>, refs: BuildReferenceTracker, api: EngineApi<B>) {
   const wall = board.walls[wallId];
   const wall2 = board.walls[wall.point2];
   const px = int(pointonWall[0]);

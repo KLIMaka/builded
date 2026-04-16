@@ -1,6 +1,5 @@
 import { ArtInfoExtended, BoardContext, BuildRor, BuildTror, DEFAULT_BLEND, DEFAULT_SECTOR_SETTING, EMPTY_ALIASES, EMPTY_TAGS, EngineContext, EngineSettings, GlBlend, Palette, PicTags, VoxelSwap } from "app/apis/engine";
 import { FileSystem } from "app/apis/fs";
-import { Values } from "app/apis/values";
 import { BloodBoard } from "build/blood/structs";
 import { loadRorLinks, MIRROR_PIC } from "build/blood/utils";
 import { EngineApi } from "build/board/mutations/api";
@@ -14,12 +13,13 @@ import { EMPTY_COLLECTION, getOrCreate, getOrDefault } from "ts-utils/collection
 import { Iter, iter } from "ts-utils/iter";
 import { field } from "ts-utils/objects";
 import { Stream } from "ts-utils/stream";
-import { first, Function, identity, second } from "ts-utils/types";
+import { first, Fn, identity, second } from "ts-utils/types";
 import { begin } from "ts-utils/work";
 import { cloneBoard, cloneSector, cloneSprite, cloneWall, loadBloodMap, newBoard, newSector, newSprite, newWall, saveBloodMap } from '../../../build/blood/maploader';
 import { createBoardModifier } from "../default/board-context-utils";
-import { loadArtMap, loadArtWork, loadEditorPicAddons, loadMaxPluId, loadRaw, openFile, openFileOptional, packegeFs } from "../default/engine-commons";
+import { loadArtMapWork, loadArtWork, loadEditorPicAddons, loadMaxPluId, loadRaw, openFile, openFileOptional, packegeFs } from "../default/engine-commons";
 import { DefaultGridController } from "../default/grid";
+import { loadEngineDefsWork } from "../default/def-utils";
 import { createRffFsArrayBuffer, stack, watchFile } from "../fs/fs";
 import { SECTOR_TAGS, SPRITE_TAGS, WALL_TAGS } from "./texts";
 
@@ -58,7 +58,7 @@ function loadTags(surfaceDat: ArrayBuffer): PicTags {
   return { allTags: () => tags, tags: id => surface.length <= id ? EMPTY_COLLECTION : [tags[surface[id]]] };
 }
 
-function createloadBoard(values: ValuesContainer, art: Source<Map<number, ArtInfoExtended>>): Function<Stream, Promise<BoardContext<BloodBoard>>> {
+function createloadBoard(values: ValuesContainer, art: Source<Map<number, ArtInfoExtended>>): Fn<Stream, Promise<BoardContext<BloodBoard>>> {
   let boardId = 1;
   return async (stream: Stream, name?: string): Promise<BoardContext<BloodBoard>> => {
     const boardValues = values.createChild(`board-${boardId++}`);
@@ -98,7 +98,7 @@ function engineSettings(values: ValuesContainer, off: Source<number>): Source<En
 
 type FileById = (fid: number, ext: string) => Optional<ArrayBuffer>;
 function loadFileById(values: ValuesContainer, bloodRff: Source<Optional<RffFile>>): Source<FileById> {
-  const toFileById: Function<RffFile, FileById> = (rff: RffFile) => (fid, ext) => rff.getRecordById(ext, fid).map(rec => rff.get(rec));
+  const toFileById: Fn<RffFile, FileById> = (rff: RffFile) => (fid, ext) => rff.getRecordById(ext, fid).map(rec => rff.get(rec));
   return values.transformed('file-by-id', bloodRff, rff => rff.map(toFileById).orElse((_1, _2) => Optional.empty()));
 }
 
@@ -128,10 +128,20 @@ async function createSpriteVoxelSwap(values: ValuesContainer, fs: Source<FileSys
   })
 }
 
+async function defname(values: ValuesContainer, fs: Source<FileSystem>) {
+  return values.transformedAsync('defname', fs, async fs => {
+    const addon = await fs.read('addon.json');
+    return addon
+      .map(ab => JSON.parse(new TextDecoder().decode(ab)))
+      .map(json => json?.def_modules?.[0] as string)
+      .orElse('')
+  })
+}
+
 export const createEngineContextWork = begin()
-  .multiInput<[Source<FileSystem>, Values]>()
+  .multiInput<[Source<FileSystem>, ValuesContainer]>()
   .thenWork((handle, fs, values) =>
-    values.create('blood-module').initializeAsync(values => begin()
+    values.createChild('blood-module').initializeAsync(values => begin()
       .input<Source<FileSystem>>()
       .thenWorkPass((handle, fs) => begin()
         .input<Source<FileSystem>>()
@@ -149,8 +159,10 @@ export const createEngineContextWork = begin()
         .thread('Loading Tags', (fs, res) => loadPicTags(values, res))
         .thread('Loading Voxels', (fs, res) => createSpriteVoxelSwap(values, fs))
         .threadWork((handle, fs, res) => loadArtWork(handle, values, res)))
-      .thenWorkPass(async (handle, fs, resources, [pal, trans, plus, picTags, spriteVoxelSwap, art]) => loadEditorPicAddons(values, loadArtMap(values, art), resources, pal)(handle))
-      .then<EngineContext<BloodBoard>>('', async (fs, resources, [pal, trans, plus, picTags, spriteVoxelSwap, art], artAddon) => {
+      .thenWorkPass(async (handle, fs, resources, [pal, trans, plus, picTags, spriteVoxelSwap, art]) => loadEngineDefsWork('', values)(handle, fs, await defname(values, fs)))
+      .thenWorkPass(async (handle, fs, resources, [pal, trans, plus, picTags, spriteVoxelSwap, art], defs) => loadArtMapWork(values, defs, art, resources, pal)(handle))
+      .thenWorkPass(async (handle, fs, resources, [pal, trans, plus, picTags, spriteVoxelSwap, art], defs, artMap) => loadEditorPicAddons(values, artMap, resources, pal)(handle))
+      .then<EngineContext<BloodBoard>>('', async (fs, resources, [pal, trans, plus, picTags, spriteVoxelSwap, art], defs, _, artAddon) => {
         const api = engineApi();
         const settings = engineSettings(values, artAddon.offset);
         const name = values.const('name', "Blood");
@@ -159,7 +171,7 @@ export const createEngineContextWork = begin()
         const aliases = values.const('aliases', EMPTY_ALIASES);
         const maxPluId = loadMaxPluId(values, plus);
         const parallaxInfo = (_: number) => 0xffffff;
-        const blends = values.const<Function<number, GlBlend>>('blend', _ => DEFAULT_BLEND);
+        const blends = values.const<Fn<number, GlBlend>>('blend', _ => DEFAULT_BLEND);
         const loadBoard = createloadBoard(values, artAddon.map);
         const dispose = () => values.dispose();
         return { name, resources, api, settings, pal, trans, picTags, plus, maxPluId, art, artMap, shadowsteps, aliases, spriteVoxelSwap, blends, parallaxInfo, loadBoard, dispose }

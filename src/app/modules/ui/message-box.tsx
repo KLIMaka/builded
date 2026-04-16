@@ -6,7 +6,7 @@ import Optional from "optional-js";
 import React, { useContext, useEffect, useRef } from "react";
 import { Source, Value } from "ts-utils/callbacks";
 import { Consumer } from "ts-utils/types";
-import { ActionDescriptorsContext, ActionsChannelContext, Button, Column, CurrentActionsChannelContext, Icon, Row, Spacer, useValue } from "./commons";
+import { ActionsChannelContext, Button, Column, Icon, Row, Spacer, UiContext, useValue } from "./commons";
 import { modalResult, WindowBuilder } from "./windows-common";
 
 function ConfirmOkCancel({ result, text, icon }: { result: Consumer<boolean>, text: string, icon: string }) {
@@ -71,9 +71,8 @@ export function info(ui: Ui, actionDescriptors: ActionDescriptors, values: Value
 }
 
 function InputText(props: { result: Consumer<boolean>, text: string, icon: string, value: Value<string>, isValid: Source<boolean> }) {
-  const actionDescriptors = useContext(ActionDescriptorsContext);
+  const { actionDescriptors, currentActions } = useContext(UiContext);
   const actionsChannel = useContext(ActionsChannelContext);
-  const currentActions = useContext(CurrentActionsChannelContext);
   const searchChannel = actionsChannel.child('input-text-box', true);
 
   const ref = useRef<HTMLInputElement>(null);

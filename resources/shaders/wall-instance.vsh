@@ -14,6 +14,7 @@ in uvec4 aWallSectorPart_u16;
 
 out vec3 tc;
 out vec4 parallax;
+out float shadow; 
 flat out ivec4 params;
 flat out pic_t picInfo;
 flat out float trans;
@@ -48,5 +49,7 @@ void main() {
   picInfo = wallInfo.picInfo;
   tc = wallInfo.tc;
   params = ivec4(wallInfo.shade, wallInfo.pal, int(sector.visibility), 255);
+  // shadow = IS_START(gl_VertexID) ? float(wall2.shade) : float(wall1.shade);
+  shadow = float(wallInfo.shade);
 }
 

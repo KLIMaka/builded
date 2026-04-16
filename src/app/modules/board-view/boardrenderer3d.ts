@@ -5,7 +5,7 @@ import { createShader } from "@utils/gl/shaders";
 import { AttribDataBuilder, BufferAllocator, ShaderConfig, StateGl1, TextureSetter, vec4 } from "@utils/gl/stategl1";
 import { iter } from "ts-utils/iter";
 import { field } from "ts-utils/objects"
-import { BiFunction, Consumer, first, Function, MultiConsumer, notNull, pair, second } from "ts-utils/types";
+import { BiFn, Consumer, first, Fn, MultiConsumer, notNull, pair, second } from "ts-utils/types";
 import { NOOP_TASK_HANDLE } from "ts-utils/scheduler";
 import { EngineContext, EngineSettings } from "app/apis/engine";
 import { mat4 } from "gl-matrix";
@@ -161,7 +161,7 @@ export class BoardRenderer3D implements Disposable {
     return { render, dispose };
   }
 
-  private createWallWriter(): BiFunction<Iterable<WallRecord>, BoardGlContext, Renderable> {
+  private createWallWriter(): BiFn<Iterable<WallRecord>, BoardGlContext, Renderable> {
     const shader = this.state.getShader('wall-instance');
     shader.texture('pal')(this.textures.pal.get());
     shader.texture('plu')(this.textures.plu.get());
@@ -175,7 +175,7 @@ export class BoardRenderer3D implements Disposable {
     return (recs, ctx) => this.genWalls(shader, walls, sectors, wallSectorPart, builder, recs, ctx);
   }
 
-  private createWallSelectWriter(): BiFunction<Iterable<WallRecord>, BoardGlContext, Renderable> {
+  private createWallSelectWriter(): BiFn<Iterable<WallRecord>, BoardGlContext, Renderable> {
     const shader = this.state.getShader('wall-select');
     shader.texture('infos')(this.textures.infos.get());
     const walls = shader.texture('walls');
@@ -186,7 +186,7 @@ export class BoardRenderer3D implements Disposable {
     return (recs, ctx) => this.genWalls(shader, walls, sectors, part, builder, recs, ctx);
   }
 
-  private createSectorWriter(): BiFunction<Iterable<SectorRecord>, BoardGlContext, Renderable> {
+  private createSectorWriter(): BiFn<Iterable<SectorRecord>, BoardGlContext, Renderable> {
     const shader = this.state.getShader('sector-instance');
     shader.texture('pal')(this.textures.pal.get());
     shader.texture('plu')(this.textures.plu.get());
@@ -230,7 +230,7 @@ export class BoardRenderer3D implements Disposable {
     };
   }
 
-  private createSectorSelectWriter(): BiFunction<Iterable<SectorRecord>, BoardGlContext, Renderable> {
+  private createSectorSelectWriter(): BiFn<Iterable<SectorRecord>, BoardGlContext, Renderable> {
     const shader = this.state.getShader('sector-select');
     shader.texture('infos')(this.textures.infos.get());
     const walls = shader.texture('walls');
@@ -271,7 +271,7 @@ export class BoardRenderer3D implements Disposable {
     };
   }
 
-  private createSpriteWriter(): BiFunction<Iterable<SpriteRecord>, BoardGlContext, Renderable> {
+  private createSpriteWriter(): BiFn<Iterable<SpriteRecord>, BoardGlContext, Renderable> {
     const shader = this.state.getShader('sprite-instance');
     shader.texture('pal')(this.textures.pal.get());
     shader.texture('plu')(this.textures.plu.get());
@@ -300,7 +300,7 @@ export class BoardRenderer3D implements Disposable {
     };
   }
 
-  private createVoxelWriter(): BiFunction<Iterable<VoxelRecord>, BoardGlContext, Renderable> {
+  private createVoxelWriter(): BiFn<Iterable<VoxelRecord>, BoardGlContext, Renderable> {
     const shader = this.state.getShader('voxel-instance');
     shader.texture('pal')(this.textures.pal.get());
     shader.texture('plu')(this.textures.plu.get());
@@ -329,7 +329,7 @@ export class BoardRenderer3D implements Disposable {
     };
   }
 
-  private createScreenSpriteWriter(): Function<Iterable<ScreenSpriteRecord>, Renderable> {
+  private createScreenSpriteWriter(): Fn<Iterable<ScreenSpriteRecord>, Renderable> {
     const shader = this.state.getShader('screen-sprite');
     shader.texture('pal')(this.textures.pal.get());
     shader.texture('plu')(this.textures.plu.get());
@@ -358,7 +358,7 @@ export class BoardRenderer3D implements Disposable {
     }
   }
 
-  private createLineWriter(): Function<Iterable<LineRecord>, Renderable> {
+  private createLineWriter(): Fn<Iterable<LineRecord>, Renderable> {
     const shader = this.state.getShader('line');
     const builder = shader.builder();
     const startWriter = builder.vec3('aStart');
@@ -379,7 +379,7 @@ export class BoardRenderer3D implements Disposable {
     }
   }
 
-  private createGridWriter(): BiFunction<Iterable<GridRecord>, number | undefined, Renderable> {
+  private createGridWriter(): BiFn<Iterable<GridRecord>, number | undefined, Renderable> {
     const shader = this.state.getShader('grid');
     const builder = shader.builder();
     const pos1Writer = builder.vec3('aPos1');

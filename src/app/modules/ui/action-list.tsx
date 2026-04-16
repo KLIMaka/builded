@@ -2,7 +2,7 @@ import { iter } from 'ts-utils/iter';
 import { clamp } from 'ts-utils/mathutils';
 import * as React from 'react';
 import { HTMLProps, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { ActionDescriptorsContext, ActionsChannelContext, styles, useValuesContainer } from './commons';
+import { ActionsChannelContext, styles, UiContext, useValuesContainer } from './commons';
 import { Consumer, nil, seq } from 'ts-utils/types';
 import { List, ListRowProps, ListRowRenderer } from 'react-virtualized';
 import { Value } from 'ts-utils/callbacks';
@@ -52,7 +52,7 @@ export type ActionListProps = {
 
 export function ActionList(props: ActionListProps & HTMLProps<HTMLDivElement>) {
   const [active, setActive] = useState(-1);
-  const actionDescriptors = useContext(ActionDescriptorsContext);
+  const { actionDescriptors } = useContext(UiContext);
   const actionsChannel = useContext(ActionsChannelContext);
   const listContainerRef = useRef<HTMLDivElement>(null);
   const onAction = props.onAction ?? nil();

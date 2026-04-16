@@ -15,10 +15,10 @@ import { getOrCreate, getOrDefault, prefixNotEmpty, range, takeFirst } from "ts-
 import { createCanvas, drawToCanvas, renderGrid } from "ts-utils/imgutils";
 import { Injector, getInstances } from "ts-utils/injector";
 import { iter } from "ts-utils/iter";
-import { clamp, cyclic } from "ts-utils/mathutils";
+import { clamp, cyclic, int } from "ts-utils/mathutils";
 import { Navigator, navigateList } from "ts-utils/navigators";
-import { Rasterizer, array, fit, palRasterizer, transform } from "ts-utils/pixelprovider";
-import { Consumer, Function, Predicate, Supplier, first, notNull, notNullOrUndefined, second } from "ts-utils/types";
+import { Rasterizer, array, fit, palRasterizer, resize, transform } from "ts-utils/pixelprovider";
+import { Consumer, Fn, Predicate, Supplier, first, notNull, notNullOrUndefined, second } from "ts-utils/types";
 import { createSavedState } from "../default/app/storage";
 import { ArtEditor } from "./arteditor-api";
 import { ArtEditorUiImpl } from "./arteditor-view";
@@ -151,7 +151,7 @@ export class ArtEditorImpl implements ArtEditor {
   readonly picnums: Source<number[]>;
   private mainFrameInfo: Source<ArtInfo> & Disposable;
   private currentFrameInfo: Source<RenderInfo>;
-  private pluProvider: Source<Function<number, number>>;
+  private pluProvider: Source<Fn<number, number>>;
   readonly previewGridSize: Value<Optional<[number, number]>>;
 
   private rasterizer: Rasterizer<number>;
@@ -311,8 +311,22 @@ export class ArtEditorImpl implements ArtEditor {
     return workplane((canvas, width, height) => {
       this.previewRect = () => [width, height];
       this.centerPic();
+      const ctx2d = notNull(canvas.getContext('2d'));
       return this.values.handle([this.ctxScaleOff, this.currentFrameInfo, this.superSample, this.repeat, this.currentPlu],
-        ([ctx, info, ss, repeat, plu]) => {/*this.previewRenderer.draw(canvas, ctx, info, plu, ss, repeat)*/ }
+        ([ctx, r, ss, repeat, plu]) => {
+          ctx2d.fillStyle = 'black';
+          ctx2d.strokeStyle = 'white';
+          ctx2d.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+
+          const scaledW = int(r.info.w * ctx.scale);
+          const scaledH = int(r.info.h * ctx.scale);
+
+          const plued = transform(art(r.info), x => plu[x]);
+          const img = resize(plued, scaledW, scaledH);
+          const x = ctl.x - int(((frameInfo.attrs.xoff | 0) + frameInfo.w / 2) * ctl.scale);
+          const y = ctl.y - int(((frameInfo.attrs.yoff | 0) + frameInfo.h / 2) * ctl.scale);
+          drawToCanvas(rect(img, - x, - y, this.view.width - x, this.view.height - y, 0), ctx, this.rasterizer);
+        }
       );
     });
   }
@@ -338,7 +352,7 @@ export class ArtEditorImpl implements ArtEditor {
 
   imageInfoRenderer(): WorkplaneBuilder {
     return workplane((canvas, w, h) => {
-      const render = (pal: Uint8Array, frameInfo: RenderInfo, plu: Function<number, number>) => {
+      const render = (pal: Uint8Array, frameInfo: RenderInfo, plu: Fn<number, number>) => {
         const ctx = notNull(canvas.getContext('2d'));
         ctx.clearRect(0, 0, w, h);
 

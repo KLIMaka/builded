@@ -3,7 +3,7 @@ import { getOrDefaultF } from "ts-utils/collections";
 import { iter } from "ts-utils/iter";
 import { nextpow2 } from "ts-utils/mathutils";
 import { asyncMapOptional } from "ts-utils/objects";
-import { BiConsumer, BiFunction, Consumer, Function, identity, MultiConsumer, MultiFunction } from "ts-utils/types";
+import { BiConsumer, BiFn, Consumer, Fn, identity, MultiConsumer, MultiFn } from "ts-utils/types";
 
 
 /*
@@ -88,6 +88,8 @@ export function createScripFile(name: string, buf: ArrayBuffer): ScriptFile {
 export class ScriptFile {
   private textPtr = 0;
   private decoder = new TextDecoder();
+  private lastToken = '';
+  private lastTextPtr = 0;
 
   constructor(
     private name: string,
@@ -109,8 +111,10 @@ export class ScriptFile {
   }
 
   skipOverWs() {
-    if (!this.isEof() && this.text[this.textPtr] === 0)
+    if (!this.isEof() && this.text[this.textPtr] === 0) {
       this.textPtr++;
+      this.lastTextPtr++;
+    }
   }
 
   skipOverToken() {
@@ -138,12 +142,17 @@ export class ScriptFile {
     return ptr;
   }
 
+  stepBack(): void {
+    this.textPtr = this.lastTextPtr;
+  }
+
   getToken(): string {
     this.skipOverWs();
     if (this.isEof()) return '';
-    const start = this.textPtr;
+    const start = this.lastTextPtr = this.textPtr;
     this.skipOverToken();
-    return this.decoder.decode(this.text.subarray(start, this.textPtr));
+    this.lastToken = this.decoder.decode(this.text.subarray(start, this.textPtr));
+    return this.lastToken;
   }
 
   * getTokens(): Generator<string> {
@@ -156,7 +165,7 @@ export class ScriptFile {
     if (this.getToken() !== '}') throw new Error();
   }
 
-  async parse<T>(ctx: T, parser: BiFunction<ScriptFile, T, Promise<void>>, braced = false): Promise<T> {
+  async parse<T>(ctx: T, parser: BiFn<ScriptFile, T, Promise<void>>, braced = false): Promise<T> {
     const end = (braced) ? this.getBraces() : this.text.length;
     this.skipOverWs();
     while (this.textPtr < end) {
@@ -167,28 +176,37 @@ export class ScriptFile {
     return ctx;
   }
 
-  parseBraced<T>(ctx: T, parser: BiFunction<ScriptFile, T, Promise<void>>) {
+  async parseUntil<T>(ctx: T, parser: BiFn<ScriptFile, T, Promise<void>>, endToken: string): Promise<T> {
+    this.skipOverWs();
+    while (this.lastToken !== endToken) {
+      await parser(this, ctx);
+      this.skipOverWs();
+    }
+    return ctx;
+  }
+
+  parseBraced<T>(ctx: T, parser: BiFn<ScriptFile, T, Promise<void>>) {
     return this.parse(ctx, parser, true);
   }
 }
 
 type Parser<C, T extends any[]> = {
   tokenAliases: string[],
-  argsParser: BiFunction<ScriptFile, C, T>,
-  processor: MultiFunction<[ScriptFile, C, ...T], Promise<void>>
+  argsParser: BiFn<ScriptFile, C, T>,
+  processor: MultiFn<[ScriptFile, C, ...T], Promise<void>>
 }
 
 export function rule<C, T extends any[]>(
   tokenAliases: string[],
-  argsParser: BiFunction<ScriptFile, C, T>,
-  processor: MultiFunction<[ScriptFile, C, ...T], Promise<void>>
+  argsParser: BiFn<ScriptFile, C, T>,
+  processor: MultiFn<[ScriptFile, C, ...T], Promise<void>>
 ): Parser<C, T> {
   return { tokenAliases, argsParser, processor }
 }
 
 export function simpleRule<C, T extends any[]>(
   tokenAliases: string[],
-  argsParser: BiFunction<ScriptFile, C, T>,
+  argsParser: BiFn<ScriptFile, C, T>,
   compositor: MultiConsumer<[C, ...T]>
 ): Parser<C, T> {
   const processor = async (_sf: ScriptFile, ctx: C, ...args: T) => compositor(ctx, ...args);
@@ -197,10 +215,10 @@ export function simpleRule<C, T extends any[]>(
 
 export function nestedRule<C, NC, T extends any[]>(
   tokenAliases: string[],
-  argsParser: BiFunction<ScriptFile, C, T>,
-  nestedCtxFactory: MultiFunction<[C, ...T], NC>,
+  argsParser: BiFn<ScriptFile, C, T>,
+  nestedCtxFactory: MultiFn<[C, ...T], NC>,
   compositor: MultiConsumer<[C, NC]>,
-  nestedParser: BiFunction<ScriptFile, NC, Promise<void>>,
+  nestedParser: BiFn<ScriptFile, NC, Promise<void>>,
 ): Parser<C, T> {
   const processor = async (sf: ScriptFile, ctx: C, ...args: T) => compositor(ctx, await sf.parseBraced(nestedCtxFactory(ctx, ...args), nestedParser));
   return { tokenAliases, argsParser, processor }
@@ -211,27 +229,24 @@ function resolve(ctx: HasSymbols, token: string): number {
   return getOrDefaultF(ctx.symbols, token, t => Number.parseInt(t))
 }
 
-export function tuple<C, T extends any[]>(...parsers: { [P in keyof T]: BiFunction<ScriptFile, C, T[P]> }): BiFunction<ScriptFile, C, T> {
+export function tuple<C, T extends any[]>(...parsers: { [P in keyof T]: BiFn<ScriptFile, C, T[P]> }): BiFn<ScriptFile, C, T> {
   return (sf, ctx) => [...parsers.map(p => p(sf, ctx))] as T
 }
 
-export function tokens(): Function<ScriptFile, [Iterable<string>]> {
-  return sf => [sf.getTokens()];
-}
-
-export function symbols<C extends HasSymbols>(): BiFunction<ScriptFile, C, [Iterable<number>]> {
+export function symbols<C extends HasSymbols>(): BiFn<ScriptFile, C, [Iterable<number>]> {
   return (sf, ctx) => [sf.getTokens().map(t => resolve(ctx, t))];
 }
 
-export function rules<C>(...rules: Parser<C, any>[]): BiFunction<ScriptFile, C, Promise<void>> {
+export function rules<C>(...rules: Parser<C, any>[]): BiFn<ScriptFile, C, Promise<void>> {
   return async (sf, ctx) => {
     const token = sf.getToken();
     await iter(rules).first(r => r.tokenAliases.includes(token))
-      .map(r => r.processor(sf, ctx, ...r.argsParser(sf, ctx))).orElse(Promise.resolve())
+      .map(r => r.processor(sf, ctx, ...r.argsParser(sf, ctx)))
+      .orElse(Promise.resolve())
   }
 }
 
-export function rulesInclude<C>(includer: Function<string, Promise<Optional<ArrayBuffer>>>, files: Set<String>, ...rules: Parser<C, any[]>[]): BiFunction<ScriptFile, C, Promise<void>> {
+export function rulesInclude<C>(includer: Fn<string, Promise<Optional<ArrayBuffer>>>, files: Set<String>, ...rules: Parser<C, any[]>[]): BiFn<ScriptFile, C, Promise<void>> {
   const includeParser = async (sf: ScriptFile, ctx: C, inc: string) => {
     files.add(inc);
     const file = await includer(inc);
@@ -255,11 +270,11 @@ export function token(sf: ScriptFile, ctx: any) { return sf.getToken() }
 export function number(sf: ScriptFile, ctx: any) { return Number.parseFloat(sf.getToken()) }
 export function symbol<C extends HasSymbols>(sf: ScriptFile, ctx: C) { return resolve(ctx, sf.getToken()) }
 
-export function compositor<C, D, T, T1>(dst: Function<C, D>, action: BiConsumer<D, T1>, transformer: Function<T, T1>): BiConsumer<C, T> {
+export function compositor<C, D, T, T1>(dst: Fn<C, D>, action: BiConsumer<D, T1>, transformer: Fn<T, T1>): BiConsumer<C, T> {
   return (ctx, value) => action(dst(ctx), transformer(value));
 }
 
-export function setTransformed<C, K extends keyof C, T>(field: K, t: Function<T, C[K]>): BiConsumer<C, T> {
+export function setTransformed<C, K extends keyof C, T>(field: K, t: Fn<T, C[K]>): BiConsumer<C, T> {
   return (ctx, value) => ctx[field] = t(value);
 }
 
@@ -273,7 +288,7 @@ export function setBool<C, K extends BoolFields<C>>(field: K): Consumer<C> {
   return ctx => (ctx[field] as boolean) = true;
 }
 
-export function pushTransformed<C, D extends Array<T>, T, T1>(dst: Function<C, D>, t: Function<T1, T>): BiConsumer<C, T1> {
+export function pushTransformed<C, D extends Array<T>, T, T1>(dst: Fn<C, D>, t: Fn<T1, T>): BiConsumer<C, T1> {
   return (ctx, value) => dst(ctx).push(t(value))
 }
 
@@ -285,12 +300,12 @@ export function pushField<C, D extends C[K] & Array<T>, K extends keyof C, T>(fi
   return pushTransformed(c => c[field] as D, identity())
 }
 
-export function pushFieldTransformed<C, D extends C[K] & Array<T>, K extends keyof C, T, T1>(field: K, t: Function<T1, T>): BiConsumer<C, T1> {
+export function pushFieldTransformed<C, D extends C[K] & Array<T>, K extends keyof C, T, T1>(field: K, t: Fn<T1, T>): BiConsumer<C, T1> {
   return pushTransformed(c => c[field] as D, t)
 }
 
 export const self = identity;
-export function field<C, K extends keyof C>(field: K): Function<C, C[K]> { return ctx => ctx[field] }
+export function field<C, K extends keyof C>(field: K): Fn<C, C[K]> { return ctx => ctx[field] }
 
 export function mapSet<K, V, C extends Map<K, V>>(): MultiConsumer<[C, K, V]> {
   return (ctx, k, v) => ctx.set(k, v)

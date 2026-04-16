@@ -12,5 +12,17 @@ uniform Engine {
   uint parallaxPics;
   uint grid;
   vec2 screenSize;
-  vec3 curpos;
 };
+
+vec3 curpos() {
+  return (IV * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+}
+
+vec3 forward() {
+  return (IV * vec4(0.0, 0.0, -1.0, 0.0)).xyz;
+}
+
+vec3 leftSide() {
+  return -(IV * vec4(1.0, 0.0, 0.0, 0.0)).xyz;
+}
+

@@ -1,16 +1,16 @@
-import { Disconnector, Value, value } from "ts-utils/callbacks";
-import { getInstances, Module, Plugin, provider } from "ts-utils/injector";
+import { Action, ACTION_DESCRIPTORS, ActionDescriptors, StateChecker } from "app/apis/actions";
+import { App, APP } from "app/apis/app";
+import { UI, Ui, Window } from "app/apis/ui";
+import { VALUES } from "app/apis/values";
+import * as React from 'react';
+import { Fragment } from 'react';
+import { createRoot } from "react-dom/client";
+import { Disconnector, Value, ValuesContainer } from "ts-utils/callbacks";
+import { getInstances, lifecycle, Module, Plugin } from "ts-utils/injector";
 import { iter } from "ts-utils/iter";
 import { Consumer } from "ts-utils/types";
-import { ACTION_DESCRIPTORS, Action, ActionDescriptors, StateChecker } from "app/apis/actions";
-import { UI, Ui, Window } from "app/apis/ui";
-import * as React from 'react';
-import { Fragment, StrictMode } from 'react';
-import { createRoot } from "react-dom/client";
 import 'winbox/dist/css/winbox.min.css';
-import { ActionDescriptorsContext, ActionsChannelContext, ActionsCollector, ActionsNode, CurrentActionsChannelContext, useValue, ValuesContext } from "./commons";
-import { App, APP } from "app/apis/app";
-import { VALUES, Values } from "app/apis/values";
+import { ActionsChannelContext, ActionsCollector, ActionsNode, UiContext, useValue } from "./commons";
 
 
 function WindowsStackImpl({ windowsValue }: { windowsValue: Value<Map<Window, WindowDescriptor>> }) {
@@ -19,18 +19,14 @@ function WindowsStackImpl({ windowsValue }: { windowsValue: Value<Map<Window, Wi
     .collect();
 }
 
-function WindowsStack(windowsValue: Value<Map<Window, WindowDescriptor>>, actionDescriptors: ActionDescriptors, currentActions: Consumer<ActionsNode>, actions: ActionsNode, values: Values) {
+function WindowsStack(windowsValue: Value<Map<Window, WindowDescriptor>>, actionDescriptors: ActionDescriptors, currentActions: Consumer<ActionsNode>, actions: ActionsNode) {
   return (
     // <StrictMode>
-    <ValuesContext.Provider value={values}>
-      <ActionDescriptorsContext.Provider value={actionDescriptors}>
-        <CurrentActionsChannelContext.Provider value={currentActions}>
-          <ActionsChannelContext.Provider value={actions}>
-            <WindowsStackImpl windowsValue={windowsValue} />
-          </ActionsChannelContext.Provider>
-        </CurrentActionsChannelContext.Provider>
-      </ActionDescriptorsContext.Provider>
-    </ValuesContext.Provider>
+    <UiContext.Provider value={{ currentActions, actionDescriptors }}>
+      <ActionsChannelContext.Provider value={actions}>
+        <WindowsStackImpl windowsValue={windowsValue} />
+      </ActionsChannelContext.Provider>
+    </UiContext.Provider>
     // </StrictMode>
   )
 }
@@ -42,7 +38,7 @@ type WindowDescriptor = {
 }
 
 class ReactUi implements Ui {
-  private windows = value<Map<Window, WindowDescriptor>>('windows', new Map());
+  private windows: Value<Map<Window, WindowDescriptor>>;
   private lastId = 0;
   private globalUiActions = new ActionsNode('global', null);
   private currentActions: ActionsNode | null = null;
@@ -51,10 +47,11 @@ class ReactUi implements Ui {
   constructor(
     private actionDescriptors: ActionDescriptors,
     private app: App,
-    private values: Values,
+    private localValues: ValuesContainer,
   ) {
+    this.windows = localValues.value<Map<Window, WindowDescriptor>>('windows', new Map());
     createRoot(this.createDesktop())
-      .render(WindowsStack(this.windows, this.actionDescriptors, a => this.setCurrentActions(a), this.globalUiActions, this.values))
+      .render(WindowsStack(this.windows, this.actionDescriptors, a => this.setCurrentActions(a), this.globalUiActions))
   }
 
   private setCurrentActions(node: ActionsNode) {
@@ -94,10 +91,14 @@ class ReactUi implements Ui {
   private createDescriptor(window: Window): WindowDescriptor {
     const disconnectors = [
       window.onClose(() => this.removeWindow(window)),
-      window.onFocus(() => this.focusedWindow = window)
+      window.onFocus(() => this.focus(window))
     ];
     const id = this.lastId++;
     return { id, modalParent: this.focusedWindow, disconnectors }
+  }
+
+  private focus(window:Window) {
+    this.focusedWindow = window;
   }
 
   removeWindow(window: Window): void {
@@ -109,9 +110,10 @@ class ReactUi implements Ui {
   }
 }
 
-const ReactUiConstructor: Plugin<Ui> = provider(async injector => {
+export const ReactUiConstructor: Plugin<Ui> = lifecycle(async (injector, lifecycle) => {
   const [descriptors, app, values] = await getInstances(injector, ACTION_DESCRIPTORS, APP, VALUES);
-  return new ReactUi(descriptors, app, values);
+  const localValues = lifecycle(values.create('ui'), v => v.dispose());
+  return new ReactUi(descriptors, app, localValues);
 });
 
 export function ReactUiModule(module: Module) {

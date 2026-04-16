@@ -1,6 +1,6 @@
 import { iter } from "ts-utils/iter";
 import { DefaultScheduler } from "ts-utils/scheduler";
-import { Consumer, Function, nil, notUndefined } from "ts-utils/types";
+import { Consumer, Fn, nil, notUndefined } from "ts-utils/types";
 import { App, BatchTask, Cache, DebouncedTask, DelayedTask, FrameTask, PeriodicTask, Timer } from "../../../apis/app";
 import { DefaultLogger } from "./logger";
 import { DefaultStorages } from "./storage";
@@ -134,7 +134,7 @@ function createTimer(): Timer {
 function createCache(): Cache {
   const map = new Map<string, WeakRef<any>>();
   const get = <T>(name: string) => map.get(name)?.deref() as T | undefined;
-  const getOrCreate = (name: string, factory: Function<string, any>) => {
+  const getOrCreate = (name: string, factory: Fn<string, any>) => {
     const value = map.get(name);
     if (value === undefined || value.deref() === undefined) {
       const nvalue = factory(name);

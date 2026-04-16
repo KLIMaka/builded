@@ -4,7 +4,7 @@ import { any, findFirst, interpolate, intersect, range } from "ts-utils/collecti
 import { LinearInterpolator } from "ts-utils/interpolator";
 import { iter } from "ts-utils/iter";
 import { clamp, cross2d, int, len2d } from "ts-utils/mathutils";
-import { BiConsumer, Function } from "ts-utils/types";
+import { BiConsumer, Fn } from "ts-utils/types";
 import { slope } from "../utils";
 import { connectedWalls, sectorWalls } from "./loops";
 import { DEFAULT_REPEAT_RATE } from "./mutations/internal";
@@ -222,7 +222,7 @@ function findSectorAll(board: Board, x: number, y: number, z: number): FindSecto
   return findFirst(range(0, board.numsectors), s => inSector(board, x, y, s)).map(sec => ({ x, y, z, sec })).orElse({ x, y, z, sec: -1 });
 }
 
-export function snapWall(board: Board, wallId: number, x: number, y: number, snap: Function<number, number>) {
+export function snapWall(board: Board, wallId: number, x: number, y: number, snap: Fn<number, number>) {
   if (!isValidWallId(board, wallId)) throw new Error(`Invalid wallId: ${wallId}`);
   const wall = board.walls[wallId];
   const w1 = nextwall(board, wallId);
@@ -239,7 +239,7 @@ export function snapWall(board: Board, wallId: number, x: number, y: number, sna
   return [xs, ys];
 }
 
-export function panScale(board: Board, wallId: number, art: Function<number, ArtInfo>): [number, number] {
+export function panScale(board: Board, wallId: number, art: Fn<number, ArtInfo>): [number, number] {
   const wall = board.walls[wallId];
   const info = art(wall.picnum);
   return [1 / 16, 16 / info.h]

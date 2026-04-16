@@ -7,8 +7,8 @@ import WinBox, { WinBoxPropType } from "react-winbox";
 import { Disposable, Source, Value, ValuesContainer, ValuesMap } from "ts-utils/callbacks";
 import { getOrCreate } from "ts-utils/collections";
 import { Id, UniqueIds } from "ts-utils/objects";
-import { Consumer, Function, notNull, seq, Supplier } from "ts-utils/types";
-import { ActionsChannelContext, CurrentActionsChannelContext, ValuesContainerContext } from "./commons";
+import { Consumer, Fn, notNull, seq, Supplier } from "ts-utils/types";
+import { ActionsChannelContext, UiContext, ValuesContainerContext } from "./commons";
 
 class WindowImpl implements Window {
   constructor(
@@ -144,7 +144,7 @@ export class WindowBuilder {
     return this;
   }
 
-  actionsFactory(factory: Function<ActionDescriptors, Action[]>): this {
+  actionsFactory(factory: Fn<ActionDescriptors, Action[]>): this {
     return this.actions(factory(this.actionDescriptors.sub(this.name)));
   }
 
@@ -198,7 +198,7 @@ export class WindowBuilder {
 
 function WindowCommon(props: { builder: WindowBuilder, windowConsumer: Consumer<WinBox>, children: ReactElement }) {
   const winRef = useRef<WinBox>(null);
-  const currentActions = useContext(CurrentActionsChannelContext);
+  const { currentActions } = useContext(UiContext);
   const actionsChannel = useContext(ActionsChannelContext);
   const channel = actionsChannel.child(props.builder.uniqueName);
 

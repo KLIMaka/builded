@@ -21,7 +21,7 @@ export class Controller3D {
     this.mousePos = values.valueBuilder<vec2>({ name: 'mousePos', value: vec2.create(), eq: vec2.exactEquals });
     this.fovRad = values.value('fovRad', deg2rad(90))
     this.aspect = values.transformed('aspect', this.size, ([w, h]) => w / h);
-    this.projection = values.transformedTuple('projection', [this.fovRad, this.aspect], ([fov, aspect]) => mat4.perspective(mat4.create(), fov, aspect, 1, null));
+    this.projection = values.transformedTuple('projection', [this.fovRad, this.aspect], ([fov, aspect]) => mat4.perspective(mat4.create(), fov, aspect, 1, Number.POSITIVE_INFINITY));
     this.forwardMouse = values.transformedTuple('forwardMouse', [this.mousePos, this.size, this.projection, this.camera.transform, this.camera.position], ([[mx, my], [w, h], proj, trans, pos]) => {
       const x = (mx / w) * 2 - 1;
       const y = (my / h) * 2 - 1;

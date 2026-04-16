@@ -7,7 +7,7 @@ import { ArtFile, ArtInfo, EMPTY_INFO } from "../../build/formats/art";
 import { VoxelData } from "build/formats/kvx";
 import Optional from "optional-js";
 import { FileSystem } from "./fs";
-import { BiConsumer, Consumer, Function } from "ts-utils/types";
+import { BiConsumer, Consumer, Fn } from "ts-utils/types";
 import { vec3 } from "gl-matrix";
 import { Draft } from "immer";
 import { SpriteDescriptor } from "build/sprites";
@@ -61,8 +61,8 @@ export type EngineContext<B extends Board = Board> = Readonly<{
   shadowsteps: Source<number>,
   aliases: Source<Aliases>,
   spriteVoxelSwap: Source<VoxelSwap>,
-  blends: Source<Function<number, GlBlend>>,
-  parallaxInfo: Function<number, number>;
+  blends: Source<Fn<number, GlBlend>>,
+  parallaxInfo: Fn<number, number>;
 
   loadBoard(stream: Stream, name?: string): Promise<BoardContext<B>>;
 }> & Disposable;
@@ -115,9 +115,9 @@ export type BoardData<B extends Board = Board> = {
   ror: BuildRor,
   tror: BuildTror,
   parallaxPicnums: number,
-  sectorSettings: Function<number, SectorSettings>,
-  spritesBySector: Function<number, number[] | undefined>,
-  spriteDescriptor: Function<number, SpriteDescriptor | undefined>,
+  sectorSettings: Fn<number, SectorSettings>,
+  spritesBySector: Fn<number, number[] | undefined>,
+  spriteDescriptor: Fn<number, SpriteDescriptor | undefined>,
 }
 
 export type BoardContext<B extends Board = Board> = Readonly<{

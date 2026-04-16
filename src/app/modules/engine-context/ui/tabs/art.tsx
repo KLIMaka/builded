@@ -1,4 +1,4 @@
-import { ActionButton, ActionDescriptorsContext, Column, FieldValue, NonwrapLabel, Row, useValuesContainer } from "@ui/commons";
+import { ActionButton, Column, FieldValue, NonwrapLabel, Row, UiContext, useValuesContainer } from "@ui/commons";
 import { column, singleSelectionModel, TypedTableCellProps, VirtualTable, VirtualTableColumn } from "@ui/table";
 import React, { useContext } from "react";
 import { sum } from "ts-utils/mathutils";
@@ -48,7 +48,7 @@ export function ArtsInfoView({ info, editor }: { info: EngineInfo, editor: Edito
       .filter(a => a.h === 0 || a.w === 0)
       .length
   })));
-  const actionDescriptors = useContext(ActionDescriptorsContext);
+  const { actionDescriptors } = useContext(UiContext);
   const ctx = actionDescriptors.sub('arts');
   const artEditorAction = ctx.bind('art-editor', () => editor.openArtEditor(info.ctx));
 

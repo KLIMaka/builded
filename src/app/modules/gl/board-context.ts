@@ -7,14 +7,14 @@ import { BoardContext } from "app/apis/engine";
 import { Sector, Sprite, Wall } from "build/board/structs";
 import { sectorStruct, spriteStruct, wallStruct } from "build/maploader";
 import { point2d, triangulate } from "./geometry/builders/sector";
-import { Function } from "ts-utils/types";
+import { Fn } from "ts-utils/types";
 
 
 export type BoardGlContext = Readonly<{
   walls: WebGLTexture;
   sprites: WebGLTexture;
   sectors: WebGLTexture;
-  sectorPoints: Source<Function<number, point2d[]>>
+  sectorPoints: Source<Fn<number, point2d[]>>
 }> & Disposable;
 
 function createTexture(gl: WebGL2RenderingContext, tex: WebGLTexture) {
@@ -69,7 +69,7 @@ export function createBoardGlContext(values: ValuesContainer, glCtx: GlContext, 
   const onSectorsDisconnector = boardCtx.onSectorsChange((b, s) => s.forEach(s => applyNotNullish(b.board.sectors[s], sec => writeSector(s, sec))));
   const onWallsDisconnector = boardCtx.onWallsChange((b, w) => w.forEach(w => applyNotNullish(b.board.walls[w], wall => writeWall(w, wall))));
   const onSpritesDisconnector = boardCtx.onSpritesChange((b, s) => s.forEach(s => applyNotNullish(b.board.sprites[s], spr => writeSprite(s, spr))));
-  const board = boardCtx.data.get().board;
+  const { board } = boardCtx.data.get();
   board.sectors.forEach((s, i) => writeSector(i, s));
   board.sprites.forEach((s, i) => writeSprite(i, s));
   board.walls.forEach((w, i) => writeWall(i, w));

@@ -12,7 +12,7 @@ import { getInstances, Plugin, provider } from "ts-utils/injector";
 import { iter } from "ts-utils/iter";
 import { asyncMapOptional, strcmpci as streqci } from "ts-utils/objects";
 import { Stream } from "ts-utils/stream";
-import { BiFunction, Function, identity, nil, notUndefined, Result, resultAsync, seq, SingleTuple } from "ts-utils/types";
+import { BiFn, Fn, identity, nil, notUndefined, Result, resultAsync, seq, SingleTuple } from "ts-utils/types";
 import { App, APP, Disconnector, Storage, Storages, Timer } from "../../apis/app";
 import { DirectoryFileSystemHandle, FileFileSystemHandle, FileInfo, FileSource, FileSystem, FileSystemHandle, FileSystemHandler, FileSystems, HttpFileSystemHandle, MemoryFileSystemHandle, SerializedFileSystemHandle, StackFileSystemHandle, StorageFileSystemHandle, WritableFileSystem } from "../../apis/fs";
 import { selectStorageFs } from "./ui/select-storage";
@@ -54,8 +54,8 @@ class FileSystemHandleImpl<T extends SerializedFileSystemHandle> implements File
   constructor(
     public name: string,
     public serialized: T,
-    private doOpen: Function<FileSystemHandle, Promise<FileSystem>>,
-    private isSame: Function<FileSystemHandle, Promise<boolean>>
+    private doOpen: Fn<FileSystemHandle, Promise<FileSystem>>,
+    private isSame: Fn<FileSystemHandle, Promise<boolean>>
   ) { }
 
   async open(): Promise<Result<FileSystem>> {
@@ -124,7 +124,7 @@ class FileSystemsImpl implements FileSystems {
     )
   }
 
-  private createFile(serialized: FileFileSystemHandle, factory: Function<File, Promise<FileSystem>>): FileSystemHandle {
+  private createFile(serialized: FileFileSystemHandle, factory: Fn<File, Promise<FileSystem>>): FileSystemHandle {
     return new FileSystemHandleImpl(
       serialized.handle.name,
       serialized,
@@ -244,7 +244,7 @@ class StackFs extends BaseFS implements FileSystem {
     super('stack', 'stack')
   }
 
-  private async call<T>(call: Function<FileSystem, Promise<Optional<T>>>): Promise<Optional<T>> {
+  private async call<T>(call: Fn<FileSystem, Promise<Optional<T>>>): Promise<Optional<T>> {
     const top = await call(this.top);
     if (top.isPresent()) return top;
     return call(this.bottom);
@@ -410,6 +410,7 @@ class LocalFS extends BaseFS implements FileSystem, WritableFileSystem, FileSour
   }
 
   private async tryGetFile(file: string): Promise<Optional<File>> {
+    if (file.length === 0) return Optional.empty();
     try {
       const handle = await this.getChain(this.directoryHandle, file.split('/'));
       const content = await handle.getFile();
@@ -637,15 +638,15 @@ export async function watchFile(values: ValuesContainer, name: string, fs: Sourc
 
 export function trackFiles<Args extends any[], T>(
   files: Iterable<string>,
-  selector: Function<SingleTuple<Args>, FileSystem>,
-  reloader: Function<SingleTuple<Args>, Promise<T>>
-): BiFunction<SingleTuple<Args>, BaseValue<T>, Disconnector> {
+  selector: Fn<SingleTuple<Args>, FileSystem>,
+  reloader: Fn<SingleTuple<Args>, Promise<T>>
+): BiFn<SingleTuple<Args>, BaseValue<T>, Disconnector> {
   return (fs, value) => selector(fs).subscribe((changed, _) => {
     if (iter(files).all(f => !streqci(f, changed))) return;
     value.setPromiseOrDispose(_ => reloader(fs))
   })
 }
 
-export function trackFilesSingle<T>(files: Iterable<string>, reloader: Function<FileSystem, Promise<T>>): BiFunction<FileSystem, BaseValue<T>, Disconnector> {
+export function trackFilesSingle<T>(files: Iterable<string>, reloader: Fn<FileSystem, Promise<T>>): BiFn<FileSystem, BaseValue<T>, Disconnector> {
   return trackFiles<[FileSystem], T>(files, identity(), reloader);
 }

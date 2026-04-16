@@ -1,5 +1,5 @@
 import { Dependency } from "ts-utils/injector";
-import { Function, Result, Supplier } from "ts-utils/types";
+import { Fn, Result, Supplier } from "ts-utils/types";
 import Optional from "optional-js";
 import { Disconnector } from "./app";
 import { Disposable } from "ts-utils/callbacks";
@@ -42,7 +42,7 @@ export type SerializedFileSystemHandle = MemoryFileSystemHandle | StorageFileSys
 export type FileSystemHandle = {
   name: string,
   open: Supplier<Promise<Result<FileSystem>>>,
-  isSameEntry: Function<FileSystemHandle, Promise<boolean>>
+  isSameEntry: Fn<FileSystemHandle, Promise<boolean>>
   serialized: SerializedFileSystemHandle
 }
 export interface FileSystems {

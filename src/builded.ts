@@ -11,7 +11,7 @@ import { FS_MANAGER, FileSystemsManagerModule as FileSystemsManagerConstructor }
 import { DefaultGlContextConstructor } from "app/modules/gl/gl-context";
 import { createRectifier } from "app/modules/rectifier/ui/rectifier";
 import { createSettings } from "app/modules/settings/settings";
-import { ReactUiModule } from "app/modules/ui/react-ui";
+import { ReactUiConstructor } from "app/modules/ui/react-ui";
 import { enableMapSet, enablePatches } from "immer";
 import { App as AppInjector, Dependency, getInstances, provider } from "ts-utils/injector";
 import { iter } from "ts-utils/iter";
@@ -21,9 +21,6 @@ import { DefaultAppConstructor } from "./app/modules/default/app/app";
 import { DefaultLifecycleListener } from "./app/modules/default/lifecycle-listener";
 import { DefaultFileSystemsConstructor, GLOBAL_FS_HANDLERS } from "./app/modules/fs/fs";
 
-const injector = new AppInjector(new DefaultLifecycleListener(() => performance.now(), DefaultLogger()));
-enableMapSet();
-enablePatches();
 
 
 function gtBind(l: Action, r: Action): Action {
@@ -39,13 +36,17 @@ const kbe = (handler: (key: string) => boolean) => (e: KeyboardEvent) => {
   }
 }
 
+enableMapSet();
+enablePatches();
+
+const injector = new AppInjector(new DefaultLifecycleListener(() => performance.now(), DefaultLogger()));
 injector.bind(APP, DefaultAppConstructor('App'));
 injector.bind(ACTION_DESCRIPTORS, DefaultActionsConstructor);
 injector.bind(FS_MANAGER, FileSystemsManagerConstructor);
 injector.bind(FS, DefaultFileSystemsConstructor);
 injector.bind(VALUES, DefaultValuesConstructor);
 injector.bind(GL_CONTEXT, DefaultGlContextConstructor);
-injector.install(ReactUiModule);
+injector.bind(UI, ReactUiConstructor);
 
 injector.bind(new Dependency<void>("", true), provider(async i => {
   const [ui, actions, fsManager, app] = await getInstances(i, UI, ACTION_DESCRIPTORS, FS_MANAGER, APP);
@@ -73,23 +74,24 @@ injector.bind(new Dependency<void>("", true), provider(async i => {
     .orElse(false)
 
   const ctl = new InputController();
+  const updateStataes = () => iter(ui.states()).forEach(s => s.action(ctl.isPressed(s.bind)));
   const keyup = kbe(key => {
     ctl.update(key, false);
-    iter(ui.states()).forEach(s => s.action(ctl.isPressed(s.bind)));
-    return false
+    updateStataes();
+    return false;
   });
   const keydown = kbe(key => {
     ctl.update(key, true);
-    iter(ui.states()).forEach(s => s.action(ctl.isPressed(s.bind)));
+    updateStataes();
     return handle();
   });
   const mouseup = (e: MouseEvent) => {
     ctl.update(`mouse${e.button}`, false);
-    iter(ui.states()).forEach(s => s.action(ctl.isPressed(s.bind)));
+    updateStataes();
   }
   const mousedown = (e: MouseEvent) => {
     ctl.update(`mouse${e.button}`, true);
-    iter(ui.states()).forEach(s => s.action(ctl.isPressed(s.bind)));
+    updateStataes();
   }
   const wheel = (e: WheelEvent) => {
     const key = e.deltaY > 0 ? "wheelup" : "wheeldown";

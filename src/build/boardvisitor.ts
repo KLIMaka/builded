@@ -1,4 +1,4 @@
-import { Function } from 'ts-utils/types';
+import { Fn } from 'ts-utils/types';
 import { BoardData, BuildTror } from 'app/apis/engine';
 import { vec3 } from 'gl-matrix';
 import { Deck } from 'ts-utils/collections';

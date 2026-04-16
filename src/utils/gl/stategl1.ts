@@ -1,7 +1,7 @@
 import { Disposable } from "ts-utils/callbacks";
 import { getOrCreate } from "ts-utils/collections";
 import { iter } from "ts-utils/iter";
-import { Function, MultiConsumer, TypedArray } from "ts-utils/types";
+import { Fn, MultiConsumer, TypedArray } from "ts-utils/types";
 import { mat4 as gmlMat4 } from "gl-matrix";
 import Optional from "optional-js";
 import { match } from "ts-pattern";
@@ -155,7 +155,7 @@ class Buffer<T extends TypedArray> implements Disposable {
   }
 }
 
-export type BufferAllocatorFactory = Function<AttribScheme, BufferAllocator>;
+export type BufferAllocatorFactory = Fn<AttribScheme, BufferAllocator>;
 export class BufferAllocator implements Disposable {
 
   constructor(

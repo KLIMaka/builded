@@ -14,7 +14,7 @@ import { int, sum } from "ts-utils/mathutils";
 import { gen, NOOP_TASK_HANDLE } from "ts-utils/scheduler";
 import { Stream } from "ts-utils/stream";
 import { Packer, Rect } from "ts-utils/texcoordpacker";
-import { Consumer, first, Function, identity, notNull, notUndefined, pair, second } from "ts-utils/types";
+import { Consumer, first, Fn, identity, notNull, notUndefined, pair, second } from "ts-utils/types";
 import { begin, tuple, Work } from "ts-utils/work";
 
 
@@ -52,16 +52,15 @@ export type EngineTextures = Readonly<{
   atlas: Source<WebGLTexture>,
   infos: Source<WebGLTexture>,
   art: Source<Map<number, ArtInfoExtended>>,
-  voxels: Source<Function<number, Optional<VoxelDrawData>>>,
+  voxels: Source<Fn<number, Optional<VoxelDrawData>>>,
 
   get(picnum: number, additional?: number): Source<number>,
 }> & Disposable;
 
 type AtlasRect = { rect: Rect, depth: number, uploaded: boolean }
 
-function createArtTextureWork(values: ValuesContainer, glCtx: GlContext, arts: Source<Map<number, ArtInfoExtended>>, parallaxInfo: Function<number, number>): Work<[], [Source<ArtTexture>]> {
-  const size = Math.min(4096, glCtx.gl.getParameter(glCtx.gl.MAX_TEXTURE_SIZE));
-  let packers: Packer[] = [];
+function createPacker(size: number) {
+  const packers: Packer[] = [];
   const pack = (w: number, h: number): AtlasRect => iter(packers)
     .enumerate()
     .map(([p, depth]) => ({ depth, rect: p.pack(w, h), uploaded: false }))
@@ -75,19 +74,24 @@ function createArtTextureWork(values: ValuesContainer, glCtx: GlContext, arts: S
       packers.push(packer);
       return { depth, rect, uploaded };
     });
+  const depth = () => packers.length;
+  return { pack, depth };
+}
 
+function createArtTextureWork(values: ValuesContainer, glCtx: GlContext, arts: Source<Map<number, ArtInfoExtended>>, parallaxInfo: Fn<number, number>): Work<[], [Source<ArtTexture>]> {
+  const size = Math.min(4096, glCtx.gl.getParameter(glCtx.gl.MAX_TEXTURE_SIZE));
   let loadHandle = NOOP_TASK_HANDLE;
   async function loadTextures(arts: Map<number, ArtInfoExtended>): Promise<ArtTexture> {
-    packers = [];
+    const packer = createPacker(size);
     const whs = iter(arts)
       .filter(([_, a]) => a.w > 0 && a.h > 0)
       .map(([id, a]) => pair(id, pair(a.w, a.h)))
       .collect();
     whs.sort(([id1, [w1, h1]], [id2, [w2, h2]]) => - w1 * h1 + w2 * h2);
-    const jobs = iter(whs).map(([id, [w, h]]) => () => pair(id, pack(w, h))).collect();
+    const jobs = iter(whs).map(([id, [w, h]]) => () => pair(id, packer.pack(w, h))).collect();
     const results = await loadHandle.waitMaybe(gen(jobs, (_, i, total) => `Allocate Atlas (${i}/${total})`), 'Allocate Atlas');
     const rects = iter(results).toMap(first, second);
-    return new ArtTexture(glCtx, arts, size, size, rects, packers.length, parallaxInfo);
+    return new ArtTexture(glCtx, arts, size, size, rects, packer.depth(), parallaxInfo);
   }
 
   return begin()
@@ -110,7 +114,7 @@ class ArtTexture implements Disposable {
     private height: number,
     private rects: Map<number, AtlasRect>,
     private depth: number,
-    private parallaxInfo: Function<number, number>,
+    private parallaxInfo: Fn<number, number>,
   ) {
     const { gl, resource } = glCtx;
     this.atlasId = this.initAtlasTexture(gl, resource);
@@ -202,9 +206,9 @@ function getVoxel(picnum: number, cache: Map<number, [number, DisposableResource
 }
 
 export const createEngineTexturesWork = begin()
-  .multiInput<[EngineContext, GlContext, Values]>()
+  .multiInput<[EngineContext, GlContext, ValuesContainer]>()
   .thenWork((handle, engine, glCtx, values) =>
-    values.create('engine-textures').initializeAsync(async values => begin()
+    values.createChild('engine-textures').initializeAsync(async values => begin()
       .thenWorkPass(createArtTextureWork(values, glCtx, engine.artMap, engine.parallaxInfo))
       .then<EngineTextures>('Create Textures', async artTexture => {
         const { gl } = glCtx;

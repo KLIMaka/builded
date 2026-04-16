@@ -19,6 +19,7 @@ uniform highp usampler2D sectors;
 in uint aSpriteId_u16;
 
 out vec3 tc;
+out float lightOff;
 flat out ivec4 params;
 flat out pic_t picInfo;
 flat out float trans;
@@ -124,14 +125,7 @@ vec4 getFacePos(pic_t picInfo, sprite_t sprite) {
 // scaled_t scaled = scale(picInfo, sprite);
 // }
 
-void main() {
-  sprite_t sprite = loadSprite(sprites, aSpriteId_u16);
-  if ((sprite_cstat_type(sprite) == uint(0) || sprite_cstat_onesided(sprite)) && gl_VertexID > 3) {
-    gl_Position = vec4(0.0);
-    return;
-  }
-  sector_t sector = loadSector(sectors, sprite.sec);
-  picInfo = loadPicInfo(infos, sprite.picnum, float(aSpriteId_u16));
+ivec2 getShadePal(uint type, sprite_t sprite, sector_t sector) {
 #ifdef SPRITE_SHADOW_OFF
   int shade = sprite.shade + (sector_cstat_floorShade(sector.ceilingFloorCstat.y) 
     ? sector.ceilingFloorShade.y 
@@ -140,19 +134,40 @@ void main() {
       : sector.ceilingFloorShade.y);
   int pal = int(sprite.pal);
 #else
-  int shade = sprite_cstat_type(sprite) == uint(1)
+  int shade = type == SPRITE_TYPE_WALL
     ? sprite.shade
     : sector_cstat_parallaxing(sector.ceilingFloorCstat.x) 
       ? sector.ceilingFloorShade.x 
       : sector.ceilingFloorShade.y;
-  int pal = sector.ceilingFloorPal.y != uint(0) ? int(sector.ceilingFloorPal.y) : int(sprite.pal);
+  int pal = sector.ceilingFloorPal.y != SPRITE_TYPE_FACE ? int(sector.ceilingFloorPal.y) : int(sprite.pal);
 #endif
+  return ivec2(shade, pal);
+}
+
+float getLightOff(uint type, sprite_t sprite) {
+  if (type != SPRITE_TYPE_FACE) return 0.0;
+  vec2 toSprite = normalize(sprite.pos.xy - curpos().xz);
+  float diff = float(sprite.ang) / 2048.0 - ang(toSprite) + 0.5;
+  return diff + (IS_RIGHT ? .75 : .25);
+}
+
+void main() {
+  sprite_t sprite = loadSprite(sprites, aSpriteId_u16);
+  uint type = sprite_cstat_type(sprite);
+  if ((type == SPRITE_TYPE_FACE || sprite_cstat_onesided(sprite)) && gl_VertexID > 3) {
+    gl_Position = vec4(0.0);
+    return;
+  }
+  sector_t sector = loadSector(sectors, sprite.sec);
+  picInfo = loadPicInfo(infos, sprite.picnum, float(aSpriteId_u16));
+  ivec2 shadePal = getShadePal(type, sprite, sector);
   bool noSectorShade = sprite_cstat_noshade(sprite);
-  shade = noSectorShade ? sprite.shade : shade;
+  int shade = noSectorShade ? sprite.shade : shadePal.x;
   trans = sprite_cstat_translucent(sprite) ? (sprite_cstat_translucentReversed(sprite) ? TRANS1 : TRANS2) : 1.0;
-  params = ivec4(shade, pal, int(sector.visibility), -uint(16) -(aSpriteId_u16 % uint(16)));
+  params = ivec4(shade, shadePal.y, int(sector.visibility), -uint(16) -(aSpriteId_u16 % uint(16)));
   tc = getTc(sprite);
-  if (sprite_cstat_type(sprite) == uint(0)) gl_Position = getFacePos(picInfo, sprite);
-  else if (sprite_cstat_type(sprite) == uint(1)) gl_Position = getWallPos(picInfo, sprite);
-  else if (sprite_cstat_type(sprite) == uint(2)) gl_Position = getFloorPos(picInfo, sprite);
+  if (type == SPRITE_TYPE_FACE) gl_Position = getFacePos(picInfo, sprite);
+  else if (type == SPRITE_TYPE_WALL) gl_Position = getWallPos(picInfo, sprite);
+  else if (type == SPRITE_TYPE_FLOOR) gl_Position = getFloorPos(picInfo, sprite);
+  lightOff = getLightOff(type, sprite);
 }

@@ -23,14 +23,15 @@ import { getInstances, Injector } from "ts-utils/injector";
 import { iter } from "ts-utils/iter";
 import { sum } from "ts-utils/mathutils";
 import { field } from "ts-utils/objects";
-import { ProgressInfo, TaskController, TaskHandle, TaskValue } from "ts-utils/scheduler";
+import { TaskController, TaskHandle, TaskValue } from "ts-utils/scheduler";
 import { size } from "ts-utils/size";
-import { first, nil, Ok } from "ts-utils/types";
+import { first, nil, Ok, pair } from "ts-utils/types";
 import { begin, Work } from "ts-utils/work";
 import { EngineContextRecord, ENGINES } from "../engine-context-api";
 import { createEngine } from "./create-engine-context";
 import { ArtsInfoView } from "./tabs/art";
 import { MapsInfoView } from "./tabs/maps";
+import { getOrCreate } from "ts-utils/collections";
 
 const ID = 'engines-context';
 
@@ -74,8 +75,11 @@ export class Editor {
   readonly error: Value<Optional<Error>>;
   readonly engineItems: Source<ActionItem[]>;
   readonly currentEngineId: Value<number>;
+  readonly currentEngineRecord: Value<Optional<EngineContextRecord>>;
   readonly currentEngine: Value<Optional<TaskController<EngineInfo>>>;
   readonly actions: EngineContextEditorActions;
+
+  private ctxCache = new Map<EngineContextRecord, TaskController<EngineInfo>>();
 
   constructor(
     private localValues: ValuesContainer,
@@ -89,62 +93,63 @@ export class Editor {
     private injector: Injector,
   ) {
     this.engines = savedState.get('engines');
-    this.currentEngine = this.localValues.valueBuilder({ name: 'engine', value: Optional.empty(), disposer: ctr => ctr.map(ctr => ctr.end().then(r => r.onOk(info => info.dispose()))) });
-    this.error = this.localValues.value('error', Optional.empty());
     this.currentEngineId = localValues.value('selectedEngineId', -1);
+    this.currentEngineRecord = this.localValues.transformedTuple('engine-rec', [this.engines, this.currentEngineId], ([engines, id]) => Optional.ofNullable(engines[id]));
+    this.currentEngine = this.localValues.transformed('engine', this.currentEngineRecord, rec => rec.map(r => this.openRecord(r)));
+    this.error = this.localValues.value('error', Optional.empty());
     this.engineItems = this.createEngineItems('engineItems');
     this.actions = {};
-    this.localValues.addSubscribed(this.currentEngineId, id => this.onIdChange(id));
+    this.localValues.addSubscribed(this.currentEngineId, id => this.currentEngineRecord.set(Optional.of(this.engines.get()[id])));
   }
 
-  async onIdChange(idx: number) {
-    const rec = this.engines.get()[idx];
-    const createEngine = iter(ENGINES)
-      .first(e => e.id === rec.type)
-      .map(field('factory'))
-      .orElseThrow(() => new Error(`Unknown engine type: '${rec.type}' `));
-    const work = begin()
-      .thenWork(handle =>
-        this.values.create(`Engine-${rec.name}`).initializeAsync(localValues => begin()
-          .forkItems(rec.fileSystems, f => `Opening File System...`, f => this.fs.deserialize(f).open())
-          .then('Building FS Stack...', async fss => localValues.value('fs-stack', iter([...fss, new Ok(httpFs(''))]).map(r => r.unwrap()).reduceFirst(stack).get()))
-          .thenWork((handle, fs) => createEngine(handle, fs, this.values, rec.mods))
-          .thenWorkPass((handle, engine) => createEngineTexturesWork(handle, engine, this.glCtx, this.values))
-          .then<EngineInfo>('Constructing Engine Info...', async (engine, textures) => {
-            const name = engine.name;
-            const artFiles = engine.art;
-            const shadowsteps = engine.shadowsteps;
-            const resources = engine.resources;
-            const arts = localValues.transformed(`arts_${idx}`, artFiles, a => iter(a).map(a => a.art.arts.length).reduceFirst(sum).orElse(0));
-            const validArts = localValues.transformed(`validArts_${idx}`, artFiles, a => iter(a).map(a => a.art.arts).flatten().filter(a => a.h !== 0 && a.w !== 0).length())
-            const plus = localValues.transformed(`plus_${idx}`, engine.plus, p => p.length);
-            const mapsLoader = async (res: FileSystem) => res.list().then(l => iter(l).filter(i => i.name.toLowerCase().endsWith('.map')).collect());
-            const mapFiles = await localValues.transformedAsync(`maps_${idx}`,
-              resources,
-              mapsLoader,
-              nil(),
-              (fs, maps) => fs.subscribe((name, deleted) => { if (name.toLowerCase().endsWith('.map')) maps.setPromiseOrDispose(m => mapsLoader(fs)) }));
-            const kvxLoader = async (res: FileSystem) => res.list().then(l => iter(l).filter(i => i.name.toLowerCase().endsWith('.kvx')).collect());
-            const kvxFiles = await localValues.transformedAsync(`kvx_${idx}`,
-              resources,
-              kvxLoader,
-              nil(),
-              (fs, maps) => fs.subscribe((name, deleted) => maps.setPromiseOrDispose(m => kvxLoader(fs))));
 
-            let renderer: Source<BoardRenderer3D> | undefined = undefined;
-            const rendererProvider = async (handle: TaskHandle) => {
-              if (renderer !== undefined) return renderer;
-              renderer = first(await createRenderer3d(localValues, this.glCtx, engine, textures)(handle));
-              return renderer;
-            };
+  openRecord(rec: EngineContextRecord) {
+    return getOrCreate(this.ctxCache, rec, rec => {
+      const createEngine = iter(ENGINES)
+        .first(e => e.id === rec.type)
+        .map(field('factory'))
+        .orElseThrow(() => new Error(`Unknown engine type: '${rec.type}' `));
+      const work = begin()
+        .thenWork(handle =>
+          this.localValues.createChild(`engine-${rec.name}`).initializeAsync(values => begin()
+            .forkItems(rec.fileSystems, f => `Opening File System...`, f => this.fs.deserialize(f).open())
+            .then('Building FS Stack...', async fss => values.value('fs-stack', iter([...fss, new Ok(httpFs(''))]).map(r => r.unwrap()).reduceFirst(stack).get()))
+            .thenWork((handle, fs) => createEngine(handle, fs, values, rec.mods))
+            .thenWorkPass((handle, engine) => createEngineTexturesWork(handle, engine, this.glCtx, values))
+            .then<EngineInfo>('Constructing Engine Info...', async (engine, textures) => {
+              const name = engine.name;
+              const artFiles = engine.art;
+              const shadowsteps = engine.shadowsteps;
+              const resources = engine.resources;
+              const arts = values.transformed(`arts`, artFiles, a => iter(a).map(a => a.art.arts.length).reduceFirst(sum).orElse(0));
+              const validArts = values.transformed(`validArts`, artFiles, a => iter(a).map(a => a.art.arts).flatten().filter(a => a.h !== 0 && a.w !== 0).length())
+              const plus = values.transformed(`plus`, engine.plus, p => p.length);
+              const mapsLoader = async (res: FileSystem) => res.list().then(l => iter(l).filter(i => i.name.toLowerCase().endsWith('.map')).collect());
+              const mapFiles = await values.transformedAsync(`maps`,
+                resources,
+                mapsLoader,
+                nil(),
+                (fs, maps) => fs.subscribe((name, deleted) => { if (name.toLowerCase().endsWith('.map')) maps.setPromiseOrDispose(m => mapsLoader(fs)) }));
+              const kvxLoader = async (res: FileSystem) => res.list().then(l => iter(l).filter(i => i.name.toLowerCase().endsWith('.kvx')).collect());
+              const kvxFiles = await values.transformedAsync(`kvx`,
+                resources,
+                kvxLoader,
+                nil(),
+                (fs, maps) => fs.subscribe((name, deleted) => maps.setPromiseOrDispose(m => kvxLoader(fs))));
 
-            const dispose = async () => { engine.dispose(); localValues.dispose(); textures.dispose(); }
-            return { name, arts, validArts, plus, shadowsteps, artFiles, mapFiles, kvxFiles, ctx: engine, textures, rendererProvider, dispose }
-          }).finish()(handle)))
-      .finishUntuple();
+              let renderer: Source<BoardRenderer3D> | undefined = undefined;
+              const rendererProvider = async (handle: TaskHandle) => {
+                if (renderer !== undefined) return renderer;
+                renderer = first(await createRenderer3d(values, this.glCtx, engine, textures)(handle));
+                return renderer;
+              };
 
-    const task = this.app.scheduler.exec(work);
-    this.currentEngine.set(Optional.of(task));
+              const dispose = async () => { engine.dispose(); values.dispose(); textures.dispose(); }
+              return { name, arts, validArts, plus, shadowsteps, artFiles, mapFiles, kvxFiles, ctx: engine, textures, rendererProvider, dispose }
+            }).finish()(handle)))
+        .finishUntuple();
+      return this.app.scheduler.exec(work);
+    })
   }
 
   async addEngine() {
@@ -242,7 +247,7 @@ function VoxelsInfoView({ info, selectedVoxelIdxValue, editor }: { info: EngineI
 }
 
 
-function EngineContextResult({ editor, result }: { editor: Editor, result: Source<TaskValue<EngineInfo>> }) {
+function EngineContextResult({ editor, result, rec }: { editor: Editor, result: Source<TaskValue<EngineInfo>>, rec: EngineContextRecord }) {
   const res = useValue(result);
   const values = useValuesContainer(`${ID}-view`);
   const selectedVoxelIdValue = values.value('selectedVoxelId', -1);
@@ -261,10 +266,12 @@ function EngineContextResult({ editor, result }: { editor: Editor, result: Sourc
 }
 
 function EngineContextView({ editor }: { editor: Editor }) {
+  const rec = useValue(editor.currentEngineRecord);
   const engine = useValue(editor.currentEngine);
+  const recEngine = rec.flatMap(r => engine.map(e => pair(r, e)));
 
   return <Column className='flex-fill'>
-    {engine.map(controller => <EngineContextResult editor={editor} result={controller.task} />).orElse(<></>)}
+    {recEngine.map(([rec, ctl]) => <EngineContextResult editor={editor} result={ctl.task} rec={rec} />).orElse(<></>)}
   </Column>
 }
 

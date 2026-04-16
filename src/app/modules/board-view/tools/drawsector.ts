@@ -15,7 +15,7 @@ import { vec2, vec3 } from "gl-matrix";
 import { match } from "ts-pattern";
 import { LineRecord, NOOP_RENDERABLE, printText, Renderable, renderables, ScreenSpriteRecord } from "../api";
 import { BoardRenderer3D } from "../boardRenderer3d";
-import { pair } from "ts-utils/types";
+import { notUndefined, pair } from "ts-utils/types";
 import { Action, ActionDescriptors } from "app/apis/actions";
 
 type VoidContour = {
@@ -61,14 +61,14 @@ function getPos(hitscan: Source<Target[]>, boardCtx: BoardContext): [number, num
 
 function findContainingSector(board: Board, points: [number, number][]): number {
   const sectors = findContainingSectorMidPoints(board, points);
-  return sectors.size === 1 ? sectors.values().next().value : -1;
+  return sectors.size === 1 ? notUndefined(sectors.values().next().value) : -1;
 }
 
 function isSplitSector(board: Board, points: [number, number][]): number {
   const sectorId = findContainingSector(board, points);
   if (sectorId === -1) return -1;
-  const first = points.at(0);
-  const last = points.at(-1);
+  const first = notUndefined(points.at(0));
+  const last = notUndefined(points.at(-1));
   return wallInSector(board, sectorId, first[0], first[1]) !== -1
     && wallInSector(board, sectorId, last[0], last[1]) !== -1 ? sectorId : -1;
 }
@@ -153,14 +153,17 @@ export function createDrawSectorTool(values: ValuesContainer, ctl: Controller3D,
             });
           contour.set(EMPTY_CONTOUR);
         } else {
-          const board = boardCtx.board.get();
+          const board = boardCtx.data.get().board;
           const splitSectorId = isSplitSector(board, points);
           if (isValidSectorId(board, splitSectorId)) {
             const ref = new BuildReferenceTrackerImpl();
             boardCtx.modifyBoard(`Split sector ${splitSectorId}`, board =>
               splitSector(board, splitSectorId, wrap(points), ref, engine.api));
             contour.set(EMPTY_CONTOUR);
-          } else contour.modImmer((c: PolyContour) => c.points.push(c.points[points.length - 1]));
+          } else contour.modImmer(c => {
+            const poly = c as PolyContour;
+            poly.points.push(poly.points[points.length - 1])
+          });
         }
       } else if (c.type === 'rect') {
         const { p1: [x1, y1], p2: [x2, y2] } = c;
@@ -186,9 +189,10 @@ export function createDrawSectorTool(values: ValuesContainer, ctl: Controller3D,
       contour.set(EMPTY_CONTOUR);
     } else if (c.type === 'poly') {
       const [x, y] = getPos(hitscan, boardCtx);
-      contour.modImmer((c: PolyContour) => {
-        c.points.pop();
-        c.points[c.points.length - 1] = [x, y];
+      contour.modImmer(c => {
+        const poly = c as PolyContour;
+        poly.points.pop();
+        poly.points[poly.points.length - 1] = [x, y];
       })
     }
   }

@@ -1,6 +1,12 @@
 
 #define PI (3.1415926535897932384626433832795)
 
+float ang(vec2 v) {
+  float atn = atan(v.y, v.x);
+  float matn = atn < 0.0 ? (2.0 * PI) + atn : atn;
+  return matn / (2.0 * PI);
+}
+
 int ubyte2byte(uint x) { return int(x) <= 0x7f ? int(x) : int(x) - 0xff - 1; }
 int ushort2short(uint x) { return int(x) <= 0x7fff ? int(x) : int(x) - 0xffff - 1; }
 int uint2int(uint x) { return int(x) <= 0x7fffffff ? int(x) : int(x) - 0xffffffff - 1; }
@@ -218,6 +224,11 @@ struct sprite_t {
   uint sec;
   uint blend;
 };
+
+const uint SPRITE_TYPE_FACE = uint(0);
+const uint SPRITE_TYPE_WALL = uint(1);
+const uint SPRITE_TYPE_FLOOR = uint(2);
+const uint SPRITE_TYPE_SLOPE = uint(3);
 
 bool sprite_cstat_translucent(sprite_t sprite) { return ((sprite.cstat >> 1) & uint(1)) == uint(1); }
 bool sprite_cstat_xflip(sprite_t sprite) { return ((sprite.cstat >> 2) & uint(1)) == uint(1); }

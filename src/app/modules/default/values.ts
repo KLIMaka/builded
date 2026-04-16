@@ -8,7 +8,7 @@ export const DefaultValuesConstructor: Plugin<Values> = provider(async injector 
   const localValues = new ValuesContainer('values');
   const root = localValues.value<ValuesContainer[]>('root', []);
   const create = (name: string, parent: ValuesContainer) => {
-    const nameId = `${name}-[0x${(id++).toString(16).padStart(8, '0')}]`;
+    const nameId = `${name}0x${(id++).toString(16).padStart(8, '0')}`;
     const result = new ValuesContainer(nameId, create, parent);
     result.addDisconnector(() => root.mod(cs => cs.filter(c => c !== result)));
     setTimeout(() => root.mod(cs => [...cs, result]));

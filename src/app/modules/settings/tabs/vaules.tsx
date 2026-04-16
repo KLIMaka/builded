@@ -76,11 +76,14 @@ export function ValuesView(props: { values: Values }) {
             : '│'
       : '';
     const icon = data.type === 'container' ? data.open ? 'folder-open' : 'folder' : 'tag';
-    const name = data.type === 'container' ? data.container.name : data.value.name ?? '';
+    const fullName = data.type === 'container' ? data.container.name : data.value.name ?? '';
+    const name = data.type === 'container' ? fullName.substring(0, fullName.length - 10) : fullName;
+    const id = data.type === 'container' ? fullName.substring(fullName.length - 10) : '';
     return <Row className="baseline-aligned gap-10">
       <div style={{ width: 16, paddingRight: padd, fontFamily: 'monospace' }}>{label}</div>
       <Icon icon={icon} />
       <div>{name}</div>
+      <div style={{ color: 'var(--font-color-muted)' }}>{id}</div>
     </Row>
   }
   const openAction = (rec: ValuesListRecord) => { if (rec.type === 'container') openContainers.modImmer(m => m.set(rec.container, !(m.get(rec.container) ?? false))) }

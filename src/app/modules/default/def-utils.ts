@@ -4,7 +4,7 @@ import { Source, ValuesContainer } from "ts-utils/callbacks";
 import { asyncMapOptional } from "ts-utils/objects";
 import { NOOP_TASK_HANDLE } from "ts-utils/scheduler";
 import { Stream } from "ts-utils/stream";
-import { first, identity, nil, notUndefined } from "ts-utils/types";
+import { first, identity, nil } from "ts-utils/types";
 import { Work, begin, tuple as tupleWork } from "ts-utils/work";
 import { openFileOptional } from "../default/engine-commons";
 import { EMPTY, createGrpOrZipFsArrayBuffer, stack, trackFiles } from "../fs/fs";
@@ -17,6 +17,7 @@ export type GlBlendDef = Partial<{ src: string, dst: string }>;
 export type BlendDef = { id: number, forward?: GlBlendDef, reverse?: GlBlendDef } & FileDef;
 export type TileFromTexture = Partial<{ picnum: number, file: string, alphacut: number, xoff: number, yoff: number }>;
 export type AnimTileRange = { start: number, end: number, speed: number, anim?: number };
+
 export type EngineDefs = {
   root: FileSystem
   mainGrp: FileSystem,
@@ -80,10 +81,10 @@ async function openGrp(values: ValuesContainer, fs: Source<FileSystem>, grpName:
   return values.transformedAsync(fn, file, o => o.map(ab => createGrpOrZipFsArrayBuffer(fn, ab)).orElse(Promise.resolve(EMPTY)));
 }
 
-export function loadEngineDefsWork(grpName: string, values: ValuesContainer): Work<[Source<FileSystem>, Source<GrpInfo>], [Source<EngineDefs>]> {
+export function loadEngineDefsWork(grpName: string, values: ValuesContainer): Work<[Source<FileSystem>, Source<string>], [Source<EngineDefs>]> {
   const files = new Set<string>();
 
-  function loadWork(grpInfo: GrpInfo, defs: EngineDefs): Work<[], [EngineDefs]> {
+  function loadWork(defname: string, defs: EngineDefs): Work<[], [EngineDefs]> {
     files.clear();
     let fs = stack(defs.root, defs.mainGrp);
     const loadGrp = async (sf: ScriptFile, defs: EngineDefs, fn: string): Promise<void> => {
@@ -131,29 +132,27 @@ export function loadEngineDefsWork(grpName: string, values: ValuesContainer): Wo
           nestedRule(['reverse'], tuple(), _ => ({}), set('reverse'), glBlendRule)
         )))));
 
-    return !grpInfo.defname
-      ? tupleWork(async () => defs)
-      : begin()
-        .thenPass('Loading def File', () => fs.read(notUndefined(grpInfo.defname)))
-        .then('Parsing def file', defFile =>
-          defFile
-            .map(def => createScripFile(notUndefined(grpInfo.defname), def).parse(cloneDefs(defs), engineDefsRule))
-            .orElse(Promise.resolve(defs)))
-        .finish();
+    return begin()
+      .thenPass('Loading def File', () => fs.read(defname))
+      .then('Parsing def file', defFile =>
+        defFile
+          .map(def => createScripFile(defname, def).parse(cloneDefs(defs), engineDefsRule))
+          .orElse(Promise.resolve(defs)))
+      .finish();
   }
 
   let loadHandle = NOOP_TASK_HANDLE;
-  async function load([defs, grpInfo]: [EngineDefs, GrpInfo]): Promise<EngineDefs> {
-    return first(await loadWork(grpInfo, defs)(loadHandle))
+  async function load([defs, defname]: [EngineDefs, string]): Promise<EngineDefs> {
+    return first(await loadWork(defname, defs)(loadHandle))
   }
 
   return begin()
-    .multiInput<[Source<FileSystem>, Source<GrpInfo>]>()
-    .thenPass('Open Grp', async (fs, grpInfo) => openGrp(values, fs, grpName))
-    .thenPass('Loading default defs', async (fs, grpInfo, mainGrp) => loadDefaultEngineDefs(values, fs, mainGrp))
-    .thenWork(tupleWork(async (handle, fs, grpInfo, mainGrp, defs) => {
+    .multiInput<[Source<FileSystem>, Source<string>]>()
+    .thenPass('Open Grp', async (fs, defname) => openGrp(values, fs, grpName))
+    .thenPass('Loading default defs', async (fs, defname, mainGrp) => loadDefaultEngineDefs(values, fs, mainGrp))
+    .thenWork(tupleWork(async (handle, fs, defname, mainGrp, defs) => {
       loadHandle = handle;
-      const value = await values.transformedAsyncTuple('engine-defs', [defs, grpInfo], load, nil(), trackFiles(files, ([defs, _]) => defs.root, load));
+      const value = await values.transformedAsyncTuple('engine-defs', [defs, defname], load, nil(), trackFiles(files, ([defs, _]) => defs.root, load));
       loadHandle = NOOP_TASK_HANDLE;
       return value;
     })).finish()

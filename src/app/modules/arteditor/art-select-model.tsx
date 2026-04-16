@@ -12,7 +12,7 @@ import { createCanvas } from "ts-utils/imgutils";
 import { getInstances, Injector } from "ts-utils/injector";
 import { iter } from "ts-utils/iter";
 import { fit, palRasterizer, Rasterizer, transform } from "ts-utils/pixelprovider";
-import { BiFunction, Consumer, first, notNull, Predicate } from "ts-utils/types";
+import { BiFn, Consumer, first, notNull, Predicate } from "ts-utils/types";
 import { createSavedState } from "../default/app/storage";
 import { ArtSelectUiImpl } from "./art-select-view";
 import { ArtEditor } from "./arteditor-api";
@@ -87,7 +87,7 @@ export class ArtSelectImpl implements ArtEditor {
     }
   }
 
-  private sortPicnums(): BiFunction<number, number, number> {
+  private sortPicnums(): BiFn<number, number, number> {
     return (l, r) => getOrDefault(this.boardInfo.walls, r, 0) - getOrDefault(this.boardInfo.walls, l, 0)
   }
 

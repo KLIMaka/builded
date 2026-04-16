@@ -91,6 +91,7 @@ function SpriteInfo(props: { ent: Entity, board: Board }) {
     <InfoRow label="Offset" value={`${spr.xoffset}, ${spr.yoffset}`} />
     <InfoRow label="Repeat" value={`${spr.xrepeat}, ${spr.yrepeat}`} />
     <InfoRow label="Cstat" value={getStat(spr.cstat)} />
+    <InfoRow label="Statnum" value={spr.statnum} />
     <InfoRow label="Blend" value={spr.blend} />
     <InfoRow label="Lo-Tag" value={`${spr.lotag} ${settings.lotagSpriteText(spr)}`} />
     <InfoRow label="Hi-Tag" value={spr.hitag} />
@@ -106,8 +107,8 @@ function getWallId(ent: Entity, board: Board): number {
 }
 
 function WallInfo(props: { ent: Entity, board: Board }) {
-  const utils = useContext(UtilsContext);
-  const settings = useValue(utils.engine.settings);
+  const { engine } = useContext(UtilsContext);
+  const settings = useValue(engine.settings);
   const wallId = getWallId(props.ent, props.board);
   const wall = props.board.walls[wallId];
   const getStat = (s: WallStats) => iter(objectKeys(s)).filter(k => s[k] === 1).map(k => k.toString()).join(', ').collect();

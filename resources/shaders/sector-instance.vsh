@@ -28,10 +28,9 @@ void main() {
   uint type = typeOverride;
   vec3 wpos = sectorInfo.pos;
   vec4 finalPos = P * V * vec4(wpos, 1.0);
-  vec3 eyepos = (IV * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
   
   gl_Position = sectorInfo.parallax ? applyParallax(finalPos) : finalPos;
-  parallax = vec4(wpos - eyepos,  sectorInfo.parallax ? 1.0 : 0.0);
+  parallax = vec4(wpos - curpos(),  sectorInfo.parallax ? 1.0 : 0.0);
   picInfo = sectorInfo.picInfo;
   tc = sectorInfo.tc;
   trans = type == uint(0) ? 1.0 : type == uint(2) ? TRANS2 : TRANS1;

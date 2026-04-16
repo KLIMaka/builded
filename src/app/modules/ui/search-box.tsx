@@ -2,7 +2,7 @@ import React, { useCallback, useContext, useEffect, useRef, useState } from "rea
 import { Signal, Value } from "ts-utils/callbacks";
 import { nil, notNull, seq, Supplier } from "ts-utils/types";
 import { ActionItem, ActionList } from "./action-list";
-import { ActionDescriptorsContext, ActionsChannelContext, checkClickInside, CurrentActionsChannelContext, Icon, useValue } from "./commons";
+import { ActionsChannelContext, checkClickInside, Icon, UiContext, useValue } from "./commons";
 
 export type SearchBoxProps = {
   value: Value<string>,
@@ -13,9 +13,8 @@ export type SearchBoxProps = {
 }
 
 export function SearchBox(props: SearchBoxProps) {
-  const actionDescriptors = useContext(ActionDescriptorsContext);
+  const { actionDescriptors, currentActions } = useContext(UiContext);
   const actionsChannel = useContext(ActionsChannelContext);
-  const currentActions = useContext(CurrentActionsChannelContext);
   const searchChannel = actionsChannel.child(props.channelName, true);
   const query = useValue(props.value);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -64,9 +63,8 @@ export function SearchBox(props: SearchBoxProps) {
 }
 
 export function SearchBoxOracle(props: SearchBoxProps & { oracle: Supplier<ActionItem[]> }) {
-  const actionDescriptors = useContext(ActionDescriptorsContext);
+  const { actionDescriptors, currentActions } = useContext(UiContext);
   const actionsChannel = useContext(ActionsChannelContext);
-  const currentActions = useContext(CurrentActionsChannelContext);
   const searchChannel = actionsChannel.child(props.channelName, true);
   const query = useValue(props.value);
   const inputRef = useRef<HTMLInputElement>(null);

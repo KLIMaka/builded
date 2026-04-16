@@ -1,7 +1,7 @@
 import { BoardData } from "app/apis/engine";
 import { vec3 } from "gl-matrix";
 import { cross2d, int, len2d, ortonorm2d, sign } from "ts-utils/mathutils";
-import { first, Function } from "ts-utils/types";
+import { first, Fn } from "ts-utils/types";
 import { inSector } from "./board/query";
 import { Board, FACE_SPRITE, FLOOR_SPRITE, Sector, WALL_SPRITE } from "./board/structs";
 import { ArtInfo } from "./formats/art";
@@ -308,7 +308,7 @@ function intersectFloorSprite(sprId: number, descriptor: SpriteDescriptor, hit: 
   hit.hit(t - SPRITE_OFF, sprId, EntityType.SPRITE, ix, iy, descriptor.info.z);
 }
 
-function intersectSprite(board: Board, artInfo: Map<number, ArtInfo>, sprId: number, spriteDescriptor: Function<number, SpriteDescriptor | undefined>, hit: Hitscan) {
+function intersectSprite(board: Board, artInfo: Map<number, ArtInfo>, sprId: number, spriteDescriptor: Fn<number, SpriteDescriptor | undefined>, hit: Hitscan) {
   const spr = board.sprites[sprId];
   const descriptor = spriteDescriptor(sprId);
   if (descriptor === undefined) return;

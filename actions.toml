@@ -177,6 +177,7 @@ repeat-down = { bind = "control+arrowdown" }
 repeat-left = { bind = "control+arrowleft" }
 repeat-right = { bind = "control+arrowright" }
 pan-repeat-reset = { bind = "/" }
+sprite-mode = { bind = "r" }
 flip = { bind = "f" }
 delete = { bind = "delete" }
 up = { bind = "pageup" }

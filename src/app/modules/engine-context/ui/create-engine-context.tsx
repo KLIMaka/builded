@@ -216,7 +216,7 @@ function createResultHandler(
       const work = begin()
         .forkItems(record.fileSystems, f => `Opening File System...`, f => fs.deserialize(f).open())
         .then('Building FS Stack...', async fss => localValues.value('fs-stack', iter(fss).map(r => r.unwrap()).reduceFirst(stack).get()))
-        .thenWork((handle, fs) => createEngine(handle, fs, values, record.mods))
+        .thenWork((handle, fs) => createEngine(handle, fs, localValues, record.mods))
         .finishUntuple();
       const task = app.scheduler.exec(work);
       const result = await task.end();

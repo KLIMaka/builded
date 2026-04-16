@@ -3,6 +3,7 @@ import { minValue } from "ts-utils/mathutils";
 import { clockwise, slope } from "../utils";
 import { isValidSectorId, isValidWallId, lastwall, nextwall, sectorOfWall } from "./query";
 import { Board } from "./structs";
+import { pair, tuple } from "ts-utils/types";
 
 export function* sectorWalls(board: Board, sectorId: number): Generator<number> {
   if (!isValidSectorId(board, sectorId))
@@ -68,7 +69,7 @@ export function innerWalls(board: Board, wallId: number): Iterable<number> {
 }
 
 export function isOuterLoop(board: Board, wallId: number) {
-  const wallMapper = (w: number) => [board.walls[w].x, board.walls[w].y] as [number, number];
+  const wallMapper = (w: number) => tuple(board.walls[w].x, board.walls[w].y);
   return clockwise(map(loopWalls(board, wallId), wallMapper));
 }
 

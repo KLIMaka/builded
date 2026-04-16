@@ -8,7 +8,7 @@ import Optional from "optional-js";
 import React, { ReactNode } from "react";
 import { initial, Source, TRANSFORM_PLACEHOLDER, ValuesContainer, ValuesMap } from "ts-utils/callbacks";
 import { iter } from "ts-utils/iter";
-import { MultiFunction } from "ts-utils/types";
+import { MultiFn } from "ts-utils/types";
 import { Work } from "ts-utils/work";
 import { createEngineContextWork as createEngineBlood } from "../blood/blood";
 import { GrpInfo } from "../eduke32/defs";
@@ -27,9 +27,9 @@ export type EngineContextRecord = {
 export type EngineContextType<T, B extends Board = Board> = {
   id: string,
   name: string,
-  factory: Work<[Source<FileSystem>, Values, T], [EngineContext<B>]>,
+  factory: Work<[Source<FileSystem>, ValuesContainer, T], [EngineContext<B>]>,
   defaultMods: T,
-  modsEditor: MultiFunction<[ValuesMap<T>, Source<FileSystemHandle[]>, ValuesContainer], ReactNode>
+  modsEditor: MultiFn<[ValuesMap<T>, Source<FileSystemHandle[]>, ValuesContainer], ReactNode>
 }
 
 type GrpFileInfo = Readonly<{

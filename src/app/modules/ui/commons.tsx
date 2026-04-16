@@ -1,14 +1,13 @@
-import { Disconnector, Source, Value, ValuesContainer } from 'ts-utils/callbacks';
-import { getOrCreate } from 'ts-utils/collections';
-import { iter } from 'ts-utils/iter';
-import { Consumer, MultiConsumer, MultiFunction, Supplier, identity, nil, seq } from 'ts-utils/types';
 import { Action, ActionDescriptors, ActionsProvider, StateChecker } from 'app/apis/actions';
+import { Values } from 'app/apis/values';
 import { Bind } from 'app/input/keymap';
 import React, { ForwardedRef, HTMLProps, MouseEventHandler, ReactNode, RefObject, createContext, forwardRef, useContext, useRef, useSyncExternalStore } from 'react';
 import { AutoSizer } from 'react-virtualized';
+import { Disconnector, Source, Value, ValuesContainer } from 'ts-utils/callbacks';
+import { getOrCreate } from 'ts-utils/collections';
+import { iter } from 'ts-utils/iter';
+import { Consumer, MultiConsumer, MultiFn, Supplier, identity, nil, seq } from 'ts-utils/types';
 import { ActionItem } from './action-list';
-import { Values } from 'app/apis/values';
-import { progress } from 'ts-utils/scheduler';
 
 export const Column = forwardRef(function Column({ children, className, ...rest }: React.HTMLProps<HTMLDivElement> & { className?: string }, ref: ForwardedRef<HTMLDivElement>) {
   return (
@@ -65,7 +64,7 @@ export type TextInputProps = {
 }
 export function TextInput(props: TextInputProps) {
   const actionsChannel = useContext(ActionsChannelContext);
-  const currentActions = useContext(CurrentActionsChannelContext);
+  const { currentActions } = useContext(UiContext);
   const searchChannel = actionsChannel.child(`input-text-${props.name}`, true);
 
   const ref = useRef<HTMLInputElement>(null);
@@ -315,11 +314,14 @@ export class ActionsNode implements ActionsProvider {
   }
 }
 
+export type UiContextProps = {
+  currentActions: Consumer<ActionsNode>,
+  actionDescriptors: ActionDescriptors,
+}
+
 export const ActionsChannelContext = createContext<ActionsNode>(null as any as ActionsNode);
-export const CurrentActionsChannelContext = createContext<Consumer<ActionsNode>>(null as any as Consumer<ActionsNode>);
-export const ActionDescriptorsContext = createContext<ActionDescriptors>(null as any as ActionDescriptors);
-export const ValuesContext = createContext<Values>(null as any as Values);
 export const ValuesContainerContext = createContext<ValuesContainer>(null as any as ValuesContainer);
+export const UiContext = createContext<UiContextProps>(undefined as any as UiContextProps);
 
 
 export function addEventListener<K extends keyof HTMLElementEventMap>(elem: HTMLElement, type: K, listener: (this: HTMLElement, ev: HTMLElementEventMap[K]) => any): Disconnector {
@@ -357,7 +359,7 @@ export function defaultWorkplaneContext(def: Partial<WorkplaneContext>): Workpla
   }
 }
 
-export function workplane(f: MultiFunction<[HTMLCanvasElement, number, number], Disconnector>): WorkplaneBuilder {
+export function workplane(f: MultiFn<[HTMLCanvasElement, number, number], Disconnector>): WorkplaneBuilder {
   let disconnector: Disconnector;
   return (canvas, width, height) => {
     disconnector?.();

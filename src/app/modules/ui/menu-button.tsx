@@ -4,7 +4,7 @@ import { constSource, Source, Value } from "ts-utils/callbacks";
 import { EMPTY_NAVIGATOR, NavigateAction, Navigator } from "ts-utils/navigators";
 import { seq } from "ts-utils/types";
 import { ActionItem, ActionList } from "./action-list";
-import { ActionDescriptorsContext, ActionsChannelContext, checkClickInside, CurrentActionsChannelContext, Icon, styles, useValue } from "./commons";
+import { ActionsChannelContext, checkClickInside, Icon, styles, UiContext, useValue } from "./commons";
 
 export type MenuButtonProps = {
   label: Source<ReactElement>,
@@ -25,9 +25,8 @@ export function MenuButton(props: MenuButtonProps) {
   const navigator = useValue(props.navigator ?? emptyNavigator);
   const isOpen = useValue(openValue);
   const closeMenu = useCallback(() => openValue.set(false), [openValue]);
-  const actionDescriptors = useContext(ActionDescriptorsContext);
+  const { actionDescriptors, currentActions } = useContext(UiContext);
   const actionsChannel = useContext(ActionsChannelContext);
-  const currentActions = useContext(CurrentActionsChannelContext);
   const listChannel = actionsChannel.child("list", true);
   const popupRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLDivElement>(null);

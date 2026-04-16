@@ -5,16 +5,16 @@ import { AutoSizer, Column, SortDirectionType, Table, TableCellDataGetterParams,
 import { Source, value, Value, ValuesContainer } from 'ts-utils/callbacks';
 import { takeFirst } from 'ts-utils/collections';
 import { clamp } from 'ts-utils/mathutils';
-import { Consumer, Function, identity, nil, notNull, notUndefined } from 'ts-utils/types';
-import { ActionDescriptorsContext, ActionsChannelContext, styles, useValue } from './commons';
+import { Consumer, Fn, identity, nil, notNull, notUndefined } from 'ts-utils/types';
+import { ActionsChannelContext, styles, UiContext, useValue } from './commons';
 
 export type HasTypedData<R, T> = { rowData: R, cellData?: T };
 export type TypedTableCellProps<T, R> = Omit<TableCellProps, "cellData" | "rowData"> & HasTypedData<T, R>;
-export type TypedTableCellRenderer<T, R> = Function<TypedTableCellProps<T, R>, ReactNode>;
+export type TypedTableCellRenderer<T, R> = Fn<TypedTableCellProps<T, R>, ReactNode>;
 
 export type VirtualTableColumn<R, T> = {
   renderer: TypedTableCellRenderer<R, T>,
-  dataGetter: Function<TableCellDataGetterParams, T>
+  dataGetter: Fn<TableCellDataGetterParams, T>
   id: string,
   label: string,
   width: number,
@@ -161,7 +161,7 @@ export function VirtualTable<R>(props: VirtualTableProps<R>) {
   const rows = useValue(props.rows);
   const sort = useValue(props.sort ?? EMPTY_SORT_VALUE);
   const selected = useValue(props.selected);
-  const actionDescriptors = useContext(ActionDescriptorsContext);
+  const { actionDescriptors } = useContext(UiContext);
   const actionsChannel = useContext(ActionsChannelContext);
   const rowHeight = props.rowHeight ?? 20;
   const tableRef = useRef<Table>(null);

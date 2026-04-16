@@ -14,24 +14,96 @@ vec2 getPos(bool ceiling, int vtxId, vec4 pos12, vec2 pos3) {
   else if (vtxId == 2) return ceiling ? pos3 : pos12.xy;
 }
 
-vec3 getTc(vec2 pos, sector_t sector, vec4 orient, pic_t pic, bool ceiling) {
-  vec2 pan = vec2(ceiling ? sector.ceilingFloorPan.xy : sector.ceilingFloorPan.zw) / vec2(256.0);
-  uint cstat = ceiling ? sector.ceilingFloorCstat.x : sector.ceilingFloorCstat.y;
-  float heinum = angscale(ceiling ? sector.ceilingFloorHeinumZ.x : sector.ceilingFloorHeinumZ.z);
-  bool alignToFirstWall = sector_cstat_alignToFirstWall(cstat);
-  bool swapXY = sector_cstat_swapXY(cstat);
-  vec2 angFactor = vec2(1.0, alignToFirstWall ? sqrt(1.0 + heinum * heinum) : 1.0);
-  vec2 flip = vec2(sector_cstat_xflip(cstat) ? -1.0 : 1.0, sector_cstat_yflip(cstat) ? -1.0 : 1.0);
-  vec2 scale = vec2(sector_cstat_doubleSmooshiness(cstat) ? 8.0 : 16.0) * pic.sizeOff.xy * flip / (swapXY ? angFactor.yx : angFactor);
-  vec2 yFlipPos = pos * vec2(1.0, -1.0);
-  if (alignToFirstWall) {
-    yFlipPos -= orient.xy * vec2(1.0, -1.0);
+// vec3 getTc(vec2 pos, sector_t sector, vec4 orient, pic_t pic, bool ceiling) {
+//   vec2 pan = vec2(ceiling ? sector.ceilingFloorPan.xy : sector.ceilingFloorPan.zw) / vec2(256.0);
+//   uint cstat = ceiling ? sector.ceilingFloorCstat.x : sector.ceilingFloorCstat.y;
+//   float heinum = angscale(ceiling ? sector.ceilingFloorHeinumZ.x : sector.ceilingFloorHeinumZ.z);
+//   bool alignToFirstWall = sector_cstat_alignToFirstWall(cstat);
+//   bool swapXY = sector_cstat_swapXY(cstat);
+//   vec2 angFactor = vec2(1.0, alignToFirstWall ? sqrt(1.0 + heinum * heinum) : 1.0);
+//   vec2 flip = vec2(sector_cstat_xflip(cstat) ? -1.0 : 1.0, sector_cstat_yflip(cstat) ? -1.0 : 1.0);
+//   vec2 scale = vec2(sector_cstat_doubleSmooshiness(cstat) ? 8.0 : 16.0) * pic.sizeOff.xy * flip / (swapXY ? angFactor.yx : angFactor);
+//   vec2 yFlipPos = pos * vec2(1.0, -1.0);
+//   if (alignToFirstWall) {
+//     yFlipPos -= orient.xy * vec2(1.0, -1.0);
+//     float ang = atan(orient.w, orient.z);
+//     vec4 orig = vec4(sin(ang), cos(ang), -cos(ang), sin(ang));
+//     yFlipPos = vec2(-dot(yFlipPos, orig.zw), -dot(yFlipPos, orig.xy));
+//   }
+//   vec2 inPos = swapXY ? yFlipPos.yx : yFlipPos.xy;
+//   return vec3(inPos / scale + pan, 1.0);
+// }
+
+vec3 getTc(vec2 pos, sector_t sector, vec4 orient, pic_t pic, bool ceiling)
+{
+    vec2 pan = vec2(ceiling ? sector.ceilingFloorPan.xy
+                            : sector.ceilingFloorPan.zw) / 256.0;
+
+    uint cstat = ceiling ? sector.ceilingFloorCstat.x
+                         : sector.ceilingFloorCstat.y;
+
+    float heinum = angscale(ceiling ? sector.ceilingFloorHeinumZ.x
+                                    : sector.ceilingFloorHeinumZ.z);
+
+    float align = sector_cstat_alignToFirstWall(cstat) ? 1.0 : 0.0;
+    float swap  = sector_cstat_swapXY(cstat) ? 1.0 : 0.0;
+
+    vec2 flip = vec2(sector_cstat_xflip(cstat) ? -1.0 : 1.0,
+                     sector_cstat_yflip(cstat) ? -1.0 : 1.0);
+
+    vec2 angFactor = vec2(1.0, mix(1.0, sqrt(1.0 + heinum * heinum), align));
+
+    vec2 scale = vec2(sector_cstat_doubleSmooshiness(cstat) ? 8.0 : 16.0)
+               * pic.sizeOff.xy * flip
+               / mix(angFactor, angFactor.yx, swap);
+
+    vec2 invScale = 1.0 / scale;
+
     float ang = atan(orient.w, orient.z);
-    vec4 orig = vec4(sin(ang), cos(ang), -cos(ang), sin(ang));
-    yFlipPos = vec2(-dot(yFlipPos, orig.zw), -dot(yFlipPos, orig.xy));
-  }
-  vec2 inPos = swapXY ? yFlipPos.yx : yFlipPos.xy;
-  return vec3(inPos / scale + pan, 1.0);
+    float C = cos(ang);
+    float S = sin(ang);
+
+    /* --- fully inlined composite matrix --- */
+
+    mat3 M =
+        /* pan */
+        mat3(
+            invScale.x,                0.0,                     0.0,
+            0.0,                       invScale.y,              0.0,
+            pan.x,                     pan.y,                   1.0
+        )
+
+        /* swapXY */
+        * mat3(
+            mix(1.0, 0.0, swap),  mix(0.0, 1.0, swap),  0.0,
+            mix(0.0, 1.0, swap),  mix(1.0, 0.0, swap),  0.0,
+            0.0,                 0.0,                 1.0
+        )
+
+        /* alignToFirstWall rotation */
+        * mat3(
+            mix(1.0,  C, align),  mix(0.0, -S, align), 0.0,
+            mix(0.0, -S, align),  mix(1.0, -C, align), 0.0,
+            0.0,                 0.0,                1.0
+        )
+
+        /* pre-translation for alignToFirstWall */
+        * mat3(
+            1.0, 0.0, 0.0,
+            0.0, 1.0, 0.0,
+            -orient.x * align,
+             orient.y * align,
+            1.0
+        )
+
+        /* Y-flip */
+        * mat3(
+            1.0,  0.0, 0.0,
+            0.0, -1.0, 0.0,
+            0.0,  0.0, 1.0
+        );
+
+    return M * vec3(pos, 1.0);
 }
 
 

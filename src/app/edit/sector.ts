@@ -36,7 +36,6 @@ export class SectorEnt extends MessageHandlerReflective {
       .map(w => [board.sectors[w.nextsector].ceilingz / ZSCALE, board.sectors[w.nextsector].floorz / ZSCALE])
       .flatten()
       .set();
-    console.log(`originz=${this.originz}`);
   }
 
   Move(msg: Move) {

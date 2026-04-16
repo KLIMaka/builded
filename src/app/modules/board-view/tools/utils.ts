@@ -1,7 +1,7 @@
 import { Source } from "ts-utils/callbacks";
 import { Action, ActionDescriptors } from "app/apis/actions";
 import { BoardContext, EngineContext, gridSnap } from "app/apis/engine";
-import { Flip, NamedMessage, PanRepeat, ResetPanRepeat, Rotate, SetPicnum, Shade } from "app/edit/messages";
+import { Flip, NamedMessage, PanRepeat, ResetPanRepeat, Rotate, SetPicnum, Shade, SpriteMode } from "app/edit/messages";
 import { BuildReferenceTrackerImpl } from "app/modules/default/reftracker";
 import { splitWall } from "build/board/mutations/walls";
 import { sectorOfWall, snapWall } from "build/board/query";
@@ -11,6 +11,12 @@ import { splitSectorFromPoint } from "build/board/mutations/splitsector";
 import { deleteLoop, deleteLoopFull, deleteSectorFull, fillInnerLoop, setFirstWall } from "build/board/mutations/sectors";
 import { selectPicnum } from "app/modules/arteditor/art-select-model";
 import { Injector } from "ts-utils/injector";
+import { notUndefined } from "ts-utils/types";
+import { Iter } from "ts-utils/iter";
+import { clamp, int } from "ts-utils/mathutils";
+import { vec3 } from "gl-matrix";
+import { sectorNormal, wallNormal } from "build/utils";
+import { Controller3D } from "@utils/camera/controller3d";
 
 export type UtilsTool = {
   registerActions: (ad: ActionDescriptors) => Action[]
@@ -22,9 +28,29 @@ function firstTarget(targets: Source<Target[]>): Target {
 
 const refs = new BuildReferenceTrackerImpl();
 
-export function createUtilsTool(boardCtx: BoardContext, selection: Source<Selection>, hitscan: Source<Target[]>, engine: EngineContext, injector: Injector): UtilsTool {
+export function createUtilsTool(boardCtx: BoardContext, selection: Source<Selection>, hitscan: Source<Target[]>, engine: EngineContext, ctl: Controller3D, injector: Injector): UtilsTool {
 
   const grid = (scale = 1) => boardCtx.grid.size.get() * scale;
+
+  const shade = () => {
+    const dir = ctl.getForward();
+    const sh = (x: number) => int(32 + clamp(x, -1, 0) * 64);
+    boardCtx.modifyBoard('shade', board => {
+      Iter.range(0, board.numsectors).forEach(s => {
+        const cn = sectorNormal(vec3.create(), board, s, true);
+        const fn = sectorNormal(vec3.create(), board, s, false);
+        const cdot = vec3.dot(dir, cn);
+        const fdot = vec3.dot(dir, fn);
+        board.sectors[s].ceilingshade = sh(cdot);
+        board.sectors[s].floorshade = sh(fdot);
+      });
+      Iter.range(0, board.numwalls).forEach(w => {
+        const n = wallNormal(vec3.create(), board, w);
+        const dot = vec3.dot(dir, n);
+        board.walls[w].shade = sh(dot);
+      })
+    });
+  }
 
   const doSplitWall = () => {
     const t = firstTarget(hitscan);
@@ -33,7 +59,7 @@ export function createUtilsTool(boardCtx: BoardContext, selection: Source<Select
     const gridSize = boardCtx.grid.size.get();
     const [x, y] = snapWall(boardCtx.data.get().board, w, cx, cy, x => gridSnap(gridSize, x));
     boardCtx.modifyBoard(`Split wall ${w} on ${x},${y}`,
-      board => splitWall(board, w, x, y, p => engine.artMap.get().get(p), refs, engine.api.cloneWall));
+      board => splitWall(board, w, x, y, p => notUndefined(engine.artMap.get().get(p)), refs, engine.api.cloneWall));
   }
 
   const doSplitSectorPoint = () => {
@@ -43,7 +69,7 @@ export function createUtilsTool(boardCtx: BoardContext, selection: Source<Select
     const gridSize = boardCtx.grid.size.get();
     const [x, y] = snapWall(boardCtx.data.get().board, w, cx, cy, x => gridSnap(gridSize, x));
     boardCtx.modifyBoard(`Split Sector on Wall ${w} from point [${x}, ${y}]`,
-      board => splitSectorFromPoint(board, w, [x, y], p => engine.artMap.get().get(p), refs, engine.api));
+      board => splitSectorFromPoint(board, w, [x, y], p => notUndefined(engine.artMap.get().get(p)), refs, engine.api));
   }
 
   const doFillInnerLoop = () => {
@@ -98,6 +124,8 @@ export function createUtilsTool(boardCtx: BoardContext, selection: Source<Select
 
       desc.bindSync('pan-repeat-reset', () => selection.get().handle(new ResetPanRepeat())),
 
+      desc.bindSync('sprite-mode', () => selection.get().handle(new SpriteMode())),
+
       desc.bindSync('flip', () => selection.get().handle(new Flip())),
       desc.bindSync('delete', () => selection.get().handle(new NamedMessage('delete'))),
       desc.bindSync('up', () => selection.get().handle(new NamedMessage('up'))),
@@ -116,6 +144,8 @@ export function createUtilsTool(boardCtx: BoardContext, selection: Source<Select
       desc.bindSync('delete-loop', () => doDeleteLoop()),
       desc.bindSync('delete-full', () => doDeleteFull()),
       desc.bindSync('set-first-wall', () => doSetFirstWall()),
+
+      desc.bindSync('shade', () => shade()),
 
       desc.bind('set-picnum', async () => {
         const sel = selection.get();

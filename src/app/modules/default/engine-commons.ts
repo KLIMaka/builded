@@ -9,11 +9,12 @@ import { loadImageFromBuffer } from "ts-utils/imgutils";
 import { iter } from "ts-utils/iter";
 import { asyncMapOptional, asyncOptional, field } from "ts-utils/objects";
 import { gen, NOOP_TASK_HANDLE } from "ts-utils/scheduler";
-import { first, Function, nil, notUndefined, pair, second } from "ts-utils/types";
-import { begin, tuple } from "ts-utils/work";
+import { first, Fn, nil, notUndefined, pair, second } from "ts-utils/types";
+import { begin, tuple, Work } from "ts-utils/work";
 import { EMPTY, watchFile } from "../fs/fs";
+import { EngineDefs } from "./def-utils";
 
-export async function packegeFs(values: ValuesContainer, fs: Source<FileSystem>, name: string, factory: Function<ArrayBuffer, Promise<FileSystem>>): Promise<Source<FileSystem>> {
+export async function packegeFs(values: ValuesContainer, fs: Source<FileSystem>, name: string, factory: Fn<ArrayBuffer, Promise<FileSystem>>): Promise<Source<FileSystem>> {
   return values.transformedAsync(`packegeFs-${name}`, await watchFile(values, name, fs), async buff => asyncMapOptional(buff, async b => factory(b)).then(o => o.orElse(EMPTY)));
 }
 
@@ -75,15 +76,40 @@ export const loadArtWork = (function () {
     })).finishUntuple();
 })()
 
-export function loadArtMap(values: ValuesContainer, arts: Source<NamedArtFile[]>) {
-  return values.transformed('artMap', arts, artFiles =>
-    iter(artFiles)
-      .map(file => iter(file.art.arts)
-        .enumerate()
-        .map(([info, i]) => pair(file.art.header.start + i, { ...info, artFile: file.name })))
-      .flatten()
-      .toMap(first, second)
-  );
+export function loadArtMapWork(values: ValuesContainer, defs: Source<EngineDefs>, arts: Source<NamedArtFile[]>, fs: Source<FileSystem>, pal: Source<Uint8Array>): Work<[], [Source<Map<number, ArtInfoExtended>>]> {
+  return tuple(async handle => {
+    let loadHandle = NOOP_TASK_HANDLE;
+    const load = async ([artFiles, defs, fs, pal]: [NamedArtFile[], EngineDefs, FileSystem, Uint8Array]): Promise<Map<number, ArtInfoExtended>> => {
+      const map = iter(artFiles)
+        .map(file => iter(file.art.arts)
+          .enumerate()
+          .map(([info, i]) => pair(file.art.header.start + i, { ...info, artFile: file.name })))
+        .flatten()
+        .toMap(first, second);
+
+      iter(defs.tiles)
+        .zip(first(await loadPicAddonsWork(fs, pal, defs.tiles)(loadHandle)))
+        .filter(([t, i]) => i.h !== 0 && i.w !== 0)
+        .forEach(([t, i]) => map.set(notUndefined(t.picnum), i))
+
+      iter(defs.animTileRanges)
+        .forEach(({ start, end, speed, anim }) => {
+          const animType = anim ?? AnimationType.NO_ANIMATION;
+          const picnum = animType === AnimationType.ANIMATE_BACKWARD ? end : start;
+          const frames = Math.abs(start - end);
+          const info = map.get(picnum);
+          if (info === undefined) return;
+          info.attrs = { ...info.attrs, frames, speed, animType };
+        });
+
+      return map;
+    }
+
+    loadHandle = handle;
+    const value = await values.transformedAsyncTuple('artMap', [arts, defs, fs, pal], load);
+    loadHandle = NOOP_TASK_HANDLE;
+    return value;
+  })
 }
 
 export function loadMaxPluId(values: ValuesContainer, plus: Source<Palette[]>) {

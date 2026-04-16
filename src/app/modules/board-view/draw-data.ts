@@ -6,7 +6,7 @@ import { mat4, vec3 } from "gl-matrix";
 import { Source, ValuesContainer } from "ts-utils/callbacks";
 import { getOrCreate, range } from "ts-utils/collections";
 import { Iter, iter } from "ts-utils/iter";
-import { first, Function, pair } from "ts-utils/types";
+import { first, Fn, pair } from "ts-utils/types";
 import { BoardGlContext } from "../gl/board-context";
 import { NOOP_RENDERABLE, Renderable, SectorRecord, SpriteRecord, VoxelRecord, WallRecord, WallType } from "./api";
 import { BoardRenderer3D } from "./boardRenderer3d";
@@ -147,7 +147,7 @@ function getSpriteData(data: BoardData, result: VisResult, voxelSwap: VoxelSwap)
   return { blend, solid, trans, voxel };
 }
 
-function rorMapper(voxelSwap: VoxelSwap, data: BoardData, boardCtx: BoardContext, renderer: BoardRenderer3D, boardGlCtx: BoardGlContext, result: VisResult, pos: ViewPosition, forward: vec3, visited: Set<number>): Function<RorLinkData, RorDrawData> {
+function rorMapper(voxelSwap: VoxelSwap, data: BoardData, boardCtx: BoardContext, renderer: BoardRenderer3D, boardGlCtx: BoardGlContext, result: VisResult, pos: ViewPosition, forward: vec3, visited: Set<number>): Fn<RorLinkData, RorDrawData> {
   return ({ sectorId, link: { buildDiff, dstSector }, type }) => {
     const diff = build2gl(vec3.create(), buildDiff);
     const npos = vec3.sub(vec3.create(), vec3.fromValues(pos.x, pos.y, pos.z), buildDiff);
@@ -207,7 +207,7 @@ function wallType(wall: Wall): WallType {
   return wall.nextsector === -1 ? WallType.VOID : (wall.cstat.masking || wall.cstat.oneWay) ? WallType.MASKED : WallType.NONMASKED;
 }
 
-export function drawImpl(renderer: BoardRenderer3D, gl: WebGL2RenderingContext, blends: Function<number, GlBlend>, rootView: mat4, data: DrawData, view: mat4) {
+export function drawImpl(renderer: BoardRenderer3D, gl: WebGL2RenderingContext, blends: Fn<number, GlBlend>, rootView: mat4, data: DrawData, view: mat4) {
   gl.enable(WebGLRenderingContext.STENCIL_TEST);
   drawImpl1(renderer, gl, blends, rootView, data, view, 0);
   gl.disable(WebGLRenderingContext.STENCIL_TEST);
@@ -215,7 +215,7 @@ export function drawImpl(renderer: BoardRenderer3D, gl: WebGL2RenderingContext, 
   renderer.view(rootView);
 }
 
-export function drawImpl1(renderer: BoardRenderer3D, gl: WebGL2RenderingContext, blends: Function<number, GlBlend>, rootView: mat4, data: DrawData, view: mat4, idx: number) {
+export function drawImpl1(renderer: BoardRenderer3D, gl: WebGL2RenderingContext, blends: Fn<number, GlBlend>, rootView: mat4, data: DrawData, view: mat4, idx: number) {
   writeStenciledOnly(gl, idx);
   renderer.view(view);
 

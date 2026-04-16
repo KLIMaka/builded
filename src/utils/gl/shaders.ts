@@ -78,7 +78,7 @@ function getBaseDir(name: string): string {
 }
 
 export async function createShader({ gl, resource }: GlContext, name: string, defines: string[] = []): Promise<Shader> {
-  const deftext = '#version 300 es\n#pragma debug(on)\n' + defines.map(d => "#define " + d).join("\n") + "\n";
+  const deftext = '#version 300 es\n' + defines.map(d => "#define " + d).join("\n") + "\n";
   const baseDir = getBaseDir(name);
   return Promise.all([loadString(name + '.vsh'), loadString(name + '.fsh')])
     .then(async ([vsh, fsh]) => {

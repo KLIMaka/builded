@@ -11,7 +11,7 @@ uniform highp usampler2D infos;
 
 in vec3 tc;
 in vec4 parallax;
-in float shadow;
+flat in float shadow;
 flat in ivec4 params;
 flat in pic_t picInfo;
 flat in float trans;

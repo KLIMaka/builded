@@ -1,9 +1,9 @@
 import { forEach, map } from "ts-utils/collections";
 import { minValue } from "ts-utils/mathutils";
+import { tuple } from "ts-utils/types";
 import { clockwise, slope } from "../utils";
 import { isValidSectorId, isValidWallId, lastwall, nextwall, sectorOfWall } from "./query";
 import { Board } from "./structs";
-import { pair, tuple } from "ts-utils/types";
 
 export function* sectorWalls(board: Board, sectorId: number): Generator<number> {
   if (!isValidSectorId(board, sectorId))

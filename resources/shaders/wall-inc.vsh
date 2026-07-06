@@ -1,13 +1,17 @@
 
 // vtxId mapping
-// 1----0 
+// 1----0  ceiling
 // |\   |
 // | \  |
 // |  \ |
 // |   \|
-// 3----2
+// 3----2  floor
 
 #define IS_START(v) ((v & 1) == 0)
+const uint VOID_WALL = uint(0);
+const uint TOP_WALL = uint(1);
+const uint BOTTOM_WALL = uint(2);
+const uint MASK_WALL = uint(3);
 
 vec3 getWall3dPos(int vtxId, wall_t wall1, wall_t wall2, vec4 corient, vec4 forient, vec2 ceiling, vec2 floor) {
   vec2 start = wall2.pos;
@@ -79,7 +83,7 @@ struct wall_info_t {
 
 wall_info_t getWallInfo(highp usampler2D sectors, highp usampler2D walls, highp usampler2D infos, uint part,  int vtxId, wall_t wall1, wall_t wall2, sector_t sector) {
   vec4 orient = loadOrient(walls, sector);
-  if (part > uint(0)) {
+  if (part != VOID_WALL) {
     sector_t nextSector = loadSector(sectors, wall1.nextWallSector.y);
     vec4 nextOrient = loadOrient(walls, nextSector);
     vec4 corient = orient;
@@ -89,7 +93,7 @@ wall_info_t getWallInfo(highp usampler2D sectors, highp usampler2D walls, highp 
     wall_t ref = wall1;
     uint cstat = sector.ceilingFloorCstat.x;
     uint ncstat = nextSector.ceilingFloorCstat.x;
-    if (part == uint(2)) {
+    if (part == BOTTOM_WALL) {
       if (wall_cstat_swapBottoms(wall1)) 
         ref = loadWall(walls, wall1.nextWallSector.x);
       corient = nextOrient;
@@ -99,9 +103,9 @@ wall_info_t getWallInfo(highp usampler2D sectors, highp usampler2D walls, highp 
       cstat = sector.ceilingFloorCstat.y;
       ncstat = nextSector.ceilingFloorCstat.y;
     }
-    bool masked = part == uint(3);
+    bool masked = part == MASK_WALL;
     bool isParallax = sector_cstat_parallaxing(cstat) && sector_cstat_parallaxing(ncstat) && !masked;
-    bool ceilingWall = part == uint(1);
+    bool ceilingWall = part == TOP_WALL;
     uint parallaxPal = ceilingWall ? sector.ceilingFloorPal.x : sector.ceilingFloorPal.y;
     int parallaxShade = ceilingWall ? sector.ceilingFloorShade.x : sector.ceilingFloorShade.y;
     int shade = isParallax ? parallaxShade : ref.shade;
@@ -117,7 +121,7 @@ wall_info_t getWallInfo(highp usampler2D sectors, highp usampler2D walls, highp 
         : min(sector.ceilingFloorHeinumZ.y, nextSector.ceilingFloorHeinumZ.y)
       : wall_cstat_alignBottom(ref) 
         ? sector.ceilingFloorHeinumZ.y 
-        : part == uint(1)
+        : part == TOP_WALL
           ? nextSector.ceilingFloorHeinumZ.y
           : nextSector.ceilingFloorHeinumZ.w;
     pic_t picInfo = loadPicInfo(infos, picnum, 0.0);

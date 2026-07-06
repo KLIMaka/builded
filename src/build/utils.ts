@@ -24,12 +24,7 @@ export function getPlayerStart(board: Board): { x: number, y: number, z: number,
   return { x: board.posx, y: board.posy, z, sec: board.cursectnum };
 }
 
-export interface MoveStruct {
-  readonly x: number;
-  readonly y: number;
-  readonly z: number;
-  readonly sec: number;
-}
+export type MoveStruct = Readonly<Record<'x' | 'y' | 'z' | 'sec', number>>;
 
 export function inPolygon(x: number, y: number, points: Iterable<[number, number]>) {
   let inter = 0;

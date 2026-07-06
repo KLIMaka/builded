@@ -34,7 +34,7 @@ export function ValuesView(props: { values: Values }) {
     function lookup(depth: number, container: ValuesContainer): ValuesListRecord[] {
       if (getOrDefault(open, container, false)) {
         const first: ValueContainerRecord = { type: 'container', container, open: true, depth }
-        const values = container.graph.nodes.keys().filter(v => (v as any)?.name !== undefined).map<ValueRecord>(v => ({ type: 'value', depth: depth + 1, value: v as any as Source<any> }));
+        const values = container.getValues().filter(v => (v as any)?.name !== undefined).map<ValueRecord>(v => ({ type: 'value', depth: depth + 1, value: v as any as Source<any> }));
         return [first, ...container.children.values().flatMap(c => lookup(depth + 1, c)), ...values];
       } else return [{ type: 'container', container, open: false, depth }];
     }

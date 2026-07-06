@@ -1,16 +1,14 @@
-import { Axes } from "@ui/axes";
-import { Column, Row, Spacer, useValue } from "@ui/commons";
+import { Column, Row, Spacer, useValue, Workplane, WorkplaneBuilder } from "@ui/commons";
 import { Controller3D } from "@utils/camera/controller3d";
 import { StateChecker } from "app/apis/actions";
 import { ArtInfoExtended, BoardContext, EngineContext } from "app/apis/engine";
+import { Axes } from "app/modules/board-view/ui/axes";
 import { Board, SectorStats, SpriteStats, WallStats } from "build/board/structs";
 import { EMPTY_ENTITY, Entity, EntityType } from "build/hitscan";
 import React, { createContext, useContext, useEffect, useRef } from "react";
-import { AutoSizer } from "react-virtualized";
 import { Source } from "ts-utils/callbacks";
 import { iter } from "ts-utils/iter";
 import { objectKeys } from "ts-utils/objects";
-import { Consumer } from "ts-utils/types";
 import { ViewPosition } from "../view";
 
 function InfoRow(props: { label: string, value: any }) {
@@ -18,14 +16,6 @@ function InfoRow(props: { label: string, value: any }) {
     <div className='form-row-label'>{props.label}</div>
     <div className='form-row-content'>{props.value}</div>
   </Row>
-}
-
-function View(props: { canvas: Consumer<HTMLCanvasElement | null>, }) {
-  return <AutoSizer className="flex-fill" >
-    {({ height, width }) => (
-      <canvas tabIndex={1} height={height} width={width} ref={c => props.canvas(c)} />
-    )}
-  </AutoSizer>
 }
 
 type Utils = {
@@ -153,11 +143,11 @@ function Footer(props: { board: Source<Board> }) {
   </div>
 }
 
-export function BoardViewWindow(props: { canvas: Consumer<HTMLCanvasElement | null>, states: StateChecker[], board: Source<Board>, ent: Source<Entity>, ctl: Controller3D }) {
+export function BoardViewWindow(props: { builders: WorkplaneBuilder[], states: StateChecker[], board: Source<Board>, ent: Source<Entity>, ctl: Controller3D }) {
   return (
     <Column>
-      <Column>
-        <View canvas={props.canvas} />
+      <Column style={{ position: 'relative' }}>
+        <Workplane builders={props.builders} />
         <div style={{ position: 'absolute', right: 0, bottom: 0, padding: '5px', width: '200px' }} ><InfoPanel board={props.board} ent={props.ent} /></div>
         <div style={{ position: 'absolute', left: 0, bottom: 0, padding: '5px' }} ><Axes cameraAngles={props.ctl.camera.angle} /></div>
       </Column>

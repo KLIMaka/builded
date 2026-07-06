@@ -1,5 +1,5 @@
 import { point_3d, buildHull, Point } from '../src/build/board/mutations/drawwall';
-import { cyclic } from '../src/utils/mathutils';
+import { cyclic } from 'ts-utils/mathutils';
 
 const proj = (x: number, y: number) => [0, 0, x] as [number, number, number];
 

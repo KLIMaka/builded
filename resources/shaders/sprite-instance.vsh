@@ -19,7 +19,6 @@ uniform highp usampler2D sectors;
 in uint aSpriteId_u16;
 
 out vec3 tc;
-out float lightOff;
 flat out ivec4 params;
 flat out pic_t picInfo;
 flat out float trans;
@@ -144,13 +143,6 @@ ivec2 getShadePal(uint type, sprite_t sprite, sector_t sector) {
   return ivec2(shade, pal);
 }
 
-float getLightOff(uint type, sprite_t sprite) {
-  if (type != SPRITE_TYPE_FACE) return 0.0;
-  vec2 toSprite = normalize(sprite.pos.xy - curpos().xz);
-  float diff = float(sprite.ang) / 2048.0 - ang(toSprite) + 0.5;
-  return diff + (IS_RIGHT ? .75 : .25);
-}
-
 void main() {
   sprite_t sprite = loadSprite(sprites, aSpriteId_u16);
   uint type = sprite_cstat_type(sprite);
@@ -169,5 +161,4 @@ void main() {
   if (type == SPRITE_TYPE_FACE) gl_Position = getFacePos(picInfo, sprite);
   else if (type == SPRITE_TYPE_WALL) gl_Position = getWallPos(picInfo, sprite);
   else if (type == SPRITE_TYPE_FLOOR) gl_Position = getFloorPos(picInfo, sprite);
-  lightOff = getLightOff(type, sprite);
 }

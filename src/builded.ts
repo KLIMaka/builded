@@ -59,7 +59,6 @@ injector.bind(new Dependency<void>("", true), provider(async i => {
     actions.bind('rectifier', async () => ui.addWindow(await createRectifier(i))),
     actions.bind('engines-context', async () => ui.addWindow(await createEngines(i))),
     actions.bind('settings', async () => ui.addWindow(await createSettings(i))),
-    // actions.bind('test1', async () => rectWindow.focus())
   );
 
   const handle = (): boolean => iter(ui.actions())

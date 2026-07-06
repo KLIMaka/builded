@@ -2,7 +2,7 @@ import { ACTION_DESCRIPTORS, ActionDescriptors } from "app/apis/actions";
 import { Ui, UI } from "app/apis/ui";
 import { VALUES, Values } from "app/apis/values";
 import { GrpFile } from "build/formats/grp";
-import { RffFile } from "build/formats/rff";
+import { RffFile, RffFileType } from "build/formats/rff";
 import JSZip from "jszip";
 import Optional from "optional-js";
 import { match } from "ts-pattern";
@@ -311,11 +311,13 @@ class StorageFS extends BaseFS implements FileSystem, WritableFileSystem, FileSo
   }
 
   async info(name: string): Promise<Optional<FileInfo>> {
-    return this.infoStorage.get<FileInfo>(name);
+    return (await this.infoStorage.get<FileInfo>(name))
+      .map(i => ({ ...i, src: this }));
   }
 
   async list(): Promise<FileInfo[]> {
-    return await this.infoStorage.getAll<FileInfo>();
+    return (await this.infoStorage.getAll<FileInfo>())
+      .map(i => ({ ...i, src: this }));
   }
 
   async delete(name: string) {
@@ -528,7 +530,7 @@ export async function createGrpOrZipFsArrayBuffer(name: string, file: ArrayBuffe
 class RffFS extends BaseFS implements FileSystem, FileSource {
   constructor(
     name: string,
-    private rff: RffFile,
+    private rff: RffFileType,
     private fileLastModified: number = 0,
   ) {
     super('rff', name)
@@ -544,7 +546,7 @@ class RffFS extends BaseFS implements FileSystem, FileSource {
   }
 
   async list(): Promise<FileInfo[]> {
-    return this.rff.fat.map(r => { return { name: r.filename, size: r.size, lastModified: this.fileLastModified, src: this } });
+    return this.rff.getFat().map(r => { return { name: r.filename, size: r.size, lastModified: this.fileLastModified, src: this } });
   }
 
   async writable(): Promise<Optional<WritableFileSystem>> {
@@ -558,6 +560,10 @@ export async function createRffFs(file: File): Promise<RffFS> {
 
 export function createRffFsArrayBuffer(name: string, buffer: ArrayBuffer): FileSystem {
   return new RffFS(name, new RffFile(buffer));
+}
+
+export function createRffFsFile(name: string, rffFile: RffFileType): FileSystem {
+  return new RffFS(name, rffFile);
 }
 
 class GrpFS extends BaseFS implements FileSystem, FileSource {
@@ -634,6 +640,17 @@ export async function watchFile(values: ValuesContainer, name: string, fs: Sourc
     })
   }
   return values.transformedAsync<FileSystem, Optional<ArrayBuffer>>(`watch file '${name}'`, fs, async fs => fs.read(name), nil(), srcConnector)
+}
+
+export async function watchFileNamed(values: ValuesContainer, name: Source<string>, fs: Source<FileSystem>): Promise<Source<Optional<ArrayBuffer>>> {
+  const srcConnector = ([fs, name]: [FileSystem, string], file: Value<Optional<ArrayBuffer>>): Disconnector => {
+    return fs.subscribe(async (changed, deleted) => {
+      if (!streqci(name, changed)) return;
+      if (deleted) file.set(Optional.empty())
+      else file.set(await fs.read(name));
+    })
+  }
+  return values.transformedAsyncTuple<[FileSystem, string], Optional<ArrayBuffer>>(`watch file '${name.name}'`, [fs, name], async ([fs, name]) => fs.read(name), nil(), srcConnector)
 }
 
 export function trackFiles<Args extends any[], T>(

@@ -6,13 +6,13 @@ import { Board, Sector, Sprite, Wall } from "../../build/board/structs";
 import { ArtFile, ArtInfo, EMPTY_INFO } from "../../build/formats/art";
 import { VoxelData } from "build/formats/kvx";
 import Optional from "optional-js";
-import { FileSystem } from "./fs";
+import { FileInfo, FileSystem } from "./fs";
 import { BiConsumer, Consumer, Fn } from "ts-utils/types";
 import { vec3 } from "gl-matrix";
 import { Draft } from "immer";
 import { SpriteDescriptor } from "build/sprites";
 
-export interface PicTags {
+export type PicTags = {
   allTags(): Iterable<string>;
   tags(picnum: number): Iterable<string>;
 }
@@ -24,10 +24,10 @@ export type Aliases = {
 }
 export const EMPTY_ALIASES = { get: _ => '', all: emptyMap } as Aliases;
 
-export type Palette = { readonly id: number, readonly name: string, readonly plu: Uint8Array }
-export type NamedArtFile = { readonly name: string, readonly art: ArtFile }
-export type ArtInfoExtended = ArtInfo & { readonly artFile: string }
-export const EMPTY_INFO_EXTENDED = { ...EMPTY_INFO, artFile: '' } as ArtInfoExtended;
+export type Palette = Readonly<{ id: number, name: string, plu: Uint8Array }>;
+export type NamedArtFile = Readonly<{ name: string, art: ArtFile, info: FileInfo }>;
+export type ArtInfoExtended = ArtInfo & Readonly<{ artFile: string }>
+export const EMPTY_INFO_EXTENDED: ArtInfoExtended = { ...EMPTY_INFO, artFile: '' };
 
 export type EngineSettings = Readonly<{
   spriteShadowOff: boolean;
@@ -46,6 +46,18 @@ export type VoxelSwap = (picnum: number) => Optional<VoxelData>;
 export type GlBlend = { src: number, dst: number };
 export const DEFAULT_BLEND: GlBlend = { src: WebGL2RenderingContext.SRC_ALPHA, dst: WebGL2RenderingContext.ONE_MINUS_SRC_ALPHA };
 
+export type Sound = Readonly<{
+  id: number,
+  file: string,
+  sampleRate: number,
+  pitchLower: number,
+  pitchUpper: number,
+  priority: number,
+  type: number,
+  distance: number,
+  volume: number,
+}>;
+
 export type EngineContext<B extends Board = Board> = Readonly<{
   name: Source<string>,
   api: EngineApi<B>,
@@ -62,9 +74,11 @@ export type EngineContext<B extends Board = Board> = Readonly<{
   aliases: Source<Aliases>,
   spriteVoxelSwap: Source<VoxelSwap>,
   blends: Source<Fn<number, GlBlend>>,
+  sounds: Source<Sound[]>,
   parallaxInfo: Fn<number, number>;
 
   loadBoard(stream: Stream, name?: string): Promise<BoardContext<B>>;
+  createBoard(): Promise<BoardContext<B>>;
 }> & Disposable;
 
 export type SectorDrawType = 'normal' | 'nodraw' | 'trans1' | 'trans2';

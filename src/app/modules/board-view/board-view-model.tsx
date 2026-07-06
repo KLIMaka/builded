@@ -12,24 +12,25 @@ import { ArtRaster } from "build/artraster";
 import { BloodBoard } from "build/blood/structs";
 import { findSector } from "build/board/query";
 import { Sector, Sprite, Wall } from "build/board/structs";
-import { build2gl, getPlayerStart, gl2build } from "build/utils";
+import { ZSCALE, build2gl, getPlayerStart, gl2build } from "build/utils";
 import { vec3 } from "gl-matrix";
 import React from "react";
 import { Source, ValuesContainer, disposer } from "ts-utils/callbacks";
 import { getOrDefault } from "ts-utils/collections";
+import { cookbook } from "ts-utils/cookbook";
 import { drawToCanvas } from "ts-utils/imgutils";
 import { Injector, getInstances } from "ts-utils/injector";
 import { quadraticInterpolator } from "ts-utils/interpolator";
-import { Iter, iter } from "ts-utils/iter";
+import { iter } from "ts-utils/iter";
 import { int } from "ts-utils/mathutils";
 import { applyNotNullish } from "ts-utils/objects";
 import { fit, palRasterizer, pluTransform, transform } from "ts-utils/pixelprovider";
-import { Scheduler, gen } from "ts-utils/scheduler";
+import { Scheduler, Task, gen } from "ts-utils/scheduler";
 import { Stream } from "ts-utils/stream";
 import { DelayedValue } from "ts-utils/timed";
-import { Result, notNull } from "ts-utils/types";
-import { Work, begin } from "ts-utils/work";
+import { Result, nil, notNull } from "ts-utils/types";
 import { createBoardGlContext } from "../gl/board-context";
+import { WorkplaneBuilder, WorkplaneHandlers, canvasWorkplane } from "../ui/commons";
 import { Renderable } from "./api";
 import { BoardRenderer3D } from "./boardRenderer3d";
 import { createToRender, drawImpl } from "./draw-data";
@@ -39,6 +40,7 @@ import { createDrawSectorTool } from "./tools/drawsector";
 import { createTransform } from "./tools/transform";
 import { createUtilsTool } from "./tools/utils";
 import { BoardViewWindow, UtilsContext } from "./ui/board-view-ui";
+import { Gizmo } from "./ui/gizmo";
 import { ViewPosition } from "./view";
 
 function createViewPosition(values: ValuesContainer, ctl: Controller3D, boardCtx: BoardContext): Source<ViewPosition> {
@@ -60,44 +62,42 @@ async function loadBoardContext(ctx: EngineContext, mapName: string) {
   return ctx.loadBoard(new Stream(mapFile), mapName);
 }
 
-export async function createBoardView(injector: Injector, ctx: EngineContext, textures: EngineTextures, rendererProvider: Work<[], Source<BoardRenderer3D>>, mapName: string): Promise<Result<Window>> {
-  const values = await injector.getInstance(VALUES);
+export async function createBoardView(injector: Injector, ctx: EngineContext, textures: EngineTextures, rendererProvider: Task<Source<BoardRenderer3D>>, mapName: string): Promise<Result<Window>> {
+  const [values, app, actionDescriptors, glContext, ui] = await getInstances(injector, VALUES, APP, ACTION_DESCRIPTORS, GL_CONTEXT, UI);
   return values.create(`board-view`).initializeAsync(async localValues => {
     localValues.handleStandalone([ctx.settings], settings => {
       textures.get(settings.fontPicnum).get();
       textures.get(settings.pointPicnum).get();
     });
-    const [app, actionDescriptors, glContext, ui] = await getInstances(injector, APP, ACTION_DESCRIPTORS, GL_CONTEXT, UI);
-    const task = app.scheduler.exec(begin()
-      .thenPass('Loading map', () => loadBoardContext(ctx, mapName))
-      .forkPass(p => p
-        .threadWork(rendererProvider)
-        .threadWork(async (handle, boardCtx) => {
-          const { board, parallaxPicnums } = boardCtx.data.get();
-          const loadSectorTextures = (sector: Sector) => {
-            textures.get(sector.ceilingpicnum, sector.ceilingstat.parallaxing ? parallaxPicnums : 1).get();
-            textures.get(sector.floorpicnum, sector.floorstat.parallaxing ? parallaxPicnums : 1).get();
-          }
-          const loadSpriteTextures = (sprite: Sprite) => {
-            textures.get(sprite.picnum).get()
-            ctx.spriteVoxelSwap.get()(sprite.picnum).ifPresent(_ => textures.voxels.get()(sprite.picnum))
-          }
-          const loadWallTextures = (wall: Wall) => {
-            textures.get(wall.picnum).get();
-            textures.get(wall.overpicnum).get();
-          }
-          boardCtx.onSectorsChange((b, ss) => ss.forEach(s => applyNotNullish(b.board.sectors[s], loadSectorTextures)));
-          boardCtx.onSpritesChange((b, ss) => ss.forEach(s => applyNotNullish(b.board.sprites[s], loadSpriteTextures)));
-          boardCtx.onWallsChange((b, ws) => ws.forEach(w => applyNotNullish(b.board.walls[w], loadWallTextures)));
-          const tasks = iter(board.sectors).map(s => () => loadSectorTextures(s))
-            .chain(iter(board.sprites).map(s => () => loadSpriteTextures(s)))
-            .chain(iter(board.walls).map(w => () => loadWallTextures(w)))
-            .collect();
-          await handle.waitMaybe(gen(tasks, (_, i, total) => `Preloading textures (${i}/${total})`), 'Preloading textures');
-          return []
-        }))
-      .then('Constructing window', async (boardCtx, [renderer]) => createWindow(values, localValues, ctx, boardCtx, renderer, glContext, app, ui, actionDescriptors, injector))
-      .finishUntuple());
+    const task = app.scheduler.exec(cookbook(book => {
+      const boardCtx = book.recepie('Loading map', [], async () => loadBoardContext(ctx, mapName));
+      const renderer = book.paste([], rendererProvider);
+      const postLoad = book.paste([boardCtx], async (handle, boardCtx) => {
+        const { board, parallaxPicnums } = boardCtx.data.get();
+        const loadSectorTextures = (sector: Sector) => {
+          textures.get(sector.ceilingpicnum, sector.ceilingstat.parallaxing ? parallaxPicnums : 1).get();
+          textures.get(sector.floorpicnum, sector.floorstat.parallaxing ? parallaxPicnums : 1).get();
+        }
+        const loadSpriteTextures = (sprite: Sprite) => {
+          textures.get(sprite.picnum).get()
+          ctx.spriteVoxelSwap.get()(sprite.picnum).ifPresent(_ => textures.voxels.get()(sprite.picnum))
+        }
+        const loadWallTextures = (wall: Wall) => {
+          textures.get(wall.picnum).get();
+          textures.get(wall.overpicnum).get();
+        }
+        boardCtx.onSectorsChange((b, ss) => ss.forEach(s => applyNotNullish(b.board.sectors[s], loadSectorTextures)));
+        boardCtx.onSpritesChange((b, ss) => ss.forEach(s => applyNotNullish(b.board.sprites[s], loadSpriteTextures)));
+        boardCtx.onWallsChange((b, ws) => ws.forEach(w => applyNotNullish(b.board.walls[w], loadWallTextures)));
+        const tasks = iter(board.sectors).map(s => () => loadSectorTextures(s))
+          .chain(iter(board.sprites).map(s => () => loadSpriteTextures(s)))
+          .chain(iter(board.walls).map(w => () => loadWallTextures(w)))
+          .collect();
+        await handle.waitMaybe(gen(tasks, (_, i, total) => `Preloading textures (${i}/${total})`), 'Preloading textures');
+      })
+      return book.recepie('Constructing window', [boardCtx, renderer, postLoad], async (boardCtx, renderer, _) =>
+        createWindow(values, localValues, ctx, boardCtx, renderer, glContext, app, ui, actionDescriptors, injector));
+    }));
     return waitFor(ui, actionDescriptors, values, `Opening map ${mapName}`, task);
   });
 }
@@ -141,27 +141,21 @@ function createWindow(values: Values, localValues: ValuesContainer, engine: Engi
   const { board } = boardCtx.data.get();
 
   const sprite = getPlayerStart(board);
-  const ctl = new Controller3D(localValues);
+  const ctl = new Controller3D(localValues.createChild('camera'));
 
   const [posx, posy, posz] = build2gl(vec3.create(), vec3.fromValues(sprite.x, sprite.y, sprite.z));
   ctl.setPosition(posx, posy, posz);
-  const viewPosition = createViewPosition(localValues, ctl, boardCtx);
-  const hitscan = createHitscan(localValues, ctl, viewPosition, engine.artMap, boardCtx);
-  const targets = createTargets(localValues, hitscan);
-  const snapTarget = createSnapTarget(localValues, hitscan, boardCtx);
+  const viewPosition = createViewPosition(localValues.createChild('viewPosition'), ctl, boardCtx);
+  const hitscan = createHitscan(localValues.createChild('hitscan'), ctl, viewPosition, engine.artMap, boardCtx);
+  const targets = createTargets(localValues.createChild('targets'), hitscan);
+  const snapTarget = createSnapTarget(localValues.createChild('snapTargets'), hitscan, boardCtx);
   // const entity = createEntity(values, targets);
   const entity = localValues.field('entyty', snapTarget, 'entity');
-  const selection = createSelection(localValues, entity, boardCtx, engine);
+  const selection = createSelection(localValues.createChild('selection'), entity, boardCtx, engine);
   const moveState = localValues.value('move-state', false);
   const verticalState = localValues.value('vertical-state', false);
   const parallelState = localValues.value('parallel-state', false);
-  const transform = createTransform(localValues, ctl, moveState, parallelState, verticalState, hitscan, selection, renderer);
-
-  let lookaim = false;
-  const mousemove = (e: MouseEvent) => ctl.track(e.offsetX, e.offsetY, lookaim);
-  const canvasValue = localValues.valueBuilder<HTMLCanvasElement | undefined | null>({ name: 'canvasValue', value: undefined, disposer: c => c?.removeEventListener('mousemove', mousemove) });
-  localValues.addSubscribed(canvasValue, c => { if (c) ctl.setSize(c.clientWidth, c.clientHeight) });
-  localValues.addSubscribed(canvasValue, c => c?.addEventListener('mousemove', mousemove));
+  const transform = createTransform(localValues.createChild('transform'), ctl, moveState, parallelState, verticalState, hitscan, selection, renderer);
 
   const vis = localValues.value('vis', (board as BloodBoard).visibility ?? 512);
   const shadowOff = localValues.value('shadow-mod', 0);
@@ -169,11 +163,44 @@ function createWindow(values: Values, localValues: ValuesContainer, engine: Engi
   localValues.handleStandalone([shadowOff, renderer], ([shadow, renderer]) => renderer.globalShadow(shadow));
   localValues.handleStandalone([boardCtx.grid.size, renderer], ([gridSize, renderer]) => renderer.grid(gridSize));
 
-  const toRender = createToRender(renderer, boardCtx, boardGlCtx, engine, localValues, viewPosition, ctl.camera.forward);
+
+  const toRender = createToRender(renderer, boardCtx, boardGlCtx, engine, localValues.createChild('renderer'), viewPosition, ctl.camera.forward);
   const overlay = localValues.transformedTuple('overlay', [entity, boardCtx.data, engine.settings, renderer, engine.aliases, engine.artMap], getOverlay(boardGlCtx), { disposer: disposer() })
-  const utils = createUtils(localValues, engine);
-  const drawSectorTool = createDrawSectorTool(localValues, ctl, renderer, engine.settings, hitscan, boardCtx, engine);
+  const utils = createUtils(localValues.createChild('utils'), engine);
+  const drawSectorTool = createDrawSectorTool(localValues.createChild('drawSectorTool'), ctl, renderer, engine.settings, hitscan, boardCtx, engine);
   const utilsTool = createUtilsTool(boardCtx, selection, hitscan, engine, ctl, injector);
+
+  const canvasValue = localValues.valueBuilder<HTMLCanvasElement | undefined>({ name: 'canvasValue', value: undefined });
+  const boardView = canvasWorkplane((canvas, w, h) => {
+    canvasValue.set(canvas);
+    ctl.setSize(w, h);
+    return () => canvasValue.set(undefined);
+  });
+
+  const pos = localValues.value('pos', vec3.create());
+  const overlayView: WorkplaneBuilder = (width, height, key) => {
+    const handlers: WorkplaneHandlers = {
+      handleMouseMove: e => ctl.track(e.offsetX, e.offsetY, (e.buttons & 2) !== 0),
+      handleClick: _ => {
+        const e = entity.get();
+        if (e.isSprite()) {
+          const spr = boardCtx.data.get().board.sprites[e.id];
+          pos.set(vec3.fromValues(spr.x, spr.z / ZSCALE, spr.y));
+        }
+      },
+      handleWheel: nil(),
+      handleMouseButton: nil(),
+    }
+    return <Gizmo
+      width={width}
+      height={height}
+      projection={ctl.projection}
+      camPos={ctl.camera.position}
+      transform={ctl.camera.transform}
+      pos={pos} key={key}
+      handlers={handlers} />
+  };
+
 
   const actionsCtx = actionDescriptors.sub('board-view');
   const bind = (name: string) => actionsCtx.get(name).bind().get();
@@ -187,7 +214,6 @@ function createWindow(values: Values, localValues: ValuesContainer, engine: Engi
     { bind: bind('back'), action: s => backDamper.set(s ? -1 : 0) },
     { bind: bind('strife-left'), action: s => leftDamper.set(s ? -1 : 0) },
     { bind: bind('strife-right'), action: s => rightDamper.set(s ? 1 : 0) },
-    { bind: bind('lookaim'), action: s => lookaim = s },
     { bind: bind('move'), action: s => moveState.set(s) },
     { bind: bind('move-vertical'), action: s => verticalState.set(s) },
     { bind: bind('move-parallel'), action: s => parallelState.set(s) },
@@ -262,7 +288,7 @@ function createWindow(values: Values, localValues: ValuesContainer, engine: Engi
     .build(
       <UtilsContext.Provider value={{ ...utils, viewPosition, boardCtx, engine }}>
         <BoardViewWindow
-          canvas={c => canvasValue.set(c)}
+          builders={[boardView, overlayView]}
           states={states}
           board={localValues.field('board', boardCtx.data, 'board')}
           ent={entity}

@@ -1,12 +1,11 @@
 import { Action, ActionDescriptors, ActionsProvider, StateChecker } from 'app/apis/actions';
-import { Values } from 'app/apis/values';
 import { Bind } from 'app/input/keymap';
 import React, { ForwardedRef, HTMLProps, MouseEventHandler, ReactNode, RefObject, createContext, forwardRef, useContext, useRef, useSyncExternalStore } from 'react';
 import { AutoSizer } from 'react-virtualized';
 import { Disconnector, Source, Value, ValuesContainer } from 'ts-utils/callbacks';
 import { getOrCreate } from 'ts-utils/collections';
 import { iter } from 'ts-utils/iter';
-import { Consumer, MultiConsumer, MultiFn, Supplier, identity, nil, seq } from 'ts-utils/types';
+import { Consumer, MultiFn, Supplier, identity, nil, seq } from 'ts-utils/types';
 import { ActionItem } from './action-list';
 
 export const Column = forwardRef(function Column({ children, className, ...rest }: React.HTMLProps<HTMLDivElement> & { className?: string }, ref: ForwardedRef<HTMLDivElement>) {
@@ -329,7 +328,7 @@ export function addEventListener<K extends keyof HTMLElementEventMap>(elem: HTML
   return () => elem.removeEventListener(type, listener);
 }
 
-export type WorkplaneBuilder = MultiConsumer<[HTMLCanvasElement | null, number, number]>;
+export type WorkplaneBuilder = MultiFn<[number, number, number], React.JSX.Element>;
 export type WorkplaneContext = {
   xmouse: number,
   ymouse: number,
@@ -359,15 +358,24 @@ export function defaultWorkplaneContext(def: Partial<WorkplaneContext>): Workpla
   }
 }
 
-export function workplane(f: MultiFn<[HTMLCanvasElement, number, number], Disconnector>): WorkplaneBuilder {
-  let disconnector: Disconnector;
-  return (canvas, width, height) => {
-    disconnector?.();
-    if (canvas != null) disconnector = f(canvas, width, height);
+export function canvasWorkplane(f: MultiFn<[HTMLCanvasElement, number, number], Disconnector>): WorkplaneBuilder {
+  return (width, height, key) => {
+    let disconnector: Disconnector | undefined = undefined;
+    const onMount = (canvas: HTMLCanvasElement | null) => {
+      disconnector?.();
+      disconnector = canvas ? f(canvas, width, height) : undefined;
+    };
+    return <canvas ref={ref => onMount(ref)} height={height} width={width} style={{ position: 'absolute' }} key={key} />
   }
 }
 
-export function workplaneController(ctx: Value<WorkplaneContext>): WorkplaneBuilder {
+export type WorkplaneHandlers = {
+  handleMouseMove: Consumer<MouseEvent>,
+  handleWheel: Consumer<WheelEvent>,
+  handleMouseButton: Consumer<MouseEvent>,
+  handleClick: Consumer<MouseEvent>,
+}
+export function workplaneControllerHandlers(ctx: Value<WorkplaneContext>): WorkplaneHandlers {
   function handleMouseMove(e: MouseEvent) {
     const ctxValue = ctx.get();
     const x = e.offsetX;
@@ -386,10 +394,13 @@ export function workplaneController(ctx: Value<WorkplaneContext>): WorkplaneBuil
   }
   function handleWheel(e: WheelEvent) {
     ctx.modImmer(ctx => {
-      const ds = e.deltaY > 0 ? (1 / 1.1) : e.deltaY < 0 ? 1.1 : 1;
+      // const ds = e.deltaY > 0 ? (1 / 1.1) : e.deltaY < 0 ? 1.1 : 1;
+      const ds = e.deltaY > 0 ? -1 : 1;
       const x1 = ctx.xmouse / ctx.scale - ctx.xoff1 / ctx.scale;
       const y1 = ctx.ymouse / ctx.scale - ctx.yoff1 / ctx.scale;
-      ctx.scale *= ds;
+      const s = (ctx.scale < 1 ? 1 / -ctx.scale + 1 : ctx.scale - 1) + ds;
+      ctx.scale = s < 0 ? -1 / (s - 1) : s + 1;
+      // ctx.scale *= ds;
       const x2 = ctx.xmouse / ctx.scale - ctx.xoff1 / ctx.scale;
       const y2 = ctx.ymouse / ctx.scale - ctx.yoff1 / ctx.scale;
       ctx.xoff1 += (x2 - x1) * ctx.scale;
@@ -401,7 +412,13 @@ export function workplaneController(ctx: Value<WorkplaneContext>): WorkplaneBuil
     if (!ctx.get().disable)
       ctx.modImmer(c => c.dragging = e.buttons)
   }
-  return workplane((canvas, w, h) => {
+
+  return { handleMouseButton, handleMouseMove, handleWheel, handleClick: nil() }
+}
+
+export function workplaneController(ctx: Value<WorkplaneContext>): WorkplaneBuilder {
+  const { handleMouseMove, handleWheel, handleMouseButton } = workplaneControllerHandlers(ctx);
+  return canvasWorkplane((canvas, w, h) => {
     const moveD = addEventListener(canvas, 'mousemove', handleMouseMove);
     const wheelD = addEventListener(canvas, 'wheel', handleWheel);
     const mouseBtnDownD = addEventListener(canvas, 'mousedown', handleMouseButton);
@@ -412,21 +429,21 @@ export function workplaneController(ctx: Value<WorkplaneContext>): WorkplaneBuil
 }
 
 export function Workplane(props: { builders: WorkplaneBuilder[] }) {
-  return (<div className='flex-fill'>
+  return <div className='flex-fill'>
     <AutoSizer>
-      {({ height, width }) => (<>{iter(props.builders)
-        .enumerate()
-        .map(([b, i]) =>
-          <Plane width={width} height={height} builder={b} key={i} />
-        ).collect()}</>)}
+      {({ height, width }) => width <= 0 || height <= 0
+        ? <></>
+        : <>{props.builders.map((b, i) => b(width, height, i))}</>}
     </AutoSizer>
-  </div>)
+  </div>
 }
 
 
-function Plane({ height, width, builder }: { height: number, width: number, builder: WorkplaneBuilder }) {
-  return <canvas ref={ref => builder(ref, width, height)} height={height} width={width} style={{ position: 'absolute' }} />
-}
+// function Plane({ height, width, builder }: { height: number, width: number, builder: WorkplaneBuilder }) {
+//   return width <= 0 || height <= 0
+//     ? <></>
+//     : <canvas ref={ref => builder(ref, width, height)} height={height} width={width} style={{ position: 'absolute' }} />
+// }
 
 export type GridMove = 'up' | 'down' | 'left' | 'right' | 'pageup' | 'pagedown';
 export function getGridOff(move: GridMove, [cols, rows]: [number, number]): number {

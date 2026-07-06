@@ -1,13 +1,14 @@
-import { ScriptFile, boolRule, createScripFile, nestedRule, number, numberRule, pushField, rule, rules, rulesInclude, set, simpleRule, stringRule, token, tuple } from "@utils/scriptfile";
 import { FileSystem } from "app/apis/fs";
 import { Source, ValuesContainer } from "ts-utils/callbacks";
 import { asyncMapOptional } from "ts-utils/objects";
-import { NOOP_TASK_HANDLE } from "ts-utils/scheduler";
 import { Stream } from "ts-utils/stream";
-import { first, identity, nil } from "ts-utils/types";
-import { Work, begin, tuple as tupleWork } from "ts-utils/work";
+import { first, identity, nil, typeToken } from "ts-utils/types";
+import { DefFile, boolRule, createDefFile, nestedRule, number, numberRule, pushField, rule, rules, rulesInclude, set, simpleRule, stringRule, token, tuple } from "utils/deffile";
 import { openFileOptional } from "../default/engine-commons";
 import { EMPTY, createGrpOrZipFsArrayBuffer, stack, trackFiles } from "../fs/fs";
+import { taskHandleContext } from "../scheduler/utils";
+import { cookbook, cookbookInput } from "ts-utils/cookbook";
+import { Task } from "ts-utils/scheduler";
 
 export type FileDef = Partial<{ file: string, offset: number }>;
 export type VoxelDef = Partial<{ picnum: number }> & FileDef;
@@ -29,7 +30,7 @@ export type EngineDefs = {
   tiles: TileFromTexture[],
   animTileRanges: AnimTileRange[],
 }
-export type GrpInfo = { name?: string, defname?: string }
+export type GrpInfo = { name?: string, defname?: string, scriptname?: string }
 
 export function cloneDefs(defs: EngineDefs): EngineDefs {
   return {
@@ -81,13 +82,17 @@ async function openGrp(values: ValuesContainer, fs: Source<FileSystem>, grpName:
   return values.transformedAsync(fn, file, o => o.map(ab => createGrpOrZipFsArrayBuffer(fn, ab)).orElse(Promise.resolve(EMPTY)));
 }
 
-export function loadEngineDefsWork(grpName: string, values: ValuesContainer): Work<[Source<FileSystem>, Source<string>], [Source<EngineDefs>]> {
+const glBlendRule = rules<GlBlendDef>(
+  simpleRule(['src'], tuple(token), set('src')),
+  simpleRule(['dst'], tuple(token), set('dst')));
+
+export function loadEngineDefsWork(grpName: string, values: ValuesContainer): Task<Source<EngineDefs>, [Source<FileSystem>, Source<string>]> {
   const files = new Set<string>();
 
-  function loadWork(defname: string, defs: EngineDefs): Work<[], [EngineDefs]> {
+  function loadTask(defname: string, defs: EngineDefs): Task<EngineDefs> {
     files.clear();
     let fs = stack(defs.root, defs.mainGrp);
-    const loadGrp = async (sf: ScriptFile, defs: EngineDefs, fn: string): Promise<void> => {
+    const loadGrp = async (sf: DefFile, defs: EngineDefs, fn: string): Promise<void> => {
       const file = await defs.root.read(fn);
       await asyncMapOptional(file, ab => createGrpOrZipFsArrayBuffer(fn, ab))
         .then(o => o.ifPresent(grp => {
@@ -96,9 +101,6 @@ export function loadEngineDefsWork(grpName: string, values: ValuesContainer): Wo
           files.add(fn);
         }));
     }
-    const glBlendRule = rules<GlBlendDef>(
-      simpleRule(['src'], tuple(token), set('src')),
-      simpleRule(['dst'], tuple(token), set('dst')));
     const engineDefsRule = rulesInclude(inc => fs.read(inc), files,
       rule(['loadgrp'], tuple(token), loadGrp),
       nestedRule(['palookup'], tuple(number), (_, id) => ({ id }), pushField('plus'), rules<PluDef>(
@@ -132,29 +134,22 @@ export function loadEngineDefsWork(grpName: string, values: ValuesContainer): Wo
           nestedRule(['reverse'], tuple(), _ => ({}), set('reverse'), glBlendRule)
         )))));
 
-    return begin()
-      .thenPass('Loading def File', () => fs.read(defname))
-      .then('Parsing def file', defFile =>
-        defFile
-          .map(def => createScripFile(defname, def).parse(cloneDefs(defs), engineDefsRule))
-          .orElse(Promise.resolve(defs)))
-      .finish();
+    return cookbook(book => {
+      const defFile = book.recepie('Loading def File', [], () => fs.read(defname));
+      return book.recepie('Parsing def file', [defFile], async defFile => defFile
+        .map(def => createDefFile(defname, def).parse(cloneDefs(defs), engineDefsRule))
+        .orElse(Promise.resolve(defs)))
+    })
   }
 
-  let loadHandle = NOOP_TASK_HANDLE;
-  async function load([defs, defname]: [EngineDefs, string]): Promise<EngineDefs> {
-    return first(await loadWork(defname, defs)(loadHandle))
-  }
-
-  return begin()
-    .multiInput<[Source<FileSystem>, Source<string>]>()
-    .thenPass('Open Grp', async (fs, defname) => openGrp(values, fs, grpName))
-    .thenPass('Loading default defs', async (fs, defname, mainGrp) => loadDefaultEngineDefs(values, fs, mainGrp))
-    .thenWork(tupleWork(async (handle, fs, defname, mainGrp, defs) => {
-      loadHandle = handle;
-      const value = await values.transformedAsyncTuple('engine-defs', [defs, defname], load, nil(), trackFiles(files, ([defs, _]) => defs.root, load));
-      loadHandle = NOOP_TASK_HANDLE;
-      return value;
-    })).finish()
+  return taskHandleContext(handle => {
+    const load = ([defs, defname]: [EngineDefs, string]) => loadTask(defname, defs)(handle());
+    return (fs, defname) => cookbookInput(typeToken<[Source<FileSystem>, Source<string>]>(), (book, input) => {
+      const grp = book.recepie('Open Grp', [input], ([fs]) => openGrp(values, fs, grpName));
+      const defaultDefs = book.recepie('Loading default defs', [input, grp], async ([fs], mainGrp) => loadDefaultEngineDefs(values, fs, mainGrp));
+      return book.recepie('', [input, defaultDefs], ([_, defname], defs) =>
+        values.transformedAsyncTuple('engine-defs', [defs, defname], load, nil(), trackFiles(files, ([defs, _]) => defs.root, load)));
+    })(handle(), fs, defname);
+  })
 }
 

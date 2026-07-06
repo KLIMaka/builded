@@ -6,53 +6,12 @@ import { Board, FACE_SPRITE, FLOOR_SPRITE, SLOPE_SPRITE, Sprite, WALL_SPRITE } f
 import { ArtInfo, EMPTY_INFO } from "./formats/art";
 import { match } from "ts-pattern";
 
-export type WallSpriteCoords = Readonly<{
-  ztop: number,
-  zbottom: number,
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number
-}>
-
-export type FloorSpriteCoords = Readonly<{
-  z: number,
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number,
-  x3: number,
-  y3: number,
-  x4: number,
-  y4: number
-}>
-
-export type FaceSpriteCoords = Readonly<{
-  left: number,
-  right: number,
-  top: number,
-  bottom: number,
-}>
-
-export type SpriteInfo = Readonly<{
-  x: number;
-  y: number;
-  z: number;
-  w: number;
-  h: number;
-  hw: number;
-  hh: number;
-  angRad: number;
-  xo: number;
-  yo: number;
-  xf: boolean;
-  yf: boolean;
-  ztop: number;
-  zbottom: number;
-  onesided: boolean;
-  hscale: number;
-  wscale: number;
-}>
+export type WallSpriteCoords = Readonly<Record<'ztop' | 'zbottom' | 'x1' | 'y1' | 'x2' | 'y2', number>>;
+export type FloorSpriteCoords = Readonly<Record<'z' | 'x1' | 'y1' | 'x2' | 'y2' | 'x3' | 'y3' | 'x4' | 'y4', number>>;
+export type FaceSpriteCoords = Readonly<Record<'left' | 'right' | 'top' | 'bottom', number>>;
+export type SpriteInfo = Readonly<
+  Record<'x' | 'y' | 'z' | 'w' | 'h' | 'hw' | 'hh' | 'angRad' | 'xo' | 'yo' | 'ztop' | 'zbottom' | 'hscale' | 'wscale', number> &
+  Record<'onesided' | 'xf' | 'yf', boolean>>;
 
 type SpriteCoords = WallSpriteCoords | FaceSpriteCoords | FloorSpriteCoords;
 

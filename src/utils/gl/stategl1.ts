@@ -6,6 +6,7 @@ import { mat4 as gmlMat4 } from "gl-matrix";
 import Optional from "optional-js";
 import { match } from "ts-pattern";
 import { DisposableResource, GlContext, Shader, Texture, UniformBlockDefinition } from "./drawstruct";
+import { checkNotUndefined } from "ts-utils/objects";
 
 type AttribValueType = 'FLOAT' | 'INT';
 
@@ -198,10 +199,14 @@ export type AttribData = {
 }
 
 export type AttribDataInstanced = {
-  data: InstancedArrayData,
+  data?: InstancedArrayData,
   mode: number,
   count: number,
 };
+
+export async function disposeAttributeData(data: AttribDataInstanced): Promise<void> {
+  return data.data?.dispose();
+}
 
 export class AttribDataBuilder implements Disposable {
   constructor(
@@ -251,7 +256,7 @@ export class AttribDataBuilder implements Disposable {
 
   build(mode: number, count: number): AttribDataInstanced {
     const vtxSizeof = this.scheme.byteSize;
-    const data = this.alloc.allocate(this.vtxData.subarray(0, this.vtxOff * vtxSizeof));
+    const data = vtxSizeof === 0 ? undefined : this.alloc.allocate(this.vtxData.subarray(0, this.vtxOff * vtxSizeof));
     return { data, mode, count };
   }
 
@@ -361,7 +366,7 @@ export class UniformBlocksRegistry {
   }
 
   uniformBlock(name: string): UniformBlock {
-    return this.registry.get(name)[1];
+    return checkNotUndefined(this.registry.get(name))[1];
   }
 
   private static checkBlocksSame(b1: UniformBlockDefinition, b2: UniformBlockDefinition): boolean {
@@ -381,11 +386,11 @@ function getTextures(gl: WebGL2RenderingContext, shader: Shader): TextureAccesso
   return iter(shader.getSamplers()).enumerate().map(([s, i]) => {
     const location = shader.getUniformLocation(s.name);
     gl.uniform1i(location, i);
-    let currentTexture: WebGLTexture = null;
+    let currentTexture: WebGLTexture | undefined = undefined;
     let currentWrap: Wrap = 'CLAMP';
     const unit = i;
     const target = getSamplerTarget(s.type);
-    const texture = () => currentTexture;
+    const texture = () => checkNotUndefined(currentTexture);
     const wrap = () => currentWrap;
     const setTexture = (tex: WebGLTexture, wrap?: Wrap) => { currentTexture = tex; currentWrap = wrap ?? 'CLAMP' }
     const name = s.name;
@@ -429,9 +434,13 @@ export class ShaderConfig implements Disposable {
   draw(gl: WebGL2RenderingContext, data: AttribDataInstanced) {
     this.blocks.values().forEach(b => b.update(gl));
     this.bindTextures(gl);
-    gl.bindVertexArray(data.data.vao);
-    gl.drawArraysInstanced(data.mode, 0, data.count, data.data.count);
-    gl.bindVertexArray(null);
+    if (data.data !== undefined) {
+      gl.bindVertexArray(data.data.vao);
+      gl.drawArraysInstanced(data.mode, 0, data.count, data.data.count);
+      gl.bindVertexArray(null);
+    } else {
+      gl.drawArraysInstanced(data.mode, 0, data.count, 1);
+    }
   }
 
   bind(gl: WebGL2RenderingContext) {
@@ -453,25 +462,25 @@ export class ShaderConfig implements Disposable {
 export class StateGl1 implements Disposable {
   private shaders = new Map<string, ShaderConfig>();
   private uniformBlocksRegistry = new UniformBlocksRegistry();
-  private currentShader: ShaderConfig;
+  private currentShader: ShaderConfig | undefined;
   private clampWrap: DisposableResource<WebGLSampler>;
   private repeatWrap: DisposableResource<WebGLSampler>;
 
   constructor(
-    private glCtx: GlContext,
+    readonly glCtx: GlContext,
     private allocFactory: BufferAllocatorFactory,
   ) {
+    this.clampWrap = glCtx.resource('sampler', glCtx.gl.createSampler(), s => glCtx.gl.deleteSampler(s));
+    this.repeatWrap = glCtx.resource('sampler', glCtx.gl.createSampler(), s => glCtx.gl.deleteSampler(s));
     this.createWraps(glCtx);
   }
 
   private createWraps({ gl, resource }: GlContext) {
-    this.clampWrap = resource('sampler', gl.createSampler(), s => gl.deleteSampler(s));
     gl.samplerParameteri(this.clampWrap.value, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     gl.samplerParameteri(this.clampWrap.value, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.samplerParameteri(this.clampWrap.value, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.samplerParameteri(this.clampWrap.value, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-    this.repeatWrap = resource('sampler', gl.createSampler(), s => gl.deleteSampler(s));
     gl.samplerParameteri(this.repeatWrap.value, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     gl.samplerParameteri(this.repeatWrap.value, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.samplerParameteri(this.repeatWrap.value, gl.TEXTURE_WRAP_S, gl.REPEAT);
@@ -487,7 +496,7 @@ export class StateGl1 implements Disposable {
   }
 
   getShader(name: string): ShaderConfig {
-    return this.shaders.get(name);
+    return checkNotUndefined(this.shaders.get(name));
   }
 
   draw(shader: ShaderConfig, data: AttribDataInstanced) {

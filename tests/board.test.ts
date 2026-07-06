@@ -14,8 +14,8 @@ import { findContainingSector, findContainingSectorMidPoints, findSectorBasic, f
 import { Board } from '../src/build/board/structs';
 import * as BUILD from '../src/build/maploader';
 import { clockwise, inPolygon } from '../src/build/utils';
-import { map, reverse, wrap } from '../src/utils/collections';
-import { iter } from '../src/utils/iter';
+import { map, reverse, wrap } from 'ts-utils/collections';
+import { iter } from 'ts-utils/iter';
 import { Stream } from 'ts-utils/stream';
 
 const REFS = new BuildReferenceTrackerImpl()

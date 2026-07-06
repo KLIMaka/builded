@@ -10,7 +10,6 @@ uniform sampler2D plu;
 uniform highp usampler2D infos;
 
 in vec3 tc;
-in float lightOff;
 flat in ivec4 params;
 flat in pic_t picInfo;
 flat in float trans;
@@ -21,7 +20,7 @@ out vec4 fragColor;
 #define GLOBAL_VIS (float(globalVis))
 #define DEPTH_SHADOW_SCALE (float(depthShadowScale))
 #define GLOBAL_SHADOW (float(globalShadow))
-#define LOCAL_SHADOW (float(params.x) - clamp(-cos(2.0 * PI * lightOff), 0.0, 1.0) * 32.0)
+#define LOCAL_SHADOW (float(params.x))
 #define PAL (float(params.y))
 #define DETPH_OFF (float(params.w))
 #define PARALLAX (false)

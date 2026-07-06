@@ -1,69 +1,69 @@
-import { Disposable, Source, ValuesContainer } from "ts-utils/callbacks";
-import { iterIsEmpty } from "ts-utils/collections";
 import { GlContext } from "@utils/gl/drawstruct";
 import { createShader } from "@utils/gl/shaders";
-import { AttribDataBuilder, BufferAllocator, ShaderConfig, StateGl1, TextureSetter, vec4 } from "@utils/gl/stategl1";
-import { iter } from "ts-utils/iter";
-import { field } from "ts-utils/objects"
-import { BiFn, Consumer, first, Fn, MultiConsumer, notNull, pair, second } from "ts-utils/types";
-import { NOOP_TASK_HANDLE } from "ts-utils/scheduler";
+import { AttribDataBuilder, BufferAllocator, disposeAttributeData, ShaderConfig, StateGl1, TextureSetter, vec4 } from "@utils/gl/stategl1";
 import { EngineContext, EngineSettings } from "app/apis/engine";
 import { mat4 } from "gl-matrix";
+import { Disposable, Source, ValuesContainer } from "ts-utils/callbacks";
+import { iterIsEmpty } from "ts-utils/collections";
+import { iter } from "ts-utils/iter";
+import { field } from "ts-utils/objects";
+import { BiFn, Consumer, first, Fn, MultiConsumer, MultiFn, notNull, pair, second, tuple, typeToken } from "ts-utils/types";
 import { BoardGlContext } from "../gl/board-context";
-import { EngineTextures } from "../gl/gl-context";
-import { begin, tuple, Work } from "ts-utils/work";
+import { EngineTextures, loadVoxelData } from "../gl/gl-context";
+import { taskHandleContext } from "../scheduler/utils";
 import { GridRecord, LineRecord, NOOP_RENDERABLE, Renderable, ScreenSpriteRecord, SectorRecord, SpriteRecord, VoxelRecord, WallRecord, WallType } from "./api";
+import { cookbookInput } from "ts-utils/cookbook";
+import { Task } from "ts-utils/scheduler";
+import { VoxelData } from "build/formats/kvx";
 
-export function createRenderer3d(values: ValuesContainer, glContext: GlContext, ctx: EngineContext, textures: EngineTextures): Work<[], [Source<BoardRenderer3D>]> {
+export function createRenderer3d(values: ValuesContainer, glContext: GlContext, ctx: EngineContext, textures: EngineTextures): Task<Source<BoardRenderer3D>> {
   const doCreateShader = (defs: string[], name: string) => createShader(glContext, `resources/shaders/${name}`, defs);
-  const loadRendererWork = begin()
-    .input<string[]>()
-    .fork(p => p
-      .thread('Compiling wall shader', defs => doCreateShader(defs, 'wall-instance'))
-      .thread('Compiling sector shader', defs => doCreateShader(defs, 'sector-instance'))
-      .thread('Compiling sprite shader', defs => doCreateShader(defs, 'sprite-instance'))
-      .thread('Compiling voxel shader', defs => doCreateShader(defs, 'voxel-instance'))
-      .thread('Compiling screen-sprite shader', defs => doCreateShader(defs, 'screen-sprite'))
-      .thread('Compiling wall select shader', defs => doCreateShader(defs, 'wall-select'))
-      .thread('Compiling sector select shader', defs => doCreateShader(defs, 'sector-select'))
-      .thread('Compiling line shader', defs => doCreateShader(defs, 'line'))
-      .thread('Compiling grid shader', defs => doCreateShader(defs, 'grid')))
-    .then('Creating renderer', async (wall, sector, sprite, voxel, screenSprite, wallSelect, sectorSelect, line, grid) => {
-      const state = new StateGl1(glContext, s => new BufferAllocator(glContext, s));
-      state.register('wall-instance', wall);
-      state.register('wall-select', wallSelect);
-      state.register('sector-instance', sector);
-      state.register('sector-select', sectorSelect);
-      state.register('sprite-instance', sprite);
-      state.register('voxel-instance', voxel);
-      state.register('screen-sprite', screenSprite);
-      state.register('line', line);
-      state.register('grid', grid);
-      return new BoardRenderer3D(textures, state);
-    }).finishUntuple();
+  const loadRendererWork = cookbookInput(typeToken<[string[]]>(), (book, input) => {
+    const deps = tuple(
+      book.recepie('Compiling wall shader', [input], ([defs]) => doCreateShader(defs, 'wall-instance')),
+      book.recepie('Compiling sector shader', [input], ([defs]) => doCreateShader(defs, 'sector-instance')),
+      book.recepie('Compiling sprite shader', [input], ([defs]) => doCreateShader(defs, 'sprite-instance')),
+      book.recepie('Compiling voxel shader', [input], ([defs]) => doCreateShader(defs, 'voxel-instance')),
+      book.recepie('Compiling screen-sprite', [input], ([defs]) => doCreateShader(defs, 'screen-sprite')),
+      book.recepie('Compiling wall select', [input], ([defs]) => doCreateShader(defs, 'wall-select')),
+      book.recepie('Compiling sector select', [input], ([defs]) => doCreateShader(defs, 'sector-select')),
+      book.recepie('Compiling line shader', [input], ([defs]) => doCreateShader(defs, 'line')),
+      book.recepie('Compiling grid shader', [input], ([defs]) => doCreateShader(defs, 'grid')),
+      book.recepie('Compiling voxel preview', [input], ([defs]) => doCreateShader(defs, 'voxel-preview')));
+    return book.recepie('Creating renderer', deps,
+      async (wall, sector, sprite, voxel, screenSprite, wallSelect, sectorSelect, line, grid, voxelPreview) => {
+        const state = new StateGl1(glContext, s => new BufferAllocator(glContext, s));
+        state.register('wall-instance', wall);
+        state.register('wall-select', wallSelect);
+        state.register('sector-instance', sector);
+        state.register('sector-select', sectorSelect);
+        state.register('sprite-instance', sprite);
+        state.register('voxel-instance', voxel);
+        state.register('screen-sprite', screenSprite);
+        state.register('line', line);
+        state.register('grid', grid);
+        state.register('voxel-preview', voxelPreview);
+        return new BoardRenderer3D(textures, state);
+      })
+  });
 
-  let loadHandle = NOOP_TASK_HANDLE;
-  async function loadRenderer(settings: EngineSettings, maxPluId: number, shadowsteps: number): Promise<BoardRenderer3D> {
-    const defs = [
-      `PALSWAPS (float(${maxPluId + 1}))`,
-      `SHADOWSTEPS (float(${shadowsteps}))`,
-      `TRANS1 (${settings.trans1})`,
-      `TRANS2 (${settings.trans2})`,
-      ...(settings.spriteShadowOff ? ['SPRITE_SHADOW_OFF'] : [])
-    ];
-    return await loadRendererWork(loadHandle, defs);
-  }
+  return taskHandleContext(handle => {
+    async function loadRenderer(settings: EngineSettings, maxPluId: number, shadowsteps: number): Promise<BoardRenderer3D> {
+      const defs = [
+        `PALSWAPS (float(${maxPluId + 1}))`,
+        `SHADOWSTEPS (float(${shadowsteps}))`,
+        `TRANS1 (${settings.trans1})`,
+        `TRANS2 (${settings.trans2})`,
+        ...(settings.spriteShadowOff ? ['SPRITE_SHADOW_OFF'] : [])
+      ];
+      return await loadRendererWork(handle(), defs);
+    }
 
-  return begin()
-    .thenWork(tuple(async handle => {
-      loadHandle = handle;
-      const result = await values.transformedAsyncTuple('rendeer',
-        [ctx.settings, ctx.maxPluId, ctx.shadowsteps],
-        ([settings, maxPluId, shadowsteps]) => loadRenderer(settings, maxPluId, shadowsteps),
-        r => r.dispose());
-      loadHandle = NOOP_TASK_HANDLE;
-      return result;
-    })).finish()
+    return () => values.transformedAsyncTuple('rendeer',
+      [ctx.settings, ctx.maxPluId, ctx.shadowsteps],
+      ([settings, maxPluId, shadowsteps]) => loadRenderer(settings, maxPluId, shadowsteps),
+      r => r.dispose());
+  });
 }
 
 export class BoardRenderer3D implements Disposable {
@@ -76,6 +76,7 @@ export class BoardRenderer3D implements Disposable {
   writeSectorSelect: (recs: Iterable<SectorRecord>, boardGlCtx: BoardGlContext) => Renderable;
   writeLines: (recs: Iterable<LineRecord>) => Renderable;
   writeGrid: (recs: Iterable<GridRecord>, type?: number) => Renderable;
+  writeVoxelPreview: (voxelData: VoxelData, plu: number, glContext: GlContext) => Renderable;
 
   view: Consumer<mat4>;
   projection: Consumer<mat4>;
@@ -115,6 +116,7 @@ export class BoardRenderer3D implements Disposable {
     this.writeSectorSelect = this.createSectorSelectWriter();
     this.writeLines = this.createLineWriter();
     this.writeGrid = this.createGridWriter();
+    this.writeVoxelPreview = this.createVoxelPreviewWriter();
   }
 
   async dispose() {
@@ -157,7 +159,7 @@ export class BoardRenderer3D implements Disposable {
       sectors(ctx.sectors);
       this.state.draw(shader, data);
     }
-    const dispose = async () => data.data.dispose();
+    const dispose = async () => disposeAttributeData(data);
     return { render, dispose };
   }
 
@@ -225,7 +227,7 @@ export class BoardRenderer3D implements Disposable {
         sectors(ctx.sectors);
         this.state.draw(shader, data);
       }
-      const dispose = async () => data.data.dispose();
+      const dispose = async () => disposeAttributeData(data);
       return { render, dispose };
     };
   }
@@ -266,7 +268,7 @@ export class BoardRenderer3D implements Disposable {
         sectors(ctx.sectors);
         this.state.draw(shader, data);
       }
-      const dispose = async () => data.data.dispose();
+      const dispose = async () => disposeAttributeData(data);
       return { render, dispose };
     };
   }
@@ -295,7 +297,7 @@ export class BoardRenderer3D implements Disposable {
         sprites(ctx.sprites);
         this.state.draw(shader, data);
       }
-      const dispose = async () => data.data.dispose();
+      const dispose = async () => disposeAttributeData(data);
       return { render, dispose };
     };
   }
@@ -324,7 +326,7 @@ export class BoardRenderer3D implements Disposable {
         sectors(ctx.sectors);
         data.forEach((data, texture) => { voxelTexture(texture); this.state.draw(shader, data); });
       }
-      const dispose = async () => data.values().forEach(d => d.data.dispose());
+      const dispose = async () => Promise.all(data.values().map(d => disposeAttributeData(d))) as any as Promise<void>;
       return { render, dispose };
     };
   }
@@ -353,7 +355,7 @@ export class BoardRenderer3D implements Disposable {
       });
       const data = builder.build(WebGL2RenderingContext.TRIANGLES, 6);
       const render = (gl: WebGL2RenderingContext) => this.state.draw(shader, data);
-      const dispose = async () => data.data.dispose();
+      const dispose = async () => disposeAttributeData(data);
       return { render, dispose };
     }
   }
@@ -374,7 +376,7 @@ export class BoardRenderer3D implements Disposable {
       });
       const data = builder.build(WebGL2RenderingContext.LINES, 2);
       const render = (gl: WebGL2RenderingContext) => this.state.draw(shader, data);
-      const dispose = async () => data.data.dispose();
+      const dispose = async () => disposeAttributeData(data);
       return { render, dispose };
     }
   }
@@ -401,8 +403,33 @@ export class BoardRenderer3D implements Disposable {
       });
       const data = builder.build(WebGL2RenderingContext.TRIANGLES, 6);
       const render = (gl: WebGL2RenderingContext) => { typeWriter(type); this.state.draw(shader, data); }
-      const dispose = async () => data.data.dispose();
+      const dispose = async () => disposeAttributeData(data);
       return { render, dispose };
     }
+  }
+
+  private createVoxelPreviewWriter(): MultiFn<[VoxelData, number, GlContext], Renderable> {
+    const shader = this.state.getShader('voxel-preview');
+    shader.texture('pal')(this.textures.pal.get());
+    shader.texture('plu')(this.textures.plu.get());
+    const voxelTexture = shader.texture('voxel');
+
+    const voxelBuilder = shader.builder();
+    const pluSetter = voxelBuilder.vec4('aPlu');
+
+    return (voxelData, plu, glCtx) => {
+      voxelBuilder.start();
+      pluSetter(plu, 0, 0, 0);
+      voxelBuilder.writeVertex();
+      const [textureValue, count] = loadVoxelData(glCtx, voxelData);
+      const texture = textureValue.value;
+      const data = voxelBuilder.build(WebGL2RenderingContext.TRIANGLES, 6 * count);
+      const render = (gl: WebGL2RenderingContext) => {
+        voxelTexture(texture);
+        this.state.draw(shader, data);
+      };
+      const dispose = async () => { disposeAttributeData(data); textureValue.dispose() };
+      return { render, dispose };
+    };
   }
 }

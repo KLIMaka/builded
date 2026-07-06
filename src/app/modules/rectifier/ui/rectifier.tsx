@@ -1,4 +1,4 @@
-import { workplane, Workplane, WorkplaneContext, workplaneController } from "@ui/commons";
+import { canvasWorkplane, Workplane, WorkplaneContext, workplaneController } from "@ui/commons";
 import { WindowBuilder } from "@ui/windows-common";
 import { interpolate, range } from "ts-utils/collections";
 import { GL_CONTEXT, Texture } from "@utils/gl/drawstruct";
@@ -153,7 +153,7 @@ export async function createRectifier(injector: Injector): Promise<Window> {
     r.x3 = 0; r.y3 = img.getHeight();
   })))
 
-  const original = workplane((canvas, w, h) => {
+  const original = canvasWorkplane((canvas, w, h) => {
     const canvasCtx = canvas.getContext('2d');
     return values.handle([transformedRect, selectedVertex, dragVertex, editMode], ([rect, hover, drag, mode]) => {
       canvasCtx.clearRect(0, 0, w, h);
@@ -169,7 +169,7 @@ export async function createRectifier(injector: Injector): Promise<Window> {
       });
     });
   })
-  const rectRenderer = workplane((canvas, w, h) => {
+  const rectRenderer = canvasWorkplane((canvas, w, h) => {
     const ctx = canvas.getContext('2d');
     return values.handle([transformedRect, editMode], ([rect, mode]) => {
       ctx.clearRect(0, 0, w, h);
@@ -177,12 +177,12 @@ export async function createRectifier(injector: Injector): Promise<Window> {
       drawLines(ctx, rect);
     });
   });
-  const imageRenderer = workplane((canvas, w, h) =>
+  const imageRenderer = canvasWorkplane((canvas, w, h) =>
     values.handle([offScale, homo, editMode, imageSize, rectSize], ([ctx, homo, mode, [iw, ih], [rw, rh]]) => {
       renderer.draw(canvas, ctx, !mode ? homo : IDENT, mode ? iw : rw, mode ? ih : rh);
     })
   );
-  const rectRenderer1 = workplane((canvas, w, h) =>
+  const rectRenderer1 = canvasWorkplane((canvas, w, h) =>
     values.handle([homo, ctx, imageSize], ([homo, ctx, [iw, ih]]) => {
       const canvasCtx = canvas.getContext('2d');
       canvasCtx.clearRect(0, 0, w, h);

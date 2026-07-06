@@ -10,7 +10,9 @@ module.exports = {
   },
   resolve: {
     extensions: ['.ts', '.js', '.tsx'],
-    plugins: [new TsconfigPathsPlugin()]
+    plugins: [
+      new TsconfigPathsPlugin(),
+    ]
   },
   module: {
     rules: [{
@@ -37,5 +39,5 @@ module.exports = {
   },
   stats: {
     "errorDetails": true,
-  }
+  },
 };

@@ -43,7 +43,8 @@ function disposeDrawData(data: DrawData) {
   data.rors.forEach(d => { d.cap.dispose(); disposeDrawData(d.drawData) });
 }
 
-export function createToRender(renderer: Source<BoardRenderer3D>, boardCtx: BoardContext, boardGlCtx: BoardGlContext, engine: EngineContext, values: ValuesContainer, viewPosition: Source<ViewPosition>, fwd: Source<vec3>) {
+export function createToRender(renderer: Source<BoardRenderer3D>, boardCtx: BoardContext,
+  boardGlCtx: BoardGlContext, engine: EngineContext, values: ValuesContainer, viewPosition: Source<ViewPosition>, fwd: Source<vec3>): Source<DrawData> {
   const all = values.transformedTuple('all', [boardCtx.data, renderer], ([data, renderer]) => createAll(renderer, data.board, boardGlCtx), { disposer: dd => disposeDrawData(dd) });
   return values.transformedTuple('toRender', [renderer, viewPosition, fwd, all, boardCtx.data, engine.spriteVoxelSwap], ([renderer, pos, forward, all, data, spriteVoxelSwap]): DrawData => {
     if (pos.sec === -1) return all;

@@ -45,7 +45,7 @@
     "typescript": "~5.9.2",
     "webpack": "^5.96.1",
     "webpack-cli": "^5.1.4",
-    "webpack-dev-server": "^5.1.0"
+    "webpack-dev-server": "^5.2.4"
   },
   "dependencies": {
     "@floating-ui/react": "^0.26.27",
@@ -53,6 +53,7 @@
     "gl-matrix": "^3.4.3",
     "immer": "^10.1.1",
     "jszip": "3.10.1",
+    "monaco-editor": "0.55.1",
     "optional-js": "^2.3.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -60,7 +61,7 @@
     "react-virtualized": "^9.22.5",
     "react-winbox": "^1.5.0",
     "toml": "3.0.0",
-    "ts-pattern": "5.5.0",
+    "ts-pattern": "5.9.0",
     "ts-utils": "github:KLIMaka/ts-utils",
     "use-immer": "^0.10.0"
   }

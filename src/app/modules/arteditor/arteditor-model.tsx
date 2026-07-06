@@ -1,5 +1,5 @@
 import { ActionItem } from "@ui/action-list";
-import { GridMove, WorkplaneBuilder, WorkplaneContext, defaultWorkplaneContext, getGridOff, line, menuItemDescripted, workplane } from "@ui/commons";
+import { GridMove, WorkplaneBuilder, WorkplaneContext, canvasWorkplane, defaultWorkplaneContext, getGridOff, line, menuItemDescripted } from "@ui/commons";
 import { SizeType, WindowBuilder } from "@ui/windows-common";
 import { ACTION_DESCRIPTORS, Action, ActionDescriptors } from "app/apis/actions";
 import { APP, App } from "app/apis/app";
@@ -17,8 +17,8 @@ import { Injector, getInstances } from "ts-utils/injector";
 import { iter } from "ts-utils/iter";
 import { clamp, cyclic, int } from "ts-utils/mathutils";
 import { Navigator, navigateList } from "ts-utils/navigators";
-import { Rasterizer, array, fit, palRasterizer, resize, transform } from "ts-utils/pixelprovider";
-import { Consumer, Fn, Predicate, Supplier, first, notNull, notNullOrUndefined, second } from "ts-utils/types";
+import { Rasterizer, array, fit, palRasterizer, rect, rectRepeat, resize, superResize, transform } from "ts-utils/pixelprovider";
+import { Consumer, Fn, Pred, Supplier, first, notNull, notNullOrUndefined, second } from "ts-utils/types";
 import { createSavedState } from "../default/app/storage";
 import { ArtEditor } from "./arteditor-api";
 import { ArtEditorUiImpl } from "./arteditor-view";
@@ -48,29 +48,29 @@ function createDefaultState(): SavedState {
   };
 }
 
-export type ArtEditorActions = {
-  right: Action,
-  left: Action,
-  up: Action,
-  down: Action,
-  pageup: Action,
-  pagedown: Action,
-  center: Action,
-  toggleSuperSample: Action
-  toggleRepeat: Action,
-  toggleGrid: Action,
-  gridInc: Action,
-  gridDec: Action,
-  copy: Action,
-  gridMenu: Action,
-  pluMenu: Action,
-  search: Action,
-  clearSearch: Action,
-  nextPlu: Action,
-  prevPlu: Action,
-  resetPlu: Action,
-  toggleUpscalePreview: Action,
-}
+export type ArtEditorActions = Record<
+  'right' |
+  'left' |
+  'up' |
+  'down' |
+  'pageup' |
+  'pagedown' |
+  'center' |
+  'toggleSuperSample' |
+  'toggleRepeat' |
+  'toggleGrid' |
+  'gridInc' |
+  'gridDec' |
+  'copy' |
+  'gridMenu' |
+  'pluMenu' |
+  'search' |
+  'clearSearch' |
+  'nextPlu' |
+  'prevPlu' |
+  'resetPlu' |
+  'toggleUpscalePreview'
+  , Action>;
 
 export type RenderType = 'regular' | 'mirrored';
 export type RenderInfo = {
@@ -107,18 +107,17 @@ function sizePredicate(query: string): (w: number, h: number) => boolean {
   }
 }
 
-function artFilePredicate(query: string): Predicate<string> {
+function artFilePredicate(query: string): Pred<string> {
   if (!query.startsWith('art')) return _ => false;
   query = query.replace('art', '');
   return artFile => artFile.includes(query.padStart(3, '0'));
 }
 
-function specialPredicate(query: string): Predicate<ArtInfoExtended> {
+function specialPredicate(query: string): Pred<ArtInfoExtended> {
   if (query === 'anim') return info => info.attrs.animType !== 0 && info.attrs.frames !== 0;
   if (query === 'off') return info => info.attrs.xoff !== 0 || info.attrs.yoff !== 0;
   return _ => false;
 }
-
 
 function filterPicnum(artFiles: Map<number, ArtInfoExtended>, query: string, tags: PicTags, aliases: Aliases): number[] {
   const queryLc = query.toLowerCase();
@@ -134,6 +133,15 @@ function filterPicnum(artFiles: Map<number, ArtInfoExtended>, query: string, tag
     .map(first)
     .collect()
     .sort((l, r) => l - r);
+}
+
+function blend(off: number) {
+  return (l: number, r: number, t: number) => {
+    if (Math.abs(l - r) > off) return l;
+    return l < r
+      ? t <= .5 ? r : l
+      : t <= .5 ? l : r;
+  };
 }
 
 export class ArtEditorImpl implements ArtEditor {
@@ -188,7 +196,8 @@ export class ArtEditorImpl implements ArtEditor {
     readonly tags: Source<PicTags>,
     private shadowsteps: Source<number>,
     // private previewRenderer: PreviewRenderer,
-    readonly aliases: Source<Aliases>
+    readonly aliases: Source<Aliases>,
+    readonly trans: Source<Uint8Array>,
   ) {
     this.searchQuery = this.values.value('searchQuery', "");
     this.searchHistory = this.values.transformedSelf('searchHistory', this.searchQuery, [] as string[], (q, self) => this.updateSearchHistory(q, self));
@@ -234,6 +243,7 @@ export class ArtEditorImpl implements ArtEditor {
 
   clickOnPicnum(picnum: number, doubleClick?: boolean): void {
     this.currentId.set(picnum);
+    this.centerPic();
   }
 
   private animateFrame() {
@@ -308,31 +318,37 @@ export class ArtEditorImpl implements ArtEditor {
   }
 
   rasterWorkplaneRenderer(): WorkplaneBuilder {
-    return workplane((canvas, width, height) => {
+    return canvasWorkplane((canvas, width, height) => {
       this.previewRect = () => [width, height];
       this.centerPic();
       const ctx2d = notNull(canvas.getContext('2d'));
-      return this.values.handle([this.ctxScaleOff, this.currentFrameInfo, this.superSample, this.repeat, this.currentPlu],
-        ([ctx, r, ss, repeat, plu]) => {
+      return this.values.handle([this.ctxScaleOff, this.currentFrameInfo, this.superSample, this.repeat, this.currentPlu, this.plus],
+        ([ctx, r, ss, repeat, plu, plus]) => {
           ctx2d.fillStyle = 'black';
           ctx2d.strokeStyle = 'white';
-          ctx2d.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+          ctx2d.fillRect(0, 0, width, height);
 
           const scaledW = int(r.info.w * ctx.scale);
           const scaledH = int(r.info.h * ctx.scale);
 
-          const plued = transform(art(r.info), x => plu[x]);
-          const img = resize(plued, scaledW, scaledH);
-          const x = ctl.x - int(((frameInfo.attrs.xoff | 0) + frameInfo.w / 2) * ctl.scale);
-          const y = ctl.y - int(((frameInfo.attrs.yoff | 0) + frameInfo.h / 2) * ctl.scale);
-          drawToCanvas(rect(img, - x, - y, this.view.width - x, this.view.height - y, 0), ctx, this.rasterizer);
+          const plued = transform(art(r.info), x => plus[plu].plu[x]);
+          const img = ss === 0
+            ? resize(plued, scaledW, scaledH)
+            : superResize(plued, scaledW, scaledH);
+          const x = int(ctx.xoff1) - int(((r.info.attrs.xoff ?? 0) + int(r.info.w / 2)) * ctx.scale);
+          const y = int(ctx.yoff1) - int(((r.info.attrs.yoff ?? 0) + int(r.info.h / 2)) * ctx.scale);
+
+          const subframe = repeat
+            ? rectRepeat(img, -x, -y, width - x, height - y)
+            : rect(img, -x, -y, width - x, height - y, 0);
+          drawToCanvas(subframe, ctx2d, this.rasterizer);
         }
       );
     });
   }
 
   gridRenderer(): WorkplaneBuilder {
-    return workplane(canvas => {
+    return canvasWorkplane(canvas => {
       const render = (ctx: Pick<WorkplaneContext, 'xoff1' | 'yoff1' | 'scale'>, grid: number) => renderGrid(canvas, ctx.xoff1, ctx.yoff1, ctx.scale, grid, grid * grid);
       return this.values.handle([this.ctxScaleOff, this.gridSize], ([ctx, grid]) => render(ctx, grid));
     })
@@ -351,7 +367,7 @@ export class ArtEditorImpl implements ArtEditor {
   // }
 
   imageInfoRenderer(): WorkplaneBuilder {
-    return workplane((canvas, w, h) => {
+    return canvasWorkplane((canvas, w, h) => {
       const render = (pal: Uint8Array, frameInfo: RenderInfo, plu: Fn<number, number>) => {
         const ctx = notNull(canvas.getContext('2d'));
         ctx.clearRect(0, 0, w, h);
@@ -540,8 +556,9 @@ export async function createArtEditor(injector: Injector, ctx: EngineContext): P
     const tags = ctx.picTags;
     const shadowsteps = ctx.shadowsteps;
     const aliases = ctx.aliases;
+    const trans = ctx.trans;
     // const previewRenderer = await createPreviewRenderer(values, glCtx, ctx);
-    const editor = new ArtEditorImpl(values, state, actionDescriptors, app, art, artMap, pal, plus, tags, shadowsteps, aliases);
+    const editor = new ArtEditorImpl(values, state, actionDescriptors, app, art, artMap, pal, plus, tags, shadowsteps, aliases, trans);
 
     return new WindowBuilder('art-editor', actionDescriptors, values)
       .titleFromId()

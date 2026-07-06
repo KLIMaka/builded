@@ -14,7 +14,7 @@ in uvec4 aWallSectorPart_u16;
 
 out vec3 tc;
 out vec4 parallax;
-out float shadow; 
+flat out float shadow; 
 flat out ivec4 params;
 flat out pic_t picInfo;
 flat out float trans;
@@ -32,7 +32,7 @@ void main() {
   wall_info_t wallInfo = getWallInfo(sectors, walls, infos, part, gl_VertexID, wall1, wall2, sector);
 
 
-  if (part > uint(0)) {
+  if (part != VOID_WALL) {
     bool masked = part == uint(3);
     bool isParallax = wallInfo.parallax;
     vec3 wpos = wallInfo.pos.xzy;

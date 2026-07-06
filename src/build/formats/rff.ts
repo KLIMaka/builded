@@ -20,9 +20,26 @@ const fatRecord = builder()
   .field('fileId', uint)
   .build();
 
-type FatRecord = AccessorType<typeof fatRecord>
+export type FatRecord = AccessorType<typeof fatRecord>
+export type RffFileType = {
+  get(rec: FatRecord): ArrayBuffer,
+  getByName(fname: string): Optional<ArrayBuffer>,
+  getRecord(fname: string): Optional<FatRecord>,
+  getRecordById(ext: string, fid: number): Optional<FatRecord>,
+  getTypeRecords(ext: string): FatRecord[],
+  getFat(): FatRecord[],
+}
 
-export class RffFile {
+export const EMPTY_RFF_FILE: RffFileType = {
+  get(rec: FatRecord) { throw new Error('Empty RFF file') },
+  getByName(fname: string) { return Optional.empty() },
+  getRecord(fname: string) { return Optional.empty() },
+  getRecordById(ext: string, fid: number) { return Optional.empty() },
+  getTypeRecords(ext: string) { return [] },
+  getFat() { return [] }
+}
+
+export class RffFile implements RffFileType {
   private data: Stream;
   private header: AccessorType<typeof headerStruct>;
   private namesTable = new Map<string, FatRecord>();
@@ -83,6 +100,14 @@ export class RffFile {
   getRecordById(ext: string, fid: number): Optional<FatRecord> {
     return Optional.ofNullable(this.fileIdMap.get(ext.toLowerCase()))
       .map(m => m.get(fid))
+  }
+
+  getTypeRecords(ext: string): FatRecord[] {
+    return [...this.fileIdMap.get(ext.toLowerCase())?.values() ?? []]
+  }
+
+  getFat(): FatRecord[] {
+    return this.fat;
   }
 }
 

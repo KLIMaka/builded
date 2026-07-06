@@ -15,23 +15,27 @@ import { BoardRenderer3D, createRenderer3d } from "app/modules/board-view/boardR
 import { createSavedState } from "app/modules/default/app/storage";
 import { httpFs, stack } from "app/modules/fs/fs";
 import { createEngineTexturesWork, EngineTextures } from "app/modules/gl/gl-context";
+import { createTextEditor } from "app/modules/text-editor/text-editor";
 import Optional from "optional-js";
 import React, { useRef } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { Disposable, Source, Value, ValuesContainer, ValuesMap } from "ts-utils/callbacks";
+import { getOrCreate } from "ts-utils/collections";
+import { cookbook } from "ts-utils/cookbook";
 import { getInstances, Injector } from "ts-utils/injector";
 import { iter } from "ts-utils/iter";
 import { sum } from "ts-utils/mathutils";
 import { field } from "ts-utils/objects";
-import { TaskController, TaskHandle, TaskValue } from "ts-utils/scheduler";
+import { Task, TaskController, TaskHandle, TaskValue } from "ts-utils/scheduler";
 import { size } from "ts-utils/size";
-import { first, nil, Ok, pair } from "ts-utils/types";
-import { begin, Work } from "ts-utils/work";
-import { EngineContextRecord, ENGINES } from "../engine-context-api";
+import { nil, Ok, pair } from "ts-utils/types";
+import { EngineContextRecord, getEngine } from "../engine-context-api";
 import { createEngine } from "./create-engine-context";
 import { ArtsInfoView } from "./tabs/art";
+import { FilesInfoView } from "./tabs/files";
 import { MapsInfoView } from "./tabs/maps";
-import { getOrCreate } from "ts-utils/collections";
+import { SoundsInfoView } from "./tabs/sounds";
+import { createKvxView } from "app/modules/kvx/kvx-editor";
 
 const ID = 'engines-context';
 
@@ -53,11 +57,13 @@ export type EngineInfo = {
   plus: Source<number>,
   shadowsteps: Source<number>,
   artFiles: Source<NamedArtFile[]>,
+  files: Source<FileInfo[]>,
+  filesMap: Source<Map<string, FileInfo>>,
   mapFiles: Source<FileInfo[]>,
   kvxFiles: Source<FileInfo[]>,
   ctx: EngineContext;
   textures: EngineTextures;
-  rendererProvider: Work<[], Source<BoardRenderer3D>>,
+  rendererProvider: Task<Source<BoardRenderer3D>>,
 } & Disposable;
 
 function createDefaultState(): SavedState {
@@ -105,18 +111,15 @@ export class Editor {
 
   openRecord(rec: EngineContextRecord) {
     return getOrCreate(this.ctxCache, rec, rec => {
-      const createEngine = iter(ENGINES)
-        .first(e => e.id === rec.type)
-        .map(field('factory'))
-        .orElseThrow(() => new Error(`Unknown engine type: '${rec.type}' `));
-      const work = begin()
-        .thenWork(handle =>
-          this.localValues.createChild(`engine-${rec.name}`).initializeAsync(values => begin()
-            .forkItems(rec.fileSystems, f => `Opening File System...`, f => this.fs.deserialize(f).open())
-            .then('Building FS Stack...', async fss => values.value('fs-stack', iter([...fss, new Ok(httpFs(''))]).map(r => r.unwrap()).reduceFirst(stack).get()))
-            .thenWork((handle, fs) => createEngine(handle, fs, values, rec.mods))
-            .thenWorkPass((handle, engine) => createEngineTexturesWork(handle, engine, this.glCtx, values))
-            .then<EngineInfo>('Constructing Engine Info...', async (engine, textures) => {
+      const createEngine = getEngine(rec.type).map(field('factory')).orElseThrow(() => new Error(`Unknown engine type: '${rec.type}' `));
+      const work: Task<EngineInfo> = handle =>
+        this.localValues.createChild(`engine-${rec.name}`).initializeAsync(values =>
+          cookbook(book => {
+            const fss = rec.fileSystems.map(f => book.recepie(`Opening File System...`, [], async () => this.fs.deserialize(f).open()));
+            const fsStack = book.recepie('Building FS Stack...', fss, async (...fss) => values.value('fs-stack', iter([...fss, new Ok(httpFs(''))]).map(r => r.unwrap()).reduceFirst(stack).get()));
+            const engine = book.paste([fsStack], async (handle, fs) => createEngine(handle, fs, values, rec.mods));
+            const textures = book.paste([engine], async (handle, engine) => createEngineTexturesWork(handle, engine, this.glCtx, values));
+            return book.recepie('Constructing Engine Info...', [engine, textures], async (engine, textures) => {
               const name = engine.name;
               const artFiles = engine.art;
               const shadowsteps = engine.shadowsteps;
@@ -124,30 +127,23 @@ export class Editor {
               const arts = values.transformed(`arts`, artFiles, a => iter(a).map(a => a.art.arts.length).reduceFirst(sum).orElse(0));
               const validArts = values.transformed(`validArts`, artFiles, a => iter(a).map(a => a.art.arts).flatten().filter(a => a.h !== 0 && a.w !== 0).length())
               const plus = values.transformed(`plus`, engine.plus, p => p.length);
-              const mapsLoader = async (res: FileSystem) => res.list().then(l => iter(l).filter(i => i.name.toLowerCase().endsWith('.map')).collect());
-              const mapFiles = await values.transformedAsync(`maps`,
-                resources,
-                mapsLoader,
-                nil(),
-                (fs, maps) => fs.subscribe((name, deleted) => { if (name.toLowerCase().endsWith('.map')) maps.setPromiseOrDispose(m => mapsLoader(fs)) }));
-              const kvxLoader = async (res: FileSystem) => res.list().then(l => iter(l).filter(i => i.name.toLowerCase().endsWith('.kvx')).collect());
-              const kvxFiles = await values.transformedAsync(`kvx`,
-                resources,
-                kvxLoader,
-                nil(),
-                (fs, maps) => fs.subscribe((name, deleted) => maps.setPromiseOrDispose(m => kvxLoader(fs))));
+              const filesLoader = async (res: FileSystem) => res.list();
+              const files = await values.transformedAsync('files', resources, filesLoader, nil(), (fs, files) => fs.subscribe(() => files.setPromiseOrDispose(f => filesLoader(fs))));
+              const mapFiles = values.transformed(`maps`, files, files => iter(files).filter(f => f.name.toLowerCase().endsWith('.map')).collect());
+              const kvxFiles = values.transformed(`kvx`, files, files => iter(files).filter(f => f.name.toLowerCase().endsWith('.kvx')).collect());
+              const filesMap = values.transformed('files-map', files, files => iter(files).toMap(f => f.name.toLowerCase(), f => f));
 
               let renderer: Source<BoardRenderer3D> | undefined = undefined;
               const rendererProvider = async (handle: TaskHandle) => {
                 if (renderer !== undefined) return renderer;
-                renderer = first(await createRenderer3d(values, this.glCtx, engine, textures)(handle));
+                renderer = await createRenderer3d(values, this.glCtx, engine, textures)(handle);
                 return renderer;
               };
 
               const dispose = async () => { engine.dispose(); values.dispose(); textures.dispose(); }
-              return { name, arts, validArts, plus, shadowsteps, artFiles, mapFiles, kvxFiles, ctx: engine, textures, rendererProvider, dispose }
-            }).finish()(handle)))
-        .finishUntuple();
+              return { name, arts, validArts, plus, shadowsteps, artFiles, files, filesMap, mapFiles, kvxFiles, ctx: engine, textures, rendererProvider, dispose }
+            });
+          })(handle));
       return this.app.scheduler.exec(work);
     })
   }
@@ -171,10 +167,35 @@ export class Editor {
       .collect())
   }
 
-  async openMap(engine: EngineContext, textures: EngineTextures, rendererProvider: Work<[], Source<BoardRenderer3D>>, mapName: string): Promise<void> {
+  async openMap(engine: EngineContext, textures: EngineTextures, rendererProvider: Task<Source<BoardRenderer3D>>, mapName: string): Promise<void> {
     (await createBoardView(this.injector, engine, textures, rendererProvider, mapName))
       .onErr(e => { this.app.logger.log('ERROR', e); info(this.ui, this.actionDescriptors, this.values, 'Error', e.message) })
       .onOk(w => this.ui.addWindow(w));
+  }
+
+  async openText(text: string): Promise<void> {
+    (await createTextEditor(this.injector, text))
+      .onErr(e => { info(this.ui, this.actionDescriptors, this.values, 'Error', e.message) })
+      .onOk(w => this.ui.addWindow(w));
+  }
+
+  async openKvx(engine: EngineContext, rendererProvider: Task<Source<BoardRenderer3D>>, fn: string): Promise<void> {
+    (await createKvxView(this.injector, engine, rendererProvider, fn))
+      .onErr(e => { info(this.ui, this.actionDescriptors, this.values, 'Error', e.message) })
+      .onOk(w => this.ui.addWindow(w));
+  }
+
+  async openFile(engine: EngineContext, rendererProvider: Task<Source<BoardRenderer3D>>, fileName: string): Promise<void> {
+    const fn = fileName.toLowerCase();
+    if (fn.endsWith('.con') || fn.endsWith('.txt') || fn.endsWith('.def') || fn.endsWith('.json')) {
+      const fileOpt = await engine.resources.get().read(fileName);
+      if (!fileOpt.isPresent()) return;
+      const decoder = new TextDecoder('utf-8');
+      const text = decoder.decode(fileOpt.get());
+      this.openText(text);
+    } else if (fn.endsWith('.kvx')) {
+      this.openKvx(engine, rendererProvider, fn);
+    }
   }
 
   async openArtEditor(ctx: EngineContext): Promise<void> {
@@ -253,16 +274,17 @@ function EngineContextResult({ editor, result, rec }: { editor: Editor, result: 
   const selectedVoxelIdValue = values.value('selectedVoxelId', -1);
   const active = values.value('active', 0);
 
-  return !res.isDone()
-    ? <Row className="flex-auto"><ProgressBar progress={res.progress().progress} info={res.progress().info} /></Row>
-    : res.result().isErr()
-      ? <div className="error">{res.result().getErr().message}</div>
-      : <Tabs items={[
-        { icon: 'bars', label: 'General', content: <EngineInfoView info={res.result().getOk()} /> },
-        { icon: 'images', label: 'Arts', content: <ArtsInfoView info={res.result().getOk()} editor={editor} /> },
-        { icon: 'map', label: 'Maps', content: <MapsInfoView info={res.result().getOk()} editor={editor} /> },
-        { icon: '', label: 'Voxels', content: <VoxelsInfoView info={res.result().getOk()} selectedVoxelIdxValue={selectedVoxelIdValue} editor={editor} /> },
-      ]} active={active} />
+  return res.on(r => r.on(
+    ok => <Tabs items={[
+      { icon: 'bars', label: 'General', content: <EngineInfoView info={ok} /> },
+      { icon: 'file', label: 'Files', content: <FilesInfoView info={ok} editor={editor} /> },
+      { icon: 'images', label: 'Arts', content: <ArtsInfoView info={ok} editor={editor} /> },
+      { icon: 'map', label: 'Maps', content: <MapsInfoView info={ok} editor={editor} /> },
+      { icon: '', label: 'Voxels', content: <VoxelsInfoView info={ok} selectedVoxelIdxValue={selectedVoxelIdValue} editor={editor} /> },
+      { icon: 'music', label: 'Sounds', content: <SoundsInfoView info={ok} /> },
+    ]} active={active} />,
+    err => <div className="error">{err.message}</div>),
+    p => <Row className="flex-auto"><ProgressBar progress={p.progress} info={p.info} /></Row>)
 }
 
 function EngineContextView({ editor }: { editor: Editor }) {

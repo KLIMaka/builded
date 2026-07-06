@@ -1,9 +1,10 @@
-import { HasSymbols, createScripFile, defaultDefine, nestedRule, number, rules, rulesInclude, set, simpleRule, symbols, token, tuple } from "@utils/scriptfile";
-import { Aliases, ArtInfoExtended, BoardContext, BuildRor, BuildTror, DEFAULT_SECTOR_SETTING, EMPTY_ALIASES, EMPTY_TAGS, EngineContext, EngineSettings, GlBlend, Palette, PicTags, RorLink, SectorSettings, VoxelSwap } from "app/apis/engine";
+import { Aliases, ArtInfoExtended, BoardContext, BuildRor, BuildTror, DEFAULT_SECTOR_SETTING, EMPTY_ALIASES, EMPTY_TAGS, EngineContext, EngineSettings, GlBlend, Palette, PicTags, RorLink, SectorSettings, Sound, VoxelSwap } from "app/apis/engine";
 import { FileSystem } from "app/apis/fs";
 import { EngineApi } from "build/board/mutations/api";
 import { forAllSectors, isValidSectorId } from "build/board/query";
 import { Board, SECTOR_NORMAL, SECTOR_REVERSE_TRANSLUNCENT_MASKED, SECTOR_TRANSLUNCENT_MASKED, Sector, Sprite, Wall } from "build/board/structs";
+import { KeywordId } from "build/formats/confile/constants";
+import { parseConHandleIncludes, toStringHasRange } from "build/formats/confile/parser";
 import { VoxelData, readKvx } from "build/formats/kvx";
 import { cloneBoard, cloneSector, cloneSprite, cloneWall, loadBuildMap, newBoard, newSector, newSprite, newWall, saveBuildMap } from "build/maploader";
 import { spriteInfo } from "build/sprites";
@@ -12,20 +13,22 @@ import { vec3 } from "gl-matrix";
 import Optional from "optional-js";
 import { match } from "ts-pattern";
 import { Source, ValuesContainer } from "ts-utils/callbacks";
-import { getOrCreate, getOrDefault, range, rect, reverseMap } from "ts-utils/collections";
+import { getOrCreate, getOrDefault, getOrDefaultF, range, rect, reverseMap } from "ts-utils/collections";
 import { palColorFinder } from "ts-utils/color";
 import { LinearInterpolator, vector3 } from "ts-utils/interpolator";
 import { iter } from "ts-utils/iter";
 import { asyncMapOptional, field } from "ts-utils/objects";
 import { Stream } from "ts-utils/stream";
-import { Fn, tuple as asTuple, first, identity, nil, notUndefined, second } from "ts-utils/types";
-import { begin } from "ts-utils/work";
+import { Fn, Supplier, tuple as asTuple, first, identity, nil, notUndefined, second, typeToken } from "ts-utils/types";
+import { HasSymbols, createDefFile, defaultDefine, nestedRule, number, rules, rulesInclude, set, simpleRule, symbols, token, tuple } from "utils/deffile";
 import { createBoardModifier } from "../default/board-context-utils";
-import { loadArtMapWork, loadArtWork, loadEditorPicAddons, loadMaxPluId, openFileOptional } from "../default/engine-commons";
+import { EngineDefs, GrpInfo, PalDef, PluDef, loadEngineDefsWork } from "../default/def-utils";
+import { loadArtMapWork, loadArtTask, loadEditorPicAddons, loadMaxPluId, openFileOptional } from "../default/engine-commons";
 import { DefaultGridController } from "../default/grid";
 import { stack, trackFilesSingle } from "../fs/fs";
-import { EngineDefs, GrpInfo, PalDef, PluDef, loadEngineDefsWork } from "../default/def-utils";
 import { SE_TAGS, sectorLotagText } from "./tags";
+import { cookbookInput } from "ts-utils/cookbook";
+import { Task } from "ts-utils/scheduler";
 
 function engineApi(): EngineApi<Board> {
   return { cloneBoard, cloneWall, cloneSprite, cloneSector, newWall, newSector, newSprite, newBoard };
@@ -38,7 +41,7 @@ async function loadAliases(values: ValuesContainer, fs: Source<FileSystem>, fn: 
     files.add(fn);
     const file = await fs.read(fn);
     return asyncMapOptional<ArrayBuffer, Aliases>(file, async file => {
-      const names = await createScripFile(fn, file)
+      const names = await createDefFile(fn, file)
         .parse({ symbols: new Map() },
           rulesInclude<HasSymbols>(
             inc => fs.read(inc), files,
@@ -67,7 +70,7 @@ async function loadTags(values: ValuesContainer, fs: Source<FileSystem>, fn: str
         )),
       defaultDefine());
     return asyncMapOptional<ArrayBuffer, PicTags>(await fs.read(fn), async tags => {
-      const picTags = await createScripFile(fn, tags).parse<Context>({ groups: [], symbols: new Map() }, fileParser).then(field('groups'));
+      const picTags = await createDefFile(fn, tags).parse<Context>({ groups: [], symbols: new Map() }, fileParser).then(field('groups'));
       return { allTags: () => picTags.map(p => p.name), tags: picnum => iter(picTags).filter(p => p.tiles.has(picnum)).map(p => p.name).collect() };
     }).then(o => o.orElse(EMPTY_TAGS))
   }
@@ -87,19 +90,26 @@ function defaultEngineSettings(values: ValuesContainer, picnumOffset: Source<num
 
 export async function loadGrpInfoFile(fileName: string, file: Optional<ArrayBuffer>): Promise<Optional<GrpInfo>> {
   return asyncMapOptional(file, ab =>
-    createScripFile(fileName, ab)
+    createDefFile(fileName, ab)
       .parse<GrpInfo>({}, rules(
         nestedRule(['grpinfo'], tuple(), identity(), nil(), rules<GrpInfo>(
           simpleRule(['name'], tuple(token), set('name')),
-          simpleRule(['defname'], tuple(token), set('defname')))))));
+          simpleRule(['defname'], tuple(token), set('defname')),
+          simpleRule(['scriptname'], tuple(token), set('scriptname'))
+        )))));
 }
+
 
 
 async function loadGrpInfo(values: ValuesContainer, fs: Source<FileSystem>, grpName: string): Promise<Source<GrpInfo>> {
   const fileName = `${grpName}.grpinfo`;
   const file = await openFileOptional(values, fileName, fs);
-  return values.transformedAsync('grpinfo', file, o => loadGrpInfoFile(fileName, o)
-    .then(o => o.orElse({ name: "Duke Nukem 3D", defname: `${grpName}.def` })))
+  const grpConFileName = `${grpName}.con`;
+  const grpConFile = await openFileOptional(values, grpConFileName, fs);
+  return values.transformedAsyncTuple('grpinfo', [file, grpConFile], ([file, gameCon]) => loadGrpInfoFile(fileName, file)
+    .then(o => o
+      .flatMap(grpInfo => gameCon.map(_ => ({ ...grpInfo, scriptname: grpConFileName })))
+      .orElse({ name: "Duke Nukem 3D", defname: `${grpName}.def`, scriptname: gameCon.map(_ => grpConFileName).orElse('game.con') })))
 }
 
 function remapPal(basePlu: Uint8Array, remap: Uint8Array): Uint8Array {
@@ -234,6 +244,30 @@ function loadBlends(values: ValuesContainer, defs: Source<EngineDefs>): Source<F
   });
 }
 
+async function loadSounds(values: ValuesContainer, grpInfo: Source<GrpInfo>, fs: Source<FileSystem>): Promise<Source<Sound[]>> {
+  return values.transformedAsyncTuple('sounds', [grpInfo, fs], async ([info, fs]) => {
+    const conFile = await fs.read(info.scriptname ?? 'game.con');
+    return asyncMapOptional(conFile, async buff => {
+      const { statements } = await parseConHandleIncludes(buff, f => fs.read(f));
+      const defines = iter(statements)
+        .filter(s => s.keyword === KeywordId.CON_DEFINE)
+        .toMap(s => toStringHasRange(s.args[0]), s => Number.parseInt(toStringHasRange(s.args[1])));
+      return statements
+        .filter(s => s.keyword === KeywordId.CON_DEFINESOUND)
+        .map<Sound>(s => {
+          const id = getOrDefaultF(defines, toStringHasRange(s.args[0]), id => Number.parseInt(id));
+          const file = toStringHasRange(s.args[1], 120);
+          const pitchLower = Number.parseInt(toStringHasRange(s.args[2]));
+          const pitchUpper = Number.parseInt(toStringHasRange(s.args[3]));
+          const priority = Number.parseInt(toStringHasRange(s.args[4]));
+          const type = Number.parseInt(toStringHasRange(s.args[5]));
+          const distance = Number.parseInt(toStringHasRange(s.args[6]));
+          return { id, file, pitchLower, pitchUpper, priority, type, distance, volume: 1, sampleRate: 11025 };
+        })
+    }).then(o => o.orElse([]));
+  })
+}
+
 function getTror(board: Board): BuildTror {
   const sectorByCeilingBunch = iter(board.sectors)
     .enumerate()
@@ -315,28 +349,34 @@ function defaultParallaxPicnums(picnum: number): number {
     .otherwise(() => 0);
 }
 
-function createloadBoard(values: ValuesContainer, art: Source<Map<number, ArtInfoExtended>>): Fn<Stream, Promise<BoardContext>> {
-  let boardId = 1;
-  return async (stream: Stream, name?: string): Promise<BoardContext> => {
-    const boardValues = values.createChild(`board-${boardId++}`);
-    const board = boardValues.value('board', loadBuildMap(stream));
-    const data = boardValues.transformedTuple('data', [board, art], ([board, art]) => {
-      const tror = getTror(board);
-      const [ror, sectorSettingsMap] = getRor(board, tror);
-      const sectorSettings = (sectorId: number) => getOrDefault(sectorSettingsMap, sectorId, DEFAULT_SECTOR_SETTING);
-      const spritesBySectorMap = iter(board.sprites).map(field('sectnum')).enumerate().group(first, second);
-      const spritesBySector = (sectorId: number) => getOrDefault(spritesBySectorMap, sectorId, []);
-      const parallaxPicnums = 8;
-      const spriteDescriptorsMap = iter(range(0, board.numsprites)).toMap(identity(), s => spriteInfo(board, s, art));
-      const spriteDescriptor = (spriteId: number) => spriteDescriptorsMap.get(spriteId);
-      return { board, ror, tror, spritesBySector, parallaxPicnums, spriteDescriptor, sectorSettings }
-    });
-    const grid = DefaultGridController(values);
-    const save = async () => saveBuildMap(board.get())
-    const dispose = async () => boardValues.dispose();
+let boardId = 1;
+function createContext(values: ValuesContainer, art: Source<Map<number, ArtInfoExtended>>, initialBoard: Board, name?: string): BoardContext {
+  const boardValues = values.createChild(`board-${name}-0x${(boardId++).toString(16)}`);
+  const board = boardValues.value('board', initialBoard);
+  const data = boardValues.transformedTuple('data', [board, art], ([board, art]) => {
+    const tror = getTror(board);
+    const [ror, sectorSettingsMap] = getRor(board, tror);
+    const sectorSettings = (sectorId: number) => getOrDefault(sectorSettingsMap, sectorId, DEFAULT_SECTOR_SETTING);
+    const spritesBySectorMap = iter(board.sprites).map(field('sectnum')).enumerate().group(first, second);
+    const spritesBySector = (sectorId: number) => getOrDefault(spritesBySectorMap, sectorId, []);
+    const parallaxPicnums = 8;
+    const spriteDescriptorsMap = iter(range(0, board.numsprites)).toMap(identity(), s => spriteInfo(board, s, art));
+    const spriteDescriptor = (spriteId: number) => spriteDescriptorsMap.get(spriteId);
+    return { board, ror, tror, spritesBySector, parallaxPicnums, spriteDescriptor, sectorSettings }
+  });
+  const grid = DefaultGridController(values);
+  const save = async () => saveBuildMap(board.get())
+  const dispose = async () => boardValues.dispose();
 
-    return { name, data, grid, ...createBoardModifier(board, data), save, dispose };
-  }
+  return { name, data, grid, ...createBoardModifier(board, data), save, dispose };
+}
+
+function createloadBoard(values: ValuesContainer, art: Source<Map<number, ArtInfoExtended>>): Fn<Stream, Promise<BoardContext>> {
+  return async (stream: Stream, name?: string): Promise<BoardContext> => createContext(values, art, loadBuildMap(stream), name)
+}
+
+function createCreateBoard(values: ValuesContainer, art: Source<Map<number, ArtInfoExtended>>): Supplier<Promise<BoardContext>> {
+  return async () => createContext(values, art, newBoard(), 'unnamed');
 }
 
 export type Eduke32ModsType = {
@@ -344,46 +384,49 @@ export type Eduke32ModsType = {
   mainGrpFirst: boolean,
 }
 
-export const createEngineContextEduke32 = begin()
-  .multiInput<[Source<FileSystem>, ValuesContainer, Eduke32ModsType]>()
-  .thenWork((handle, fs, values, { grpName, mainGrpFirst }) =>
-    values.createChild('eduke32-module').initializeAsync(values => begin()
-      .thenPass('Loading GrpInfo', () => loadGrpInfo(values, fs, grpName))
-      .thenWorkPass((handle, grpInfo) => loadEngineDefsWork(grpName, values)(handle, fs, values.transformed('defname', grpInfo, i => i.defname ?? '')))
-      .thenPass('Loading Resources', async (_, defs) => values.transformed('resources', defs, defs => mainGrpFirst
-        ? stack(stack(defs.addGrp, defs.mainGrp), defs.root)
-        : stack(defs.root, stack(defs.addGrp, defs.mainGrp))))
-      .forkPass(p => p
-        .thread('Loading Pal', (_, defs, res) => loadPal(values, defs, res))
-        .thread('Loading Trans', (_, defs, res) => loadTrans(values, defs, res))
-        .thread('Loading PLUs', (_, defs, res) => loadPlus(values, defs, res))
-        .thread('Loading voxels', (_, defs, res) => loadVoxels(values, defs, res))
-        .threadWork((handle, _, defs, res) => loadArtWork(handle, values, res))
-        .thread('Loading aliases', (_, defs, res) => loadAliases(values, res, 'NAMES.H'))
-        .thread('Loading tags', (_, defs, res) => loadTags(values, res, 'tiles.cfg')))
-      .thenWorkPass(async (handler, grpInfo, defs, resources, [pal, trans, plus, spriteVoxelSwap, art, aliases, picTags]) => loadArtMapWork(values, defs, art, resources, pal)(handler))
-      .thenWorkPass(async (handler, grpInfo, defs, resources, [pal, trans, plus, spriteVoxelSwap, art, aliases, picTags], artMap) => loadEditorPicAddons(values, artMap, resources, pal)(handle))
-      .thenPass('Creating default Fog pals', (grpInfo, defs, resources, [pal, trans, plus, spriteVoxelSwap, art, aliases, picTags], artMap, addonArtMap) => generateFogPals(values, pal, plus))
-      .then<EngineContext>('', async (grpInfo, defs, resources, [pal, trans, plus, spriteVoxelSwap, art, aliases, picTags], artMap, addonArtMap, plusWithFog) => {
-        return {
-          name: values.transformed('name', grpInfo, grpInfo => grpInfo.name ?? ''),
-          resources,
-          api: engineApi(),
-          settings: defaultEngineSettings(values, addonArtMap.offset),
-          pal,
-          trans,
-          picTags,
-          plus: plusWithFog,
-          maxPluId: loadMaxPluId(values, plusWithFog),
-          art,
-          artMap: addonArtMap.map,
-          shadowsteps: values.const('shadowsteps', 32),
-          aliases,
-          spriteVoxelSwap,
-          blends: loadBlends(values, defs),
-          parallaxInfo: defaultParallaxPicnums,
-          loadBoard: createloadBoard(values, addonArtMap.map),
-          dispose: () => values.dispose()
-        }
-      }).finish()(handle)
-    )).finish();
+export const createEngineContextEduke32: Task<EngineContext, [Source<FileSystem>, ValuesContainer, Eduke32ModsType]> =
+  cookbookInput(typeToken<[Source<FileSystem>, ValuesContainer, Eduke32ModsType]>(), (book, input) =>
+    book.paste([input], async (handle, [fs, values, { grpName, mainGrpFirst }]) =>
+      values.createChild('eduke32-module').initializeAsync(values => cookbookInput(typeToken<[]>(), book => {
+        const grpInfo = book.recepie('Loading GrpInfo', [], () => loadGrpInfo(values, fs, grpName));
+        const engineDefs = book.paste([grpInfo], (handle, grpInfo) => loadEngineDefsWork(grpName, values)(handle, fs, values.transformed('defname', grpInfo, i => i.defname ?? '')))
+        const res = book.recepie('Loading Resources', [engineDefs], async (defs) => values.transformed('resources', defs, defs => mainGrpFirst
+          ? stack(stack(defs.addGrp, defs.mainGrp), defs.root)
+          : stack(defs.root, stack(defs.addGrp, defs.mainGrp))));
+        const pal = book.recepie('Loading Pal', [engineDefs, res], (defs, res) => loadPal(values, defs, res));
+        const trans = book.recepie('Loading Trans', [engineDefs, res], (defs, res) => loadTrans(values, defs, res));
+        const plus = book.recepie('Loading PLUs', [engineDefs, res], (defs, res) => loadPlus(values, defs, res));
+        const voxels = book.recepie('Loading voxels', [engineDefs, res], (defs, res) => loadVoxels(values, defs, res));
+        const art = book.paste([res], (handle, res) => loadArtTask(handle, values, res));
+        const aliases = book.recepie('Loading aliases', [res], res => loadAliases(values, res, 'NAMES.H'));
+        const tags = book.recepie('Loading tags', [res], res => loadTags(values, res, 'tiles.cfg'));
+        const sounds = book.recepie('Loading sounds', [grpInfo, res], (grpInfo, res) => loadSounds(values, grpInfo, res));
+        const artMap = book.paste([engineDefs, art, res, pal], (handle, defs, art, res, pal) => loadArtMapWork(values, defs, art, res, pal)(handle));
+        const addonArtMap = book.paste([res, pal, artMap], (handle, res, pal, artMap) => loadEditorPicAddons(values, artMap, res, pal)(handle));
+        const plusWithFog = book.recepie('Creating default Fog pals', [pal, plus], (pal, plus) => generateFogPals(values, pal, plus));
+        return book.recepie('', [grpInfo, engineDefs, res, pal, trans, voxels, art, aliases, tags, sounds, addonArtMap, plusWithFog],
+          async (grpInfo, defs, resources, pal, trans, spriteVoxelSwap, art, aliases, picTags, sounds, addonArtMap, plusWithFog) => ({
+            name: values.transformed('name', grpInfo, grpInfo => grpInfo.name ?? ''),
+            resources,
+            api: engineApi(),
+            settings: defaultEngineSettings(values, addonArtMap.offset),
+            pal,
+            trans,
+            picTags,
+            plus: plusWithFog,
+            maxPluId: loadMaxPluId(values, plusWithFog),
+            art,
+            artMap: addonArtMap.map,
+            shadowsteps: values.const('shadowsteps', 32),
+            aliases,
+            spriteVoxelSwap,
+            blends: loadBlends(values, defs),
+            sounds,
+            parallaxInfo: defaultParallaxPicnums,
+            loadBoard: createloadBoard(values, addonArtMap.map),
+            createBoard: createCreateBoard(values, addonArtMap.map),
+            dispose: () => values.dispose()
+          }))
+      })(handle))
+    )
+  );

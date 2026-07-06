@@ -10,17 +10,19 @@
     "outDir": "distr",
     "rootDir": "src",
     "sourceMap": true,
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "jsx": "react",
     "allowJs": true,
-    "baseUrl": "./src",
     "strict": true,
     "paths": {
+      "*": [
+        "./src/*"
+      ],
       "@utils/*": [
-        "utils/*"
+        "./src/utils/*"
       ],
       "@ui/*": [
-        "app/modules/ui/*"
+        "./src/app/modules/ui/*"
       ]
     },
     "allowSyntheticDefaultImports": true,

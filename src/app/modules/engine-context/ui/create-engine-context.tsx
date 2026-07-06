@@ -14,14 +14,15 @@ import Optional from "optional-js";
 import React from "react";
 import { match } from "ts-pattern";
 import { Source, toValuesMap, Value, ValuesContainer, ValuesMap } from "ts-utils/callbacks";
+import { range } from "ts-utils/collections";
+import { cookbook } from "ts-utils/cookbook";
 import { iter } from "ts-utils/iter";
 import { sum } from "ts-utils/mathutils";
 import { asyncMapOptional } from "ts-utils/objects";
 import { Scheduler, TaskValue } from "ts-utils/scheduler";
 import { size } from "ts-utils/size";
-import { Consumer, first, notUndefined, pair } from "ts-utils/types";
-import { begin } from "ts-utils/work";
-import { EngineContextRecord, EngineContextType, ENGINES } from "../engine-context-api";
+import { Consumer, first, notUndefined, tuple } from "ts-utils/types";
+import { EngineContextRecord, EngineContextType, getAllEngines, getEngine } from "../engine-context-api";
 
 const ID = 'engines-context-create';
 
@@ -40,7 +41,8 @@ type CreateEngineWindowProps = {
   engineType: Value<Optional<EngineContextType<any>>>,
   engineMods: Value<ValuesMap<any>>,
   fsHandles: Source<FileSystemHandle[]>,
-  fsInfos: Source<FsInfo[]>,
+  fsInfosRefs: Source<number[]>,
+  fsInfosOrdered: Source<FsInfo[]>,
   error: Source<Optional<Error>>,
   valid: Source<boolean>,
   actions: Actions,
@@ -52,16 +54,15 @@ function FsRow(props: { info: FsInfo }) {
   return <Row className='gap-10'>
     <Icon icon={fsIcon(props.info.type)} className='fa-fixwidth' />
     <NonwrapLabel label={props.info.name} />
-    {details.isDone()
-      ? details.result().map(d => <div> {size(d.size)} in {d.files} files(s)</div>).getOk()
-      : <Icon icon="spinner" className="fa-spin-pulse" />}
+    {details.on(
+      r => r.map(d => <div> {size(d.size)} in {d.files} files(s)</div>).getOk(),
+      _ => <Icon icon="spinner" className="fa-spin-pulse" />)}
   </Row>
 }
 
 function createAddItems(values: ValuesContainer, engineType: Value<Optional<EngineContextType<any>>>) {
-  return values.transformed('addItems', engineType, current => iter(ENGINES)
-    .map(e => createActionItem(<div>{e.name}</div>, () => engineType.set(Optional.of(e)), false, current.map(c => e === c).orElse(false)))
-    .collect());
+  return values.transformed('addItems', engineType, current => getAllEngines()
+    .map(e => createActionItem(<div>{e.name}</div>, () => engineType.set(Optional.of(e)), false, current.map(c => e === c).orElse(false))));
 }
 
 function FsRenderer({ cellData }: TypedTableCellProps<FsInfo, FsInfo>) {
@@ -79,7 +80,8 @@ function CreateEngineWindow(props: CreateEngineWindowProps) {
   const addItems = values.const('addItems', actionsToActionItem(Object.values(props.actions.add)));
   const addLabel = values.const('addLabel', <Row className='gap-5 baseline-aligned'><Icon icon='plus' /> File System</Row>)
   const engineTypeLabel = values.transformed('engineTypeLabel', props.engineType, e =>
-    e.map(e => <div className="flex-fill">{e.name}</div>).orElse(<div className="flex-fill"><TextHeight /></div>))
+    e.map(e => <div className="flex-fill">{e.name}</div>).orElse(<div className="flex-fill"><TextHeight /></div>));
+  const selectionModel = selectIdSelectionModel(values, props.selected, props.fsInfosOrdered);
 
   return <Column className='padded-10 gap-10 flex-nowrap' >
     <Column className='flex-fill flex-nowrap gap-5'>
@@ -106,9 +108,9 @@ function CreateEngineWindow(props: CreateEngineWindowProps) {
         <div style={{ flexBasis: '100px' }} />
         <Column className="flex-fill">
           <VirtualTable
-            rows={props.fsInfos}
+            rows={props.fsInfosOrdered}
             columns={[row('info', 'Info', FsRenderer, 0, 1, 1)]}
-            selected={selectIdSelectionModel(values, props.selected, props.fsInfos)}
+            selected={selectionModel}
             disableHeader
           />
         </Column>
@@ -128,28 +130,34 @@ function CreateEngineWindow(props: CreateEngineWindowProps) {
   </Column>
 }
 
-function createActions(actionDescriptors: ActionDescriptors, fs: FileSystems, fileSystems: Value<FileSystemHandle[]>, selected: Value<number>, values: ValuesContainer): Actions {
-  const ctx = actionDescriptors.sub(ID);
+function createActions(ad: ActionDescriptors, fs: FileSystems, fileSystems: Value<FileSystemHandle[]>, fsRefs: Value<number[]>, selected: Value<number>, values: ValuesContainer): Actions {
+  const ctx = ad.sub(ID);
   const register = (id: string, action: Consumer<void>, enabled?: Source<boolean>) => ctx.bindSync(id, action, enabled);
   const addStorage = async (type: SerializedFileSystemHandle['type']) => {
-    fs.pickHandle(type).then(o => o.ifPresent(h => {
-      fileSystems.setPromiseOrDispose(async fss => [h,
-        ...await iter(fss)
-          .map(async fs => pair(fs, await fs.isSameEntry(h)))
-          .await_()
-          .then(fss => fss
-            .filter(([_, same]) => !same)
-            .map(first)
-            .collect()
-          )])
+    fs.pickHandle(type).then(o => o.ifPresent(async h => {
+      const fss = fileSystems.get();
+      const newFss = [h, ...await iter(fsRefs.get().map(x => fss[x]))
+        .map(async fs => tuple(fs, await fs.isSameEntry(h)))
+        .await_()
+        .then(fss => fss
+          .filter(([_, same]) => !same)
+          .map(first)
+          .collect()
+        )];
+      fileSystems.set(newFss);
+      fsRefs.set([...range(0, newFss.length)]);
     }))
   }
-  const moveUpEnabled = values.transformedTuple('moveUpEnabled', [selected, fileSystems], ([s, { length }]) => s > 0 && s < length)
-  const moveDownEnabled = values.transformedTuple('moveDownEnabled', [selected, fileSystems], ([s, { length }]) => s >= 0 && s < length - 1)
-  const deleteEnabled = values.transformedTuple('deleteEnabled', [selected, fileSystems], ([s, { length }]) => s >= 0 && s < length)
+  const moveUpEnabled = values.transformedTuple('moveUpEnabled', [selected, fsRefs], ([s, { length }]) => s > 0 && s < length)
+  const moveDownEnabled = values.transformedTuple('moveDownEnabled', [selected, fsRefs], ([s, { length }]) => s >= 0 && s < length - 1)
+  const deleteEnabled = values.transformedTuple('deleteEnabled', [selected, fsRefs], ([s, { length }]) => s >= 0 && s < length)
   const deleteAction = values.transformed('deleteAction', selected, s => () => {
-    if (s === 0) fileSystems.modImmer(fss => fss.shift())
+    if (s === 0) {
+      fsRefs.modImmer(refs => refs.shift());
+      fileSystems.modImmer(fss => fss.shift());
+    }
     else {
+      fsRefs.modImmer(refs => refs.splice(s, 1));
       fileSystems.modImmer(fss => fss.splice(s, 1));
       selected.mod(s => s - 1);
     }
@@ -160,7 +168,7 @@ function createActions(actionDescriptors: ActionDescriptors, fs: FileSystems, fi
       .with('down', () => 1)
       .exhaustive();
     selected.mod(s => s + delta);
-    fileSystems.modImmer(fss => { [fss[s], fss[s + delta]] = [fss[s + delta], fss[s]] })
+    fsRefs.modImmer(refs => { [refs[s], refs[s + delta]] = [refs[s + delta], refs[s]] })
   })
   return {
     add: {
@@ -186,15 +194,12 @@ function createFsInfo(scheduler: Scheduler, handle: FileSystemHandle): FsInfo {
   return { name: handle.name, type: handle.serialized.type, details: details.task };
 }
 
-function createFileSystemsInfo(values: ValuesContainer, scheduler: Scheduler, fileSystems: Source<FileSystemHandle[]>): Source<FsInfo[]> {
-  return values.transformed('fileSystemInfos', fileSystems, fss => fss.map(handle => createFsInfo(scheduler, handle)));
-}
-
 function createResultHandler(
   engineType: Source<Optional<EngineContextType<any>>>,
   engineMods: Source<ValuesMap<any>>,
   name: Source<string>,
   fsHandles: Source<FileSystemHandle[]>,
+  fsRefs: Source<number[]>,
   fs: FileSystems,
   error: Value<Optional<Error>>,
   resultAndClose: Consumer<EngineContextRecord | null>,
@@ -203,21 +208,20 @@ function createResultHandler(
 ) {
   return async (isOk: boolean) => {
     if (isOk) {
+      const handles = fsHandles.get();
       const record: EngineContextRecord = {
         type: engineType.get().get().id,
         name: name.get(),
         mods: engineMods.get().getObject(),
-        fileSystems: iter(fsHandles.get())
-          .map(h => h.serialized)
-          .collect()
+        fileSystems: fsRefs.get().map(i => handles[i].serialized)
       };
       const localValues = values.create('tmp-values-create-engine-context');
-      const createEngine = iter(ENGINES).first(e => e.id === record.type).map(e => e.factory).orElseThrow(() => new Error(`Unknown engine type: '${record.type}' `));
-      const work = begin()
-        .forkItems(record.fileSystems, f => `Opening File System...`, f => fs.deserialize(f).open())
-        .then('Building FS Stack...', async fss => localValues.value('fs-stack', iter(fss).map(r => r.unwrap()).reduceFirst(stack).get()))
-        .thenWork((handle, fs) => createEngine(handle, fs, localValues, record.mods))
-        .finishUntuple();
+      const createEngine = getEngine(record.type).map(e => e.factory).orElseThrow(() => new Error(`Unknown engine type: '${record.type}' `));
+      const work = cookbook(book => {
+        const fss = record.fileSystems.map(f => book.recepie('Opening File System...', [], async () => fs.deserialize(f).open()));
+        const resources = book.recepie('Building FS Stack...', fss, async (...fss) => localValues.value('fs-stack', iter(fss).map(r => r.unwrap()).reduceFirst(stack).get()));
+        return book.paste([resources], (handle, res) => createEngine(handle, res, localValues, record.mods))
+      })
       const task = app.scheduler.exec(work);
       const result = await task.end();
       result
@@ -231,39 +235,42 @@ function createResultHandler(
   }
 }
 
-export async function createEngine(ui: Ui, actionDescriptors: ActionDescriptors, fs: FileSystems, app: App, values: Values, def?: EngineContextRecord): Promise<Optional<EngineContextRecord>> {
-  return values.create(ID).initializeAsync(async localValues => {
-    const name = localValues.value('name', def?.name ?? '');
-    const engineType = localValues.value('engineType', iter(ENGINES).first(e => e.id === def?.type));
-    const engineDefault = iter(ENGINES).first(e => e.id === def?.type).map(e => e.defaultMods).orElse({});
-    const engineMods = localValues.value('engineMods', toValuesMap(def?.mods ?? engineDefault, engineDefault, localValues));
-    const fsHandles = localValues.value('fsHandles', iter(def?.fileSystems ?? []).map(h => fs.deserialize(h)).collect());
-    const fsInfos = createFileSystemsInfo(localValues, app.scheduler, fsHandles);
-    const error = localValues.value('error', Optional.empty<Error>());
-    const selected = localValues.value('selected', -1);
+export async function createEngine(ui: Ui, ad: ActionDescriptors, fs: FileSystems, app: App, values: Values, def?: EngineContextRecord): Promise<Optional<EngineContextRecord>> {
+  return values.create(ID).initializeAsync(async v => {
+    const name = v.value('name', def?.name ?? '');
+    const engineType = v.value('engineType', getEngine(def?.type));
+    const engineDefaultMods = getEngine(def?.type).map(e => e.defaultMods).orElse({});
+    const engineMods = v.value('engineMods', toValuesMap(def?.mods ?? engineDefaultMods, engineDefaultMods, v));
+    const fsHandles = v.value('fsHandles', iter(def?.fileSystems ?? []).map(h => fs.deserialize(h)).collect());
+    const fsInfos = v.transformed('fileSystemInfos', fsHandles, fss => fss.map(handle => createFsInfo(app.scheduler, handle)));
+    const fsInfosRefs = v.value('fsInfosRefs', [...range(0, def?.fileSystems.length ?? 0)]);
+    const fsInfosOrdered = v.transformedTuple('fsInfosOrdered', [fsInfos, fsInfosRefs], ([infos, refs]) => refs.map(i => infos[i]));
+    const error = v.value('error', Optional.empty<Error>());
+    const selected = v.value('selected', -1);
     const clearError = () => error.set(Optional.empty());
-    localValues.handleStandalone([engineType], type => { clearError(); type.ifPresent(t => engineMods.set(toValuesMap(def?.type === t.id ? def.mods : t.defaultMods, t.defaultMods, localValues))) });
-    localValues.handleStandalone([fsHandles], clearError);
-    const valid = localValues.transformedTuple('valid', [engineType, error, fsHandles], ([type, err, fss]) => type.isPresent() && !err.isPresent() && fss.length > 0);
-    const actions = createActions(actionDescriptors, fs, fsHandles, selected, localValues);
+    v.handleStandalone([engineType], type => { clearError(); type.ifPresent(t => engineMods.set(toValuesMap(def?.type === t.id ? def.mods : t.defaultMods, t.defaultMods, v))) });
+    v.handleStandalone([fsHandles], clearError);
+    const valid = v.transformedTuple('valid', [engineType, error, fsHandles], ([type, err, fss]) => type.isPresent() && !err.isPresent() && fss.length > 0);
+    const actions = createActions(ad, fs, fsHandles, fsInfosRefs, selected, v);
 
     return new Promise<Optional<EngineContextRecord>>(ok => {
       const [resultAndClose, close] = modalResult(() => window.close(), ok);
-      const result = createResultHandler(engineType, engineMods, name, fsHandles, fs, error, resultAndClose, app, values);
-      const window = new WindowBuilder(ID, actionDescriptors, localValues)
+      const result = createResultHandler(engineType, engineMods, name, fsHandles, fsInfosRefs, fs, error, resultAndClose, app, values);
+      const window = new WindowBuilder(ID, ad, v)
         .titleFromId()
         .size(500, 350)
         .minSize(450, 300)
         .actions([...Object.values(actions.add), ...Object.values(actions.fs)])
         .onClose(close)
-        .disposable(localValues)
+        .disposable(v)
         .build(<CreateEngineWindow
           result={result}
           name={name}
           engineType={engineType}
           engineMods={engineMods}
           fsHandles={fsHandles}
-          fsInfos={fsInfos}
+          fsInfosRefs={fsInfosRefs}
+          fsInfosOrdered={fsInfosOrdered}
           error={error}
           valid={valid}
           actions={actions}

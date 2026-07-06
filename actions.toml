@@ -240,3 +240,7 @@ select = { parent = "select" }
 [settings]
 label = "Settings"
 bind = "g"
+
+[text-editor]
+label = "Text Editor"
+bind = "x"

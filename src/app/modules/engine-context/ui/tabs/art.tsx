@@ -1,10 +1,12 @@
 import { ActionButton, Column, FieldValue, NonwrapLabel, Row, UiContext, useValuesContainer } from "@ui/commons";
 import { column, singleSelectionModel, TypedTableCellProps, VirtualTable, VirtualTableColumn } from "@ui/table";
+import { FileSource } from "app/apis/fs";
 import React, { useContext } from "react";
 import { sum } from "ts-utils/mathutils";
 import { size } from "ts-utils/size";
 import { notUndefined } from "ts-utils/types";
 import { Editor, EngineInfo } from "../engine-context";
+import { FileSourceRenderer } from "./common";
 
 
 type ArtFileInfo = Readonly<{
@@ -13,6 +15,7 @@ type ArtFileInfo = Readonly<{
   end: number,
   empty: number,
   size: number,
+  src: FileSource,
 }>;
 
 function ArtName({ cellData }: TypedTableCellProps<ArtFileInfo, string>) {
@@ -32,6 +35,7 @@ const COLUMNS: VirtualTableColumn<ArtFileInfo, any>[] = [
   column('start', 'Offset', ArtField, 60),
   column('empty', 'Empty', ArtField, 60),
   column('size', 'Size', ArtSize, 60),
+  column("src", "Source", FileSourceRenderer, 120),
 ]
 
 export function ArtsInfoView({ info, editor }: { info: EngineInfo, editor: Editor }) {
@@ -44,6 +48,7 @@ export function ArtsInfoView({ info, editor }: { info: EngineInfo, editor: Edito
     start: f.art.header.start,
     end: f.art.header.end,
     size: f.art.fileSize,
+    src: f.info.src,
     empty: f.art.arts
       .filter(a => a.h === 0 || a.w === 0)
       .length

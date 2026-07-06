@@ -13,12 +13,13 @@ import { waitFor } from "app/modules/scheduler/ui/task-propgress";
 import Optional from "optional-js";
 import * as React from 'react';
 import { Signal, Source, Value, ValuesContainer, ValuesMap, initial } from "ts-utils/callbacks";
+import { cookbook } from "ts-utils/cookbook";
 import { Dependency, getInstances, lifecycle } from "ts-utils/injector";
 import { iter } from "ts-utils/iter";
-import { asyncMapOptional, zipOptional } from "ts-utils/objects";
+import { andOptional, asyncMapOptional } from "ts-utils/objects";
+import { Task } from "ts-utils/scheduler";
 import { size } from "ts-utils/size";
 import { Consumer, Supplier, identity, pair } from "ts-utils/types";
-import { begin } from "ts-utils/work";
 import { EMPTY } from "../fs";
 import { FsManagerUiImpl } from "./fs-model-view";
 import { fsIcon } from "./fs-ui-utils";
@@ -133,7 +134,6 @@ type ManagerActions = {
   createDuke: Action,
   createFury: Action,
   addMenuOpen: Action,
-  ceateEngineOpen: Action,
   search: Action,
   clearSearch: Action,
 }
@@ -150,7 +150,6 @@ export class FileSystemsManagerImpl {
   readonly selected: Source<SelectionController<FileInfo>>;
   readonly query: Value<string>;
   readonly addMenuOpen: Value<boolean>;
-  readonly createEngineOpen: Value<boolean>;
   readonly searchSiganl: Signal<[]>;
 
   constructor(
@@ -170,7 +169,6 @@ export class FileSystemsManagerImpl {
     this.storages = this.createStorages(global.recentFss, this.selectedFsHandle,
       [this.actions.addStorage, this.actions.addDir, this.actions.addZip, this.actions.addRff, this.actions.addGrp]);
     this.addMenuOpen = localValues.value('addMenuOpen', false);
-    this.createEngineOpen = localValues.value('createEngineOpen', false);
     this.searchSiganl = localValues.signal();
   }
 
@@ -252,7 +250,6 @@ export class FileSystemsManagerImpl {
       createFury: register('create-engine-fury', () => { }),
       createDuke: register('create-engine-duke', () => { }),
       addMenuOpen: register('add-menu', () => this.addMenuOpen.set(true)),
-      ceateEngineOpen: register('create-engine', () => this.createEngineOpen.set(true)),
       search: register('search', () => this.searchSiganl.call()),
       clearSearch: register('clear-search', () => this.query.set(''))
     }
@@ -273,10 +270,10 @@ export class FileSystemsManagerImpl {
     if (!isOk.orElse(false)) return;
     await this.selectedFs.get().writable().then(w => w.ifPresent(async writable => {
       const scheduler = this.global.app.scheduler;
-      const task = scheduler.exec(begin()
-        .forkItems(selected, f => `Deleting ${f.name}...`, f => writable.delete(f.name))
-        .finish()
-      );
+      const task = scheduler.exec(cookbook(book => {
+        const toDelete = selected.map(f => book.recepie(`Deleting ${f.name}...`, [], async () => writable.delete(f.name)));
+        return book.recepie('', toDelete, async (..._) => []);
+      }))
       await waitFor(this.global.ui, this.global.actionDescriptors, this.global.values, "Delete", task);
     }));
   }
@@ -284,9 +281,9 @@ export class FileSystemsManagerImpl {
   async writeFiles(files: FileProvider[]) {
     await this.selectedFs.get().writable().then(w => w.ifPresent(async w => {
       const scheduler = this.global.app.scheduler;
-      const task = scheduler.exec(begin()
-        .then('Preparing...', async () => this.selectedFs.get().list())
-        .factory((work, dstFiles) => {
+      const task = scheduler.exec(cookbook(book => {
+        const list = book.recepie('Preparing...', [], async () => this.selectedFs.get().list());
+        return book.paste([list], async (handle, dstFiles) => cookbook(book => {
           const filesMap = iter(dstFiles).toMap(f => f.name.toLowerCase(), identity());
           const checkFile = async (name: string, byteLength: number) => {
             const fn = name;
@@ -296,24 +293,27 @@ export class FileSystemsManagerImpl {
             const isOk = await confirmOverwrite(this.global.ui, this.global.actionDescriptors, this.global.values, 'Overwrite', text)
             return isOk.orElse('all-no')
           }
-          return work.input<OverwriteOption>()
-            .append(files, (work, file) => work
-              .thenPass(`Writing ${file.name}...`, async option => option === 'all-no'
-                ? Optional.empty<ArrayBuffer>()
-                : file.provider())
-              .thenPass(`Writing ${file.name}...`, async (option, data) => option === 'all-yes'
-                ? Optional.of(option)
-                : asyncMapOptional(data, data => checkFile(file.name, data.byteLength)))
-              .then(`Writing ${file.name}...`, async (prevOption, data, checkOption) =>
-                asyncMapOptional(zipOptional(checkOption, data), async ([option, data]) =>
-                  (option === 'all-no' || option === 'no')
-                    ? option
-                    : w.write(file.name, data)
-                      .catch(e => info(this.global.ui, this.global.actionDescriptors, this.global.values, 'Error', e.message))
-                      .then(_ => option)
-                ).then(o => o.orElse(prevOption)))
-            ).finish(['yes']);
-        }).finish());
+          const initialOption = book.recepie<[], OverwriteOption>('', [], async () => 'yes');
+          let lastOption: Task<OverwriteOption, any> = initialOption;
+          for (const file of files) {
+            const load = book.recepie(`Loading ${file.name}...`, [lastOption], async option => option === 'all-no'
+              ? Optional.empty<ArrayBuffer>()
+              : file.provider());
+            const check = book.recepie(`Checking ${file.name}...`, [load, lastOption], async (data, option) => option === 'all-yes'
+              ? Optional.of(option)
+              : asyncMapOptional(data, data => checkFile(file.name, data.byteLength)));
+            lastOption = book.recepie(`Writing ${file.name}`, [lastOption, load, check], async (prevOption, data, checkOption) =>
+              asyncMapOptional(andOptional(checkOption, data), async ([option, data]) =>
+                (option === 'all-no' || option === 'no')
+                  ? option
+                  : w.write(file.name, data)
+                    .catch(e => info(this.global.ui, this.global.actionDescriptors, this.global.values, 'Error', e.message))
+                    .then(_ => option)
+              ).then(o => o.orElse(prevOption)));
+          }
+          return lastOption;
+        })(handle))
+      }))
       const result = await waitFor(this.global.ui, this.global.actionDescriptors, this.global.values, "Write", task);
       result.onErr(e => { this.global.app.logger.log('ERROR', e); info(this.global.ui, this.global.actionDescriptors, this.global.values, 'Error', e.message) })
     }));

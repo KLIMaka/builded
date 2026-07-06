@@ -1,14 +1,14 @@
-import { ActionButton, Column, Icon, NonwrapLabel, Row, Spacer, TextHeight, actionsToActionItem, useValue, useValuesContainer } from '@ui/commons';
+import { ActionButton, Column, Icon, NonwrapLabel, Row, Spacer, TextHeight, useValue, useValuesContainer } from '@ui/commons';
 import { MenuButton } from '@ui/menu-button';
 import { SearchBox } from '@ui/search-box';
 import { TypedTableCellProps, VirtualTable, VirtualTableColumn, column } from '@ui/table';
-import { iter } from 'ts-utils/iter';
-import { size } from 'ts-utils/size';
 import Optional from 'optional-js';
 import * as React from 'react';
 import { useMemo } from 'react';
-import { FileInfo, fileProvider, FileSystemsManagerImpl } from './fs-model';
+import { iter } from 'ts-utils/iter';
+import { size } from 'ts-utils/size';
 import { EMPTY } from '../fs';
+import { FileInfo, FileSystemsManagerImpl, fileProvider } from './fs-model';
 import { fsIcon } from './fs-ui-utils';
 
 
@@ -70,15 +70,6 @@ export function FsManagerUiImpl({ manager }: { manager: FileSystemsManagerImpl }
       <div className='text-ellipsis'>{h.map(fs => fs.name).orElse('')}</div>
       <TextHeight />
     </Row>)
-  const createEngineLabel = values.const('createEngineLabel',
-    <Row className='gap-10 baseline-aligned'>
-      <Icon icon='gears' />
-      <div>Create Engine</div>
-    </Row>)
-
-  const engines = values.const('engines',
-    actionsToActionItem([manager.actions.createDuke, manager.actions.createBlood, manager.actions.createFury]));
-
 
   return (
     <Column>
@@ -88,7 +79,6 @@ export function FsManagerUiImpl({ manager }: { manager: FileSystemsManagerImpl }
         <ActionButton action={manager.actions.copy} />
         <ActionButton action={manager.actions.paste} />
         <ActionButton action={manager.actions.delete} />
-        <MenuButton openValue={manager.createEngineOpen} label={createEngineLabel} items={engines} />
         <Spacer />
         <SearchBox value={manager.query} focusSignal={manager.searchSiganl} channelName='search' />
       </Row>

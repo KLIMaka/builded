@@ -277,6 +277,7 @@
   background: var(--window-title-bg);
   line-height: 24px;
   height: 24px;
+  z-index: -1;
 }
 
 .window>.wb-body {
@@ -771,6 +772,7 @@
   border: none;
   padding: 0px 5px;
   min-width: 0px;
+  color: var(--font-color);
 }
 
 .text-box>input:focus-visible {
@@ -793,15 +795,6 @@ canvas:focus-visible {
   outline: none;
 }
 
-* {
-  color: var(--font-color);
-  text-shadow: var(--text-shadow);
-  font-size: 12px;
-  font-family: sans-serif;
-  user-select: none;
-  cursor: default;
-}
-
 body {
   margin: 0px;
   position: absolute;
@@ -810,6 +803,13 @@ body {
   left: 0;
   right: 0;
   overflow: hidden;
+
+  color: var(--font-color);
+  text-shadow: var(--text-shadow);
+  font-size: 12px;
+  font-family: sans-serif;
+  user-select: none;
+  cursor: default;
 }
 
 .listbox-base {
@@ -1087,6 +1087,10 @@ body {
   width: 0px;
 }
 
+.text-align-right {
+  text-align: end;
+}
+
 .flex-nowrap {
   flex-wrap: nowrap;
 }
@@ -1211,6 +1215,10 @@ body {
   fill: rgba(90, 90, 90, 0.5);
 }
 
+.axes-rect:hover {
+  stroke: white;
+}
+
 .axes-label {
   text-anchor: middle;
   font-weight: bold;
@@ -1227,7 +1235,12 @@ body {
 }
 
 .axes-label:hover {
+  stroke: white;
+}
+
+.axes-label:hover>text {
   fill: white;
+  stroke: none;
 }
 
 .axes-line {

@@ -4,18 +4,17 @@ import { Row } from "@ui/commons";
 import { MenuButton } from "@ui/menu-button";
 import { EngineContext } from "app/apis/engine";
 import { FileSystem, FileSystemHandle, SerializedFileSystemHandle } from "app/apis/fs";
+import { Board } from "build/board/structs";
 import Optional from "optional-js";
 import React, { ReactNode } from "react";
 import { initial, Source, TRANSFORM_PLACEHOLDER, ValuesContainer, ValuesMap } from "ts-utils/callbacks";
 import { iter } from "ts-utils/iter";
 import { MultiFn } from "ts-utils/types";
-import { Work } from "ts-utils/work";
 import { createEngineContextWork as createEngineBlood } from "../blood/blood";
-import { GrpInfo } from "../eduke32/defs";
+import { GrpInfo } from "../default/def-utils";
 import { createEngineContextEduke32, Eduke32ModsType, loadGrpInfoFile } from "../eduke32/eduke32";
 import { stack } from "../fs/fs";
-import { Board } from "build/board/structs";
-import { Values } from "app/apis/values";
+import { Task } from "ts-utils/scheduler";
 
 export type EngineContextRecord = {
   name: string,
@@ -27,7 +26,7 @@ export type EngineContextRecord = {
 export type EngineContextType<T, B extends Board = Board> = {
   id: string,
   name: string,
-  factory: Work<[Source<FileSystem>, ValuesContainer, T], [EngineContext<B>]>,
+  factory: Task<EngineContext<B>, [Source<FileSystem>, ValuesContainer, T]>,
   defaultMods: T,
   modsEditor: MultiFn<[ValuesMap<T>, Source<FileSystemHandle[]>, ValuesContainer], ReactNode>
 }
@@ -82,7 +81,15 @@ function Eduke32Mods(mods: ValuesMap<Eduke32ModsType>, fsHandles: Source<FileSys
   </>
 }
 
-export const ENGINES: EngineContextType<any, any>[] = [
+const ENGINES: EngineContextType<any, any>[] = [
   { id: 'blood', name: 'Blood', factory: createEngineBlood, defaultMods: {}, modsEditor: _ => <></> },
   { id: 'eduke32', name: 'EDuke32', factory: createEngineContextEduke32, defaultMods: { grpName: '', mainGrpFirst: false }, modsEditor: Eduke32Mods } as EngineContextType<Eduke32ModsType>,
 ]
+
+export function getEngine(id: string | undefined): Optional<EngineContextType<any, any>> {
+  return iter(ENGINES).first(e => e.id === id);
+}
+
+export function getAllEngines(): EngineContextType<any, any>[] {
+  return ENGINES;
+}

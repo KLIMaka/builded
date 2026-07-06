@@ -1,12 +1,12 @@
 import { Board } from "../structs";
 import { ArtProvider, BuildReferenceTracker } from "../../../app/apis/app2";
 import { vec3 } from "gl-matrix";
-import { Deck } from "../../../utils/collections";
+import { Deck } from "ts-utils/collections";
 import { wallNormal, ZSCALE, ANGSCALE } from "../../utils";
 import { sectorWalls } from "../loops";
 import { sectorOfWall, lastwall, wallInSector, isValidWallId } from "../query";
 import { EngineApi } from "./api";
-import { cyclic, int } from "../../../utils/mathutils";
+import { cyclic, int } from "ts-utils/mathutils";
 import { setFirstWall } from "../mutations/sectors"
 import { createNewSector } from "./createsector";
 import { splitWall } from "./walls";

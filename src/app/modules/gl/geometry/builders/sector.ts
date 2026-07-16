@@ -1,10 +1,10 @@
 import { mat2d, mat4, vec2, vec3, vec4 } from "gl-matrix";
-import { sectorWalls } from "../../../../../build/board/loops";
-import { Board, Wall } from "../../../../../build/board/structs";
-import { ArtInfo } from "../../../../../build/formats/art";
-import { ANGSCALE, ZSCALE, convertVisibility, createSlopeCalculator, getFirstWallAngle, sectorNormal } from "../../../../../build/utils";
 import { Deck, groups, last, slidingPairs } from "ts-utils/collections";
 import { iter } from "ts-utils/iter";
+import { sectorWalls } from "../../../../../build/board/loops";
+import { Board } from "../../../../../build/board/structs";
+import { ArtInfo } from "../../../../../build/formats/art";
+import { ANGSCALE, ZSCALE, convertVisibility, createSlopeCalculator, getFirstWallAngle, sectorNormal, triangulate } from "../../../../../build/utils";
 import { Builders } from "../../../../apis/builder";
 import { SectorRenderable } from "../../../../apis/renderable";
 import { BuildBuffer } from "../../buffers";
@@ -98,75 +98,6 @@ function compress(triangles: point2d[]): [point2d[], number[]] {
     indexes.push(idx);
   });
   return [vtxset, indexes];
-}
-
-export type point2d = [number, number];
-type point2dxy = { x: number, y: number };
-type zoid_t = { x: [number, number, number, number], y: [number, number], w: [Wall, Wall] };
-type trap_t = { x0: number, x1: number, w: Wall }
-const trapCmp = (lh: trap_t, rh: trap_t) => { return lh.x0 + lh.x1 - rh.x0 - rh.x1 }
-
-export function triangulate(board: Board, sectorId: number): point2d[] {
-  const secy = [...new Set(iter(sectorWalls(board, sectorId))
-    .map(w => board.walls[w].y)
-    .collect()
-    .sort((l, r) => l - r))];
-  const zoids = new Deck<zoid_t>();
-  // for (const [sy0, sy1] of iter(range(0, secy.length - 1))
-  //   .map(i => [secy[i], secy[i + 1]])) {
-  for (const [sy0, sy1] of slidingPairs(secy)) {
-    const ts = new Deck<trap_t>();
-    for (const [w0, w1] of iter(sectorWalls(board, sectorId))
-      .map(w => [board.walls[w], board.walls[board.walls[w].point2]])) {
-      let [x0, y0, x1, y1] = w0.y > w1.y ? [w1.x, w1.y, w0.x, w0.y] : [w0.x, w0.y, w1.x, w1.y];
-      if ((y0 >= sy1) || (y1 <= sy0)) continue;
-      if (y0 < sy0) x0 = (sy0 - w0.y) * (w1.x - w0.x) / (w1.y - w0.y) + w0.x;
-      if (y1 > sy1) x1 = (sy1 - w0.y) * (w1.x - w0.x) / (w1.y - w0.y) + w0.x;
-      ts.push({ x0, x1, w: w0 });
-    }
-    const traps = [...ts].sort(trapCmp);
-    let j = 0;
-    for (let i = 0; i < traps.length; i = j + 1) {
-      j = i + 1;
-      const trapi = traps[i];
-      const trapi1 = traps[i + 1];
-      if ((trapi1.x0 <= trapi.x0) && (trapi1.x1 <= trapi.x1)) continue;
-      while ((j + 2 < traps.length) && (traps[j + 1].x0 <= traps[j].x0) && (traps[j + 1].x1 <= traps[j].x1)) j += 2;
-      const x0 = trapi.x0
-      const x1 = traps[j].x0;
-      const x2 = traps[j].x1;
-      const x3 = trapi.x1;
-      const y0 = sy0;
-      const y1 = sy1;
-      const w0 = trapi.w
-      const w1 = traps[j].w;
-      zoids.push({ x: [x0, x1, x2, x3], y: [y0, y1], w: [w0, w1] });
-    }
-  }
-
-  const triangles: point2d[] = [];
-  for (let i = 0; i < zoids.length(); i++) {
-    const pol = new Deck<point2dxy>();
-    for (let j = 0; j < 4; j++) {
-      const polx = zoids.get(i).x[j];
-      const poly = zoids.get(i).y[j >> 1];
-      if (pol.length() === 0 || (polx !== last(pol).x) || (poly !== last(pol).y)) pol.push({ x: polx, y: poly });
-    }
-    if (pol.length() < 3) continue;
-    const fp0x = pol.get(0).x;
-    const fp0y = pol.get(0).y;
-    for (let j = 2; j < pol.length(); j++) {
-      const fp1x = pol.get(j).x;
-      const fp1y = pol.get(j).y;
-      const fp2x = pol.get(j - 1).x;
-      const fp2y = pol.get(j - 1).y;
-      triangles.push([fp2x, fp2y]);
-      triangles.push([fp1x, fp1y]);
-      triangles.push([fp0x, fp0y]);
-    }
-  }
-
-  return triangles;
 }
 
 function fillBuffersForSector(ceil: boolean, board: Board, s: number, builder: SectorBuilder, normal: vec3, t: mat4, lms: mat2d) {

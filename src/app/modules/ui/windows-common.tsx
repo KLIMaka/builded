@@ -57,6 +57,7 @@ export class WindowBuilder {
   uniqueId: Id;
   uniqueName: string;
   props: WinBoxPropType = {};
+  blockingContext: boolean;
   _size: Supplier<Value<SizeType>>;
   _position: Supplier<Value<SizeType>>;
   _actions: Action[] = [];
@@ -72,6 +73,7 @@ export class WindowBuilder {
     this.uniqueId = getOrCreate(uniqueIds, name, _ => new UniqueIds()).get();
     this.values.addDisposable(this.uniqueId);
     this.uniqueName = `${this.name}-${this.uniqueId.value}`;
+    this.blockingContext = false;
     const sizeValue = values.value<SizeType>('size', [800, 800]);
     this._size = () => sizeValue;
     this.props.width = 800;
@@ -185,6 +187,11 @@ export class WindowBuilder {
     return this;
   }
 
+  blockContext(): this {
+    this.blockingContext = true;
+    return this;
+  }
+
   build(children: ReactElement): Window {
     const winboxPromise = Promise.withResolvers<WinBox>();
     const windowElement = <WindowCommon
@@ -200,7 +207,7 @@ function WindowCommon(props: { builder: WindowBuilder, windowConsumer: Consumer<
   const winRef = useRef<WinBox>(null);
   const { currentActions } = useContext(UiContext);
   const actionsChannel = useContext(ActionsChannelContext);
-  const channel = actionsChannel.child(props.builder.uniqueName);
+  const channel = actionsChannel.child(props.builder.uniqueName, props.builder.blockingContext);
 
   useEffect(() => {
     props.windowConsumer(notNull(winRef.current));

@@ -1,5 +1,5 @@
 import { iter } from "ts-utils/iter";
-import { DefaultScheduler } from "ts-utils/scheduler";
+import { DefaultScheduler, Scheduler } from "ts-utils/scheduler";
 import { Consumer, Fn, nil, notUndefined } from "ts-utils/types";
 import { App, BatchTask, Cache, DebouncedTask, DelayedTask, FrameTask, PeriodicTask, Timer } from "../../../apis/app";
 import { DefaultLogger } from "./logger";
@@ -159,7 +159,15 @@ export function DefaultAppConstructor(appName: string): Plugin<App> {
     const logger = DefaultLogger();
     const timer = createTimer();
     const storages = DefaultStorages(appName);
-    const scheduler = DefaultScheduler(requestAnimationFrame, timer.now, values.create('scheduler'));
+    const schedulerImpl = DefaultScheduler(requestAnimationFrame, timer.now, values.create('scheduler'));
+    const scheduler: Scheduler = {
+      tasks: schedulerImpl.tasks,
+      exec(task, name) {
+        const ctl = schedulerImpl.exec(task, name)
+        ctl.end().then(r => r.onErr(e => logger.log('ERROR', e)));
+        return ctl;
+      },
+    }
     const cache = createCache();
     const dispose = async () => { };
     return { logger, timer, storages, scheduler, cache, dispose }

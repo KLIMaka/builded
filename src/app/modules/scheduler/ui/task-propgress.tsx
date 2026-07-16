@@ -1,10 +1,13 @@
 import { useValue } from "@ui/commons";
 import { WindowBuilder } from "@ui/windows-common";
 import { ActionDescriptors } from "app/apis/actions";
+import { App } from "app/apis/app";
 import { Ui } from "app/apis/ui";
 import { Values } from "app/apis/values";
+import Optional from "optional-js";
 import React from "react";
 import { TaskController } from "ts-utils/scheduler";
+import { Result } from "ts-utils/types";
 
 function Progress<T>({ task }: { task: TaskController<T> }) {
   const info = useValue(task.info);
@@ -31,7 +34,7 @@ function Progress<T>({ task }: { task: TaskController<T> }) {
   </div>);
 }
 
-export async function waitFor<T>(ui: Ui, actionDescriptors: ActionDescriptors, values: Values, title: string, task: TaskController<T>) {
+export async function waitFor<T>(app: App, ui: Ui, actionDescriptors: ActionDescriptors, values: Values, title: string, task: TaskController<T>, error: (title: string, text: string, icon: string) => Promise<Optional<void>>): Promise<Result<T>> {
   const localValues = values.create('task-window');
   const window = new WindowBuilder('progress-box', actionDescriptors, localValues)
     .modal()
@@ -46,5 +49,7 @@ export async function waitFor<T>(ui: Ui, actionDescriptors: ActionDescriptors, v
   await window.show();
   const result = await task.end();
   await window.close();
+  if (result.isErr())
+    await error('Error', result.getErr().message, 'fa-triangle-exclamation');
   return result;
 }

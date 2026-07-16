@@ -6,8 +6,8 @@ import { Stream } from "ts-utils/stream";
 import { BoardContext } from "app/apis/engine";
 import { Sector, Sprite, Wall } from "build/board/structs";
 import { sectorStruct, spriteStruct, wallStruct } from "build/maploader";
-import { point2d, triangulate } from "./geometry/builders/sector";
 import { Fn } from "ts-utils/types";
+import { point2d, triangulate } from "build/utils";
 
 
 export type BoardGlContext = Readonly<{

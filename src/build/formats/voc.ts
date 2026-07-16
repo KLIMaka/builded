@@ -1,5 +1,5 @@
 import { int } from "ts-utils/mathutils";
-import { atomic_array, builder, byte, short, Stream, string, ubyte, uint, ushort } from "ts-utils/stream";
+import { atomic_array, bits, builder, byte, short, Stream, string, ubyte, uint, ushort } from "ts-utils/stream";
 
 const HEADER = builder()
   .field('sig', string(19))
@@ -8,6 +8,15 @@ const HEADER = builder()
   .field('version', ushort)
   .field('validation', ushort)
   .build();
+
+const HEADER9 = builder()
+  .field('bps', ubyte)
+  .field('channels', ubyte)
+  .field('codec', ushort)
+  .field('unk', uint)
+  .build();
+
+const U24 = bits(24);
 
 export type Voc8Block = {
   type: '8',
@@ -51,6 +60,7 @@ function createWriter() {
   return { write8, write16, setSampleRate, build };
 }
 
+
 export function readVoc(buff: ArrayBuffer): VocBlock {
   const stream = new Stream(buff);
   const header = HEADER.read(stream);
@@ -61,7 +71,7 @@ export function readVoc(buff: ArrayBuffer): VocBlock {
   while (!stream.eoi()) {
     const type = ubyte.read(stream);
     if (type === 0) break;
-    const blockHeadData = ushort.read(stream) | (ubyte.read(stream) << 16);
+    const blockHeadData = U24.read(stream);
     if (type === 1) {
       writer.setSampleRate(int(1000000 / (256 - ubyte.read(stream))));
       const codec = ubyte.read(stream);
@@ -72,11 +82,8 @@ export function readVoc(buff: ArrayBuffer): VocBlock {
       stream.skip(blockHeadData);
     } else if (type === 9) {
       writer.setSampleRate(uint.read(stream));
-      const bps = ubyte.read(stream);
-      const channels = ubyte.read(stream);
-      const codec = ushort.read(stream);
-      const unk = uint.read(stream);
-      if (bps === 8) writer.write8(atomic_array(ubyte, blockHeadData - 12).read(stream));
+      const h = HEADER9.read(stream);
+      if (h.bps === 8) writer.write8(atomic_array(ubyte, blockHeadData - 12).read(stream));
       else writer.write16(atomic_array(short, (blockHeadData - 12) / 2).read(stream));
     } else throw new Error(`Invalid voc block type: ${type}`);
   }

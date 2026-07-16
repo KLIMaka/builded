@@ -42,6 +42,8 @@
   --window-border-shadow: 0px 0px 10px var(--shadow-color);
   --shadow: 0px 1px 1px var(--shadow-color);
   --text-shadow: 0px 1px 1px var(--text-shadow-color);
+
+  --tab-border-radius: 6px;
 }
 
 .side {
@@ -1195,14 +1197,14 @@ body {
 
 
 .tab:first-child {
-  border-bottom-left-radius: 3px;
-  border-top-left-radius: 3px;
+  border-bottom-left-radius: var(--tab-border-radius);
+  border-top-left-radius: var(--tab-border-radius);
   border-left-style: solid;
 }
 
 .tab:last-child {
-  border-bottom-right-radius: 3px;
-  border-top-right-radius: 3px;
+  border-bottom-right-radius: var(--tab-border-radius);
+  border-top-right-radius: var(--tab-border-radius);
 }
 
 .axes {}

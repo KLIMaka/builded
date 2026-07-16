@@ -1,7 +1,5 @@
-import { ACTION_DESCRIPTORS } from "app/apis/actions";
-import { APP } from "app/apis/app";
 import { EngineContext, Palette } from "app/apis/engine";
-import { UI, Window } from "app/apis/ui";
+import { UI_UTILS } from "app/apis/ui";
 import { VALUES } from "app/apis/values";
 import { readKvx } from "build/formats/kvx";
 import { vec2 } from "gl-matrix";
@@ -13,16 +11,14 @@ import { getInstances, Injector } from "ts-utils/injector";
 import { iter } from "ts-utils/iter";
 import { Task } from "ts-utils/scheduler";
 import { Stream } from "ts-utils/stream";
-import { Fn, notNull, Result } from "ts-utils/types";
+import { Fn, notNull } from "ts-utils/types";
 import { orbitController } from "utils/camera/controller-orbit";
 import { GL_CONTEXT } from "utils/gl/drawstruct";
 import { BoardRenderer3D } from "../board-view/boardRenderer3d";
 import { Axes } from "../board-view/ui/axes";
-import { waitFor } from "../scheduler/ui/task-propgress";
 import { ActionItem } from "../ui/action-list";
 import { canvasWorkplane, Column, Icon, Row, Spacer, useValue, Workplane, WorkplaneBuilder } from "../ui/commons";
 import { MenuButton } from "../ui/menu-button";
-import { WindowBuilder } from "../ui/windows-common";
 
 function KvxView(props: {
   builders: WorkplaneBuilder[],
@@ -50,17 +46,17 @@ function KvxView(props: {
   );
 }
 
-export async function createKvxView(injector: Injector, ctx: EngineContext, rendererProvider: Task<Source<BoardRenderer3D>>, kvxName: string): Promise<Result<Window>> {
-  const [values, app, actionDescriptors, glContext, ui] = await getInstances(injector, VALUES, APP, ACTION_DESCRIPTORS, GL_CONTEXT, UI);
-  return values.create(`kvx-view`).initializeAsync(async v => {
-    const task = app.scheduler.exec(cookbook(book => {
+export async function createKvxView(injector: Injector, ctx: EngineContext, rendererProvider: Task<Source<BoardRenderer3D>>, kvxName: string): Promise<void> {
+  const [values, glContext, uiUtils] = await getInstances(injector, VALUES, GL_CONTEXT, UI_UTILS);
+  values.create(`kvx-view`).initializeAsync(async v => {
+    uiUtils.addWindow(`Opening kvx ${kvxName}`, cookbook(book => {
       const kvx = book.recepie('Loading kvx', [], async () => readKvx(new Stream((await ctx.resources.get().read(kvxName)).get())));
       const renderer = book.paste([], rendererProvider);
       return book.recepie('Constructing window', [kvx, renderer], async (kvx, renderer) => {
         const currentPluValue = v.value('current-plu', 0);
         const model = v.transformed('model', currentPluValue, plu => renderer.get().writeVoxelPreview(kvx, plu, glContext), { disposer: m => m.dispose() });
         const orbit = orbitController(v);
-        const voxels = v.value('voxels-count', kvx.list().length);
+        const voxels = v.value('voxels-count', kvx.list.length);
 
         const canvasValue = v.valueBuilder<HTMLCanvasElement | undefined>({ name: 'canvasValue', value: undefined });
         const boardView = canvasWorkplane((canvas, w, h) => {
@@ -82,14 +78,12 @@ export async function createKvxView(injector: Injector, ctx: EngineContext, rend
             const ctx = notNull(canvas.getContext('2d'));
             ctx.clearRect(0, 0, w, h);
 
-            const palByLum = [...range(0, 255)];
-            const voxels = kvx.list();
-
+            const voxels = kvx.list;
             const stats: number[] = new Array(256).fill(0);
             iter(voxels).forEach(x => stats[x.color]++);
             stats[255] = 0;
             const max = Math.max(...stats);
-            iter(palByLum).enumerate().forEach(([p, i]) => {
+            iter(range(0, 255)).enumerate().forEach(([p, i]) => {
               const or = pal[p * 3];
               const og = pal[p * 3 + 1];
               const ob = pal[p * 3 + 2];
@@ -109,8 +103,8 @@ export async function createKvxView(injector: Injector, ctx: EngineContext, rend
         })
 
         const gl = glContext.gl;
-        const redrawProc = v.transformedTuple('redraw', [orbit.size, orbit.projection, orbit.view, canvasValue, renderer],
-          ([size, projection, view, canvas, renderer]) => () => {
+        const redrawProc = v.transformedTuple('redraw', [orbit.size, orbit.projection, orbit.view, canvasValue, renderer, model],
+          ([size, projection, view, canvas, renderer, model]) => () => {
             if (!canvas) return;
 
             const [width, height] = size;
@@ -119,7 +113,7 @@ export async function createKvxView(injector: Injector, ctx: EngineContext, rend
             offscreen.height = height;
 
             renderer.screenSize(width, height);
-            renderer.time(app.timer.now() % 10000.0);
+            renderer.time(uiUtils.app.timer.now() % 10000.0);
             renderer.projection(projection);
             renderer.view(view);
 
@@ -129,7 +123,7 @@ export async function createKvxView(injector: Injector, ctx: EngineContext, rend
             gl.clearStencil(0);
             gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
 
-            model.get().render(gl);
+            model.render(gl);
 
             canvas
               ?.getContext('bitmaprenderer')
@@ -152,26 +146,23 @@ export async function createKvxView(injector: Injector, ctx: EngineContext, rend
         const pluItems = v.transformedTuple('pluItems', [ctx.plus, currentPluValue], ([plus, currentPlu]) =>
           iter(plus).enumerate().map(([p, pid]) => item(p, pid, currentPlu)).collect());
 
-        const redrawTask = app.timer.onFrame(_ => redrawProc.get()());
-        redrawTask.onError(e => app.logger.log('ERROR', e));
-        redrawTask.start();
+        v.handleStandalone([redrawProc], proc => proc());
 
-        return new WindowBuilder('kvx-view', actionDescriptors, v)
+        return uiUtils.windowBuilder('kvx-view', v)
           .title(kvxName)
           .size(800, 600)
           .minSize(400, 400)
           .disposable(v)
-          .disposable(redrawTask)
-          .build(<KvxView
-            builders={[boardView, colors, overlayView]}
-            angles={orbit.angles}
-            pluMenuOpen={pluMenuOpen}
-            pluLabel={pluLabel}
-            pluItems={pluItems}
-            voxelsCount={voxels}
-          />)
+          .build(
+            <KvxView
+              builders={[boardView, colors, overlayView]}
+              angles={orbit.angles}
+              pluMenuOpen={pluMenuOpen}
+              pluLabel={pluLabel}
+              pluItems={pluItems}
+              voxelsCount={voxels}
+            />);
       });
     }));
-    return waitFor(ui, actionDescriptors, values, `Opening kvx ${kvxName}`, task);
   });
 }

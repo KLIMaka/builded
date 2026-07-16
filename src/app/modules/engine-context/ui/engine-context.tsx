@@ -1,33 +1,29 @@
 import { ActionItem, ActionList, createActionItem } from "@ui/action-list";
 import { Button, Column, ProgressBar, Row, Tabs, useValue, useValuesContainer } from "@ui/commons";
-import { info } from "@ui/message-box";
-import { SizeType, WindowBuilder } from "@ui/windows-common";
+import { SizeType } from "@ui/windows-common";
 import { GL_CONTEXT, GlContext } from "@utils/gl/drawstruct";
-import { ACTION_DESCRIPTORS, ActionDescriptors } from "app/apis/actions";
-import { APP, App } from "app/apis/app";
-import { EngineContext, EngineContextFactory, NamedArtFile } from "app/apis/engine";
+import { EngineContext, EngineContextFactory } from "app/apis/engine";
 import { FileInfo, FileSystem, FileSystems, FS } from "app/apis/fs";
-import { UI, Ui, Window } from "app/apis/ui";
-import { VALUES, Values } from "app/apis/values";
+import { UI_UTILS, UiUtils, Window } from "app/apis/ui";
 import { createArtEditor } from "app/modules/arteditor/arteditor-model";
 import { createBoardView } from "app/modules/board-view/board-view-model";
 import { BoardRenderer3D, createRenderer3d } from "app/modules/board-view/boardRenderer3d";
 import { createSavedState } from "app/modules/default/app/storage";
 import { httpFs, stack } from "app/modules/fs/fs";
 import { createEngineTexturesWork, EngineTextures } from "app/modules/gl/gl-context";
+import { createKvxView } from "app/modules/kvx/kvx-editor";
 import { createTextEditor } from "app/modules/text-editor/text-editor";
 import Optional from "optional-js";
-import React, { useRef } from "react";
+import React from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { Disposable, Source, Value, ValuesContainer, ValuesMap } from "ts-utils/callbacks";
 import { getOrCreate } from "ts-utils/collections";
-import { cookbook } from "ts-utils/cookbook";
+import { cookbook, cookbookImmediate } from "ts-utils/cookbook";
 import { getInstances, Injector } from "ts-utils/injector";
 import { iter } from "ts-utils/iter";
 import { sum } from "ts-utils/mathutils";
 import { field } from "ts-utils/objects";
 import { Task, TaskController, TaskHandle, TaskValue } from "ts-utils/scheduler";
-import { size } from "ts-utils/size";
 import { nil, Ok, pair } from "ts-utils/types";
 import { EngineContextRecord, getEngine } from "../engine-context-api";
 import { createEngine } from "./create-engine-context";
@@ -35,7 +31,6 @@ import { ArtsInfoView } from "./tabs/art";
 import { FilesInfoView } from "./tabs/files";
 import { MapsInfoView } from "./tabs/maps";
 import { SoundsInfoView } from "./tabs/sounds";
-import { createKvxView } from "app/modules/kvx/kvx-editor";
 
 const ID = 'engines-context';
 
@@ -51,16 +46,11 @@ type SavedState = {
 }
 
 export type EngineInfo = {
-  name: Source<string>,
   arts: Source<number>,
   validArts: Source<number>,
   plus: Source<number>,
-  shadowsteps: Source<number>,
-  artFiles: Source<NamedArtFile[]>,
   files: Source<FileInfo[]>,
   filesMap: Source<Map<string, FileInfo>>,
-  mapFiles: Source<FileInfo[]>,
-  kvxFiles: Source<FileInfo[]>,
   ctx: EngineContext;
   textures: EngineTextures;
   rendererProvider: Task<Source<BoardRenderer3D>>,
@@ -90,11 +80,8 @@ export class Editor {
   constructor(
     private localValues: ValuesContainer,
     private savedState: ValuesMap<SavedState>,
-    private ui: Ui,
-    private actionDescriptors: ActionDescriptors,
     private fs: FileSystems,
-    private app: App,
-    private values: Values,
+    private uiUtils: UiUtils,
     private glCtx: GlContext,
     private injector: Injector,
   ) {
@@ -105,32 +92,25 @@ export class Editor {
     this.error = this.localValues.value('error', Optional.empty());
     this.engineItems = this.createEngineItems('engineItems');
     this.actions = {};
-    this.localValues.addSubscribed(this.currentEngineId, id => this.currentEngineRecord.set(Optional.of(this.engines.get()[id])));
   }
 
 
-  openRecord(rec: EngineContextRecord) {
+  openRecord(rec: EngineContextRecord): TaskController<EngineInfo> {
     return getOrCreate(this.ctxCache, rec, rec => {
       const createEngine = getEngine(rec.type).map(field('factory')).orElseThrow(() => new Error(`Unknown engine type: '${rec.type}' `));
-      const work: Task<EngineInfo> = handle =>
+      const task: Task<EngineInfo> = handle =>
         this.localValues.createChild(`engine-${rec.name}`).initializeAsync(values =>
-          cookbook(book => {
+          cookbookImmediate(handle, book => {
             const fss = rec.fileSystems.map(f => book.recepie(`Opening File System...`, [], async () => this.fs.deserialize(f).open()));
             const fsStack = book.recepie('Building FS Stack...', fss, async (...fss) => values.value('fs-stack', iter([...fss, new Ok(httpFs(''))]).map(r => r.unwrap()).reduceFirst(stack).get()));
             const engine = book.paste([fsStack], async (handle, fs) => createEngine(handle, fs, values, rec.mods));
             const textures = book.paste([engine], async (handle, engine) => createEngineTexturesWork(handle, engine, this.glCtx, values));
             return book.recepie('Constructing Engine Info...', [engine, textures], async (engine, textures) => {
-              const name = engine.name;
-              const artFiles = engine.art;
-              const shadowsteps = engine.shadowsteps;
-              const resources = engine.resources;
-              const arts = values.transformed(`arts`, artFiles, a => iter(a).map(a => a.art.arts.length).reduceFirst(sum).orElse(0));
-              const validArts = values.transformed(`validArts`, artFiles, a => iter(a).map(a => a.art.arts).flatten().filter(a => a.h !== 0 && a.w !== 0).length())
+              const arts = values.transformed(`arts`, engine.art, a => iter(a).map(a => a.art.arts.length).reduceFirst(sum).orElse(0));
+              const validArts = values.transformed(`validArts`, engine.art, a => iter(a).map(a => a.art.arts).flatten().filter(a => a.h !== 0 && a.w !== 0).length())
               const plus = values.transformed(`plus`, engine.plus, p => p.length);
               const filesLoader = async (res: FileSystem) => res.list();
-              const files = await values.transformedAsync('files', resources, filesLoader, nil(), (fs, files) => fs.subscribe(() => files.setPromiseOrDispose(f => filesLoader(fs))));
-              const mapFiles = values.transformed(`maps`, files, files => iter(files).filter(f => f.name.toLowerCase().endsWith('.map')).collect());
-              const kvxFiles = values.transformed(`kvx`, files, files => iter(files).filter(f => f.name.toLowerCase().endsWith('.kvx')).collect());
+              const files = await values.transformedAsync('files', engine.resources, filesLoader, nil(), (fs, files) => fs.subscribe(() => files.setPromiseOrDispose(f => filesLoader(fs))));
               const filesMap = values.transformed('files-map', files, files => iter(files).toMap(f => f.name.toLowerCase(), f => f));
 
               let renderer: Source<BoardRenderer3D> | undefined = undefined;
@@ -141,23 +121,29 @@ export class Editor {
               };
 
               const dispose = async () => { engine.dispose(); values.dispose(); textures.dispose(); }
-              return { name, arts, validArts, plus, shadowsteps, artFiles, files, filesMap, mapFiles, kvxFiles, ctx: engine, textures, rendererProvider, dispose }
+              return { arts, validArts, plus, files, filesMap, ctx: engine, textures, rendererProvider, dispose }
             });
-          })(handle));
-      return this.app.scheduler.exec(work);
+          }));
+      return this.uiUtils.app.scheduler.exec(task);
     })
   }
 
   async addEngine() {
-    const engineRecord = await createEngine(this.ui, this.actionDescriptors, this.fs, this.app, this.values);
+    const engineRecord = await createEngine(this.uiUtils, this.fs);
     engineRecord.ifPresent(e => this.engines.modImmer(p => p.push(e)));
   }
 
   async editEngine() {
     const id = this.currentEngineId.get();
     const rec = this.engines.get()[id];
-    const editedRec = await createEngine(this.ui, this.actionDescriptors, this.fs, this.app, this.values, rec);
+    const editedRec = await createEngine(this.uiUtils, this.fs, rec);
     editedRec.ifPresent(rec => this.engines.modImmer(es => es[id] = rec));
+  }
+
+  async deleteEngine() {
+    const id = this.currentEngineId.get();
+    this.currentEngineId.set(-1);
+    this.engines.mod(es => es.toSpliced(id, 1));
   }
 
   private createEngineItems(name: string): Source<ActionItem[]> {
@@ -168,21 +154,15 @@ export class Editor {
   }
 
   async openMap(engine: EngineContext, textures: EngineTextures, rendererProvider: Task<Source<BoardRenderer3D>>, mapName: string): Promise<void> {
-    (await createBoardView(this.injector, engine, textures, rendererProvider, mapName))
-      .onErr(e => { this.app.logger.log('ERROR', e); info(this.ui, this.actionDescriptors, this.values, 'Error', e.message) })
-      .onOk(w => this.ui.addWindow(w));
+    createBoardView(this.injector, engine, textures, rendererProvider, mapName);
   }
 
   async openText(text: string): Promise<void> {
-    (await createTextEditor(this.injector, text))
-      .onErr(e => { info(this.ui, this.actionDescriptors, this.values, 'Error', e.message) })
-      .onOk(w => this.ui.addWindow(w));
+    createTextEditor(this.injector, text);
   }
 
   async openKvx(engine: EngineContext, rendererProvider: Task<Source<BoardRenderer3D>>, fn: string): Promise<void> {
-    (await createKvxView(this.injector, engine, rendererProvider, fn))
-      .onErr(e => { info(this.ui, this.actionDescriptors, this.values, 'Error', e.message) })
-      .onOk(w => this.ui.addWindow(w));
+    createKvxView(this.injector, engine, rendererProvider, fn);
   }
 
   async openFile(engine: EngineContext, rendererProvider: Task<Source<BoardRenderer3D>>, fileName: string): Promise<void> {
@@ -199,14 +179,14 @@ export class Editor {
   }
 
   async openArtEditor(ctx: EngineContext): Promise<void> {
-    this.ui.addWindow(await createArtEditor(this.injector, ctx));
+    createArtEditor(this.injector, ctx);
   }
 }
 
 function EngineInfoView({ info }: { info: EngineInfo }) {
   const plus = useValue(info.plus);
-  const shadowsteps = useValue(info.shadowsteps);
-  const name = useValue(info.name);
+  const shadowsteps = useValue(info.ctx.shadowsteps);
+  const name = useValue(info.ctx.name);
 
   return <Column className='form-panel'>
     <Column className='form-panel-rows-container'>
@@ -226,52 +206,9 @@ function EngineInfoView({ info }: { info: EngineInfo }) {
   </Column>
 }
 
-function KvxFile(props: { info: FileInfo }) {
-  return <Row>
-    <div className='flex-fill'>{props.info.name}</div>
-    <div className='flex-auto'>{size(props.info.size)}</div>
-  </Row>
-}
-
-function VoxelsInfoView({ info, selectedVoxelIdxValue, editor }: { info: EngineInfo, selectedVoxelIdxValue: Value<number>, editor: Editor }) {
-  const values = useValuesContainer(`${ID}-voxels`);
-  const selectedVoxelIdx = useValue(selectedVoxelIdxValue);
-  const voxelCountValue = values.transformed('voxelsCount', info.kvxFiles, mf => mf.length);
-  const voxelsCount = useValue(voxelCountValue);
-  const voxelFilesValue = values.transformed('voxelFiles', info.kvxFiles, mf => iter(mf)
-    .enumerate().map(([info, idx]) => createActionItem(<KvxFile info={info} />, () => selectedVoxelIdxValue.set(idx), false, idx === selectedVoxelIdx)).collect());
-  const voxelFiles = useValue(voxelFilesValue);
-  const canvasContRef = useRef<HTMLDivElement>(null);
-
-  return <Column className='form-panel'>
-    <div ref={canvasContRef} />
-    <Column className='form-panel-rows-container'>
-      <Row className='form-row'>
-        <div className='form-row-label'>Maps</div>
-        <div className='form-row-content'>{voxelsCount}</div>
-      </Row>
-      <Row className='form-row'>
-        <div className='form-row-label'>Files</div>
-        <Row className='form-row-content'>
-        </Row>
-      </Row>
-      <Row className='form-row fill'>
-        <div className='form-row-label' />
-        <Column className='form-row-content flex-fill'>
-          <Column className='flex-fill' style={{ overflow: 'auto' }}>
-            <ActionList items={voxelFiles} stripped={true} className='action-list-bg flex-fill' />
-          </Column>
-        </Column>
-      </Row>
-    </Column>
-  </Column>
-}
-
-
 function EngineContextResult({ editor, result, rec }: { editor: Editor, result: Source<TaskValue<EngineInfo>>, rec: EngineContextRecord }) {
   const res = useValue(result);
   const values = useValuesContainer(`${ID}-view`);
-  const selectedVoxelIdValue = values.value('selectedVoxelId', -1);
   const active = values.value('active', 0);
 
   return res.on(r => r.on(
@@ -280,7 +217,6 @@ function EngineContextResult({ editor, result, rec }: { editor: Editor, result: 
       { icon: 'file', label: 'Files', content: <FilesInfoView info={ok} editor={editor} /> },
       { icon: 'images', label: 'Arts', content: <ArtsInfoView info={ok} editor={editor} /> },
       { icon: 'map', label: 'Maps', content: <MapsInfoView info={ok} editor={editor} /> },
-      { icon: '', label: 'Voxels', content: <VoxelsInfoView info={ok} selectedVoxelIdxValue={selectedVoxelIdValue} editor={editor} /> },
       { icon: 'music', label: 'Sounds', content: <SoundsInfoView info={ok} /> },
     ]} active={active} />,
     err => <div className="error">{err.message}</div>),
@@ -304,6 +240,7 @@ function EngineContextEditorUiImpl({ editor }: { editor: Editor }) {
     <Row className='window-toolbar flex-auto'>
       <Button className='flex-auto' onClick={_ => editor.addEngine()}>Add Engine...</Button>
       <Button className='flex-auto' onClick={_ => editor.editEngine()}>Edit Engine...</Button>
+      <Button className='flex-auto' onClick={_ => editor.deleteEngine()}>Delete Engine...</Button>
     </Row>
     <PanelGroup direction={"horizontal"} className="flex-fill padded-5 box-sized">
       <Panel className="column-block" defaultSize={30} minSize={10}>
@@ -323,13 +260,13 @@ let globalWindow: Window | undefined;
 export async function createEngines(injector: Injector): Promise<Window> {
   if (globalWindow !== undefined) return globalWindow;
 
-  const [actionDescriptors, app, ui, fs, glCtx, values] = await getInstances(injector, ACTION_DESCRIPTORS, APP, UI, FS, GL_CONTEXT, VALUES);
-  const localValues = values.create(ID);
-  const windowStates = await app.storages('ui.window-states');
-  const state = await createSavedState(localValues, windowStates, ID, createDefaultState(), app.timer);
-  const editor = new Editor(localValues, state, ui, actionDescriptors, fs, app, values, glCtx, injector);
+  const [fs, glCtx, uiUtils] = await getInstances(injector, FS, GL_CONTEXT, UI_UTILS);
+  const localValues = uiUtils.values.create(ID);
+  const windowStates = await uiUtils.app.storages('ui.window-states');
+  const state = await createSavedState(localValues, windowStates, ID, createDefaultState(), uiUtils.app.timer);
+  const editor = new Editor(localValues, state, fs, uiUtils, glCtx, injector);
 
-  globalWindow = new WindowBuilder(ID, actionDescriptors, localValues)
+  globalWindow = uiUtils.windowBuilder(ID, localValues)
     .titleFromId()
     .minSize(400, 400)
     .state(state)

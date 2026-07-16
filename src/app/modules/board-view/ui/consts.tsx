@@ -125,8 +125,25 @@ export function rect(position: vec3, scale: number, axis: keyof typeof AXIS, col
   return { rect: projRect, color: toRgbaString(color.strokeStart), type: 'rect', depth };
 }
 
+function validValue(value: number) {
+  return !Number.isNaN(value)
+}
+
+function validVector3(value: vec3) {
+  return validValue(value[0]) && validValue(value[1]) && validValue(value[2]);
+}
+
+function validVector4(value: vec3) {
+  return validValue(value[0]) && validValue(value[1]) && validValue(value[2]) && validValue(value[3]);
+}
+
 export function RenderGizmo(props: { elements: GizmoProps[] }) {
-  return props.elements.sort((l, r) => r.depth - l.depth)
+  return props.elements
+    .filter(props => match(props)
+      .with({ type: 'axis-plus' }, { type: 'axis-minus' }, p => validVector3(p.pos) && validVector3(p.center))
+      .with({ type: 'rect' }, p => p.rect.every(validVector4))
+      .exhaustive())
+    .sort((l, r) => r.depth - l.depth)
     .map((props, i) =>
       match(props)
         .with({ type: 'axis-plus' }, p =>

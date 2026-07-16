@@ -13,6 +13,11 @@ export function* sectorWalls(board: Board, sectorId: number): Generator<number> 
   for (let w = sector.wallptr; w < end; w++) yield w;
 }
 
+export function wallLoops(board: Board, sectorId: number): IteratorObject<number[]> {
+  return loopPoints(board, sectorId)
+    .map(loopPoint => [...loopWalls(board, loopPoint)]);
+}
+
 export function* loopPoints(board: Board, sectorId: number): Generator<number> {
   for (const w of sectorWalls(board, sectorId)) {
     const wall = board.walls[w];

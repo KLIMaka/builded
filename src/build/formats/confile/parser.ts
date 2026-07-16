@@ -2,6 +2,7 @@ import Optional from "optional-js";
 import { asyncMapOptional, field } from "ts-utils/objects";
 import { BiFn, Fn, notUndefined, pair, Supplier } from "ts-utils/types";
 import { KeywordCharSet, KeywordId, Keywords, KeywordsMap } from "./constants";
+import { match } from "ts-pattern";
 
 namespace Chars {
   export const NL = '\n'.charCodeAt(0);
@@ -27,6 +28,7 @@ namespace Chars {
   export const QUESTION_MARK = '?'.charCodeAt(0);
   export const EXCL_MARK = '!'.charCodeAt(0);
   export const AMP = '&'.charCodeAt(0);
+  export const QUOTE = '"'.charCodeAt(0);
 
   const A = 'A'.charCodeAt(0);
   const Z = 'Z'.charCodeAt(0);
@@ -40,7 +42,7 @@ namespace Chars {
   export function isNumber(ch: number) { return ch >= _0 && ch <= _9 }
   export function isAlphaNum(ch: number) { return isAlpha(ch) || isNumber(ch) }
   export function isAlphaTok(ch: number) {
-    return isAlphaNum(ch) || ch === L_CURL || ch === R_CURL || ch === SLASH || ch === BACK_SLASH || ch === STAR || ch === MINUS || ch === UNDERSCORE || ch === DOT || ch === EXCL_MARK || ch === AMP;
+    return isAlphaNum(ch) || ch === L_CURL || ch === R_CURL || ch === SLASH || ch === BACK_SLASH || ch === STAR || ch === MINUS || ch === UNDERSCORE || ch === DOT || ch === EXCL_MARK || ch === AMP || ch === QUOTE;
   }
   export function isLabel(c: number, i: number) {
     return isAlphaNum(c) || c === UNDERSCORE || c === STAR || c === QUESTION_MARK || (i > 0 && (c === PLUS || c === MINUS));
@@ -151,6 +153,20 @@ export function toString(range: Range | undefined, limit = 40): string {
   if (range === undefined) return "undefined";
   const str = String.fromCharCode(...range.src.subarray(range.start.pos, range.end.pos));
   return str.length > limit ? str.slice(0, limit) + '...' : str;
+}
+
+function removeQuotes(str: string) {
+  const trimmed = str.trim();
+  if (trimmed.startsWith('"') && trimmed.endsWith('"')) return trimmed.substring(1, trimmed.length - 1);
+  return trimmed;
+}
+
+export function value(value: Value): string | number {
+  return match(value)
+    .with({ type: 'const' }, v => v.value)
+    .with({ type: 'string' }, v => removeQuotes(toString(v.range)))
+    .with({ type: "named" }, v => removeQuotes(v.name))
+    .exhaustive()
 }
 
 export type Position = { line: number, col: number, pos: number };
@@ -359,7 +375,7 @@ export async function parseConHandleIncludes(con: ArrayBuffer, loader: Fn<string
   const { statements, diagnostics } = parseCon(con);
   const includes = statements.filter(s => s.keyword === KeywordId.CON_INCLUDE);
   const loadAndParse = async (fn: string) => asyncMapOptional(await loader(fn), ab => parseConHandleIncludes(ab, loader));
-  const loaded = await Promise.all(includes.map(i => loadAndParse(toString(i.args[0].range)).then(o => o.map(con => pair(con, i)))));
+  const loaded = await Promise.all(includes.map(i => loadAndParse(value(i.args[0]) as string).then(o => o.map(con => pair(con, i)))));
   loaded.map(o => o.ifPresent(([con, stat]) => {
     const idx = statements.indexOf(stat);
     statements.splice(idx, 1, ...con.statements);

@@ -1,5 +1,5 @@
 import { rect, Ring } from "ts-utils/collections";
-import { atomic_array, int, Stream, ubyte, uint, ushort } from "ts-utils/stream";
+import { atomic_array, builder, int, Stream, ubyte, uint, ushort } from "ts-utils/stream";
 
 export enum VoxelSide { ZM, ZP, XM, XP, YM, YP };
 export const VOXEL_SIDES = [VoxelSide.ZM, VoxelSide.ZP, VoxelSide.XM, VoxelSide.XP, VoxelSide.YM, VoxelSide.YP];
@@ -29,7 +29,17 @@ export type VoxelListItem = {
   sides: number,
 };
 
-export class VoxelData {
+export type VoxelData = Readonly<{
+  xsize: number,
+  ysize: number,
+  zsize: number,
+  xpivot: number,
+  ypivot: number,
+  zpivot: number,
+  list: VoxelListItem[],
+}>
+
+class VoxelDataProcessor {
   private data: Uint8Array;
 
   constructor(
@@ -85,8 +95,8 @@ export class VoxelData {
           if (this.getImpl(x, y, z, copy) === 0) this.set(x, y, z, 0)
   }
 
-  list(): VoxelListItem[] {
-    const voxels: VoxelListItem[] = [];
+  list(): VoxelData {
+    const list: VoxelListItem[] = [];
     for (let z = 0; z < this.zsize; z++) {
       for (let y = 0; y < this.ysize; y++) {
         for (let x = 0; x < this.xsize; x++) {
@@ -100,38 +110,45 @@ export class VoxelData {
             this.get(x, y - 1, z) === 255,
             this.get(x, y + 1, z) === 255);
           if (sides === 0) continue;
-          voxels.push({ x, y, z: this.zsize - z, color, sides });
+          list.push({ x, y, z: this.zsize - z, color, sides });
         }
       }
     }
-    return voxels;
+    return { list, xpivot: this.xpivot, ypivot: this.ypivot, zpivot: this.zpivot, xsize: this.xsize, ysize: this.ysize, zsize: this.zsize };
   }
 }
 
+const headerStruct = builder()
+  .field('numbytes', uint)
+  .field('xsize', uint)
+  .field('ysize', uint)
+  .field('zsize', uint)
+  .field('xpivot', int)
+  .field('ypivot', int)
+  .field('zpivot', int)
+  .build();
+
+const slabStruct = builder()
+  .field('ztop', ubyte)
+  .field('zleng', ubyte)
+  .field('backfaseInfo', ubyte)
+  .build();
+
 export function readKvx(stream: Stream): VoxelData {
-  const numbytes = uint.read(stream);
-  const xsize = uint.read(stream);
-  const ysize = uint.read(stream);
-  const zsize = uint.read(stream);
-  const xpivot = int.read(stream);
-  const ypivot = int.read(stream);
-  const zpivot = int.read(stream);
-  const off = stream.mark();
-  const xoffset = atomic_array(uint, xsize + 1).read(stream);
-  const xyoffset = atomic_array(ushort, xsize * (ysize + 1)).read(stream);
-  const cube = new VoxelData(xsize, ysize, zsize, xpivot, ypivot, zpivot);
-  for (const [x, y] of rect(xsize, ysize)) {
-    const start = off + xoffset[x] + xyoffset[x * (ysize + 1) + y];
-    const end = off + xoffset[x] + xyoffset[x * (ysize + 1) + y + 1];
+  const header = headerStruct.read(stream);
+  const xoffset = atomic_array(uint, header.xsize + 1).read(stream);
+  const xyoffset = atomic_array(ushort, header.xsize * (header.ysize + 1)).read(stream);
+  const cube = new VoxelDataProcessor(header.xsize, header.ysize, header.zsize, header.xpivot, header.ypivot, header.zpivot);
+  for (const [x, y] of rect(header.xsize, header.ysize)) {
+    const start = headerStruct.size + xoffset[x] + xyoffset[x * (header.ysize + 1) + y];
+    const end = headerStruct.size + xoffset[x] + xyoffset[x * (header.ysize + 1) + y + 1];
     stream.setOffset(start);
     while (stream.mark() < end) {
-      const slabztop = ubyte.read(stream);
-      const slabzleng = ubyte.read(stream);
-      const backfaceInfo = ubyte.read(stream);
-      const column = atomic_array(ubyte, slabzleng).read(stream);
-      column.forEach((c, i) => cube.set(x, y, slabztop + i, c));
+      const slab = slabStruct.read(stream);
+      const column = atomic_array(ubyte, slab.zleng).read(stream);
+      column.forEach((c, i) => cube.set(x, y, slab.ztop + i, c));
     }
   }
   cube.fill();
-  return cube;
+  return cube.list();
 }

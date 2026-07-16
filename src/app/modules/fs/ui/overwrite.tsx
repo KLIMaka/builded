@@ -1,7 +1,5 @@
 import { modalResult, WindowBuilder } from "@ui/windows-common";
-import { ActionDescriptors } from "app/apis/actions";
-import { Ui } from "app/apis/ui";
-import { Values } from "app/apis/values";
+import { UiUtils } from "app/apis/ui";
 import Optional from "optional-js";
 import React from "react";
 import { Consumer } from "ts-utils/types";
@@ -24,11 +22,11 @@ export function ConfirmOkCancel({ result, text, icon }: { result: Consumer<Overw
   </div>
 }
 
-export function confirmOverwrite(ui: Ui, actionDescriptors: ActionDescriptors, values: Values, title: string, text: string): Promise<Optional<OverwriteOption>> {
-  const localValues = values.create('override-box');
+export function confirmOverwrite(uiUtils: UiUtils, title: string, text: string): Promise<Optional<OverwriteOption>> {
+  const localValues = uiUtils.values.create('override-box');
   return new Promise<Optional<OverwriteOption>>(async (ok, error) => {
     const [resultAndClose, close] = modalResult(() => window.close(), ok);
-    const window = new WindowBuilder('overwrite-box', actionDescriptors, localValues)
+    const window = new WindowBuilder('overwrite-box', uiUtils.actionDescriptors, localValues)
       .modal()
       .title(title)
       .size(450, 150)
@@ -39,6 +37,6 @@ export function confirmOverwrite(ui: Ui, actionDescriptors: ActionDescriptors, v
       .onClose(close)
       .disposable(localValues)
       .build(<ConfirmOkCancel result={resultAndClose} text={text} icon='fa-triangle-exclamation' />)
-    ui.addWindow(window);
+    uiUtils.ui.addWindow(window);
   });
 }

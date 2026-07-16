@@ -10,13 +10,14 @@ import { size } from 'ts-utils/size';
 import { EMPTY } from '../fs';
 import { FileInfo, FileSystemsManagerImpl, fileProvider } from './fs-model';
 import { fsIcon } from './fs-ui-utils';
+import { sum } from 'ts-utils/mathutils';
 
 
 function Footer({ manager }: { manager: FileSystemsManagerImpl }) {
   const files = useValue(manager.files);
   const selected = useValue(manager.selected).selected();
-  const totalSize = useMemo(() => iter(files).map(f => f.size).reduceFirst((l, h) => l + h).orElse(0), [files]);
-  const selectedSize = iter(selected).map(f => f.size).reduceFirst((l, h) => l + h).orElse(0);
+  const totalSize = useMemo(() => iter(files).map(f => f.size).reduceFirst(sum).orElse(0), [files]);
+  const selectedSize = iter(selected).map(f => f.size).reduceFirst(sum).orElse(0);
   return (<div className='row-block window-footer flex-auto gap-5'>
     <Spacer />
     <div className='padded-5'>{size(selectedSize)} / {size(totalSize)} in {selected.length} / {files.length} file(s)</div>

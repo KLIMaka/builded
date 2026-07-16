@@ -2,12 +2,10 @@ import { createActionItem } from "@ui/action-list";
 import { ActionButton, actionsToActionItem, Button, Column, Icon, NonwrapLabel, Row, Spacer, TextHeight, TextInput, useValue, useValuesContainer } from "@ui/commons";
 import { MenuButton } from "@ui/menu-button";
 import { row, selectIdSelectionModel, TypedTableCellProps, VirtualTable } from "@ui/table";
-import { modalResult, WindowBuilder } from "@ui/windows-common";
+import { modalResult } from "@ui/windows-common";
 import { Action, ActionDescriptors } from "app/apis/actions";
-import { App } from "app/apis/app";
 import { FileSystemHandle, FileSystems, SerializedFileSystemHandle } from "app/apis/fs";
-import { Ui } from "app/apis/ui";
-import { Values } from "app/apis/values";
+import { UiUtils } from "app/apis/ui";
 import { stack } from "app/modules/fs/fs";
 import { fsIcon } from "app/modules/fs/ui/fs-ui-utils";
 import Optional from "optional-js";
@@ -203,8 +201,7 @@ function createResultHandler(
   fs: FileSystems,
   error: Value<Optional<Error>>,
   resultAndClose: Consumer<EngineContextRecord | null>,
-  app: App,
-  values: Values,
+  uiUtils: UiUtils
 ) {
   return async (isOk: boolean) => {
     if (isOk) {
@@ -215,19 +212,19 @@ function createResultHandler(
         mods: engineMods.get().getObject(),
         fileSystems: fsRefs.get().map(i => handles[i].serialized)
       };
-      const localValues = values.create('tmp-values-create-engine-context');
+      const localValues = uiUtils.values.create('tmp-values-create-engine-context');
       const createEngine = getEngine(record.type).map(e => e.factory).orElseThrow(() => new Error(`Unknown engine type: '${record.type}' `));
       const work = cookbook(book => {
         const fss = record.fileSystems.map(f => book.recepie('Opening File System...', [], async () => fs.deserialize(f).open()));
         const resources = book.recepie('Building FS Stack...', fss, async (...fss) => localValues.value('fs-stack', iter(fss).map(r => r.unwrap()).reduceFirst(stack).get()));
         return book.paste([resources], (handle, res) => createEngine(handle, res, localValues, record.mods))
       })
-      const task = app.scheduler.exec(work);
+      const task = uiUtils.app.scheduler.exec(work);
       const result = await task.end();
       result
         .map(async ctx => await ctx.dispose())
         .onOk(_ => resultAndClose(record))
-        .onErr(e => { app.logger.log('ERROR', e); error.set(Optional.of(e)) })
+        .onErr(e => error.set(Optional.of(e)))
       await localValues.dispose();
     } else {
       resultAndClose(null);
@@ -235,14 +232,14 @@ function createResultHandler(
   }
 }
 
-export async function createEngine(ui: Ui, ad: ActionDescriptors, fs: FileSystems, app: App, values: Values, def?: EngineContextRecord): Promise<Optional<EngineContextRecord>> {
-  return values.create(ID).initializeAsync(async v => {
+export async function createEngine(uiUtils: UiUtils, fs: FileSystems, def?: EngineContextRecord): Promise<Optional<EngineContextRecord>> {
+  return uiUtils.values.create(ID).initializeAsync(async v => {
     const name = v.value('name', def?.name ?? '');
     const engineType = v.value('engineType', getEngine(def?.type));
     const engineDefaultMods = getEngine(def?.type).map(e => e.defaultMods).orElse({});
     const engineMods = v.value('engineMods', toValuesMap(def?.mods ?? engineDefaultMods, engineDefaultMods, v));
     const fsHandles = v.value('fsHandles', iter(def?.fileSystems ?? []).map(h => fs.deserialize(h)).collect());
-    const fsInfos = v.transformed('fileSystemInfos', fsHandles, fss => fss.map(handle => createFsInfo(app.scheduler, handle)));
+    const fsInfos = v.transformed('fileSystemInfos', fsHandles, fss => fss.map(handle => createFsInfo(uiUtils.app.scheduler, handle)));
     const fsInfosRefs = v.value('fsInfosRefs', [...range(0, def?.fileSystems.length ?? 0)]);
     const fsInfosOrdered = v.transformedTuple('fsInfosOrdered', [fsInfos, fsInfosRefs], ([infos, refs]) => refs.map(i => infos[i]));
     const error = v.value('error', Optional.empty<Error>());
@@ -251,12 +248,12 @@ export async function createEngine(ui: Ui, ad: ActionDescriptors, fs: FileSystem
     v.handleStandalone([engineType], type => { clearError(); type.ifPresent(t => engineMods.set(toValuesMap(def?.type === t.id ? def.mods : t.defaultMods, t.defaultMods, v))) });
     v.handleStandalone([fsHandles], clearError);
     const valid = v.transformedTuple('valid', [engineType, error, fsHandles], ([type, err, fss]) => type.isPresent() && !err.isPresent() && fss.length > 0);
-    const actions = createActions(ad, fs, fsHandles, fsInfosRefs, selected, v);
+    const actions = createActions(uiUtils.actionDescriptors, fs, fsHandles, fsInfosRefs, selected, v);
 
     return new Promise<Optional<EngineContextRecord>>(ok => {
       const [resultAndClose, close] = modalResult(() => window.close(), ok);
-      const result = createResultHandler(engineType, engineMods, name, fsHandles, fsInfosRefs, fs, error, resultAndClose, app, values);
-      const window = new WindowBuilder(ID, ad, v)
+      const result = createResultHandler(engineType, engineMods, name, fsHandles, fsInfosRefs, fs, error, resultAndClose, uiUtils);
+      uiUtils.addWindow('', async _ => uiUtils.windowBuilder(ID, v)
         .titleFromId()
         .size(500, 350)
         .minSize(450, 300)
@@ -275,8 +272,7 @@ export async function createEngine(ui: Ui, ad: ActionDescriptors, fs: FileSystem
           valid={valid}
           actions={actions}
           selected={selected}
-        />)
-      ui.addWindow(window);
+        />));
     });
   });
 }

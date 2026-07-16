@@ -17,6 +17,7 @@ type SoundFile = Readonly<{
 
 type SoundFileRow = Readonly<{
   id: number,
+  alias?: string,
   name: string,
   size: number,
   lenght: number,
@@ -108,20 +109,20 @@ async function play(row: SoundFileRow): Promise<void> {
 const soundsColumns: VirtualTableColumn<SoundFileRow, any>[] = [
   column('id', "Id", SoundIdRenderer, 60),
   column('name', "File", FileNameRenderer, 0, 1, 1),
-  column('volume', "Volume", FileVolumeRenderer, 60),
+  column('alias', "Alias", FileNameRenderer, 0, 1, 1),
+  // column('volume', "Volume", FileVolumeRenderer, 60),
   column('lenght', "Lenght", FileLengthRenderer, 60),
-  column('sampleRate', "Rate", FileRateRenderer, 60),
+  // column('sampleRate', "Rate", FileRateRenderer, 60),
   column('size', "Size", FileSizeRenderer, 60),
 ];
 
 export function SoundsInfoView({ info }: { info: EngineInfo }) {
   const values = useValuesContainer(`sounds`);
-  const soundFiles = values.transformedTuple('sound-files', [info.ctx.sounds, info.filesMap], ([sounds, map]) => sounds.map<SoundFile>(sound => ({
-    sound,
-    file: map.get(sound.file.toLowerCase())
-  })));
+  const soundFiles = values.transformedTuple('sound-files', [info.ctx.sounds, info.filesMap], ([sounds, map]) =>
+    sounds.map<SoundFile>(sound => ({ sound, file: map.get(sound.file.toLowerCase()) })));
   const soundsFileRows = values.transformed('sound-file-rows', soundFiles, sfs => sfs.map<SoundFileRow>(sf => ({
     id: sf.sound.id,
+    alias: sf.sound.alias,
     name: sf.sound.file,
     size: sf.file?.size ?? 0,
     soundFile: sf,

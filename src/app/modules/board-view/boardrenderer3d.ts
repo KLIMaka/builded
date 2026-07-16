@@ -2,19 +2,19 @@ import { GlContext } from "@utils/gl/drawstruct";
 import { createShader } from "@utils/gl/shaders";
 import { AttribDataBuilder, BufferAllocator, disposeAttributeData, ShaderConfig, StateGl1, TextureSetter, vec4 } from "@utils/gl/stategl1";
 import { EngineContext, EngineSettings } from "app/apis/engine";
+import { VoxelData } from "build/formats/kvx";
 import { mat4 } from "gl-matrix";
 import { Disposable, Source, ValuesContainer } from "ts-utils/callbacks";
-import { iterIsEmpty } from "ts-utils/collections";
+import { groups, iterIsEmpty } from "ts-utils/collections";
+import { cookbookInput } from "ts-utils/cookbook";
 import { iter } from "ts-utils/iter";
 import { field } from "ts-utils/objects";
+import { Task } from "ts-utils/scheduler";
 import { BiFn, Consumer, first, Fn, MultiConsumer, MultiFn, notNull, pair, second, tuple, typeToken } from "ts-utils/types";
 import { BoardGlContext } from "../gl/board-context";
 import { EngineTextures, loadVoxelData } from "../gl/gl-context";
 import { taskHandleContext } from "../scheduler/utils";
 import { GridRecord, LineRecord, NOOP_RENDERABLE, Renderable, ScreenSpriteRecord, SectorRecord, SpriteRecord, VoxelRecord, WallRecord, WallType } from "./api";
-import { cookbookInput } from "ts-utils/cookbook";
-import { Task } from "ts-utils/scheduler";
-import { VoxelData } from "build/formats/kvx";
 
 export function createRenderer3d(values: ValuesContainer, glContext: GlContext, ctx: EngineContext, textures: EngineTextures): Task<Source<BoardRenderer3D>> {
   const doCreateShader = (defs: string[], name: string) => createShader(glContext, `resources/shaders/${name}`, defs);
@@ -245,11 +245,7 @@ export class BoardRenderer3D implements Disposable {
       if (iterIsEmpty(recs)) return NOOP_RENDERABLE;
       builder.start();
       iter(recs).forEach(({ sectorId, ceiling, floor }) => {
-        const points = ctx.sectorPoints.get()(sectorId);
-        for (let i = 0; i < points.length; i += 3) {
-          const p1 = points[i];
-          const p2 = points[i + 1];
-          const p3 = points[i + 2];
+        groups(ctx.sectorPoints.get()(sectorId), 3).forEach(([p1, p2, p3]) => {
           if (ceiling) {
             pos12(p1[0], p1[1], p2[0], p2[1]);
             pos3Sec(p3[0], p3[1], sectorId, 0);
@@ -260,7 +256,7 @@ export class BoardRenderer3D implements Disposable {
             pos3Sec(p3[0], p3[1], sectorId, 1);
             builder.writeVertex();
           }
-        }
+        })
       });
       const data = builder.build(WebGL2RenderingContext.TRIANGLES, 3);
       const render = (gl: WebGL2RenderingContext) => {

@@ -18,8 +18,10 @@ export function Gizmo(props: { width: number, height: number, camPos: Source<vec
 
   const mat = mat4.create();
   mat4.identity(mat);
-  mat4.translate(mat, mat, vec3.fromValues(props.width / 2, props.height / 2, 0));
-  mat4.scale(mat, mat, vec3.fromValues(props.width / 2, -props.height / 2, scale))
+  const hw = props.width / 2;
+  const hh = props.height / 2;
+  mat4.translate(mat, mat, vec3.fromValues(hw, hh, 0));
+  mat4.scale(mat, mat, vec3.fromValues(hw, -hh, scale))
   mat4.mul(mat, mat, proj);
   mat4.mul(mat, mat, transform);
 

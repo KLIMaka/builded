@@ -1,6 +1,6 @@
 import { GL_CONTEXT } from "@utils/gl/drawstruct";
 import { ACTION_DESCRIPTORS, Action } from "app/apis/actions";
-import { UI } from "app/apis/ui";
+import { UI, UI_UTILS } from "app/apis/ui";
 import { VALUES } from "app/apis/values";
 import { InputController } from "app/input/keymap";
 import { DefaultActionsConstructor } from "app/modules/default/app/actions";
@@ -11,7 +11,7 @@ import { FS_MANAGER, FileSystemsManagerModule as FileSystemsManagerConstructor }
 import { DefaultGlContextConstructor } from "app/modules/gl/gl-context";
 import { createRectifier } from "app/modules/rectifier/ui/rectifier";
 import { createSettings } from "app/modules/settings/settings";
-import { ReactUiConstructor } from "app/modules/ui/react-ui";
+import { ReactUiConstructor, ReactUiUtilsConstructor } from "app/modules/ui/react-ui";
 import { enableMapSet, enablePatches } from "immer";
 import { App as AppInjector, Dependency, getInstances, provider } from "ts-utils/injector";
 import { iter } from "ts-utils/iter";
@@ -47,6 +47,7 @@ injector.bind(FS, DefaultFileSystemsConstructor);
 injector.bind(VALUES, DefaultValuesConstructor);
 injector.bind(GL_CONTEXT, DefaultGlContextConstructor);
 injector.bind(UI, ReactUiConstructor);
+injector.bind(UI_UTILS, ReactUiUtilsConstructor);
 
 injector.bind(new Dependency<void>("", true), provider(async i => {
   const [ui, actions, fsManager, app] = await getInstances(i, UI, ACTION_DESCRIPTORS, FS_MANAGER, APP);

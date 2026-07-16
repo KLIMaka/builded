@@ -1,9 +1,11 @@
 import { mat2d, vec2, vec3 } from 'gl-matrix';
-import { cyclicPairs, loopPairs } from 'ts-utils/collections';
+import { cyclicPairs, Deck, last, loopPairs, slidingPairs } from 'ts-utils/collections';
 import { cross2d, cyclic, deg2rad, int, len2d, monoatan2, TWO_PI } from 'ts-utils/mathutils';
 import { normal2d } from '../utils/vecmath';
 import { Board } from './board/structs';
 import { Entity, EntityType } from './hitscan';
+import { iter } from 'ts-utils/iter';
+import { sectorWalls } from './board/loops';
 
 export const ZSCALE = -16;
 
@@ -231,7 +233,6 @@ export function sectorNormal(out: vec3, board: Board, sectorId: number, ceiling:
   return out;
 }
 
-
 export function ang2vec(rad: number): vec2 {
   const mat = mat2d.create();
   mat2d.rotate(mat, mat, rad);
@@ -318,4 +319,75 @@ export function getMaskedWallCoords(x1: number, y1: number, x2: number, y2: numb
   const z3 = Math.max(currz3, nextz3);
   const z4 = Math.max(currz4, nextz4);
   return [x1, y1, z1, x2, y2, z2, x2, y2, z3, x1, y1, z4];
+}
+
+export type point2d = [number, number];
+type point2dxy = { x: number, y: number };
+type zoid_t = { x: [number, number, number, number], y: [number, number] };
+type trap_t = { x0: number, x1: number }
+const ZERO_TRAP: trap_t = { x0: 0, x1: 0 }
+const trapCmp = (lh: trap_t, rh: trap_t) => { return lh.x0 + lh.x1 - rh.x0 - rh.x1 }
+
+export function triangulate(board: Board, sectorId: number): point2d[] {
+  const walls = [...sectorWalls(board, sectorId)];
+  const secy = [...new Set(iter(walls)
+    .map(w => board.walls[w].y)
+    .collect()
+    .sort((l, r) => l - r))];
+  const zoids = new Deck<zoid_t>();
+  for (const [sy0, sy1] of slidingPairs(secy)) {
+    const ts = new Deck<trap_t>();
+    for (const [w0, w1] of iter(walls)
+      .map(w => [board.walls[w], board.walls[board.walls[w].point2]])) {
+      let [x0, y0, x1, y1] = w0.y > w1.y ? [w1.x, w1.y, w0.x, w0.y] : [w0.x, w0.y, w1.x, w1.y];
+      if ((y0 >= sy1) || (y1 <= sy0)) continue;
+      if (y0 < sy0) x0 = (sy0 - w0.y) * (w1.x - w0.x) / (w1.y - w0.y) + w0.x;
+      if (y1 > sy1) x1 = (sy1 - w0.y) * (w1.x - w0.x) / (w1.y - w0.y) + w0.x;
+      ts.push({ x0, x1 });
+    }
+    const traps = [...ts].sort(trapCmp);
+    const getTrap = (idx: number) => traps[idx] ?? ZERO_TRAP;
+    let j = 0;
+    for (let i = 0; i < traps.length; i = j + 1) {
+      j = i + 1;
+      const trapi = getTrap(i);
+      const trapi1 = getTrap(i + 1);
+      if ((trapi1.x0 <= trapi.x0) && (trapi1.x1 <= trapi.x1)) continue;
+      while ((j + 2 < traps.length)
+        && (getTrap(j + 1).x0 <= getTrap(j).x0)
+        && (getTrap(j + 1).x1 <= getTrap(j).x1))
+        j += 2;
+      const x0 = trapi.x0
+      const x1 = getTrap(j).x0;
+      const x2 = getTrap(j).x1;
+      const x3 = trapi.x1;
+      const y0 = sy0;
+      const y1 = sy1;
+      zoids.push({ x: [x0, x1, x2, x3], y: [y0, y1] });
+    }
+  }
+
+  const triangles: point2d[] = [];
+  for (let i = 0; i < zoids.length(); i++) {
+    const pol = new Deck<point2dxy>();
+    for (let j = 0; j < 4; j++) {
+      const polx = zoids.get(i).x[j];
+      const poly = zoids.get(i).y[j >> 1];
+      if (pol.length() === 0 || (polx !== last(pol).x) || (poly !== last(pol).y)) pol.push({ x: polx, y: poly });
+    }
+    if (pol.length() < 3) continue;
+    const fp0x = pol.get(0).x;
+    const fp0y = pol.get(0).y;
+    for (let j = 2; j < pol.length(); j++) {
+      const fp1x = pol.get(j).x;
+      const fp1y = pol.get(j).y;
+      const fp2x = pol.get(j - 1).x;
+      const fp2y = pol.get(j - 1).y;
+      triangles.push([fp2x, fp2y]);
+      triangles.push([fp1x, fp1y]);
+      triangles.push([fp0x, fp0y]);
+    }
+  }
+
+  return triangles;
 }

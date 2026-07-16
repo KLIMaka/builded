@@ -1,17 +1,17 @@
 import { ActionItem } from "@ui/action-list";
 import { GridMove, WorkplaneBuilder, WorkplaneContext, canvasWorkplane, defaultWorkplaneContext, getGridOff, line, menuItemDescripted } from "@ui/commons";
-import { SizeType, WindowBuilder } from "@ui/windows-common";
-import { ACTION_DESCRIPTORS, Action, ActionDescriptors } from "app/apis/actions";
-import { APP, App } from "app/apis/app";
+import { SizeType } from "@ui/windows-common";
+import { Action, ActionDescriptors } from "app/apis/actions";
+import { App } from "app/apis/app";
 import { Aliases, ArtInfoExtended, EMPTY_INFO_EXTENDED, EngineContext, NamedArtFile, Palette, PicTags } from "app/apis/engine";
-import { Window } from "app/apis/ui";
-import { VALUES } from "app/apis/values";
+import { UI_UTILS } from "app/apis/ui";
 import { art } from "build/artraster";
 import { ArtInfo, animate } from "build/formats/art";
 import Optional from "optional-js";
 import React, { useEffect, useRef } from "react";
 import { Disposable, Signal, Source, Value, ValuesContainer, ValuesMap } from "ts-utils/callbacks";
 import { getOrCreate, getOrDefault, prefixNotEmpty, range, takeFirst } from "ts-utils/collections";
+import { cookbookImmediate } from "ts-utils/cookbook";
 import { createCanvas, drawToCanvas, renderGrid } from "ts-utils/imgutils";
 import { Injector, getInstances } from "ts-utils/injector";
 import { iter } from "ts-utils/iter";
@@ -133,15 +133,6 @@ function filterPicnum(artFiles: Map<number, ArtInfoExtended>, query: string, tag
     .map(first)
     .collect()
     .sort((l, r) => l - r);
-}
-
-function blend(off: number) {
-  return (l: number, r: number, t: number) => {
-    if (Math.abs(l - r) > off) return l;
-    return l < r
-      ? t <= .5 ? r : l
-      : t <= .5 ? l : r;
-  };
 }
 
 export class ArtEditorImpl implements ArtEditor {
@@ -543,30 +534,30 @@ export class ArtEditorImpl implements ArtEditor {
   }
 }
 
-export async function createArtEditor(injector: Injector, ctx: EngineContext): Promise<Window> {
-  const values = await injector.getInstance(VALUES);
-  return values.create('art-editor-model').initializeAsync(async values => {
-    const [actionDescriptors, app] = await getInstances(injector, ACTION_DESCRIPTORS, APP);
-    const windowStates = await app.storages('ui.window-states');
-    const state = await createSavedState(values, windowStates, 'art-editor', createDefaultState(), app.timer);
-    const art = ctx.art;
-    const artMap = ctx.artMap;
-    const pal = ctx.pal;
-    const plus = ctx.plus;
-    const tags = ctx.picTags;
-    const shadowsteps = ctx.shadowsteps;
-    const aliases = ctx.aliases;
-    const trans = ctx.trans;
-    // const previewRenderer = await createPreviewRenderer(values, glCtx, ctx);
-    const editor = new ArtEditorImpl(values, state, actionDescriptors, app, art, artMap, pal, plus, tags, shadowsteps, aliases, trans);
+export async function createArtEditor(injector: Injector, ctx: EngineContext): Promise<void> {
+  const [uiUtils] = await getInstances(injector, UI_UTILS);
+  uiUtils.addWindow('Opening Art Editor', handle =>
+    uiUtils.values.create('art-editor-model').initializeAsync(async values => cookbookImmediate(handle, book => {
+      const windowStates = book.recepie('Loading window states', [], () => uiUtils.app.storages('ui.window-states'));
+      const state = book.recepie('Load state', [windowStates], windowStates => createSavedState(values, windowStates, 'art-editor', createDefaultState(), uiUtils.app.timer));
+      return book.recepie('Constructing window', [state], async state => {
+        const art = ctx.art;
+        const artMap = ctx.artMap;
+        const pal = ctx.pal;
+        const plus = ctx.plus;
+        const tags = ctx.picTags;
+        const shadowsteps = ctx.shadowsteps;
+        const aliases = ctx.aliases;
+        const trans = ctx.trans;
+        const editor = new ArtEditorImpl(values, state, uiUtils.actionDescriptors, uiUtils.app, art, artMap, pal, plus, tags, shadowsteps, aliases, trans);
 
-    return new WindowBuilder('art-editor', actionDescriptors, values)
-      .titleFromId()
-      .minSize(400, 400)
-      .state(state)
-      .actions(Object.values(editor.actions))
-      .disposable(values)
-      // .disposable(previewRenderer)
-      .build(<ArtEditorUiImpl artEditor={editor} />)
-  });
+        return uiUtils.windowBuilder('art-editor', values)
+          .titleFromId()
+          .minSize(400, 400)
+          .state(state)
+          .actions(Object.values(editor.actions))
+          .disposable(values)
+          .build(<ArtEditorUiImpl artEditor={editor} />)
+      })
+    })));
 }

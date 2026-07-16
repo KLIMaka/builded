@@ -4,7 +4,7 @@ import { EngineApi } from "build/board/mutations/api";
 import { forAllSectors, isValidSectorId } from "build/board/query";
 import { Board, SECTOR_NORMAL, SECTOR_REVERSE_TRANSLUNCENT_MASKED, SECTOR_TRANSLUNCENT_MASKED, Sector, Sprite, Wall } from "build/board/structs";
 import { KeywordId } from "build/formats/confile/constants";
-import { parseConHandleIncludes, toStringHasRange } from "build/formats/confile/parser";
+import { Statement, parseConHandleIncludes, toStringHasRange } from "build/formats/confile/parser";
 import { VoxelData, readKvx } from "build/formats/kvx";
 import { cloneBoard, cloneSector, cloneSprite, cloneWall, loadBuildMap, newBoard, newSector, newSprite, newWall, saveBuildMap } from "build/maploader";
 import { spriteInfo } from "build/sprites";
@@ -15,20 +15,20 @@ import { match } from "ts-pattern";
 import { Source, ValuesContainer } from "ts-utils/callbacks";
 import { getOrCreate, getOrDefault, getOrDefaultF, range, rect, reverseMap } from "ts-utils/collections";
 import { palColorFinder } from "ts-utils/color";
+import { cookbookImmediate, cookbookInput } from "ts-utils/cookbook";
 import { LinearInterpolator, vector3 } from "ts-utils/interpolator";
 import { iter } from "ts-utils/iter";
 import { asyncMapOptional, field } from "ts-utils/objects";
+import { Task } from "ts-utils/scheduler";
 import { Stream } from "ts-utils/stream";
 import { Fn, Supplier, tuple as asTuple, first, identity, nil, notUndefined, second, typeToken } from "ts-utils/types";
 import { HasSymbols, createDefFile, defaultDefine, nestedRule, number, rules, rulesInclude, set, simpleRule, symbols, token, tuple } from "utils/deffile";
 import { createBoardModifier } from "../default/board-context-utils";
 import { EngineDefs, GrpInfo, PalDef, PluDef, loadEngineDefsWork } from "../default/def-utils";
-import { loadArtMapWork, loadArtTask, loadEditorPicAddons, loadMaxPluId, openFileOptional } from "../default/engine-commons";
+import { loadArtMapTask, loadArtTask, loadEditorPicAddons, loadMaxPluId, openFileOptional } from "../default/engine-commons";
 import { DefaultGridController } from "../default/grid";
 import { stack, trackFilesSingle } from "../fs/fs";
 import { SE_TAGS, sectorLotagText } from "./tags";
-import { cookbookInput } from "ts-utils/cookbook";
-import { Task } from "ts-utils/scheduler";
 
 function engineApi(): EngineApi<Board> {
   return { cloneBoard, cloneWall, cloneSprite, cloneSector, newWall, newSector, newSprite, newBoard };
@@ -244,28 +244,35 @@ function loadBlends(values: ValuesContainer, defs: Source<EngineDefs>): Source<F
   });
 }
 
-async function loadSounds(values: ValuesContainer, grpInfo: Source<GrpInfo>, fs: Source<FileSystem>): Promise<Source<Sound[]>> {
-  return values.transformedAsyncTuple('sounds', [grpInfo, fs], async ([info, fs]) => {
+async function loadCons(values: ValuesContainer, grpInfo: Source<GrpInfo>, fs: Source<FileSystem>): Promise<Source<Statement[]>> {
+  return values.transformedAsyncTuple('cons', [grpInfo, fs], async ([info, fs]) => {
     const conFile = await fs.read(info.scriptname ?? 'game.con');
     return asyncMapOptional(conFile, async buff => {
       const { statements } = await parseConHandleIncludes(buff, f => fs.read(f));
-      const defines = iter(statements)
-        .filter(s => s.keyword === KeywordId.CON_DEFINE)
-        .toMap(s => toStringHasRange(s.args[0]), s => Number.parseInt(toStringHasRange(s.args[1])));
-      return statements
-        .filter(s => s.keyword === KeywordId.CON_DEFINESOUND)
-        .map<Sound>(s => {
-          const id = getOrDefaultF(defines, toStringHasRange(s.args[0]), id => Number.parseInt(id));
-          const file = toStringHasRange(s.args[1], 120);
-          const pitchLower = Number.parseInt(toStringHasRange(s.args[2]));
-          const pitchUpper = Number.parseInt(toStringHasRange(s.args[3]));
-          const priority = Number.parseInt(toStringHasRange(s.args[4]));
-          const type = Number.parseInt(toStringHasRange(s.args[5]));
-          const distance = Number.parseInt(toStringHasRange(s.args[6]));
-          return { id, file, pitchLower, pitchUpper, priority, type, distance, volume: 1, sampleRate: 11025 };
-        })
+      return statements;
     }).then(o => o.orElse([]));
   })
+}
+
+async function loadSounds(values: ValuesContainer, cons: Source<Statement[]>): Promise<Source<Sound[]>> {
+  return values.transformed('sound', cons, cons => {
+    const defines = iter(cons)
+      .filter(s => s.keyword === KeywordId.CON_DEFINE)
+      .toMap(s => toStringHasRange(s.args[0]), s => Number.parseInt(toStringHasRange(s.args[1])));
+    return cons
+      .filter(s => s.keyword === KeywordId.CON_DEFINESOUND)
+      .map<Sound>(s => {
+        const alias = toStringHasRange(s.args[0]);
+        const id = getOrDefaultF(defines, alias, id => Number.parseInt(id));
+        const file = toStringHasRange(s.args[1], 120);
+        const pitchLower = Number.parseInt(toStringHasRange(s.args[2]));
+        const pitchUpper = Number.parseInt(toStringHasRange(s.args[3]));
+        const priority = Number.parseInt(toStringHasRange(s.args[4]));
+        const type = Number.parseInt(toStringHasRange(s.args[5]));
+        const distance = Number.parseInt(toStringHasRange(s.args[6]));
+        return { id, alias, file, pitchLower, pitchUpper, priority, type, distance, volume: 1, sampleRate: 11025 };
+      })
+  });
 }
 
 function getTror(board: Board): BuildTror {
@@ -387,22 +394,23 @@ export type Eduke32ModsType = {
 export const createEngineContextEduke32: Task<EngineContext, [Source<FileSystem>, ValuesContainer, Eduke32ModsType]> =
   cookbookInput(typeToken<[Source<FileSystem>, ValuesContainer, Eduke32ModsType]>(), (book, input) =>
     book.paste([input], async (handle, [fs, values, { grpName, mainGrpFirst }]) =>
-      values.createChild('eduke32-module').initializeAsync(values => cookbookInput(typeToken<[]>(), book => {
+      values.createChild('eduke32-module').initializeAsync(values => cookbookImmediate(handle, book => {
         const grpInfo = book.recepie('Loading GrpInfo', [], () => loadGrpInfo(values, fs, grpName));
         const engineDefs = book.paste([grpInfo], (handle, grpInfo) => loadEngineDefsWork(grpName, values)(handle, fs, values.transformed('defname', grpInfo, i => i.defname ?? '')))
         const res = book.recepie('Loading Resources', [engineDefs], async (defs) => values.transformed('resources', defs, defs => mainGrpFirst
           ? stack(stack(defs.addGrp, defs.mainGrp), defs.root)
           : stack(defs.root, stack(defs.addGrp, defs.mainGrp))));
+        const cons = book.recepie('Load CONs', [grpInfo, res], (grpInfo, res) => loadCons(values, grpInfo, res))
         const pal = book.recepie('Loading Pal', [engineDefs, res], (defs, res) => loadPal(values, defs, res));
         const trans = book.recepie('Loading Trans', [engineDefs, res], (defs, res) => loadTrans(values, defs, res));
         const plus = book.recepie('Loading PLUs', [engineDefs, res], (defs, res) => loadPlus(values, defs, res));
         const voxels = book.recepie('Loading voxels', [engineDefs, res], (defs, res) => loadVoxels(values, defs, res));
-        const art = book.paste([res], (handle, res) => loadArtTask(handle, values, res));
+        const art = book.recepieTask([res], res => loadArtTask(values, res));
         const aliases = book.recepie('Loading aliases', [res], res => loadAliases(values, res, 'NAMES.H'));
         const tags = book.recepie('Loading tags', [res], res => loadTags(values, res, 'tiles.cfg'));
-        const sounds = book.recepie('Loading sounds', [grpInfo, res], (grpInfo, res) => loadSounds(values, grpInfo, res));
-        const artMap = book.paste([engineDefs, art, res, pal], (handle, defs, art, res, pal) => loadArtMapWork(values, defs, art, res, pal)(handle));
-        const addonArtMap = book.paste([res, pal, artMap], (handle, res, pal, artMap) => loadEditorPicAddons(values, artMap, res, pal)(handle));
+        const sounds = book.recepie('Loading sounds', [cons], cons => loadSounds(values, cons));
+        const artMap = book.recepieTask([engineDefs, art, res, pal], (defs, art, res, pal) => loadArtMapTask(values, defs, art, res, pal));
+        const addonArtMap = book.recepieTask([res, pal, artMap], (res, pal, artMap) => loadEditorPicAddons(values, artMap, res, pal));
         const plusWithFog = book.recepie('Creating default Fog pals', [pal, plus], (pal, plus) => generateFogPals(values, pal, plus));
         return book.recepie('', [grpInfo, engineDefs, res, pal, trans, voxels, art, aliases, tags, sounds, addonArtMap, plusWithFog],
           async (grpInfo, defs, resources, pal, trans, spriteVoxelSwap, art, aliases, picTags, sounds, addonArtMap, plusWithFog) => ({
@@ -427,6 +435,6 @@ export const createEngineContextEduke32: Task<EngineContext, [Source<FileSystem>
             createBoard: createCreateBoard(values, addonArtMap.map),
             dispose: () => values.dispose()
           }))
-      })(handle))
+      }))
     )
   );

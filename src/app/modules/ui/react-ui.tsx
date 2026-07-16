@@ -1,16 +1,20 @@
 import { Action, ACTION_DESCRIPTORS, ActionDescriptors, StateChecker } from "app/apis/actions";
 import { App, APP } from "app/apis/app";
-import { UI, Ui, Window } from "app/apis/ui";
+import { UI, Ui, UiUtils, Window } from "app/apis/ui";
 import { VALUES } from "app/apis/values";
 import * as React from 'react';
 import { Fragment } from 'react';
 import { createRoot } from "react-dom/client";
 import { Disconnector, Value, ValuesContainer } from "ts-utils/callbacks";
-import { getInstances, lifecycle, Module, Plugin } from "ts-utils/injector";
+import { getInstances, lifecycle, Plugin, provider } from "ts-utils/injector";
 import { iter } from "ts-utils/iter";
+import { Task } from "ts-utils/scheduler";
 import { Consumer } from "ts-utils/types";
-import 'winbox/dist/css/winbox.min.css';
+import { waitFor } from "../scheduler/ui/task-propgress";
 import { ActionsChannelContext, ActionsCollector, ActionsNode, UiContext, useValue } from "./commons";
+import { confirm, info } from "./message-box";
+import { WindowBuilder } from "./windows-common";
+import 'winbox/dist/css/winbox.min.css';
 
 
 function WindowsStackImpl({ windowsValue }: { windowsValue: Value<Map<Window, WindowDescriptor>> }) {
@@ -97,7 +101,7 @@ class ReactUi implements Ui {
     return { id, modalParent: this.focusedWindow, disconnectors }
   }
 
-  private focus(window:Window) {
+  private focus(window: Window) {
     this.focusedWindow = window;
   }
 
@@ -116,6 +120,27 @@ export const ReactUiConstructor: Plugin<Ui> = lifecycle(async (injector, lifecyc
   return new ReactUi(descriptors, app, localValues);
 });
 
-export function ReactUiModule(module: Module) {
-  module.bind(UI, ReactUiConstructor);
-}
+export const ReactUiUtilsConstructor: Plugin<UiUtils> = provider(async injector => {
+  const [descriptors, values, ui, app] = await getInstances(injector, ACTION_DESCRIPTORS, VALUES, UI, APP);
+  function infoImpl(title: string, text: string, icon?: string) { return info(ui, descriptors, values, title, text, icon) }
+  function waitForImpl<T>(title: string, task: Task<T>) { return waitFor(app, ui, descriptors, values, title, app.scheduler.exec(task), infoImpl) }
+  function confirmImpl(title: string, text: string) { return confirm(ui, descriptors, values, title, text) }
+  function windowBuilder(id: string, values: ValuesContainer) { return new WindowBuilder(id, descriptors, values) }
+  async function addWindowImpl(title: string, task: Task<Window>) {
+    const result = await waitForImpl(title, task);
+    result.onOk(w => ui.addWindow(w));
+  }
+
+  return {
+    actionDescriptors: descriptors,
+    ui,
+    app,
+    values,
+
+    waitFor: waitForImpl,
+    info: infoImpl,
+    confirm: confirmImpl,
+    addWindow: addWindowImpl,
+    windowBuilder,
+  };
+})

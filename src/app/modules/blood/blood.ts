@@ -10,7 +10,7 @@ import { spriteInfo } from "build/sprites";
 import Optional from "optional-js";
 import { Source, ValuesContainer } from "ts-utils/callbacks";
 import { EMPTY_COLLECTION, getOrCreate, getOrDefault } from "ts-utils/collections";
-import { cookbook, cookbookInput } from "ts-utils/cookbook";
+import { cookbookImmediate, cookbookInput } from "ts-utils/cookbook";
 import { Iter, iter } from "ts-utils/iter";
 import { field } from "ts-utils/objects";
 import { Task } from "ts-utils/scheduler";
@@ -19,7 +19,7 @@ import { first, Fn, identity, second, Supplier, typeToken } from "ts-utils/types
 import { cloneBoard, cloneSector, cloneSprite, cloneWall, loadBloodMap, newBoard, newSector, newSprite, newWall, saveBloodMap } from '../../../build/blood/maploader';
 import { createBoardModifier } from "../default/board-context-utils";
 import { loadEngineDefsWork } from "../default/def-utils";
-import { loadAddonJson, loadArtMapWork, loadArtTask, loadEditorPicAddons, loadMaxPluId, loadRaw, openFile, openFileOptional, packegeFs } from "../default/engine-commons";
+import { loadAddonJson, loadArtMapTask, loadArtTask, loadEditorPicAddons, loadMaxPluId, loadRaw, openFile, openFileOptional, packegeFs } from "../default/engine-commons";
 import { DefaultGridController } from "../default/grid";
 import { createRffFsArrayBuffer, createRffFsFile, stack, watchFile, watchFileNamed } from "../fs/fs";
 import { SECTOR_TAGS, SPRITE_TAGS, WALL_TAGS } from "./texts";
@@ -169,7 +169,7 @@ async function loadRff(values: ValuesContainer, root: Source<FileSystem>, name: 
 export const createEngineContextWork: Task<EngineContext<BloodBoard>, [Source<FileSystem>, ValuesContainer]> =
   cookbookInput(typeToken<[Source<FileSystem>, ValuesContainer]>(), (book, input) =>
     book.paste([input], async (handle, [fs, values]) =>
-      values.createChild('blood-module').initializeAsync(values => cookbook(book => {
+      values.createChild('blood-module').initializeAsync(values => cookbookImmediate(handle, book => {
         const addon = book.recepie('Loading addon.json', [], async () => loadAddonJson(values, fs));
         const mainRffName = book.recepie('Main RFF name', [addon], async addon => values.transformed('main rff', addon, addon => addon.rff_main ?? 'BLOOD.RFF'));
         const soundsRffName = book.recepie('Sounds RFF name', [addon], async addon => values.transformed('sounds rff', addon, addon => addon.rff_sound ?? 'SOUNDS.RFF'));
@@ -188,9 +188,9 @@ export const createEngineContextWork: Task<EngineContext<BloodBoard>, [Source<Fi
         const tags = book.recepie('Loading Tags', [res], res => loadPicTags(values, res));
         const voxels = book.recepie('Loading Voxels', [res], res => createSpriteVoxelSwap(values, res));
         const sounds = book.recepie('Loading Sounds', [soundsRffFile], soundsRff => createSounds(values, soundsRff));
-        const art = book.paste([res], (handle, res) => loadArtTask(handle, values, res));
-        const artMap = book.paste([res, pal, defs, art], async (handle, res, pal, defs, art) => loadArtMapWork(values, defs, art, res, pal)(handle));
-        const picAddons = book.paste([res, pal, artMap], async (handle, res, pal, artMap) => loadEditorPicAddons(values, artMap, res, pal)(handle));
+        const art = book.recepieTask([res], res => loadArtTask(values, res));
+        const artMap = book.recepieTask([res, pal, defs, art], (res, pal, defs, art) => loadArtMapTask(values, defs, art, res, pal));
+        const picAddons = book.recepieTask([res, pal, artMap], (res, pal, artMap) => loadEditorPicAddons(values, artMap, res, pal));
         return book.recepie('Compose', [res, pal, trans, plus, tags, voxels, sounds, art, picAddons],
           async (resources, pal, trans, plus, picTags, spriteVoxelSwap, sounds, art, artAddon): Promise<EngineContext<BloodBoard>> => {
             const api = engineApi();
@@ -207,5 +207,4 @@ export const createEngineContextWork: Task<EngineContext<BloodBoard>, [Source<Fi
             const dispose = () => values.dispose();
             return { name, resources, api, settings, pal, trans, picTags, plus, maxPluId, art, artMap, shadowsteps, aliases, spriteVoxelSwap, blends, sounds, parallaxInfo, loadBoard, createBoard, dispose }
           });
-
-      })(handle))));
+      }))));

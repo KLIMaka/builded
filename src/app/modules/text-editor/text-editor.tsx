@@ -1,10 +1,8 @@
-import { ACTION_DESCRIPTORS } from "app/apis/actions";
-import { Window } from "app/apis/ui";
+import { UI_UTILS } from "app/apis/ui";
 import { VALUES } from "app/apis/values";
 import React, { useEffect, useRef } from "react";
+import { cookbook } from "ts-utils/cookbook";
 import { getInstances, Injector } from "ts-utils/injector";
-import { WindowBuilder } from "../ui/windows-common";
-import { Result, resultAsync } from "ts-utils/types";
 
 const ID = "text-editor"
 
@@ -20,21 +18,19 @@ function TextEditor(props: { monaco: typeof import("monaco-editor"), value: stri
       wrappingIndent: "indent",
     });
   })
-
   return <div className="flex-fill" ref={frameRef} style={{ minWidth: 0 }} />
-
 }
 
-export async function createTextEditor(injector: Injector, text: string): Promise<Result<Window>> {
-  return resultAsync(async () => {
-    const [actionDescriptors, values] = await getInstances(injector, ACTION_DESCRIPTORS, VALUES);
-    const localValues = values.create(ID);
-    const editor = await import("monaco-editor");
-
-    return new WindowBuilder(ID, actionDescriptors, localValues)
+export async function createTextEditor(injector: Injector, text: string): Promise<void> {
+  const [values, uiUtils] = await getInstances(injector, VALUES, UI_UTILS);
+  const localValues = values.create(ID);
+  uiUtils.addWindow(`Opening text editor`, cookbook(book => {
+    const editor = book.recepie('Loading Monaco Editor', [], () => import("monaco-editor"));
+    return book.recepie('', [editor], async editor => uiUtils.windowBuilder(ID, localValues)
       .titleFromId()
       .minSize(400, 400)
       .disposable(localValues)
-      .build(<TextEditor monaco={editor} value={text} />)
-  });
+      .blockContext()
+      .build(<TextEditor monaco={editor} value={text} />))
+  }));
 }

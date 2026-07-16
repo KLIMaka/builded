@@ -1,13 +1,10 @@
-import { WindowBuilder } from "@ui/windows-common";
 import { Controller3D } from "@utils/camera/controller3d";
 import { GL_CONTEXT, GlContext } from "@utils/gl/drawstruct";
-import { ACTION_DESCRIPTORS, ActionDescriptors, StateChecker } from "app/apis/actions";
-import { APP, App } from "app/apis/app";
+import { ActionDescriptors, StateChecker } from "app/apis/actions";
 import { BoardContext, EMPTY_INFO_EXTENDED, EngineContext } from "app/apis/engine";
-import { UI, Ui, Window } from "app/apis/ui";
-import { VALUES, Values } from "app/apis/values";
+import { UI_UTILS, UiUtils, Window } from "app/apis/ui";
+import { VALUES } from "app/apis/values";
 import { EngineTextures } from "app/modules/gl/gl-context";
-import { waitFor } from "app/modules/scheduler/ui/task-propgress";
 import { ArtRaster } from "build/artraster";
 import { BloodBoard } from "build/blood/structs";
 import { findSector } from "build/board/query";
@@ -25,10 +22,10 @@ import { iter } from "ts-utils/iter";
 import { int } from "ts-utils/mathutils";
 import { applyNotNullish } from "ts-utils/objects";
 import { fit, palRasterizer, pluTransform, transform } from "ts-utils/pixelprovider";
-import { Scheduler, Task, gen } from "ts-utils/scheduler";
+import { Task, gen } from "ts-utils/scheduler";
 import { Stream } from "ts-utils/stream";
 import { DelayedValue } from "ts-utils/timed";
-import { Result, nil, notNull } from "ts-utils/types";
+import { nil, notNull } from "ts-utils/types";
 import { createBoardGlContext } from "../gl/board-context";
 import { WorkplaneBuilder, WorkplaneHandlers, canvasWorkplane } from "../ui/commons";
 import { Renderable } from "./api";
@@ -62,14 +59,14 @@ async function loadBoardContext(ctx: EngineContext, mapName: string) {
   return ctx.loadBoard(new Stream(mapFile), mapName);
 }
 
-export async function createBoardView(injector: Injector, ctx: EngineContext, textures: EngineTextures, rendererProvider: Task<Source<BoardRenderer3D>>, mapName: string): Promise<Result<Window>> {
-  const [values, app, actionDescriptors, glContext, ui] = await getInstances(injector, VALUES, APP, ACTION_DESCRIPTORS, GL_CONTEXT, UI);
-  return values.create(`board-view`).initializeAsync(async localValues => {
+export async function createBoardView(injector: Injector, ctx: EngineContext, textures: EngineTextures, rendererProvider: Task<Source<BoardRenderer3D>>, mapName: string): Promise<void> {
+  const [values, glContext, uiUtils] = await getInstances(injector, VALUES, GL_CONTEXT, UI_UTILS);
+  values.create(`board-view`).initializeAsync(async localValues => {
     localValues.handleStandalone([ctx.settings], settings => {
       textures.get(settings.fontPicnum).get();
       textures.get(settings.pointPicnum).get();
     });
-    const task = app.scheduler.exec(cookbook(book => {
+    uiUtils.addWindow(`Opening map ${mapName}`, cookbook(book => {
       const boardCtx = book.recepie('Loading map', [], async () => loadBoardContext(ctx, mapName));
       const renderer = book.paste([], rendererProvider);
       const postLoad = book.paste([boardCtx], async (handle, boardCtx) => {
@@ -96,9 +93,8 @@ export async function createBoardView(injector: Injector, ctx: EngineContext, te
         await handle.waitMaybe(gen(tasks, (_, i, total) => `Preloading textures (${i}/${total})`), 'Preloading textures');
       })
       return book.recepie('Constructing window', [boardCtx, renderer, postLoad], async (boardCtx, renderer, _) =>
-        createWindow(values, localValues, ctx, boardCtx, renderer, glContext, app, ui, actionDescriptors, injector));
+        createWindow(localValues, ctx, boardCtx, renderer, glContext, uiUtils, injector));
     }));
-    return waitFor(ui, actionDescriptors, values, `Opening map ${mapName}`, task);
   });
 }
 
@@ -125,14 +121,14 @@ function drawOverlayImpl(gl: WebGL2RenderingContext, ...rs: Renderable[]) {
   gl.enable(gl.DEPTH_TEST);
 }
 
-async function saveBoard(engine: EngineContext, boardCtx: BoardContext, ui: Ui, actionDescriptors: ActionDescriptors, values: Values, scheduler: Scheduler) {
-  await waitFor(ui, actionDescriptors, values, "Save", scheduler.exec(async handle => {
+async function saveBoard(engine: EngineContext, boardCtx: BoardContext, uiUtils: UiUtils) {
+  await uiUtils.waitFor("Save", async handle => {
     const writable = await engine.resources.get().writable();
     writable.ifPresent(async fs => fs.write(boardCtx.name ?? '', await boardCtx.save()))
-  }));
+  });
 }
 
-function createWindow(values: Values, localValues: ValuesContainer, engine: EngineContext, boardCtx: BoardContext, renderer: Source<BoardRenderer3D>, glContext: GlContext, app: App, ui: Ui, actionDescriptors: ActionDescriptors, injector: Injector): Window {
+function createWindow(localValues: ValuesContainer, engine: EngineContext, boardCtx: BoardContext, renderer: Source<BoardRenderer3D>, glContext: GlContext, uiUtils: UiUtils, injector: Injector): Window {
   localValues.handleStandalone([renderer, localValues.field('parallaxPicnums', boardCtx.data, "parallaxPicnums")], ([renderer, parallaxPicnums]) => {
     renderer.depthShadowScale(1024);
     renderer.parallaxPics(parallaxPicnums);
@@ -202,13 +198,13 @@ function createWindow(values: Values, localValues: ValuesContainer, engine: Engi
   };
 
 
-  const actionsCtx = actionDescriptors.sub('board-view');
+  const actionsCtx = uiUtils.actionDescriptors.sub('board-view');
   const bind = (name: string) => actionsCtx.get(name).bind().get();
   const inter = quadraticInterpolator(0.8);
-  const forwardDamper = new DelayedValue(250, 0, inter, app.timer.now);
-  const backDamper = new DelayedValue(250, 0, inter, app.timer.now);
-  const leftDamper = new DelayedValue(250, 0, inter, app.timer.now);
-  const rightDamper = new DelayedValue(250, 0, inter, app.timer.now);
+  const forwardDamper = new DelayedValue(250, 0, inter, uiUtils.app.timer.now);
+  const backDamper = new DelayedValue(250, 0, inter, uiUtils.app.timer.now);
+  const leftDamper = new DelayedValue(250, 0, inter, uiUtils.app.timer.now);
+  const rightDamper = new DelayedValue(250, 0, inter, uiUtils.app.timer.now);
   const states: StateChecker[] = [
     { bind: bind('forward'), action: s => forwardDamper.set(s ? 1 : 0) },
     { bind: bind('back'), action: s => backDamper.set(s ? -1 : 0) },
@@ -233,7 +229,7 @@ function createWindow(values: Values, localValues: ValuesContainer, engine: Engi
       offscreen.height = height;
 
       renderer.screenSize(width, height);
-      renderer.time(app.timer.now() % 10000.0);
+      renderer.time(uiUtils.app.timer.now() % 10000.0);
       renderer.projection(projection);
 
       gl.viewport(0, 0, width, height);
@@ -250,12 +246,12 @@ function createWindow(values: Values, localValues: ValuesContainer, engine: Engi
         ?.transferFromImageBitmap(offscreen.transferToImageBitmap());
     });
 
-  const updateMovement = app.timer.onFrame(dt => {
+  const updateMovement = uiUtils.app.timer.onFrame(dt => {
     ctl.moveForward((forwardDamper.get() + backDamper.get()) * 5 * dt);
     ctl.moveSideway((leftDamper.get() + rightDamper.get()) * 5 * dt);
   })
-  const redrawTask = app.timer.onFrame(_ => redrawProc.get()());
-  redrawTask.onError(e => app.logger.log('ERROR', e));
+  const redrawTask = uiUtils.app.timer.onFrame(_ => redrawProc.get()());
+  redrawTask.onError(e => uiUtils.app.logger.log('ERROR', e));
   updateMovement.start();
   redrawTask.start();
 
@@ -264,13 +260,13 @@ function createWindow(values: Values, localValues: ValuesContainer, engine: Engi
       desc.bindSync('undo', () => boardCtx.undo()),
       desc.bindSync('grid-inc', () => boardCtx.grid.incGridSize()),
       desc.bindSync('grid-dec', () => boardCtx.grid.decGridSize()),
-      desc.bind('save', async () => saveBoard(engine, boardCtx, ui, actionDescriptors, values, app.scheduler)),
+      desc.bind('save', async () => saveBoard(engine, boardCtx, uiUtils)),
       ...drawSectorTool.registerActions(desc),
       ...utilsTool.registerActions(desc)
     ];
   }
 
-  return new WindowBuilder('board-view', actionDescriptors, localValues)
+  return uiUtils.windowBuilder('board-view', localValues)
     .title(boardCtx.name ?? '')
     .size(800, 600)
     .minSize(400, 400)

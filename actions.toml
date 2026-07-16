@@ -78,7 +78,7 @@ add-storage = { parent = "add-storage" }
 add-dir = { parent = "add-dir" }
 add-zip = { parent = "add-zip" }
 add-rff = { parent = "add-rff" }
-add-grp = { parent = "add-rgp" }
+add-grp = { parent = "add-grp" }
 add-res = { label = "Add resource", bind = "control+r" }
 add-menu = { bind = "m" }
 refresh = { label = "Refresh", icon = "arrows-rotate", bind = "f5" }

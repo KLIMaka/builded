@@ -5,6 +5,7 @@ import React from "react";
 import { sum } from "ts-utils/mathutils";
 import { Editor, EngineInfo } from "../engine-context";
 import { FileNameRenderer, FileSizeRenderer, FileSourceRenderer, FilesSummary, sortFunction } from "./common";
+import { iter } from "ts-utils/iter";
 
 const mapsColumns: VirtualTableColumn<FileInfo, any>[] = [
   column("name", "Name", FileNameRenderer, 0, 1, 1),
@@ -14,15 +15,16 @@ const mapsColumns: VirtualTableColumn<FileInfo, any>[] = [
 
 export function MapsInfoView({ info, editor }: { info: EngineInfo, editor: Editor }) {
   const values = useValuesContainer(`maps`);
+  const mapFiles = values.transformed(`maps`, info.files, files => iter(files).filter(f => f.name.toLowerCase().endsWith('.map')).collect());
   const sort = values.value<Sort<FileInfo>>('sort', { column: 'name', direction: "ASC" });
-  const sortedMaps = values.transformedTuple('sorted-maps', [info.mapFiles, sort], ([maps, sort]) => {
+  const sortedMaps = values.transformedTuple('sorted-maps', [mapFiles, sort], ([maps, sort]) => {
     const sortColumn = sort.column;
     if (sortColumn === undefined) return maps;
     const [dirG, dirL] = sort.direction === 'ASC' ? [-1, 1] : [1, -1];
     return maps.toSorted(sortFunction(sortColumn, dirG, dirL));
   });
-  const mapsCount = values.transformed('maps-count', info.mapFiles, maps => maps.length);
-  const mapsSize = values.transformed('maps-size', info.mapFiles, maps => maps.map(m => m.size).reduce(sum, 0))
+  const mapsCount = values.transformed('maps-count', mapFiles, maps => maps.length);
+  const mapsSize = values.transformed('maps-size', mapFiles, maps => maps.map(m => m.size).reduce(sum, 0))
 
   return <Column className='form-panel gap-5'>
     <Row className="flex-auto">

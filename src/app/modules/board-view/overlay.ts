@@ -1,5 +1,5 @@
 import { Aliases, ArtInfoExtended, BoardData, EngineSettings } from "app/apis/engine";
-import { sectorWalls } from "build/board/loops";
+import { wallLoops } from "build/board/loops";
 import { sectorOfWall } from "build/board/query";
 import { Board, FACE_SPRITE, FLOOR_SPRITE, Wall, WALL_SPRITE } from "build/board/structs";
 import { EMPTY_ENTITY, Entity, EntityType } from "build/hitscan";
@@ -7,12 +7,13 @@ import { SpriteDescriptor } from "build/sprites";
 import { createSlopeCalculator, slope, wallNormal, ZSCALE } from "build/utils";
 import { vec2, vec3 } from "gl-matrix";
 import { match } from "ts-pattern";
+import { loopPairs } from "ts-utils/collections";
 import { Iter } from "ts-utils/iter";
 import { memoize } from "ts-utils/mathutils";
+import { notUndefined } from "ts-utils/types";
 import { BoardGlContext } from "../gl/board-context";
 import { LineRecord, NOOP_RENDERABLE, printText, Renderable, renderables, ScreenSpriteRecord, WallType } from "./api";
 import { BoardRenderer3D } from "./boardRenderer3d";
-import { notUndefined } from "ts-utils/types";
 
 const POINT_OFF = vec2.fromValues(-2.5, 2.5);
 const POINT_SIZE = vec2.fromValues(5, 5);
@@ -159,15 +160,9 @@ function selecSector(hitscan: Entity, board: Board, renderer: BoardRenderer3D, b
   const points = Iter.range(sector.wallptr, sector.wallptr + sector.wallnum).map(w => ({ picnum, pos: pos(w), off: POINT_OFF, size: POINT_SIZE })).collect();
   const sectorR = renderer.writeSectorSelect([{ ceiling, floor: 1 - ceiling, sectorId }], boardGlCtx);
   const contour: LineRecord[] = [];
-  let fw = sector.wallptr;
-  sectorWalls(board, sectorId).forEach(w => {
-    const wall = board.walls[w];
-    if (fw !== w) contour.push({ start: pos(w - 1), end: pos(w) });
-    if (wall.point2 === fw) {
-      contour.push({ start: pos(w), end: pos(fw) });
-      fw = w + 1;
-    }
-  });
+  wallLoops(board, sectorId)
+    .flatMap(loop => loopPairs(loop))
+    .forEach(([w1, w2]) => contour.push({ start: pos(w1), end: pos(w2) }));
   const firstWall = board.walls[sector.wallptr];
   const secondWall = board.walls[firstWall.point2];
   const [fwx, fwy] = vec2.lerp(vec2.create(), vec2.fromValues(firstWall.x, firstWall.y), vec2.fromValues(secondWall.x, secondWall.y), 0.5);

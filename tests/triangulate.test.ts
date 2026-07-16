@@ -1,5 +1,5 @@
+import { triangulate } from 'build/utils';
 import { BuildReferenceTrackerImpl } from '../src/app/modules/default/reftracker';
-import { triangulate } from '../src/app/modules/gl/geometry/builders/sector';
 import { createNewSector } from '../src/build/board/mutations/createsector';
 import { cloneBoard, cloneSector, cloneSprite, cloneWall, newBoard, newSector, newSprite, newWall } from '../src/build/maploader';
 import { wrap } from 'ts-utils/collections';

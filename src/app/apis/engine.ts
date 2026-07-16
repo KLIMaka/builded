@@ -48,6 +48,7 @@ export const DEFAULT_BLEND: GlBlend = { src: WebGL2RenderingContext.SRC_ALPHA, d
 
 export type Sound = Readonly<{
   id: number,
+  alias?: string,
   file: string,
   sampleRate: number,
   pitchLower: number,

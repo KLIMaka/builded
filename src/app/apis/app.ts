@@ -2,7 +2,7 @@ import Optional from "optional-js";
 import { Disposable } from "ts-utils/callbacks";
 import { Dependency } from "ts-utils/injector";
 import { Scheduler } from "ts-utils/scheduler";
-import { Consumer, Fn } from "ts-utils/types";
+import { Consumer } from "ts-utils/types";
 
 // General
 export type Disconnector = Consumer<void>;
@@ -65,17 +65,10 @@ export type Storage = Readonly<{
 
 export type Storages = (name: string) => Promise<Storage>;
 
-// Cache
-export type Cache = Readonly<{
-  get<T>(name: string): T | undefined;
-  getOrCreate<T>(name: string, factory: Fn<string, T>): T;
-}> & Disposable;
-
 export type App = Readonly<{
   logger: Logger;
   timer: Timer;
   scheduler: Scheduler;
-  cache: Cache;
   storages: Storages;
 }> & Disposable;
 

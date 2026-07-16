@@ -1,15 +1,13 @@
 import { ActionItem } from "@ui/action-list";
 import { Icon, actionsToActionItem, line } from "@ui/commons";
-import { confirm, info } from "@ui/message-box";
 import { SelectionController, Sort, setSelectionModel } from "@ui/table";
-import { SizeType, WindowBuilder } from "@ui/windows-common";
-import { ACTION_DESCRIPTORS, Action, ActionDescriptors } from "app/apis/actions";
+import { SizeType } from "@ui/windows-common";
+import { Action, ActionDescriptors } from "app/apis/actions";
 import { APP, App, Storage } from "app/apis/app";
 import { FS, FileSystem, FileSystemHandle, FileSystems, SerializedFileSystemHandle } from "app/apis/fs";
-import { UI, Ui, Window } from "app/apis/ui";
+import { UI_UTILS, UiUtils, Window } from "app/apis/ui";
 import { VALUES, Values } from "app/apis/values";
 import { createSavedState } from "app/modules/default/app/storage";
-import { waitFor } from "app/modules/scheduler/ui/task-propgress";
 import Optional from "optional-js";
 import * as React from 'react';
 import { Signal, Source, Value, ValuesContainer, ValuesMap, initial } from "ts-utils/callbacks";
@@ -82,8 +80,7 @@ class GlobalFileSystemsManagerImpl implements GlobalFileSystemsManager {
     readonly app: App,
     readonly fs: FileSystems,
     private storage: Storage,
-    readonly ui: Ui,
-    readonly actionDescriptors: ActionDescriptors,
+    readonly uiUtils: UiUtils,
   ) {
     this.clipboard = this.localValues.value('clipboard', Optional.empty());
     this.recentFss = localValues.transformed('recentFss', state.get('recent'), r => r.map(r => fs.deserialize(r)));
@@ -108,7 +105,7 @@ class GlobalFileSystemsManagerImpl implements GlobalFileSystemsManager {
     const values = this.values.create(LOCAL);
     const savedState = await createSavedState(values, this.storage, LOCAL, createDefaultSavedState(), this.app.timer);
     const manager = new FileSystemsManagerImpl(values, savedState, this);
-    this.window = new WindowBuilder(LOCAL, this.actionDescriptors, values)
+    this.window = this.uiUtils.windowBuilder(LOCAL, values)
       .title('File Systems')
       .minSize(400, 400)
       .state(savedState)
@@ -165,7 +162,7 @@ export class FileSystemsManagerImpl {
     this.files = this.createFiles(this.loadedFiles, this.sort, this.query);
     this.selected = setSelectionModel(this.localValues, this.files);
     this.localValues.handleStandalone([this.selectedFs], _ => { this.selected.get().unselectAll() });
-    this.actions = this.createActions(global.actionDescriptors, this.createRecentConsumer());
+    this.actions = this.createActions(global.uiUtils.actionDescriptors, this.createRecentConsumer());
     this.storages = this.createStorages(global.recentFss, this.selectedFsHandle,
       [this.actions.addStorage, this.actions.addDir, this.actions.addZip, this.actions.addRff, this.actions.addGrp]);
     this.addMenuOpen = localValues.value('addMenuOpen', false);
@@ -266,22 +263,19 @@ export class FileSystemsManagerImpl {
 
   private async delete() {
     const selected = this.selected.get().selected();
-    const isOk = await confirm(this.global.ui, this.global.actionDescriptors, this.global.values, 'Delete', `Do you really want to delete the ${selected.length} selected files(s)?`);
+    const isOk = await this.global.uiUtils.confirm('Delete', `Do you really want to delete the ${selected.length} selected files(s)?`);
     if (!isOk.orElse(false)) return;
     await this.selectedFs.get().writable().then(w => w.ifPresent(async writable => {
-      const scheduler = this.global.app.scheduler;
-      const task = scheduler.exec(cookbook(book => {
+      await this.global.uiUtils.waitFor("Delete", cookbook(book => {
         const toDelete = selected.map(f => book.recepie(`Deleting ${f.name}...`, [], async () => writable.delete(f.name)));
         return book.recepie('', toDelete, async (..._) => []);
-      }))
-      await waitFor(this.global.ui, this.global.actionDescriptors, this.global.values, "Delete", task);
+      }));
     }));
   }
 
   async writeFiles(files: FileProvider[]) {
     await this.selectedFs.get().writable().then(w => w.ifPresent(async w => {
-      const scheduler = this.global.app.scheduler;
-      const task = scheduler.exec(cookbook(book => {
+      this.global.uiUtils.waitFor("Write", cookbook(book => {
         const list = book.recepie('Preparing...', [], async () => this.selectedFs.get().list());
         return book.paste([list], async (handle, dstFiles) => cookbook(book => {
           const filesMap = iter(dstFiles).toMap(f => f.name.toLowerCase(), identity());
@@ -290,7 +284,7 @@ export class FileSystemsManagerImpl {
             const dstFile = filesMap.get(fn.toLowerCase());
             if (!dstFile) return 'yes';
             const text = `Do you really want to overwrite file '${fn}'? Old size ${size(dstFile.size)} new size ${size(byteLength)}`;
-            const isOk = await confirmOverwrite(this.global.ui, this.global.actionDescriptors, this.global.values, 'Overwrite', text)
+            const isOk = await confirmOverwrite(this.global.uiUtils, 'Overwrite', text)
             return isOk.orElse('all-no')
           }
           const initialOption = book.recepie<[], OverwriteOption>('', [], async () => 'yes');
@@ -307,25 +301,23 @@ export class FileSystemsManagerImpl {
                 (option === 'all-no' || option === 'no')
                   ? option
                   : w.write(file.name, data)
-                    .catch(e => info(this.global.ui, this.global.actionDescriptors, this.global.values, 'Error', e.message))
+                    .catch(e => this.global.uiUtils.info('Error', e.message))
                     .then(_ => option)
               ).then(o => o.orElse(prevOption)));
           }
           return lastOption;
         })(handle))
-      }))
-      const result = await waitFor(this.global.ui, this.global.actionDescriptors, this.global.values, "Write", task);
-      result.onErr(e => { this.global.app.logger.log('ERROR', e); info(this.global.ui, this.global.actionDescriptors, this.global.values, 'Error', e.message) })
+      }));
     }));
   }
 }
 
 export const FileSystemsManagerModule = lifecycle<GlobalFileSystemsManager>(async (injector, lifecycle) => {
-  const [fs, actionDescriptors, app, ui, values] = await getInstances(injector, FS, ACTION_DESCRIPTORS, APP, UI, VALUES);
+  const [fs, app, uiUtils, values] = await getInstances(injector, FS, APP, UI_UTILS, VALUES);
   const globalValues = lifecycle(values.create(GLOBAL), async c => c.dispose());
   const windowStates = lifecycle(await app.storages('ui.window-states'), async s => s.dispose());
   const globalState = await createSavedState(globalValues, windowStates, GLOBAL, createDefaultGlobalState(), app.timer);
-  return new GlobalFileSystemsManagerImpl(values, globalValues, globalState, app, fs, windowStates, ui, actionDescriptors);
+  return new GlobalFileSystemsManagerImpl(values, globalValues, globalState, app, fs, windowStates, uiUtils);
 });
 
 export const FS_MANAGER = new Dependency<GlobalFileSystemsManager>('File Systems Manager');

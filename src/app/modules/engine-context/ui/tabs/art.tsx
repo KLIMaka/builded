@@ -40,10 +40,10 @@ const COLUMNS: VirtualTableColumn<ArtFileInfo, any>[] = [
 
 export function ArtsInfoView({ info, editor }: { info: EngineInfo, editor: Editor }) {
   const values = useValuesContainer(`arts`);
-  const artFilesCount = values.transformed('artFilesCount', info.artFiles, afs => afs.length + '');
-  const totalSize = values.transformed('total-size', info.artFiles, files => size(files.map(f => f.art.fileSize).reduce(sum, 0)))
+  const artFilesCount = values.transformed('artFilesCount', info.ctx.art, afs => afs.length + '');
+  const totalSize = values.transformed('total-size', info.ctx.art, files => size(files.map(f => f.art.fileSize).reduce(sum, 0)))
   const arts = values.transformedTuple('arts', [info.arts, info.validArts], ([total, valid]) => `${total} / ${valid}`)
-  const files = values.transformed('art-files', info.artFiles, files => files.map(f => ({
+  const files = values.transformed('art-files', info.ctx.art, files => files.map(f => ({
     name: f.name,
     start: f.art.header.start,
     end: f.art.header.end,

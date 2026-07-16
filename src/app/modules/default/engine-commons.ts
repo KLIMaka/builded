@@ -36,48 +36,45 @@ export async function loadRaw(name: string, values: ValuesContainer, src: Source
   return values.transformed(name, src, buff => new Uint8Array(buff))
 }
 
-export const loadArtTask = (() => {
-  const TILES_REGEXP = /TILES\d{3}.ART/i;
-  const subscriber = (fs: FileSystem, files: Value<NamedArtFile[]>) => {
-    return fs.subscribe(async (fn, deleted) => {
-      if (!fn.match(TILES_REGEXP)) return;
-      const name = fn.toUpperCase();
-      if (deleted) {
-        files.mod(fs => fs.filter(f => f.name !== name))
-      } else {
-        const info = (await fs.info(name)).get();
-        const data = (await fs.read(name)).get();
-        const art = readArtFile(data);
-        files.modImmer(fs => {
-          const file: NamedArtFile = { name, art, info };
-          const idx = fs.findIndex(f => f.name === name);
-          if (idx === -1) fs.push(file)
-          else fs[idx] = file;
-        });
-      }
-    });
-  }
+const TILES_REGEXP = /TILES\d{3}.ART/i;
+export function loadArtTask(values: ValuesContainer, fs: Source<FileSystem>): Task<Source<NamedArtFile[]>> {
+  return taskHandleContext(handle => {
+    const subscriber = (fs: FileSystem, files: Value<NamedArtFile[]>) => {
+      return fs.subscribe(async (fn, deleted) => {
+        if (!fn.match(TILES_REGEXP)) return;
+        const name = fn.toUpperCase();
+        if (deleted) {
+          files.mod(fs => fs.filter(f => f.name !== name))
+        } else {
+          const info = (await fs.info(name)).get();
+          const data = (await fs.read(name)).get();
+          const art = readArtFile(data);
+          files.modImmer(fs => {
+            const file: NamedArtFile = { name, art, info };
+            const idx = fs.findIndex(f => f.name === name);
+            if (idx === -1) fs.push(file)
+            else fs[idx] = file;
+          });
+        }
+      });
+    }
 
-  const loadArtsTask = cookbookInput(typeToken<[FileSystem]>(), (book, input) => {
-    const list = book.recepie('Load List', [input], async ([fs]) => fs.list());
-    return book.paste([input, list], (handle, [fs], list) => {
-      return cookbook(book => {
+    const loadArtsTask = cookbookInput(typeToken<[FileSystem]>(), (book, input) => {
+      const list = book.recepie('Load List', [input], async ([fs]) => fs.list());
+      return book.recepieTask([input, list], ([fs], list) => cookbook(book => {
         const files = list.filter(f => f.name.match(TILES_REGEXP) !== null)
           .map(f => book.recepie(`Loading ${f.name}`, [], async () =>
             fs.read(f.name)
               .then<NamedArtFile>(data => ({ name: f.name.toUpperCase(), art: readArtFile(data.get()), info: f }))))
         return book.recepie('', files, async (...files) => files)
-      })(handle);
+      }))
     });
-  });
 
-  return taskHandleContext(handle => {
-    const loadArts = (fs: FileSystem) => loadArtsTask(handle(), fs);
-    return async (values, res) => values.transformedAsync('art', res, loadArts, nil(), subscriber);
+    return () => values.transformedAsync('art', fs, fs => loadArtsTask(handle(), fs), nil(), subscriber)
   })
-})()
+}
 
-export function loadArtMapWork(values: ValuesContainer, defs: Source<EngineDefs>, arts: Source<NamedArtFile[]>, fs: Source<FileSystem>, pal: Source<Uint8Array>): Task<Source<Map<number, ArtInfoExtended>>> {
+export function loadArtMapTask(values: ValuesContainer, defs: Source<EngineDefs>, arts: Source<NamedArtFile[]>, fs: Source<FileSystem>, pal: Source<Uint8Array>): Task<Source<Map<number, ArtInfoExtended>>> {
   return taskHandleContext(handle => {
     const load = async ([artFiles, defs, fs, pal]: [NamedArtFile[], EngineDefs, FileSystem, Uint8Array]): Promise<Map<number, ArtInfoExtended>> => {
       const map = iter(artFiles)

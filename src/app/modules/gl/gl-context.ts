@@ -7,7 +7,7 @@ import { unpackVoxelSides, VoxelData } from "build/formats/kvx";
 import Optional from "optional-js";
 import { Disposable, Source, ValuesContainer } from "ts-utils/callbacks";
 import { getOrCreate, getOrDefault, range } from "ts-utils/collections";
-import { cookbook } from "ts-utils/cookbook";
+import { cookbookImmediate } from "ts-utils/cookbook";
 import { axisSwap } from "ts-utils/imgutils";
 import { Plugin, provider } from "ts-utils/injector";
 import { iter } from "ts-utils/iter";
@@ -176,7 +176,7 @@ class ArtTexture implements Disposable {
 }
 
 export function loadVoxelData(glCtx: GlContext, data: VoxelData): [DisposableResource<WebGLTexture>, number] {
-  const voxels = data.list();
+  const voxels = data.list;
   const count = (x: number) => range(0, 6).map(i => (x >> i) & 1).reduce(sum);
   const quads = voxels.map(v => count(v.sides)).reduce(sum);
   const quadPixels = Math.ceil(quads / 4);
@@ -208,7 +208,7 @@ function getVoxel(picnum: number, cache: Map<number, [number, DisposableResource
 export const createEngineTexturesWork: Task<EngineTextures, [EngineContext, GlContext, ValuesContainer]> =
   async (handle, engine, glCtx, values) => values.createChild('engine-textures')
     .initializeAsync(async values =>
-      cookbook(book => {
+      cookbookImmediate(handle, book => {
         const artTexture = book.paste([], createArtTextureWork(values, glCtx, engine.artMap, engine.parallaxInfo));
         return book.recepie('Create Textures', [artTexture], async artTexture => {
           const { gl } = glCtx;
@@ -238,4 +238,4 @@ export const createEngineTexturesWork: Task<EngineTextures, [EngineContext, GlCo
           const dispose = async () => { values.dispose(); voxelsCache.values().forEach(([_, t]) => t.dispose()) }
           return { pal, plu, trans, atlas, infos, art, voxels, get, dispose };
         })
-      })(handle))
+      }))

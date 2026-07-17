@@ -81,7 +81,7 @@ export class Editor {
     private localValues: ValuesContainer,
     private savedState: ValuesMap<SavedState>,
     private fs: FileSystems,
-    private uiUtils: UiUtils,
+    readonly uiUtils: UiUtils,
     private glCtx: GlContext,
     private injector: Injector,
   ) {
@@ -217,7 +217,7 @@ function EngineContextResult({ editor, result, rec }: { editor: Editor, result: 
       { icon: 'file', label: 'Files', content: <FilesInfoView info={ok} editor={editor} /> },
       { icon: 'images', label: 'Arts', content: <ArtsInfoView info={ok} editor={editor} /> },
       { icon: 'map', label: 'Maps', content: <MapsInfoView info={ok} editor={editor} /> },
-      { icon: 'music', label: 'Sounds', content: <SoundsInfoView info={ok} /> },
+      { icon: 'music', label: 'Sounds', content: <SoundsInfoView info={ok} scheduler={editor.uiUtils.app.scheduler} /> },
     ]} active={active} />,
     err => <div className="error">{err.message}</div>),
     p => <Row className="flex-auto"><ProgressBar progress={p.progress} info={p.info} /></Row>)
